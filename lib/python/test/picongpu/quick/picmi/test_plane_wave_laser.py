@@ -80,3 +80,8 @@ class TestPlaneWaveLaserFieldComputation(TestCase):
         found = np.moveaxis([laser.Ex(*self.grid), laser.Ey(*self.grid), laser.Ez(*self.grid)], 0, -1)
         expected = self.make_laser().E(*self.grid)
         np.testing.assert_allclose(found, expected)
+
+    def test_plateau_duration(self):
+        found = self.make_laser(picongpu_plateau_duration=100).E(*self.grid)
+        expected = self.make_laser().E(*self.grid)
+        np.testing.assert_allclose(found, expected, atol=1.0e-10)

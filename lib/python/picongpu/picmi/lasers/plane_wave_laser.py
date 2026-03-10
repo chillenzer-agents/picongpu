@@ -22,8 +22,8 @@ from .polarization_type import PolarizationType
 @default_converts_to(
     laser.PlaneWaveLaser,
     conversions={
-        "focal_position": "focus_pos",
-        "laser_nofocus_constant_si": lambda self: 0.0,
+        "focal_position": lambda *_, **__: [0, 0, 0],
+        "laser_nofocus_constant_si": "picongpu_plateau_duration",
     },
 )
 class PlaneWaveLaser(BaseModel, BaseLaser):
@@ -35,7 +35,7 @@ class PlaneWaveLaser(BaseModel, BaseLaser):
     wavelength: float
         Laser wavelength [m], must be > 0
     duration: float
-        Duration of the Gaussian pulse [s], must be > 0
+        Duration of the temporal Gaussian pulse [s], must be > 0
     propagation_direction: unit vector of length 3 of floats
         Direction of propagation [1]
     polarization_direction: unit vector of length 3 of floats
@@ -87,7 +87,11 @@ class PlaneWaveLaser(BaseModel, BaseLaser):
         self._validate_common_properties()
 
     def complex_amplitude(self, x, y, z, t=0.0):
-        return np.exp(-1.0j * self.k0 * np.einsum("i,i...->...", self.propagation_direction, [x, y, z]))
+        from picongpu.picmi.constants import c
+
+        prop = t / c - np.einsum("i,i...->...", self.propagation_direction, [x, y, z])
+        prop_env = prop
+        return np.exp(-(prop_env**2) / self.duration**2) * np.exp(-1.0j * self.k0 * prop)
 
     def E(self, x, y, z, t=0.0):
         return np.real(self.complex_amplitude(x, y, z, t))[..., np.newaxis] * self.polarization_vector_at(x, y, z, t)

@@ -9,6 +9,8 @@ from collections.abc import Sequence
 
 import math
 
+import numpy as np
+
 from pydantic import BaseModel, Field, computed_field, model_validator
 
 from ...pypicongpu import laser
@@ -83,3 +85,25 @@ class PlaneWaveLaser(BaseModel, BaseLaser):
 
     def check(self):
         self._validate_common_properties()
+
+    def complex_amplitude(self, x, y, z, t=0.0):
+        return np.exp(-1.0j * self.k0 * np.einsum("i,i...->...", self.propagation_direction, [x, y, z]))
+
+    def E(self, x, y, z, t=0.0):
+        return np.real(self.complex_amplitude(x, y, z, t))[..., np.newaxis] * self.polarization_vector_at(x, y, z, t)
+
+    def Ex(self, x, y, z, t=0.0):
+        return self.E(x, y, z, t)[..., 0]
+
+    def Ey(self, x, y, z, t=0.0):
+        return self.E(x, y, z, t)[..., 1]
+
+    def Ez(self, x, y, z, t=0.0):
+        return self.E(x, y, z, t)[..., 2]
+
+    def polarization_vector_at(self, x, y, z, t=0.0):
+        shape = np.broadcast_shapes(x.shape, y.shape, z.shape)
+        return np.ones(shape + (len(self.polarization_direction),)) * np.reshape(
+            self.polarization_direction, len(shape) * (1,) + (-1,)
+        )
+

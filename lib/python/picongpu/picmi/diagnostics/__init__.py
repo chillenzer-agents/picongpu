@@ -1,8 +1,6 @@
 """
-This file is part of PIConGPU.
-Copyright 2024 PIConGPU contributors
-Authors: Julian Lenz, Masoud Afshari
-License: GPLv3+
+SPDX-FileCopyrightText: 2024 PIConGPU contributors, Julian Lenz, Masoud Afshari
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from .backend_config import BackendConfig, OpenPMDConfig

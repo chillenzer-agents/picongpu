@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# SPDX-FileCopyrightText: 2024-2026 PIConGPU contributors, Masoud Afshari, Brian Edward Marre, Richard Pausch, Julian Lenz
+# SPDX-License-Identifier: GPL-3.0-or-later
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
@@ -8,12 +10,6 @@
 #   "picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python"
 # ]
 # ///
-"""
-This file is part of PIConGPU.
-Copyright 2024-2026 PIConGPU contributors
-Authors: Masoud Afshari, Brian Edward Marre, Richard Pausch, Julian Lenz
-License: GPLv3+
-"""
 
 import datetime
 from pathlib import Path

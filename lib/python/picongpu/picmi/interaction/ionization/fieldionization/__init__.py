@@ -1,3 +1,8 @@
+"""
+SPDX-FileCopyrightText: 2024 PIConGPU contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
+
 from .fieldionization import FieldIonization
 from .keldysh import Keldysh
 from .ADK import ADK, ADKVariant

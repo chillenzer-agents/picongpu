@@ -1,8 +1,6 @@
 """
-This file is part of PIConGPU.
-Copyright 2023-2025 PIConGPU contributors
-Authors: Kristin Tippey, Brian Edward Marre, Julian Lenz
-License: GPLv3+
+SPDX-FileCopyrightText: 2023-2025 PIConGPU contributors, Kristin Tippey, Brian Edward Marre, Julian Lenz
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from typing import Literal

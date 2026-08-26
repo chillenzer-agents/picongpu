@@ -1,3 +1,8 @@
+"""
+SPDX-FileCopyrightText: 2024 PIConGPU contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
+
 from .BoundBoundTransitions import BoundBoundTransitions
 from .BoundFreeFieldTransitions import BoundFreeFieldTransitions
 from .BoundFreeCollisionalTransitions import BoundFreeCollisionalTransitions

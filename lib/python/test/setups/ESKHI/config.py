@@ -1,9 +1,6 @@
 """
-This file is part of PIConGPU.
-
-Copyright 2022-2024 PIConGPU contributors
-Authors: Mika Soren Voss
-License: GPLv3+
+SPDX-FileCopyrightText: 2022-2024 PIConGPU contributors, Mika Soren Voss
+SPDX-License-Identifier: GPL-3.0-or-later
 
 This test enables the ESKHI to be checked. It is irrelevant whether
 it is a 2D or 3D simulation. In a 3D simulation, however, attention

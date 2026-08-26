@@ -1,8 +1,6 @@
 """
-This file is part of PIConGPU.
-Copyright 2024-2024 PIConGPU contributors
-Authors: Brian Edward Marre, Pawel Ordyna
-License: GPLv3+
+SPDX-FileCopyrightText: 2024-2024 PIConGPU contributors, Brian Edward Marre, Pawel Ordyna
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from ...pypicongpu import species

@@ -1,3 +1,8 @@
+"""
+SPDX-FileCopyrightText: 2024 PIConGPU contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
+
 from .ionizationmodel import IonizationModel
 from .ionizationmodelgroups import IonizationModelGroups
 from .BSI import BSI

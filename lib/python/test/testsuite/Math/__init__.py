@@ -1,9 +1,6 @@
 """
-This file is part of PIConGPU.
-
-Copyright 2022-2024 PIConGPU contributors
-Authors: Mika Soren Voss
-License: GPLv3+
+SPDX-FileCopyrightText: 2022-2024 PIConGPU contributors, Mika Soren Voss
+SPDX-License-Identifier: GPL-3.0-or-later
 
 This library contains some functions for calculating some mathematical
 and physics functions, as well as some deviation calculations. It is

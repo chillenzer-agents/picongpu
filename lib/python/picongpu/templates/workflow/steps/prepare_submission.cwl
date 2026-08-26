@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 PIConGPU contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 cwlVersion: v1.2
 class: CommandLineTool
 label: "Run PIConGPU Simulation"

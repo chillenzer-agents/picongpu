@@ -1,3 +1,8 @@
+"""
+SPDX-FileCopyrightText: 2023 PIConGPU contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
+
 from .exponential import Exponential
 from .none import None_
 

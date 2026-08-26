@@ -2,6 +2,9 @@
 This file is part of PIConGPU and based on energy_histogram_visualizer.py.
 
 Authors: Finn-Ole Carstens, Sebastian Starke
+
+SPDX-FileCopyrightText: 2019 Finn-Ole Carstens, Sebastian Starke
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from ..data import TransitionRadiationData

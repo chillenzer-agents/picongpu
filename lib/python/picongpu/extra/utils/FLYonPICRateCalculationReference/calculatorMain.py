@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 """
 atomicPhysics(FLYonPIC) reference rate calculation
-This file is part of the PIConGPU.
-Copyright 2023-2024 PIConGPU contributors
-Authors: Brian Marre
-License: GPLv3+
+SPDX-FileCopyrightText: 2023-2024 PIConGPU contributors, Brian Marre
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 import BoundBoundTransitions as boundbound

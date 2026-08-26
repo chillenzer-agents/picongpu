@@ -1,5 +1,8 @@
 """
 PICMI for PIConGPU
+
+SPDX-FileCopyrightText: 2024 PIConGPU contributors
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from .UniformDistribution import UniformDistribution

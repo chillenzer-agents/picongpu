@@ -1,7 +1,5 @@
-# This file is part of PIConGPU.
-# Copyright 2025 PIConGPU contributors
-# Authors: Pawel Ordyna
-# License: GPLv3+
+# SPDX-FileCopyrightText: 2025 PIConGPU contributors, Pawel Ordyna
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 [build-system]
 build-backend = "hatchling.build"

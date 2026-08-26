@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2022 PIConGPU contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
 #pragma once
 
 #include <pmacc/attribute/FunctionSpecifier.hpp>

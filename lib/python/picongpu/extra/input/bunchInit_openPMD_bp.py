@@ -2,7 +2,9 @@
 This file is a modified version of the pipe script from the openPMD-api.
 
 Authors: Richard Pausch, Franz Poeschel, Nico Wrobel, Finn-Ole Carstens
-License: LGPLv3+
+
+SPDX-FileCopyrightText: 2023 Richard Pausch, Franz Poeschel, Nico Wrobel, Finn-Ole Carstens
+SPDX-License-Identifier: LGPL-3.0-or-later
 """
 
 import sys

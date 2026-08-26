@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2020 PIConGPU contributors
+.. SPDX-License-Identifier: CC-BY-4.0
 .. _model-AOFDTD:
 
 Finite-Difference Time-Domain Method

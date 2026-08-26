@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2025 PIConGPU contributors
+.. SPDX-License-Identifier: CC-BY-4.0
 .. _model-lasers:
 
 Analytic Expressions for the 3D Laser Profiles

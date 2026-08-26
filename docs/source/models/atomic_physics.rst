@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2024 PIConGPU contributors
+.. SPDX-License-Identifier: CC-BY-4.0
 .. _model-atomicPhysics:
 
 Atomic Physics/FLYonPIC

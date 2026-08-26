@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2017 PIConGPU contributors
+# SPDX-License-Identifier: CC-BY-4.0
 #
 # PIConGPU documentation build configuration file, created by
 # sphinx-quickstart on Tue Feb 14 17:29:56 2017.

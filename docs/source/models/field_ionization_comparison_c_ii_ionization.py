@@ -1,3 +1,8 @@
+"""
+SPDX-FileCopyrightText: 2017 PIConGPU contributors
+SPDX-License-Identifier: CC-BY-4.0
+"""
+
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import numpy as np

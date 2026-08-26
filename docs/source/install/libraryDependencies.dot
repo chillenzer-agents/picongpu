@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2015 PIConGPU contributors
+ * SPDX-License-Identifier: CC-BY-4.0
+ */
 /* Generate the output
  *
  * Debian: apt-get install libgraph-easy-perl

@@ -1,3 +1,8 @@
+"""
+SPDX-FileCopyrightText: 2022 PIConGPU contributors
+SPDX-License-Identifier: CC-BY-4.0
+"""
+
 import typeguard
 import typing
 

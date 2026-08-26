@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2020 PIConGPU contributors
+.. SPDX-License-Identifier: CC-BY-4.0
 .. _usage-params-core-currentdeposition:
 
 Current Deposition

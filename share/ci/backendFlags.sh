@@ -1,5 +1,6 @@
 #!/bin/bash
-
+# SPDX-FileCopyrightText: 2023 PIConGPU contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ###################################################
 # translate PIConGPU backend names into CMake Flags
 ###################################################

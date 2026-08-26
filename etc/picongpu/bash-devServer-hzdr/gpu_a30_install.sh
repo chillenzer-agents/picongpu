@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2023 PIConGPU contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 echo "cmake:"
 spack install --reuse cmake@3.30
 spack load cmake@3.30 ^openssl certs=mozilla

@@ -16,6 +16,8 @@ repos:
       - id: check-merge-conflict
       - id: trailing-whitespace
         exclude_types: [markdown, rst]
+        # Canonical license texts contain trailing whitespace as published.
+        exclude: ^LICENSES/
       - id: end-of-file-fixer
       - id: check-toml
       - id: check-yaml
@@ -34,9 +36,12 @@ repos:
       - id: forbid-tabs
         types_or: [file]
         exclude_types: [rst, tex, tsv]
+        # Canonical license texts (e.g. CC-BY-4.0) use tabs for line wrapping.
+        exclude: ^LICENSES/
       - id: remove-tabs
         types_or: [file]
         exclude_types: [rst, tex, tsv]
+        exclude: ^LICENSES/
       - id: forbid-crlf
       - id: remove-crlf
   - repo: local
@@ -78,7 +83,8 @@ repos:
         # - .zenodo.json: Contains author names that might include special characters for correct spelling.
         # - unit_dimension.py: Contains theta as the symbol for temperature.
         exclude_types: [rst]
-        exclude: CHANGELOG.md|.zenodo.json|lib/python/picongpu/picmi/particle_functor/unit_dimension.py
+        # LICENSES/ holds canonical texts with typographic quotes (e.g. LGPL-3.0).
+        exclude: ^LICENSES/|CHANGELOG.md|.zenodo.json|lib/python/picongpu/picmi/particle_functor/unit_dimension.py
   - repo: https://github.com/BlankSpruce/gersemi
     rev: 0.22.1
     hooks:

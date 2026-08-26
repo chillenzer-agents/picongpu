@@ -1,9 +1,6 @@
 """
-This file is part of PIConGPU.
-
-Copyright 2023-2024 PIConGPU contributors
-Authors: Hannes Wolf
-License: GPLv3+
+SPDX-FileCopyrightText: 2023-2024 PIConGPU contributors, Hannes Wolf
+SPDX-License-Identifier: GPL-3.0-or-later
 
 Implements the assignment functions of order 0 to 3 as well as a function to
 calculate the current deposition vector.

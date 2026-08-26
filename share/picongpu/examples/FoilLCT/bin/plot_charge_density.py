@@ -1,11 +1,7 @@
 #!/usr/bin/env python
-#
 """
-This file is part of PIConGPU.
-
-Copyright 2017-2024 PIConGPU contributors
-Authors: Axel Huebl
-License: GPLv3+
+SPDX-FileCopyrightText: 2017-2024 PIConGPU contributors, Axel Huebl
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 import matplotlib.pyplot as plt

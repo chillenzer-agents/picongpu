@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 PIConGPU contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Handle tests with dimensionality
 file(GLOB_RECURSE DIMENSIONAL_TESTS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 foreach(dim 2 3)

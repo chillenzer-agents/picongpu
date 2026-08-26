@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2017 PIConGPU contributors
+.. SPDX-License-Identifier: GPL-3.0-or-later
 KelvinHelmholtz: Kelvin-Helmholtz Instability
 =============================================
 

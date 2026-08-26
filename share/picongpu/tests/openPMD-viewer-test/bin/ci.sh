@@ -1,10 +1,6 @@
 #!/bin/bash
-#
-# This file is part of PIConGPU.
-# Copyright 2023-2024 PIConGPU contributors
-# Authors: Mika Soren Voss, Hannes Wolf, Klaus Steiniger, Max Lehmann
-# License: GPLv3+
-#
+# SPDX-FileCopyrightText: 2023-2024 PIConGPU contributors, Mika Soren Voss, Hannes Wolf, Klaus Steiniger, Max Lehmann
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 function absolute_path()
 {

@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2019 PIConGPU contributors
+.. SPDX-License-Identifier: GPL-3.0-or-later
 TransitionRadiation : Transtion Radiation
 =============================================
 

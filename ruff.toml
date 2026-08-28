@@ -1,0 +1,41 @@
+# Ruff configuration for PIConGPU (single source of truth for lint and format).
+# The pre-commit hooks in .pre-commit-config.yaml rely on this file and pass
+# no rule arguments of their own.
+
+# Vendored external code is not ours to style; the rest are build output dirs.
+exclude = [
+    "thirdParty",
+    "build",
+    "dist",
+    "out",
+    "docs/build",
+    "docs/html",
+    "docs/xml",
+    ".venv",
+    "venv",
+    "*.egg-info",
+]
+
+line-length = 120
+target-version = "py311"
+
+[lint]
+# Today's effective rule set (ruff defaults), so introducing this config
+# changes nothing. Batches are added incrementally, one commit each, up to
+# select = ["ALL"].
+select = [
+    "E4", # import errors
+    "E7", # statement errors
+    "E9", # runtime and syntax errors
+    "F", # pyflakes
+]
+ignore = [
+    # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
+    # compares *exact* types (type(x) is dict) rather than using
+    # isinstance(), see the "note on typechecks" in that file; E721 would
+    # force isinstance() and change behaviour.
+    "E721",
+]
+
+[lint.isort]
+known-first-party = ["picongpu"]

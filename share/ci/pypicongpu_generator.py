@@ -185,10 +185,8 @@ def get_supported_versions(package_name: str, versions: List[str], pyproject_tom
 
             return supported_versions
 
-    exit_error(
-        f"{package_name} is not defined in dependency section.\n"
-        + f"{'\n'.join(pyproject_toml['project']['dependencies'])}"
-    )
+    dependencies = "\n".join(pyproject_toml["project"]["dependencies"])
+    exit_error(f"{package_name} is not defined in dependency section.\n{dependencies}")
 
     return []
 

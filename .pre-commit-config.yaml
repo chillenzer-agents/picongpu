@@ -60,14 +60,11 @@ repos:
       # Run the linter.
       - id: ruff
         types_or: [python, pyi, jupyter]
-        # Rule E721 is about using isinstance()
-        # but lib/python/picongpu/pypicongpu/rendering/renderer.py
-        # is strict about types. Could be solved locally but I think this is fine.
-        args: [--fix, --ignore, E721]
+        # Rules and all rule exceptions live in ruff.toml (single source of truth).
+        args: [--fix]
       # Run the formatter.
       - id: ruff-format
         types_or: [python, pyi, jupyter]
-        args: ["--line-length", "120"]
   - repo: https://github.com/jumanjihouse/pre-commit-hooks
     rev: 3.0.0
     hooks:

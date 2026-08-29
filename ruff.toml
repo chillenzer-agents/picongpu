@@ -40,6 +40,7 @@ select = [
     "FURB", # refurb
     "PERF", # Perflint
     "ISC", # flake8-implicit-str-concat
+    "PIE", # flake8-pie
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately

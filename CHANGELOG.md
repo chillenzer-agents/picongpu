@@ -6,6 +6,7 @@ Unreleased
 
 **Bug Fixes:**
 - PICMI:
+    - fix stale `test_add_ionization_model`: it asserted the removed `SetChargeState.bound_electrons` attribute (silently skipped because the species-name match never held) and now checks the actual `charge_state` (the C++ `unary::ChargeState<T_chargeState>` template parameter) for each ionized species
     - pypicongpu `Pusher`/`Shape` enums now mirror the C++ struct names (`particles::pusher::HigueraCary` etc., `pusher.param`/`shapes/*.hpp`): the pusher renders a valid C++ identifier again (previously `Higuera-Cary`) and the picmi pusher-method bridge no longer raises `KeyError` for `HigueraCary` (the unsupported `Li` method now raises an explicit error); the same fix applies to the `Counter` shape member name
 
 0.8.0

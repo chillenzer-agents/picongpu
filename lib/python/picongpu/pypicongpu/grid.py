@@ -8,7 +8,7 @@ License: GPLv3+
 import enum
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, Field, PlainSerializer, model_validator
+from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, PlainSerializer, model_validator
 from typing_extensions import Self
 
 from .rendering import RenderedObject
@@ -44,8 +44,28 @@ def serialise_vec(value) -> dict:
     return dict(zip("xyz", value))
 
 
-Vec3_float = Annotated[tuple[float, float, float], PlainSerializer(serialise_vec)]
-Vec3_int = Annotated[tuple[int, int, int], PlainSerializer(serialise_vec)]
+def deserialise_vec(value):
+    # accept the serialised form (dict with x/y/z keys) in addition to the
+    # native tuple form, so that model_dump(mode="json") output can be
+    # validated again (round-trip safety)
+    if isinstance(value, dict):
+        try:
+            return (value["x"], value["y"], value["z"])
+        except KeyError as error:
+            raise ValueError(f"Expected a vector with the keys x, y, z. You gave: {value=}.") from error
+    return value
+
+
+Vec3_float = Annotated[
+    tuple[float, float, float],
+    BeforeValidator(deserialise_vec),
+    PlainSerializer(serialise_vec),
+]
+Vec3_int = Annotated[
+    tuple[int, int, int],
+    BeforeValidator(deserialise_vec),
+    PlainSerializer(serialise_vec),
+]
 
 
 def serialise_grid_dist(value) -> None | dict[Literal["x", "y", "z"], list[dict[Literal["device_cells"], int]]]:
@@ -58,6 +78,31 @@ def serialise_grid_dist(value) -> None | dict[Literal["x", "y", "z"], list[dict[
             "z": [{"device_cells": x} for x in value[2]],
         }
     )
+
+
+def deserialise_grid_dist(value):
+    # accept the serialised form (dict with x/y/z keys holding device_cells)
+    # in addition to the native tuple-of-lists form (round-trip safety)
+    if isinstance(value, dict):
+        try:
+            return tuple([entry["device_cells"] for entry in value[axis]] for axis in ("x", "y", "z"))
+        except (KeyError, TypeError) as error:
+            raise ValueError(f"Expected a serialised grid distribution. You gave: {value=}.") from error
+    return value
+
+
+_CFG_STR_TO_BOUNDARY = {"1": BoundaryCondition.PERIODIC, "0": BoundaryCondition.ABSORBING}
+
+
+def deserialise_boundary(value):
+    # accept the serialised form (dict with x/y/z keys holding the cfg string
+    # "1"/"0") in addition to the native tuple-of-enum form (round-trip safety)
+    if isinstance(value, dict):
+        try:
+            return tuple(_CFG_STR_TO_BOUNDARY[value[axis]] for axis in ("x", "y", "z"))
+        except (KeyError, TypeError) as error:
+            raise ValueError(f"Expected a serialised boundary condition. You gave: {value=}.") from error
+    return value
 
 
 def all_gt(iterable, m):
@@ -90,6 +135,11 @@ class Grid3D(BaseModel, RenderedObject):
     cells (dimensionless).
     """
 
+    # accept both the field names (as produced by model_dump) and the aliases
+    # (e.g. cell_size_si) upon construction, so that serialised output can be
+    # validated again (round-trip safety)
+    model_config = ConfigDict(populate_by_name=True)
+
     cell_size: Annotated[Vec3_float, AfterValidator(lambda x: all_gt(x, 0)), SI("m")] = Field(alias="cell_size_si")
     """width of an individual cell in each direction, [m]; must be > 0 in every direction.
     C++ name: SI::CELL_{WIDTH,HEIGHT,DEPTH}_SI (simulation.param)."""
@@ -99,6 +149,7 @@ class Grid3D(BaseModel, RenderedObject):
 
     boundary_condition: Annotated[
         tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition],
+        BeforeValidator(deserialise_boundary),
         PlainSerializer(lambda x: serialise_vec(map(BoundaryCondition.get_cfg_str, x)), return_type=dict),
     ]
     """behavior towards particles crossing each boundary (one per axis)"""
@@ -108,6 +159,7 @@ class Grid3D(BaseModel, RenderedObject):
 
     grid_dist: Annotated[
         tuple[list[int], list[int], list[int]] | None,
+        BeforeValidator(deserialise_grid_dist),
         PlainSerializer(serialise_grid_dist),
         AfterValidator(grid_dist_validate),
     ] = None

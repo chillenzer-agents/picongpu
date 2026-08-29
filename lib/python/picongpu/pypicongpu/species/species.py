@@ -12,7 +12,9 @@ from enum import Enum
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant
 
 from ..rendering import RenderedObject
-from .attribute import Attribute, Momentum, Position
+from .attribute import Attribute, BoundElectrons, Momentum, Position, Weighting
+from .attribute.momentum_prev_1 import MomentumPrev1
+from .attribute.radiation_mask import RadiationMask
 from .constant import (
     Charge,
     Constant,
@@ -115,6 +117,18 @@ def get_constant_by_type(constants, needle_type: type[Constant]) -> Constant:
     raise RuntimeError("no constant of requested type available: {}".format(needle_type))
 
 
+# concrete attribute classes by their (default) picongpu_name, used to
+# reconstruct the concrete class from the serialised form (round-trip safety)
+_ATTRIBUTE_CLASSES_BY_NAME = {
+    "position<position_pic>": Position,
+    "weighting": Weighting,
+    "momentum": Momentum,
+    "boundElectrons": BoundElectrons,
+    "momentumPrev1": MomentumPrev1,
+    "radiationMask": RadiationMask,
+}
+
+
 class Species(RenderedObject, BaseModel):
     """
     PyPIConGPU species definition
@@ -194,6 +208,22 @@ class Species(RenderedObject, BaseModel):
             raise ValueError("species names must be c++ compatible ([A-Za-z0-9_]+)")
         return name
 
+    @field_validator("attributes", mode="before")
+    @classmethod
+    def _reconstruct_attributes(cls, attributes):
+        # reconstruct the concrete attribute class from its serialised form
+        # (a dict holding the picongpu_name) so that model_dump(mode="json")
+        # output can be validated again (round-trip safety); the base
+        # Attribute type is not discriminable from the serialised form alone
+        if isinstance(attributes, list):
+            return [
+                _ATTRIBUTE_CLASSES_BY_NAME[elem["picongpu_name"]](**elem)
+                if isinstance(elem, dict) and elem.get("picongpu_name") in _ATTRIBUTE_CLASSES_BY_NAME
+                else elem
+                for elem in attributes
+            ]
+        return attributes
+
     @model_validator(mode="after")
     def _validate_attributes(self):
         # position is mandatory attribute
@@ -245,6 +275,13 @@ class Species(RenderedObject, BaseModel):
     @field_validator("constants", mode="before")
     @classmethod
     def constants_context(cls, value):
+        # accept the serialised form (dict of constant_name -> constant dict)
+        # in addition to the native list-of-constants form, so that
+        # model_dump(mode="json") output can be validated again (round-trip
+        # safety); the serialised keys are exactly the Constants field names
+        if isinstance(value, dict):
+            return Constants(**value)
+
         constant_names_by_type = {
             "mass": Mass,
             "charge": Charge,

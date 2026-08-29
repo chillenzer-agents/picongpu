@@ -133,9 +133,8 @@ class FindTime:
             if method == "next":
                 iteration = np.ceil(guess)
             return np.uint64(iteration)
-        else:
-            if type(iterations) is not np.ndarray:
-                raise ValueError("iterations must to be a numpy array!")
+        if type(iterations) is not np.ndarray:
+            raise ValueError("iterations must to be a numpy array!")
 
         iterations_sorted = np.sort(iterations)
         times_sorted = iterations_sorted * self.dt

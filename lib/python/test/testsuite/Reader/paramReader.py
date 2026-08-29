@@ -66,8 +66,7 @@ class ParamReader(rF.ReadFiles):
     def __checkifDefination(self, line: str, parameter) -> bool:
         if "=" in line:
             return parameter in line.partition("=")[0]
-        else:
-            return False
+        return False
 
     def __calculateIfNoDef(self, parameter: str) -> float:
         if "PARAM_" in parameter:
@@ -113,26 +112,27 @@ class ParamReader(rF.ReadFiles):
 
             return value + value_2
 
-        elif "*" in line:
+        if "*" in line:
             split = line.partition("*")
 
             value = float(split[0])
             value_2 = self.__calculateResult(split[2])
             return value * value_2
 
-        elif "-" in line:
+        if "-" in line:
             split = line.partition("-")
 
             value = float(split[0])
             value_2 = self.__calculateResult(split[2])
             return value - value_2
 
-        elif "/" in line:
+        if "/" in line:
             split = line.partition("/")
 
             value = float(split[0])
             value_2 = self.__calculateResult(split[2])
             return value / value_2
+        return None
 
     def __calculateResult(self, line: str) -> float:
         result = None
@@ -201,8 +201,7 @@ class ParamReader(rF.ReadFiles):
 
         if not result:
             raise ValueError(f"The parameter {parameter} could not be found")
-        else:
-            return result
+        return result
 
     def getParam(self, parameter: str) -> list:
         """

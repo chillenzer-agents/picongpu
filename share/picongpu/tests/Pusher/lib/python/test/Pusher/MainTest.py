@@ -51,25 +51,24 @@ def get_params(path):
     if len(series.iterations) == 1:
         raise ValueError("There is just 1 iteration in the seriesmake sure, there are at least two")
 
-    elif len(np.array(i.particles)) != 1:
+    if len(np.array(i.particles)) != 1:
         raise ValueError("There is not only 1 particle in the seriesmake sure, there is only one")
 
-    else:
-        # read parameters of the simulation
-        params = {
-            "cell_depth": i.get_attribute("cell_depth"),
-            "cell_height": i.get_attribute("cell_height"),
-            "cell_width": i.get_attribute("cell_width"),
-            "dt": i.get_attribute("dt"),
-            "unit_time": i.get_attribute("unit_time"),
-            "unit_length": i.get_attribute("unit_length"),
-            "unit_charge": i.get_attribute("unit_charge"),
-            "unit_bfield": i.get_attribute("unit_bfield"),
-            "unit_speed": i.get_attribute("unit_speed"),
-            "unit_mass": i.get_attribute("unit_mass"),
-        }
+    # read parameters of the simulation
+    params = {
+        "cell_depth": i.get_attribute("cell_depth"),
+        "cell_height": i.get_attribute("cell_height"),
+        "cell_width": i.get_attribute("cell_width"),
+        "dt": i.get_attribute("dt"),
+        "unit_time": i.get_attribute("unit_time"),
+        "unit_length": i.get_attribute("unit_length"),
+        "unit_charge": i.get_attribute("unit_charge"),
+        "unit_bfield": i.get_attribute("unit_bfield"),
+        "unit_speed": i.get_attribute("unit_speed"),
+        "unit_mass": i.get_attribute("unit_mass"),
+    }
 
-        return series, params
+    return series, params
 
 
 def read_series(series):
@@ -381,9 +380,7 @@ def main(dataPath):
     )
 
     # yield both tests/comparisions a positive result?
-    compare_result = compare_result_radius + compare_result_phases
-
-    return compare_result
+    return compare_result_radius + compare_result_phases
 
 
 if __name__ == "__main__":

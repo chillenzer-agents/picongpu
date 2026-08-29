@@ -29,8 +29,7 @@ def V_eff(x, Z_eff, F):
     Unit:
         1 AU = 27.2 eV
     """
-    E_pot = -Z_eff / np.abs(x) + F * x
-    return E_pot
+    return -Z_eff / np.abs(x) + F * x
 
 
 if __name__ == "__main__":

@@ -67,15 +67,13 @@ def makeOddNumber(number, larger=True):
     if number % 2 == 1:
         # in case number is odd
         return number
-    elif number % 2 == 0:
+    if number % 2 == 0:
         # in case number is even
         if larger:
             return number + 1
-        else:
-            return number - 1
-    else:
-        error_msg = ("ERROR: number (= {}) neither odd " + "nor even").format(number)
-        raise Exception(error_msg)
+        return number - 1
+    error_msg = ("ERROR: number (= {}) neither odd " + "nor even").format(number)
+    raise Exception(error_msg)
 
 
 def gaussWindow(N, sigma):

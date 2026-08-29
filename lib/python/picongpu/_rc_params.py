@@ -336,10 +336,9 @@ class RCParams:
     def preset_dir(self):
         if "preset" in self._data:
             return self._data["preset"].split("/")[0]
-        elif "export PIC_SYSTEM_TEMPLATE_PATH=" in (txt := self.profile_content):
+        if "export PIC_SYSTEM_TEMPLATE_PATH=" in (txt := self.profile_content):
             return txt.split('PIC_SYSTEM_TEMPLATE_PATH:-"')[1].split('"}')[0].strip().split("/picongpu/")[1]
-        else:
-            return ""
+        return ""
 
     def __getitem__(self, *args, **kwargs):
         return self._data.__getitem__(*args, **kwargs)
@@ -400,7 +399,7 @@ class RCParams:
     def profile_template_content(self):
         if "profile_template_content" in self._data:
             return self._data["profile_template_content"]
-        elif "profile_template_path" in self._data:
+        if "profile_template_path" in self._data:
             with Path(self._data["profile_template_path"]).open("r") as file:
                 return file.read()
         else:
@@ -410,7 +409,7 @@ class RCParams:
     def profile_content(self):
         if "profile_content" in self._data:
             return self._data["profile_content"]
-        elif "profile_path" in self._data:
+        if "profile_path" in self._data:
             with Path(self._data["profile_path"]).open("r") as file:
                 return file.read()
         elif template := self.profile_template_content:
@@ -435,17 +434,15 @@ class RCParams:
     def shebang(self):
         if "shebang" in self._data:
             return self._data["shebang"]
-        elif (shebang := self.profile_content.split("\n", maxsplit=1)[0]).startswith("#!"):
+        if (shebang := self.profile_content.split("\n", maxsplit=1)[0]).startswith("#!"):
             return shebang
-        else:
-            return "#!/bin/bash"
+        return "#!/bin/bash"
 
     @property
     def preamble(self):
         if "preamble" in self._data:
             return self._data["preamble"]
-        else:
-            return f"""
+        return f"""
 set -exo pipefail
 export PATH="{str(core.path("bin"))}:$PATH"
 """

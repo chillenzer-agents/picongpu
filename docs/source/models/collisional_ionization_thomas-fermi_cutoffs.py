@@ -106,8 +106,7 @@ class ThomasFermiIonization:
         Q = self.CalcQ(R, Q_1, C)
         x = self.Calcx(Q)
 
-        ionState = self.CalcZStar(x, self.Z)
-        return ionState
+        return self.CalcZStar(x, self.Z)
 
 
 if __name__ == "__main__":

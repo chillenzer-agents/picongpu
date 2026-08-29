@@ -33,10 +33,9 @@ def unpack_dist_loc_scale(dist, return_type, **kwargs):
             raise ValueError(
                 f"PIConGPU does not support normal distributions of integral type. You gave: {return_type=}."
             )
-        else:
-            loc = kwargs.get("mean", 0.0)
-            scale = kwargs.get("std", 1.0)
-            distribution = norm
+        loc = kwargs.get("mean", 0.0)
+        scale = kwargs.get("std", 1.0)
+        distribution = norm
         if scale <= 0:
             raise ValueError(
                 f"std={scale} must be greater than 0 for drawing from a normal distribution. You gave std={scale}."

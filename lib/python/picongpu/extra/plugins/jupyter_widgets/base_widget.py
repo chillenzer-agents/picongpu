@@ -235,9 +235,7 @@ class BaseWidget(widgets.VBox):
         -------
         a jupyter widget that allows selection of value(s)
         """
-        sim_drop = widgets.SelectMultiple(description="Sims", options=options, value=())
-
-        return sim_drop
+        return widgets.SelectMultiple(description="Sims", options=options, value=())
 
     def _create_widgets_for_vis_args(self):
         """

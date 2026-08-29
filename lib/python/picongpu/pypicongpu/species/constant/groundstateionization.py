@@ -37,6 +37,5 @@ class GroundStateIonization(Constant):
             group: str = by_model[type(ionization_model)]
             if type_already_present[group]:
                 raise ValueError(f"ionization model group already represented: {group}")
-            else:
-                type_already_present[group] = True
+            type_already_present[group] = True
         return self

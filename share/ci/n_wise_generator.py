@@ -127,10 +127,9 @@ def is_valid_combination(row):
         # hipcc should not be used without the hip backend
         if is_hipcc:
             return False
-        else:
-            # install/clang.sh is currently not providing apt sources later than this clang version
-            if is_clang and v_compiler > 19:
-                return False
+        # install/clang.sh is currently not providing apt sources later than this clang version
+        if is_clang and v_compiler > 19:
+            return False
 
         # CUDA compiler requires backed `cuda`
         if (is_nvcc or is_clang_cuda) and not is_cuda:

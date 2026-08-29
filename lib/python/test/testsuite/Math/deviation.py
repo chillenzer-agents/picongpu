@@ -103,9 +103,7 @@ def getMinDifference(theory, simulation):
     out : The minimum in the deviation
     """
 
-    difference = np.abs(min(theory - simulation))
-
-    return difference
+    return np.abs(min(theory - simulation))
 
 
 def getDifference(theory, simulation):

@@ -62,7 +62,7 @@ def theory(**kwargs):
     """
 
     # \ToDo: Fill in the calculation of the theory
-    return None
+    return
 
 
 def simData(**kwargs):
@@ -82,4 +82,4 @@ def simData(**kwargs):
 
     # \ToDo: Fill in the Calculation
 
-    return None
+    return

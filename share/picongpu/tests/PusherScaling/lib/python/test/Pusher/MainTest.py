@@ -48,25 +48,24 @@ class Comparison:
         if len(series.iterations) == 1:
             raise ValueError("There is just 1 iteration in the series \n make sure, there are at least two")
 
-        elif len(np.array(i.particles)) != 1:
+        if len(np.array(i.particles)) != 1:
             raise ValueError("There is not only 1 particle in the series \n make sure, there is only least one")
 
-        else:
-            # read parameters of the simulation
-            params = {
-                "cell_depth": i.get_attribute("cell_depth"),
-                "cell_height": i.get_attribute("cell_height"),
-                "cell_width": i.get_attribute("cell_width"),
-                "dt": i.get_attribute("dt"),
-                "unit_time": i.get_attribute("unit_time"),
-                "unit_length": i.get_attribute("unit_length"),
-                "unit_charge": i.get_attribute("unit_charge"),
-                "unit_bfield": i.get_attribute("unit_bfield"),
-                "unit_speed": i.get_attribute("unit_speed"),
-                "unit_mass": i.get_attribute("unit_mass"),
-            }
-            self.series = series
-            self.params = params
+        # read parameters of the simulation
+        params = {
+            "cell_depth": i.get_attribute("cell_depth"),
+            "cell_height": i.get_attribute("cell_height"),
+            "cell_width": i.get_attribute("cell_width"),
+            "dt": i.get_attribute("dt"),
+            "unit_time": i.get_attribute("unit_time"),
+            "unit_length": i.get_attribute("unit_length"),
+            "unit_charge": i.get_attribute("unit_charge"),
+            "unit_bfield": i.get_attribute("unit_bfield"),
+            "unit_speed": i.get_attribute("unit_speed"),
+            "unit_mass": i.get_attribute("unit_mass"),
+        }
+        self.series = series
+        self.params = params
 
     def read_series(self):
         """Reads the position and momentum of the particle in the x-y-plane
@@ -278,9 +277,7 @@ def main():
         sigma_compare = 0
         print("pusher is valid (deviation/width)")
 
-    compare_result = x_compare + sigma_compare
-
-    return compare_result
+    return x_compare + sigma_compare
 
 
 if __name__ == "__main__":

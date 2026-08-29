@@ -31,10 +31,9 @@ def __calculate(axis, parameter, *args):
     try:
         if axis == "plot_xaxis":
             return config.plot_xaxis(*args)
-        elif axis == "plot_yaxis":
+        if axis == "plot_yaxis":
             return config.plot_yaxis(*args)
-        else:
-            return config.plot_zaxis(*args)
+        return config.plot_zaxis(*args)
 
     except Exception:
         error1 = str(sys.exc_info()[1])
@@ -74,8 +73,7 @@ def getInputparameter(parameter: dict) -> dict:
     param_Parameter = cD.checkExistVariables("param_Parameter")
     if param_Parameter:
         return {key: parameter[key] for key in config.param_Parameter}
-    else:
-        return None
+    return None
 
 
 def _output(direction, theory, simulation, max_diff, perc, acc_range, result, parameter):

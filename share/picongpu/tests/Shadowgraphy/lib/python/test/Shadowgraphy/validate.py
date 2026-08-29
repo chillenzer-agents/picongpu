@@ -39,9 +39,8 @@ def test_deviation(val_simulation, val_theory, thresh, parameter_name):
     if relative_deviation < thresh:
         print(f"{parameter_name} passed the test with {val_simulation:.5e} compared to {val_theory:.5e}")
         return True
-    else:
-        print(f"{parameter_name} failed the test with {val_simulation:.5e} compared to {val_theory:.5e}")
-        return False
+    print(f"{parameter_name} failed the test with {val_simulation:.5e} compared to {val_theory:.5e}")
+    return False
 
 
 def main(path):

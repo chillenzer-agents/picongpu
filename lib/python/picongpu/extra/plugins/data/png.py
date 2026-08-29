@@ -98,33 +98,32 @@ class PNGData(DataReader):
 
         if iteration is None:
             return output_dir
-        else:
-            if slice_point is None:
-                # determine slice point manually as the slice point of the
-                # first png file in alphabetical order
-                slice_point = [f.split("_")[3] for f in sorted(os.listdir(output_dir)) if f.endswith(".png")][0]
-                slice_point = float(slice_point)
+        if slice_point is None:
+            # determine slice point manually as the slice point of the
+            # first png file in alphabetical order
+            slice_point = [f.split("_")[3] for f in sorted(os.listdir(output_dir)) if f.endswith(".png")][0]
+            slice_point = float(slice_point)
 
-            data_file_name = (
-                self.data_file_prefix.format(
-                    species,
-                    axis,
-                    str(slice_point),
-                    f"{iteration:0>#6d}",  # leading zeros for iter
-                )
-                + self.data_file_suffix
+        data_file_name = (
+            self.data_file_prefix.format(
+                species,
+                axis,
+                str(slice_point),
+                f"{iteration:0>#6d}",  # leading zeros for iter
+            )
+            + self.data_file_suffix
+        )
+
+        data_file_path = os.path.join(output_dir, data_file_name)
+
+        if not os.path.isfile(data_file_path):
+            raise OSError(
+                f"The file {data_file_path} does not exist.\n"
+                "Did the simulation already run?\n"
+                "Is there a png for this iteration?"
             )
 
-            data_file_path = os.path.join(output_dir, data_file_name)
-
-            if not os.path.isfile(data_file_path):
-                raise OSError(
-                    f"The file {data_file_path} does not exist.\n"
-                    "Did the simulation already run?\n"
-                    "Is there a png for this iteration?"
-                )
-
-            return data_file_path
+        return data_file_path
 
     def get_iterations(self, species, species_filter="all", axis=None, slice_point=None):
         """

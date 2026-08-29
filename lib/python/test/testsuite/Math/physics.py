@@ -216,5 +216,4 @@ def plasmafrequence(density=None, gamma: float = None, relativistic: bool = True
         if gamma is None:
             gamma = sD.searchParameter("gamma", directiontype="param")
         return np.sqrt((density * e**2) / (epsilon_0 * gamma * m_e))
-    else:
-        return np.sqrt((density * e**2) / (epsilon_0 * m_e))
+    return np.sqrt((density * e**2) / (epsilon_0 * m_e))

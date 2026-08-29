@@ -32,8 +32,7 @@ def ADK_rate_simple(Z, E_i, F):
     # pol_fac = 1.
     # laser is lin. polarized
     pol_fac = ((3 * n_eff**3 * F) / (np.pi * Z**3)) ** (1.0 / 2)
-    I_rate = pol_fac * (F * D**2.0) / (8.0 * np.pi * Z) * np.exp(-(2.0 * Z**3.0) / (3.0 * n_eff**3.0 * F))
-    return I_rate
+    return pol_fac * (F * D**2.0) / (8.0 * np.pi * Z) * np.exp(-(2.0 * Z**3.0) / (3.0 * n_eff**3.0 * F))
 
 
 if __name__ == "__main__":

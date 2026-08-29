@@ -39,8 +39,7 @@ def F1(z_q):
     if z_q > 2.9e-6:  # below this value the integral is not accurate and we use the approximation for z_q << 1
         integral = quad(lambda x: kv(5 / 3, x), z_q, np.inf)[0]
         return z_q * integral
-    else:
-        return 2.15 * z_q ** (1 / 3)
+    return 2.15 * z_q ** (1 / 3)
 
 
 def F2(z_q):

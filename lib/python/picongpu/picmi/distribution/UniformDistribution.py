@@ -43,15 +43,13 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
         util.unsupported("lower bound", self.lower_bound, [None, None, None])
         util.unsupported("upper bound", self.upper_bound, [None, None, None])
 
-        profile = species.operation.densityprofile.Uniform(density_si=self.density)
+        return species.operation.densityprofile.Uniform(density_si=self.density)
 
         # @todo respect bounding box, Brian Marre, 2023
         # profile.lower_bound = tuple(map(
         #   lambda x: -math.inf if x is None else x, self.lower_bound))
         # profile.upper_bound = tuple(map(
         #   lambda x: math.inf if x is None else x, self.upper_bound))
-
-        return profile
 
     def get_picongpu_drift(self) -> species.operation.momentum.Drift | None:
         """

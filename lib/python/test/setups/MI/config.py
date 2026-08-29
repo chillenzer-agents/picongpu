@@ -91,6 +91,4 @@ def simData(Bx, **kwargs):
     time = ts.Math.physics.calculateTimeFreq(frequency, step_direction="fields_energy.dat")
 
     sim_values = ts.Math.math.growthRate(Bx, time)
-    sim_values = sim_values[argrelextrema(sim_values, np.less)[0][0] :]
-
-    return sim_values
+    return sim_values[argrelextrema(sim_values, np.less)[0][0] :]

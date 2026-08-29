@@ -21,3 +21,4 @@ class PolarizationType(Enum):
             return PyPIConGPUPolarizationType.LINEAR
         if self == PolarizationType.CIRCULAR:
             return PyPIConGPUPolarizationType.CIRCULAR
+        return None

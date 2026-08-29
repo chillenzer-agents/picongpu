@@ -9,12 +9,22 @@ from .output.checkpoint import Checkpoint
 from .output.energy_histogram import EnergyHistogram
 from .output.macro_particle_count import MacroParticleCount
 from .output.phase_space import PhaseSpace
-from .runner import Runner
+from .runner import (
+    DEFAULT_STAGE_PLAN,
+    Runner,
+    Stage,
+    WorkflowPrerequisiteError,
+    WorkflowStageError,
+)
 from .simulation import Simulation
 
 __all__ = [
     "Simulation",
     "Runner",
+    "Stage",
+    "DEFAULT_STAGE_PLAN",
+    "WorkflowPrerequisiteError",
+    "WorkflowStageError",
     "laser",
     "output",
     "rendering",

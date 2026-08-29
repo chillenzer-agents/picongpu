@@ -49,6 +49,7 @@ select = [
     "PLC", # pylint: conventional
     "ERA", # eradicate (commented-out code)
     "INP", # flake8-no-pep420
+    "PD", # pandas-vet
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -166,8 +167,10 @@ known-first-party = ["picongpu"]
 # The commented-out functor variants in test_diagnostics.py document
 # diagnostics that are currently excluded (no eligible particles / wrong
 # factors) and a rejected naming implementation; they are kept so the cases
-# can be re-enabled once fixed (ERA001).
-"lib/python/test/picongpu/end_to_end/test_diagnostics.py" = ["A002", "ERA001"]
+# can be re-enabled once fixed (ERA001). The unstack/stack chain there is a
+# deliberate multi-index reshape; melt/pivot_table are not equivalent (PD010,
+# PD013).
+"lib/python/test/picongpu/end_to_end/test_diagnostics.py" = ["A002", "ERA001", "PD010", "PD013"]
 "share/ci/n_wise_generator.py" = ["A002"]
 "src/tools/bin/printField.py" = ["A001"]
 

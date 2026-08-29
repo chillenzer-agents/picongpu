@@ -115,18 +115,18 @@ def _density_into_mesh(df, number_of_cells, cell_size):
 
 
 def read_densities_into_mesh(data_or_filename, number_of_cells, cell_size):
-    df = (
+    densities = (
         compute_densities_from_particles(data_or_filename)
         .reset_index(drop=False)
         .rename({"positionOffset_" + key: key for key in "xyz"}, axis=1)
     )
 
     for i, key in enumerate("xyz"):
-        df[key] *= 1 / cell_size[i]
-        df[key] = df[key].round()
+        densities[key] *= 1 / cell_size[i]
+        densities[key] = densities[key].round()
 
     return (
-        df.astype({"x": int, "y": int, "z": int})
+        densities.astype({"x": int, "y": int, "z": int})
         .set_index(["x", "y", "z"])
         .groupby(["setup", "impl"])
         .apply(

@@ -39,6 +39,7 @@ select = [
     "G", # flake8-logging-format
     "FURB", # refurb
     "PERF", # Perflint
+    "ISC", # flake8-implicit-str-concat
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately

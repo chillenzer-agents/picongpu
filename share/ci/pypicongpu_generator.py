@@ -343,7 +343,7 @@ if __name__ == "__main__":
 
     # remove all release version, which are not supported by the version range configured in the
     # pyproject.toml
-    for pkg in test_pkg_versions:
-        test_pkg_versions[pkg] = get_supported_versions(pkg, test_pkg_versions[pkg], pyproject_toml)
+    for pkg, versions in test_pkg_versions.items():
+        test_pkg_versions[pkg] = get_supported_versions(pkg, versions, pyproject_toml)
 
     print_job_yaml(test_pkg_versions)

@@ -9,6 +9,7 @@ from unittest import TestCase
 
 import numpy as np
 import pytest
+from pydantic_core import ValidationError
 from scipy.constants import c
 
 from picongpu.picmi import AnalyticDistribution
@@ -64,8 +65,6 @@ class TestAnalyticDistribution(TestCase):
         assert AnalyticDistribution(lambda *x: sum(x), directed_velocity=[0, 0, 0]).get_picongpu_drift() is None
 
     def test_drift_wrong_dimensionality(self):
-        from pydantic_core import ValidationError
-
         # Test drift with wrong dimensionality
         with pytest.raises(ValidationError):
             AnalyticDistribution(

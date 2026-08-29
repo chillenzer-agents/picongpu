@@ -13,10 +13,10 @@ from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species
 from picongpu.pypicongpu.collisions import Collision as PyPIConGPUCollision
 from picongpu.pypicongpu.collisions import CollisionalPhysicsSetup as PyPIConGPUCollisionalPhysicsSetup
-from picongpu.pypicongpu.collisions import CollisionFunctor
-from picongpu.pypicongpu.collisions import CollisionNumericsConfig as CollisionNumericsConfig
+from picongpu.pypicongpu.collisions import CollisionFunctor, CollisionNumericsConfig, DynamicLogCollision
+
+# re-exported via picmi.interaction's __init__, so keep the self-alias
 from picongpu.pypicongpu.collisions import ConstLogCollision as ConstLogCollision
-from picongpu.pypicongpu.collisions import DynamicLogCollision as DynamicLogCollision
 
 
 class Collision(BaseModel):

@@ -178,8 +178,8 @@ def converts_to(
                 if isinstance(value, str)
                 # Python binds lambdas by reference, so if we were to use the seemingly obvious implementation,
                 # all lambdas in this dictionary would use the last value of `value`.
-                # That is why we need to force immediate evaluation:
-                else (lambda local_value: lambda self: local_value(self, *args, **kwargs))(value)
+                # That is why we need to force immediate evaluation (via a default argument):
+                else (lambda self, _value=value: _value(self, *args, **kwargs))
                 for key, value in (conversions or {}).items()
             }
             return copy_attributes(

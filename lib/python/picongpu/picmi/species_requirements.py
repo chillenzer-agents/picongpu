@@ -59,11 +59,9 @@ def can_be_dropped_due_to_uniqueness(lhs, rhs):
         return True
     try:
         # These might well be apples and oranges and the comparison might fail.
-        if lhs == rhs:
-            return True
+        return lhs == rhs
     except Exception:
-        pass
-    return False
+        return False
 
 
 def try_update_with(into_instance, from_instance):

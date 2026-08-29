@@ -43,7 +43,8 @@ from .simulation import Simulation
 from .solver import BinomialSmoother, ElectromagneticSolver
 from .species import Species
 
-assert sys.version_info.major > 3 or sys.version_info.minor >= 11, "Python 3.11 is required for PIConGPU PICMI"
+if not (sys.version_info.major > 3 or sys.version_info.minor >= 11):
+    raise AssertionError("Python 3.11 is required for PIConGPU PICMI")
 
 __all__ = [
     "Simulation",

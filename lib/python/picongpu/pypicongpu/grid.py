@@ -151,9 +151,12 @@ class Grid3D(BaseModel, RenderedObject):
     def check(self) -> Self:
         """serialized representation provided for RenderedObject"""
         if self.grid_dist is not None:
-            assert sum(self.grid_dist[0]) == self.cell_cnt[0], "sum of grid_dists in x must be equal to number_of_cells"
-            assert sum(self.grid_dist[1]) == self.cell_cnt[1], "sum of grid_dists in y must be equal to number_of_cells"
-            assert sum(self.grid_dist[2]) == self.cell_cnt[2], "sum of grid_dists in z must be equal to number_of_cells"
+            if sum(self.grid_dist[0]) != self.cell_cnt[0]:
+                raise AssertionError("sum of grid_dists in x must be equal to number_of_cells")
+            if sum(self.grid_dist[1]) != self.cell_cnt[1]:
+                raise AssertionError("sum of grid_dists in y must be equal to number_of_cells")
+            if sum(self.grid_dist[2]) != self.cell_cnt[2]:
+                raise AssertionError("sum of grid_dists in z must be equal to number_of_cells")
 
         return self
 

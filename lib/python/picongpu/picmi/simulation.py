@@ -263,9 +263,12 @@ class Simulation(picmistandard.PICMI_Simulation):
         delta_t not set, cfl not set either:
           nop (do nothing)
         """
-        assert self.solver is not None
-        assert self.solver.method in self._CFL_GATED_SOLVER_METHODS
-        assert isinstance(self.solver.grid, (Cartesian3DGrid, Cartesian2DGrid))
+        if self.solver is None:
+            raise AssertionError()
+        if self.solver.method not in self._CFL_GATED_SOLVER_METHODS:
+            raise AssertionError()
+        if not isinstance(self.solver.grid, (Cartesian3DGrid, Cartesian2DGrid)):
+            raise AssertionError()
 
         # The CFL factor is sqrt(sum over the spatial dimensions of 1/cell_size^2).
         # In 2D the z term is dropped, so a square 2D grid yields a factor of sqrt(2)

@@ -48,7 +48,7 @@ class _Component(BaseModel):
     component: float
 
     def __eq__(self, other):
-        if isinstance(other, float) or isinstance(other, int):
+        if isinstance(other, float | int):
             return self.component == other
         return super().__eq__(other)
 

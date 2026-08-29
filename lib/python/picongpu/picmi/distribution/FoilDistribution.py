@@ -98,7 +98,7 @@ class FoilDistribution(PICMI_FoilDistribution):
         Get drift for pypicongpu
         :return: pypicongpu drift object or None
         """
-        if [0, 0, 0] == self.directed_velocity:
+        if self.directed_velocity == [0, 0, 0]:
             return None
         return species.operation.momentum.Drift.from_velocity(tuple(self.directed_velocity))
 

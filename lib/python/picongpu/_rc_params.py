@@ -91,7 +91,7 @@ def _parse_example_content(example_content):
 
 def _split_into_default_and_required(parsed_example):
     return {k: v for k, v in parsed_example.items() if k in _KEEP_AS_DEFAULT} | {
-        "required_information": [k for k in parsed_example.keys() if k not in _KEEP_AS_DEFAULT]
+        "required_information": [k for k in parsed_example if k not in _KEEP_AS_DEFAULT]
     }
 
 
@@ -284,8 +284,8 @@ class RCParams:
         self._init_args = args
         self._init_kwargs = kwargs
         direct_init = dict(*args, **kwargs)
-        rc_config = _read_picongpurc(direct_init.get("picongpurc_path", None))
-        preset = _parse_example_into_preset(direct_init.get("preset", None) or rc_config.get("preset", None))
+        rc_config = _read_picongpurc(direct_init.get("picongpurc_path"))
+        preset = _parse_example_into_preset(direct_init.get("preset") or rc_config.get("preset", None))
         self._data = _DEFAULT_CONTENT | preset | rc_config | direct_init
 
     def model_dump(self, mode="json"):

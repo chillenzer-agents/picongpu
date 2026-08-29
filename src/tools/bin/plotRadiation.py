@@ -280,10 +280,7 @@ if Nfiles > 1:
     manyFiles = True
 
 # set scaling function of color plot
-if args.logIntensity:
-    colorNorm = LogNorm()
-else:
-    colorNorm = None
+colorNorm = LogNorm() if args.logIntensity else None
 
 # check if extents are consistent
 if args.logOmega:
@@ -295,10 +292,7 @@ else:
 
 
 # set interpolation
-if args.interpolSet:
-    my_interpolation = "flat"
-else:
-    my_interpolation = "gouraud"
+my_interpolation = "flat" if args.interpolSet else "gouraud"
 
 
 # ------ setup graphic output -------
@@ -357,10 +351,7 @@ cdict_bw = {
     "blue": ((0.0, 1, 1), (0.03, 0.7, 0.7), (1, 0.0, 0.0)),
 }
 
-if args.colorbarBlackAndWhite:
-    cdict = cdict_bw
-else:
-    cdict = cdict_color
+cdict = cdict_bw if args.colorbarBlackAndWhite else cdict_color
 
 my_cmap = colors.LinearSegmentedColormap("my_colormap", cdict, 256)
 
@@ -457,10 +448,7 @@ for myfile in args.path2Data:
     plt.ylim(y[0], y[-1])
 
     # set format style of colorbar label
-    if args.logIntensity:
-        colorbarFormat = None
-    else:
-        colorbarFormat = "%2.2e"
+    colorbarFormat = None if args.logIntensity else "%2.2e"
 
     # create  colorbar
     CB = plt.colorbar(cax, format=colorbarFormat, pad=0.04)

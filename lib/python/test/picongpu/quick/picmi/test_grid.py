@@ -31,7 +31,7 @@ class TestCartesian3DGrid(TestCase):
         """simple translation"""
         grid = self.grid
         g = grid.get_as_pypicongpu()
-        assert [] != g.get_rendering_context(), "grid rendering context should not be empty"
+        assert g.get_rendering_context() != [], "grid rendering context should not be empty"
 
     def test_n_gpus_asserts(self):
         """test too many GPUs for grid"""

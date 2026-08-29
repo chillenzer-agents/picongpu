@@ -329,7 +329,7 @@ class MemoryCalculator(pydantic.BaseModel):
                     "not specified by user"
                 )
 
-        for attribute in minimum_particle_attributes.keys():
+        for attribute in minimum_particle_attributes:
             # byte
             mem_per_particle += minimum_particle_attributes[attribute]
 

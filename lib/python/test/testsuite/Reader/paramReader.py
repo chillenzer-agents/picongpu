@@ -65,10 +65,7 @@ class ParamReader(rF.ReadFiles):
     # private functions -> no documentation
     def __checkifDefination(self, line: str, parameter) -> bool:
         if "=" in line:
-            if parameter in line.partition("=")[0]:
-                return True
-            else:
-                return False
+            return parameter in line.partition("=")[0]
         else:
             return False
 
@@ -81,9 +78,10 @@ class ParamReader(rF.ReadFiles):
         try:
             jReader = jsonReader.JSONReader()
             # first search in json
-            if jReader.getAllFiles():
-                if jReader.getJSONwithParam(parameter.lower()) or jReader.getJSONwithParam(parameter.upper()):
-                    return jReader.getValue(parameter)
+            if jReader.getAllFiles() and (
+                jReader.getJSONwithParam(parameter.lower()) or jReader.getJSONwithParam(parameter.upper())
+            ):
+                return jReader.getValue(parameter)
 
         except Exception:
             # search for if not defined
@@ -194,15 +192,10 @@ class ParamReader(rF.ReadFiles):
 
         result = {}
 
-        lines = open(self._direction + filename)
+        with open(self._direction + filename) as lines:
+            allLines = lines.readlines()
 
-        allLines = lines.readlines()
-
-        number = 0
-
-        for line in allLines:
-            number += 1
-
+        for number, line in enumerate(allLines, start=1):
             if parameter in line:
                 result[number] = line
 
@@ -244,12 +237,9 @@ class ParamReader(rF.ReadFiles):
             )
 
         for file in self.getAllFiles():
-            fileParam = open(self._direction + file)
-
-            if fileParam.read().find(parameter) != -1:
-                searchResult.append(file)
-
-            fileParam.close()
+            with open(self._direction + file) as fileParam:
+                if fileParam.read().find(parameter) != -1:
+                    searchResult.append(file)
 
         return searchResult
 

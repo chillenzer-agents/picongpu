@@ -116,10 +116,7 @@ class ReadFiles:
 
         all_files = [_ for _ in os.listdir(self._direction) if _.endswith(self._fileExtension)]
 
-        if all_files:
-            return True
-        else:
-            return False
+        return bool(all_files)
 
     def getAllFiles(self) -> list:
         """

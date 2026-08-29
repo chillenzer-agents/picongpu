@@ -225,7 +225,7 @@ class Species(RenderedObject, BaseModel):
         # pairs, so inspect the actual constant objects (skipping absent ones).
         const_types = [type(const) for name, const in self.constants if const is not None]
         non_unique_constants = {c for c in const_types if const_types.count(c) > 1}
-        if 0 != len(non_unique_constants):
+        if len(non_unique_constants) != 0:
             raise ValueError(
                 "constant names must be unique per species, offending: {}".format(
                     ", ".join(map(str, non_unique_constants))
@@ -235,7 +235,7 @@ class Species(RenderedObject, BaseModel):
         # each attribute (-name) can only be used once
         attr_names = [attr.picongpu_name for attr in self.attributes]
         non_unique_attributes = {c for c in attr_names if attr_names.count(c) > 1}
-        if 0 != len(non_unique_attributes):
+        if len(non_unique_attributes) != 0:
             raise ValueError(
                 "attribute names must be unique per species, offending: {}".format(", ".join(non_unique_attributes))
             )

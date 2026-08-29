@@ -91,10 +91,7 @@ def checkDirection(variable: str = "undefined", direction: str = None, errorhand
 
     # Since the variable does not necessarily have to be set,
     # this must be checked beforehand
-    if variable in dir(config):
-        val = eval(val_name)
-    else:
-        val = None
+    val = eval(val_name) if variable in dir(config) else None
 
     # check if at least one direction is given
     # if there are two use config.py value
@@ -153,10 +150,7 @@ def checkExistVariables(variable: str) -> bool:
         return False
     else:
         val = eval(val_name)
-        if val is None:
-            return False
-        else:
-            return True
+        return val is not None
 
 
 def checkVariables(variable: str = "undefined", default=None, parameter=None):
@@ -193,10 +187,7 @@ def checkVariables(variable: str = "undefined", default=None, parameter=None):
 
     # Since the variable does not necessarily have to be set,
     # this must be checked beforehand
-    if variable in dir(config):
-        val = eval(val_name)
-    else:
-        val = None
+    val = eval(val_name) if variable in dir(config) else None
 
     if val is None and parameter is None and default is None:
         raise ValueError(

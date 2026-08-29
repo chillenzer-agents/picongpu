@@ -58,7 +58,7 @@ def getaxisvalues(parameter, axis: str = "plot_xaxis"):
         values = cD.checkVariables(variable=axis, default="")
 
         # check if the value is a parameter
-        if values in parameter.keys():
+        if values in parameter:
             values = parameter[values]
 
         # else a default value should be defined

@@ -101,9 +101,8 @@ class TransitionRadiationData(DataReader):
             self.data = np.loadtxt(data_file_path)
 
             # Read values to automatically create theta, phi and omega arrays
-            f = open(data_file_path)
-            parameters = f.readlines()[0].split("\t")
-            f.close()
+            with open(data_file_path) as f:
+                parameters = f.readlines()[0].split("\t")
 
             # Create discretized arrays or angles and frequency as they are
             # discretized for the

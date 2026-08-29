@@ -234,7 +234,4 @@ def getTestResult(theory, simulation, acceptance: float = None) -> bool:
 
     acceptance = cD.checkVariables(variable="acceptance", parameter=acceptance)
 
-    if abs(getDifferenceInPercentage(theory, simulation)) <= acceptance * 100:
-        return True
-    else:
-        return False
+    return abs(getDifferenceInPercentage(theory, simulation)) <= acceptance * 100

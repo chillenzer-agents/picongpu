@@ -263,9 +263,11 @@ class TestTimeStepSpec(TestCase):
 
     def test_raises_for_negative_step_size(self):
         for ts, indices in TESTCASES_IN_STEPS_RAISING:
-            with self.subTest(ts=ts, indices=indices):
-                with pytest.raises(ValueError, match="Step size must be >= 1"):
-                    ts.get_as_pypicongpu(TIME_STEP_SIZE, INDEX_MAX)
+            with (
+                self.subTest(ts=ts, indices=indices),
+                pytest.raises(ValueError, match="Step size must be >= 1"),
+            ):
+                ts.get_as_pypicongpu(TIME_STEP_SIZE, INDEX_MAX)
 
     def test_regression_wrong_int_casting(self):
         stop_time = 1.1195773740290312e-12

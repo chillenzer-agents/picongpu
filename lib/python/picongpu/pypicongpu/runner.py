@@ -60,9 +60,8 @@ def generate_bare_profile(path=None, rc_params=rc_params):
     if not isinstance(path, Path):
         return generate_bare_profile(path=Path(path), rc_params=rc_params)
 
-    with rc_params.set_temporarily(preamble="", override_existing=False):
-        with path.open("w") as file:
-            file.write(script_content_with("", rc_params=rc_params))
+    with rc_params.set_temporarily(preamble="", override_existing=False), path.open("w") as file:
+        file.write(script_content_with("", rc_params=rc_params))
 
     return path
 

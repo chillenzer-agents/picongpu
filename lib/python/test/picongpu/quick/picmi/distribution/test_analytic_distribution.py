@@ -48,9 +48,8 @@ class TestAnalyticDistribution(TestCase):
 
     def test_density_expression_invalid(self):
         for density, err in INVALID_DENSITIES:
-            with self.subTest(density=density, err=err):
-                with pytest.raises(err):
-                    AnalyticDistribution(density).get_as_pypicongpu()
+            with self.subTest(density=density, err=err), pytest.raises(err):
+                AnalyticDistribution(density).get_as_pypicongpu()
 
     def test_drift_input_types(self):
         types = [list, tuple, np.array]

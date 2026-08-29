@@ -84,18 +84,18 @@ def is_valid_combination(row):
     if n >= 3:
         v_compiler = get_version(row[0])
 
-        is_clang_cuda = True if len(row[0]) == 3 and row[0][2] == "clangCuda" else False
-        is_clang = True if row[0][0] == "clang++" or is_clang_cuda else False
+        is_clang_cuda = bool(len(row[0]) == 3 and row[0][2] == "clangCuda")
+        is_clang = bool(row[0][0] == "clang++" or is_clang_cuda)
 
-        is_gnu = True if row[0][0] == "g++" else False
+        is_gnu = row[0][0] == "g++"
 
-        is_nvcc = True if len(row[0]) == 3 and row[0][2] == "nvcc" else False
-        is_cuda = True if row[1][0] == "cuda" else False
+        is_nvcc = bool(len(row[0]) == 3 and row[0][2] == "nvcc")
+        is_cuda = row[1][0] == "cuda"
         v_cuda = get_version(row[1])
 
         # hipcc
-        is_hipcc = True if len(row[0]) == 3 and row[0][2] == "hipcc" else False
-        is_hip = True if row[1][0] == "hip" else False
+        is_hipcc = bool(len(row[0]) == 3 and row[0][2] == "hipcc")
+        is_hip = row[1][0] == "hip"
         v_hip = get_version(row[1])
 
         os_name = row[2][0] if n >= 3 else ""
@@ -147,9 +147,7 @@ def is_valid_combination(row):
                 return False
             if not is_cuda:
                 return False
-            if 12.0 <= v_cuda <= 12.3 and v_compiler == 18:
-                return True
-            return False
+            return bool(12.0 <= v_cuda <= 12.3 and v_compiler == 18)
 
         # nvcc compatibility
         if is_cuda and is_nvcc:
@@ -165,7 +163,7 @@ def is_valid_combination(row):
                 #   /usr/include/x86_64-linux-gnu/bits/floatn-common.h(214):
                 #   error: invalid combination of type specifiers
                 #     typedef float _Float32;
-                if 12.4 == v_cuda and v_compiler == 13:
+                if v_cuda == 12.4 and v_compiler == 13:
                     return False
                 # for C++20 add least gcc 10 is required
                 if v_compiler < 10:
@@ -197,15 +195,11 @@ def is_valid_combination(row):
             #        static constexpr unsigned fractional_width = {_S_fractional_width()};
             if v_compiler == 14:
                 return False
-            if os_name == "ubuntu" and os_version == 24.04 and v_compiler >= 14:
-                return True
-            return False
+            return bool(os_name == "ubuntu" and os_version == 24.04 and v_compiler >= 14)
 
         # g++ as host compiler
         if is_gnu:
-            if os_name == "ubuntu" and os_version == 24.04:
-                return True
-            return False
+            return bool(os_name == "ubuntu" and os_version == 24.04)
 
     return True
 
@@ -287,11 +281,8 @@ boost_libs_all = [
 
 operating_system = [("ubuntu", 22.04), ("ubuntu", 24.04)]
 
-if args.limit_boost_versions:
-    # select each second but keep the order
-    boost_libs = boost_libs_all[-1::-2][::-1]
-else:
-    boost_libs = boost_libs_all
+# select each second but keep the order
+boost_libs = boost_libs_all[-1::-2][::-1] if args.limit_boost_versions else boost_libs_all
 
 rounds = 1
 # activate looping over the compiler categories to minimize the test matrix

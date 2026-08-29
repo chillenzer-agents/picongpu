@@ -208,10 +208,7 @@ if __name__ == "__main__":
                 print(f"load iteration {iteration:d}")
                 cc_max, mean_abs, std, norm = deviation_charge_conservation(series, series.iterations[iteration])
                 data_tmp = np.array([[iteration, cc_max, mean_abs, std, norm]])
-                if collect_results is None:
-                    collect_results = data_tmp
-                else:
-                    collect_results = np.append(collect_results, data_tmp, axis=0)
+                collect_results = data_tmp if collect_results is None else np.append(collect_results, data_tmp, axis=0)
 
         # sort data temporally
         collect_results = np.sort(collect_results, axis=0)

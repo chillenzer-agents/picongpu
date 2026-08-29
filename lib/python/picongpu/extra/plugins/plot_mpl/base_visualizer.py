@@ -197,12 +197,10 @@ class Visualizer:
         # we check time first.
         # Note: the readers might be capable of dealing with multiple
         # values but visualization is not.
-        if "time" in kwargs:
-            if isinstance(kwargs["time"], list):
-                raise ValueError("This class only supports single timestep visualization!")
-        if "iteration" in kwargs:
-            if isinstance(kwargs["iteration"], list):
-                raise ValueError("This class only supports single iteration visualization!")
+        if "time" in kwargs and isinstance(kwargs["time"], list):
+            raise ValueError("This class only supports single timestep visualization!")
+        if "iteration" in kwargs and isinstance(kwargs["iteration"], list):
+            raise ValueError("This class only supports single iteration visualization!")
 
         self.collect_data(**kwargs)
 

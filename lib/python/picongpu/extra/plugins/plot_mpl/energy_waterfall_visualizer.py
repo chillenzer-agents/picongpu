@@ -72,15 +72,12 @@ class Visualizer(BaseVisualizer):
         # clear potentially occuring colorbars that are not from this object
         # i.e. the ax was used by a different object before
         for plt_obj in self.ax.images:
-            if self.plt_obj is not None:
-                if plt_obj not in self.plt_obj:
-                    # there is an image that comes from other visualizer
-                    if plt_obj.colorbar is not None:
-                        plt_obj.colorbar.remove()
-            else:
-                # we can delete since it is not from our object
-                if plt_obj.colorbar is not None:
-                    plt_obj.colorbar.remove()
+            # skip images owned by this visualizer
+            if self.plt_obj is not None and plt_obj in self.plt_obj:
+                continue
+            # we can delete since it is not from our object
+            if plt_obj.colorbar is not None:
+                plt_obj.colorbar.remove()
 
         # this removes all imshow images or previous plots
         # regardless if they were our own or from some other object

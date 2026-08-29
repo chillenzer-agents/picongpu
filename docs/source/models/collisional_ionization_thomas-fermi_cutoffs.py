@@ -131,10 +131,7 @@ TF_C = ThomasFermiIonization(Z_C, A_C)
 alpha = 1.0
 # linestyles to distinguish the plots further
 linestyles = ["solid", "dashed", "dotted"]
-# index for linestyles
-i = 0
-
-for temp in temp_array:
+for i, temp in enumerate(temp_array):
     CS_H = TF_H.TFIonState(temp, mass_density)
     CS_C = TF_C.TFIonState(temp, mass_density)
 
@@ -157,8 +154,6 @@ for temp in temp_array:
 
     # reduce alpha value to differentiate between electron temperatures
     alpha -= 0.1
-    # increment i
-    i += 1
 
 plt.xscale("log")
 plt.ylabel(r"Charge State Prediction $\langle Z \rangle$")

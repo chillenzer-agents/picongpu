@@ -6,6 +6,8 @@ Authors: Mika Soren Voss
 License: GPLv3+
 """
 
+import contextlib
+
 import testsuite._checkData as cD
 
 from . import cmakeFlagReader as cmakeReader
@@ -37,10 +39,8 @@ def mainsearch(
         if cD.checkExistVariables(variable="cmakeDirection") or cmakeDirection is not None:
             cR = cmakeReader.CMAKEFlagReader(direction=cmakeDirection, directiontype="cmakeDirection")
             for parameter in params:
-                try:
+                with contextlib.suppress(Exception):
                     param[parameter] = cR.getValue(parameter)
-                except Exception:
-                    pass
 
         pR = paramReader.ParamReader(direction=paramDirection, directiontype="paramDirection")
         for parameter in params:

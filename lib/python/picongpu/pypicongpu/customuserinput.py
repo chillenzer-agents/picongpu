@@ -29,7 +29,7 @@ class CustomUserInput(RenderedObject, BaseModel):
 
     def check_does_not_change_existing_key_values(self, firstDict: dict, secondDict: dict):
         """check that updating firstDict with secondDict will not change any value in firstDict"""
-        for key in firstDict.keys():
+        for key in firstDict:
             if (key in secondDict) and (firstDict[key] != secondDict[key]):
                 raise ValueError("Key " + str(key) + " exist already, and specified values differ.")
 

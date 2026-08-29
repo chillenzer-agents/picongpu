@@ -45,10 +45,7 @@ def CIC(x):
 
     """
 
-    if abs(x) < 1:
-        y = 1 - abs(x)
-    else:
-        y = 0
+    y = 1 - abs(x) if abs(x) < 1 else 0
     return y
 
 

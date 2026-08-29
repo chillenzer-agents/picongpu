@@ -60,7 +60,7 @@ class Drift(RenderedObject, BaseModel):
 
         :param velocity: velocity given as vector
         """
-        if (0, 0, 0) == velocity:
+        if velocity == (0, 0, 0):
             raise ValueError("velocity must not be zero")
 
         velocity_linear = math.sqrt(sum(x**2 for x in velocity))
@@ -81,7 +81,7 @@ class Drift(RenderedObject, BaseModel):
 
         :param velocity: velocity given as vector multiplied with gamma
         """
-        if (0, 0, 0) == gamma_velocity:
+        if gamma_velocity == (0, 0, 0):
             raise ValueError("velocity must not be zero")
 
         gamma_velocity_linear = math.sqrt(sum(x**2 for x in gamma_velocity))

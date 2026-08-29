@@ -64,10 +64,7 @@ class CMAKEFlagReader(rF.ReadFiles):
 
         files = os.listdir(self._direction)
 
-        if "cmakeFlags" in files and "cmakeFlagsSetup" in files:
-            return True
-        else:
-            return False
+        return bool("cmakeFlags" in files and "cmakeFlagsSetup" in files)
 
     def usedSetup(self) -> int:
         """
@@ -96,8 +93,8 @@ class CMAKEFlagReader(rF.ReadFiles):
 
         flags = []
 
-        file = open(self._direction + "cmakeFlags")
-        lines = file.readlines()
+        with open(self._direction + "cmakeFlags") as file:
+            lines = file.readlines()
 
         i = 0
         for line in lines:

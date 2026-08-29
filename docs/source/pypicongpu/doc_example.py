@@ -30,10 +30,10 @@ def my_func(a_char: str, num: int) -> list[str]:
     :raises AssertionError: if num < 0
     :return: [".", "..", "..."]
     """
-    assert 1 == len(a_char)
-    assert 0 <= num
+    assert len(a_char) == 1
+    assert num >= 0
 
-    if 0 == num:
+    if num == 0:
         return []
 
     return my_func(a_char, num - 1) + [num * a_char]

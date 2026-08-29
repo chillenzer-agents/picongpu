@@ -81,7 +81,7 @@ def plot_1D(
     direction = cD.checkDirection(variable="resultDirection", direction=direction)
     # If only one value is given, a horizontal line is plotted
     # as the theoretical value
-    if isinstance(theory, int) or isinstance(theory, float):
+    if isinstance(theory, int | float):
         plt.axhline(theory, color="k", label="theory")
         if acceptance is not None:
             offset = theory * acceptance
@@ -104,7 +104,7 @@ def plot_1D(
             plt.plot(x_value, theory - offset, color="g")
             plt.fill_between(x_value, theory + offset, theory - offset, color="green", alpha=0.5)
 
-    if isinstance(simulation, int) or isinstance(simulation, float):
+    if isinstance(simulation, int | float):
         plt.axhline(simulation, label="simulation")
 
     elif len(simulation) == 2:

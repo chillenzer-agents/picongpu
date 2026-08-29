@@ -33,6 +33,7 @@ select = [
     "UP", # pyupgrade
     "C4", # flake8-comprehensions
     "SIM", # flake8-simplify
+    "A", # flake8-builtins
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -86,3 +87,20 @@ known-first-party = ["picongpu"]
 # are ported from published research code that uses physics notation.
 "docs/**" = ["N802", "N803", "N806", "N816"]
 "src/**" = ["N802", "N803", "N806", "N807", "N816"]
+
+# Builtin names are used deliberately as physics/domain terms
+# (range = wavelength/frequency range, type = plot or spectrum type,
+# format = file format, input = the bunch-input package,
+# copyright = mandatory Sphinx conf variable). Renaming them would
+# break the public API, the correspondence to C++/openPMD plugin
+# arguments, or the Sphinx build.
+"docs/source/conf.py" = ["A001"]
+"lib/python/picongpu/extra/__init__.py" = ["A004"]
+"lib/python/picongpu/extra/input/parameters.py" = ["A002"]
+"lib/python/picongpu/extra/plugins/data/transitionradiation.py" = ["A001"]
+"lib/python/picongpu/extra/plugins/plot_mpl/transition_radiation_visualizer.py" = ["A001"]
+"lib/python/picongpu/extra/utils/param_parser.py" = ["A001"]
+"lib/python/test/picongpu/end_to_end/compare_particles.py" = ["A002"]
+"lib/python/test/picongpu/end_to_end/test_diagnostics.py" = ["A002"]
+"share/ci/n_wise_generator.py" = ["A002"]
+"src/tools/bin/printField.py" = ["A001"]

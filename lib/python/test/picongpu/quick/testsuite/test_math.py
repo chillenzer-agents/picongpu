@@ -46,9 +46,7 @@ class TestGrowthRate:
 class TestDeviation:
     def test_get_difference(self):
         assert ts_deviation.getDifference(2.0, 5.0) == 3.0
-        np.testing.assert_allclose(
-            ts_deviation.getDifference(1.0, np.array([1.5, 2.0])), [0.5, 1.0]
-        )
+        np.testing.assert_allclose(ts_deviation.getDifference(1.0, np.array([1.5, 2.0])), [0.5, 1.0])
 
     def test_get_max_difference(self):
         assert ts_deviation.getMaxDifference(2.0, 5.0) == 3.0

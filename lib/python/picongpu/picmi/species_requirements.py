@@ -173,6 +173,8 @@ class DelayedConstruction(BaseModel):
     required to fulfill the intent declared in the metadata.
     """
 
+    __hash__ = None  # comparison goes through the customisable operators, not __eq__/__hash__
+
     metadata: _Metadata
     operators: _Operators = _Operators()
     must_be_unique: bool = False

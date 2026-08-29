@@ -9,6 +9,7 @@ License: GPLv3+
 
 __all__ = ["CMAKEFlagReader"]
 
+import contextlib
 import os
 
 from . import readFiles as rF
@@ -141,9 +142,8 @@ class CMAKEFlagReader(rF.ReadFiles):
                 try:
                     value = int(value)
                 except Exception:
-                    try:
+                    # keep the value as a string if it is not numeric
+                    with contextlib.suppress(Exception):
                         value = float(value)
-                    except Exception:
-                        value = value
 
         return value

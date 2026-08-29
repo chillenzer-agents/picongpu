@@ -51,6 +51,7 @@ select = [
     "INP", # flake8-no-pep420
     "PD", # pandas-vet
     "LOG", # flake8-logging
+    "PLW", # pylint: warning
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -201,6 +202,10 @@ known-first-party = ["picongpu"]
 # Template for new testsuite cases: the commented-out imports are an
 # intentional snippet users are told to uncomment when needed (ERA001).
 "lib/python/test/testsuite/Template/config.py" = ["ERA001"]
+# The e2e tests share a lazily built module-level SIM (building the
+# simulation is expensive; setUp assigns the module global, hence the
+# `global` statements) (PLW0603).
+"lib/python/test/picongpu/end_to_end/**" = ["PLW0603"]
 # The e2e harness queries the SLURM job state via `sacct` from PATH (S607)
 # and executes the `link_results.sh` script that the CWL workflow itself
 # generates (S603), not untrusted input.

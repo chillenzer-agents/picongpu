@@ -9,8 +9,16 @@ from enum import Enum
 from operator import attrgetter, itemgetter
 from typing import Annotated, Callable, Literal
 
-from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
-from sympy import Expr, Symbol
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    Field,
+    PlainSerializer,
+    computed_field,
+    field_validator,
+    model_validator,
+)
+from sympy import Expr, Symbol, srepr, sympify
 from sympy.vector import CoordSys3D, Vector
 
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
@@ -137,6 +145,46 @@ def _make_vector(coefficients, basis_vectors=CoordSys3D("e")):
     return sum((coeff * vec for coeff, vec in zip(coefficients, basis_vectors)), Vector.zero)
 
 
+# Fixed symbol used for the (de)serialisation of index_to_direction, so that
+# the serialised form is canonical (stable symbol name) and round-trips.
+_OBSERVER_INDEX = Symbol("index")
+
+
+def serialise_index_to_direction(value) -> dict[str, str]:
+    # Evaluate the direction mapping at the canonical symbol and serialise the
+    # three component expressions (lossless, via sympy's srepr).
+    # A dict (rather than a list) is used so that the value is also accepted
+    # by the rendering context checker (lists may only contain dicts).
+    return {key: srepr(component) for key, component in zip("xyz", value(_OBSERVER_INDEX))}
+
+
+def deserialise_index_to_direction(value):
+    # Rebuild the direction mapping from the serialised form (a dict of three
+    # sympy expression strings, keyed x/y/z), so that model_dump(mode="json")
+    # output can be validated again (round-trip safety). Plain numbers are
+    # turned back into python ints/floats so that re-serialisation (srepr) is
+    # stable.
+    if isinstance(value, dict) and set(value) == {"x", "y", "z"}:
+        components = []
+        for key in "xyz":
+            expr = sympify(value[key])
+            if expr.is_Integer:
+                components.append(int(expr))
+            elif expr.is_Float:
+                components.append(float(expr))
+            else:
+                components.append(expr)
+
+        def direction(arg):
+            return tuple(
+                component.subs(_OBSERVER_INDEX, arg) if isinstance(component, Expr) else component
+                for component in components
+            )
+
+        return direction
+    return value
+
+
 class RadiationObserverConfiguration(BaseModel):
     """
     observer (virtual detector) configuration for the radiation plugin
@@ -150,9 +198,14 @@ class RadiationObserverConfiguration(BaseModel):
     N_observer: Annotated[int, Field(ge=1)] = 256
     """total number of observation directions, [dimensionless]; must be >= 1"""
 
-    index_to_direction: Annotated[Callable[[Symbol], tuple[Expr, Expr, Expr]], Field(exclude=True)]
+    index_to_direction: Annotated[
+        Callable[[Symbol], tuple[Expr, Expr, Expr]],
+        BeforeValidator(deserialise_index_to_direction),
+        PlainSerializer(serialise_index_to_direction),
+    ]
     """sympy mapping from the observer index to a (nonzero, normalisable) 3D
-    direction vector; normalised to unit length during validation"""
+    direction vector; normalised to unit length during validation. Serialised
+    as the three component expressions (sympy srepr strings, keyed x/y/z)."""
 
     @field_validator("index_to_direction", mode="after")
     @classmethod

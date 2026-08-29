@@ -48,6 +48,7 @@ select = [
     "ARG", # flake8-unused-arguments
     "PLC", # pylint: conventional
     "ERA", # eradicate (commented-out code)
+    "INP", # flake8-no-pep420
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -125,22 +126,28 @@ known-first-party = ["picongpu"]
 # Test, example, and tool code uses conventional physics notation
 # (E, B, k, n_0, ...) and C++-derived names for simulation parameters.
 # assert is the idiomatic test primitive (S101); test helpers report
-# results to the console (T201).
-"lib/python/test/**" = ["N802", "N803", "N806", "N816", "S101", "T201"]
+# results to the console (T201). The test tree is collected by pytest on a
+# rootdir basis and is not a Python package, so no __init__.py is added
+# (INP001).
+"lib/python/test/**" = ["N802", "N803", "N806", "N816", "S101", "T201", "INP001"]
 "lib/python/examples/**" = ["N802", "N816"]
-# synchrotronRadiationExtension is a standalone CLI tool (T201).
-"lib/python/synchrotronRadiationExtension/**" = ["N802", "N803", "N806", "T201"]
+# synchrotronRadiationExtension is a standalone CLI tool (T201), not a
+# package (INP001).
+"lib/python/synchrotronRadiationExtension/**" = ["N802", "N803", "N806", "T201", "INP001"]
 # The plugin test suites, examples, and CI generators are standalone
-# scripts whose stdout is their output channel (T201).
-"share/picongpu/tests/**" = ["N801", "N802", "N803", "N806", "N816", "N999", "T201"]
-"share/picongpu/examples/**" = ["N802", "N803", "N806", "T201"]
-"share/ci/**" = ["N806", "T201"]
+# scripts whose stdout is their output channel (T201) and are not Python
+# packages (INP001).
+"share/picongpu/tests/**" = ["N801", "N802", "N803", "N806", "N816", "N999", "T201", "INP001"]
+"share/picongpu/examples/**" = ["N802", "N803", "N806", "T201", "INP001"]
+"share/ci/**" = ["N806", "T201", "INP001"]
 # docs/ contains the Sphinx conf and example model scripts, parts of which
 # are ported from published research code that uses physics notation;
-# the example scripts print their output (T201).
-"docs/**" = ["N802", "N803", "N806", "N816", "T201"]
-# src/ holds only the user-facing analysis/plotting CLI tools (T201).
-"src/**" = ["N802", "N803", "N806", "N807", "N816", "T201"]
+# the example scripts print their output (T201). The docs tree is not a
+# Python package (INP001).
+"docs/**" = ["N802", "N803", "N806", "N816", "T201", "INP001"]
+# src/ holds only the user-facing analysis/plotting CLI tools (T201), not a
+# Python package (INP001).
+"src/**" = ["N802", "N803", "N806", "N807", "N816", "T201", "INP001"]
 
 # Builtin names are used deliberately as physics/domain terms
 # (range = wavelength/frequency range, type = plot or spectrum type,

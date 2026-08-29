@@ -209,13 +209,13 @@ class DataReader(rF.ReadFiles):
             raise ValueError("The parameter could be found more than once. Please use the parameter p_type for this")
 
         if "step" == parameter and step_direction is None:
-            result = np.loadtxt(self._direction + all_files[0])[:, 0]
+            result = np.loadtxt(self._direction + all_files[0], skiprows=1)[:, 0]
         elif "step" == parameter:
-            result = np.loadtxt(self._direction + step_direction)[:, 0]
+            result = np.loadtxt(self._direction + step_direction, skiprows=1)[:, 0]
         elif len(all_files) == 1:
             params = self.allParamsinFile(self._direction + all_files[0])
             index = params.index(parameter)
-            result = np.loadtxt(self._direction + all_files[0])[:, index]
+            result = np.loadtxt(self._direction + all_files[0], skiprows=1)[:, index]
         elif len(all_files) == 0:
             raise ValueError("The given Parameter could not be found")
         else:
@@ -225,7 +225,7 @@ class DataReader(rF.ReadFiles):
                 part_file = all_files[particles.index(p_type)]
                 params = self.allParamsinFile(self._direction + part_file)
                 index = params.index(parameter)
-                result = np.loadtxt(self._direction + part_file)[:, index]
+                result = np.loadtxt(self._direction + part_file, skiprows=1)[:, index]
             except Exception:
                 raise ValueError(
                     "More than one file containing the parameter"

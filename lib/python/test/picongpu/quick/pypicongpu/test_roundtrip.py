@@ -82,7 +82,7 @@ from picongpu.pypicongpu.species.constant.ionizationmodel import (
     ThomasFermi,
 )
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant, SynchrotronParams
-from picongpu.pypicongpu.species.operation import SetChargeState, SimpleDensity, SimpleMomentum
+from picongpu.pypicongpu.species.operation import CreateDensity, SetChargeState, SimpleMomentum
 from picongpu.pypicongpu.species.operation.densityprofile import Cylinder, Foil, FreeFormula, Uniform
 from picongpu.pypicongpu.species.operation.densityprofile.gaussian import Gaussian
 from picongpu.pypicongpu.species.operation.densityprofile.plasmaramp import Exponential
@@ -367,8 +367,8 @@ def _build(name: str):
                 ThomasFermi(ionization_electron_species=_ELECTRON),
             ]
         )
-    if name == "SimpleDensity":
-        return SimpleDensity(profile=Uniform(density_si=42.0), species=[_ELECTRON, _ION], layout=Random(ppc=4))
+    if name == "CreateDensity":
+        return CreateDensity(profile=Uniform(density_si=42.0), species=[_ELECTRON, _ION], start_position=Random(ppc=4))
     if name == "SimpleMomentum":
         return SimpleMomentum(
             species=_ELECTRON, temperature=Temperature(temperature_kev=1e4), drift=Drift.from_velocity((1e5, 0, 0))
@@ -493,7 +493,7 @@ _MODELS = [
     "ThomasFermi",
     "GroundStateIonization",
     # operations
-    "SimpleDensity",
+    "CreateDensity",
     "SimpleMomentum",
     "SetChargeState",
     "Uniform",

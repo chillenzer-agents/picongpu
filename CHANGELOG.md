@@ -9,6 +9,10 @@ Unreleased
     - fix stale `test_add_ionization_model`: it asserted the removed `SetChargeState.bound_electrons` attribute (silently skipped because the species-name match never held) and now checks the actual `charge_state` (the C++ `unary::ChargeState<T_chargeState>` template parameter) for each ionized species
     - pypicongpu `Pusher`/`Shape` enums now mirror the C++ struct names (`particles::pusher::HigueraCary` etc., `pusher.param`/`shapes/*.hpp`): the pusher renders a valid C++ identifier again (previously `Higuera-Cary`) and the picmi pusher-method bridge no longer raises `KeyError` for `HigueraCary` (the unsupported `Li` method now raises an explicit error); the same fix applies to the `Counter` shape member name
 
+**Refactoring:**
+- pypicongpu:
+    - rename the `SimpleDensity` species operation to `CreateDensity` to mirror the C++ `CreateDensity<T_DensityFunctor, T_PositionFunctor, T_SpeciesType>` init-pipeline functor: the field `layout` becomes `start_position` (the C++ `T_PositionFunctor`, rendered as the `startPosition::pypicongpu` functor), and the computed fields `placed_species_initial`/`placed_species_copied` become `created_species`/`derived_species` (the C++ created species and the `ManipulateDerive<DensityWeighting>` derived species). Rendered `.param`/`.cfg` output is byte-identical; only the metadata JSON keys change. The species order inside a `CreateDensity` is now deterministic (ratio-less first, then increasing density ratio, ties broken by name; previously arbitrary on ratio ties)
+
 0.8.0
 -----
 

@@ -110,7 +110,6 @@ class DataReader:
                 iteration = self.get_iterations(*args, **kwargs)
             else:
                 iteration = self.find_time.get_iteration(time, method="closest")
-            # print("got 'time'=", time, ", converted to iter", iteration)
 
         return self._get_for_iteration(iteration, *args, **kwargs)
 

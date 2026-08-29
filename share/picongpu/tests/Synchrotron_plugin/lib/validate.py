@@ -147,7 +147,6 @@ def main(dataPath):
         )
         return 1
 
-    # errorBar = np.sqrt(a[mask])/normalization_factor
     a = a / normalization_factor
     a = a[mask]
     b = b[1:]

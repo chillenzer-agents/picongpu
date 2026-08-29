@@ -48,7 +48,6 @@ class SmileiBeamRelaxation:
         w_vx_i = sim.ParticleBinning(2).get()
         n_i = sim.ParticleBinning(3).get()
         n_e = sim.ParticleBinning(4).get()
-        # cell_length = self.sims[ratio]
 
         for i, _ in enumerate(self.times_dict[ratio]):
             local_array_dict = {

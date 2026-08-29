@@ -79,8 +79,7 @@ class TestCopyAttributes(TestCase):
         ):
             # This fails because it tries to instantiate DummyReceiver as DummyReceiver().
             copy_attributes(dummy_provider, DummyReceiver)
-            # This would have worked:
-            # copy_attributes(dummy_provider, DummyReceiver(1))
+            # (passing an instance, DummyReceiver(1), would have worked)
 
     def test_returns_identical_instance(self):
         dummy_provider, DummyReceiver = gen_provider_and_matching_receiver_class()

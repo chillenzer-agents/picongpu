@@ -114,7 +114,6 @@ class Visualizer(BaseVisualizer):
         self.colorbars[idx].ax.clear()
         # deactivate the axis labels here so we don't have them as leftovers
         self.colorbars[idx].ax.axis("off")
-        # self.colorbars[idx].remove()
         self.colorbars[idx] = None
 
     def _remove_plt_obj(self, idx):

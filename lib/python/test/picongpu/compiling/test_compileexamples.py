@@ -30,5 +30,4 @@ def test_compile_example(sim):
     """Attempts to compile the given simulation."""
     runner = pypicongpu.Runner(sim=sim)
     runner.generate(printDirToConsole=True)
-    # The runner currently doesn't provide an interface for this.
-    # runner.build()
+    # no build step here: the Runner currently doesn't provide an interface for this

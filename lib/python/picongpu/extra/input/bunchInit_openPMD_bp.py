@@ -589,8 +589,8 @@ class pipe:
             offset = [0 for _ in shape]
             dest.reset_dataset(opmd.Dataset(dtype, shape))
             if src.empty:
-                # empty record component automatically created by
-                # dest.reset_dataset()
+                # an empty record component is created automatically
+                # by dest.reset_dataset()
                 pass
             elif src.constant:
                 dest.make_constant(src.get_attribute("value"))

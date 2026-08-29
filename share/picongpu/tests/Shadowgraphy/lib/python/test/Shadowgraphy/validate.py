@@ -204,7 +204,7 @@ def main(path):
             ]
 
         popt, pcov = optimize.curve_fit(gauss, odata, fourier_field_lineout, bounds=fit_bounds)
-        # (x, amplitude, sigma, mean)
+        # popt order: x, amplitude, sigma, mean
         test_results[f"[{sf[1]}-{sf[0]}] bandwidth"] = test_deviation(
             popt[1], bandwidth_expected, bandwidth_thresh, f"[{sf[1]}-{sf[0]}] bandwidth"
         )

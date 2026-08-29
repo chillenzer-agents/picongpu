@@ -471,7 +471,7 @@ def _generate_rocrate_defaults(_data):
             See the `workflow.cwl` for details.
             """,
         "mainEntity": "workflow/workflow.cwl",
-        # "license": "https://spdx.org/licenses/GPL-3.0-or-later",
+        # a "license" field (e.g. the SPDX URL for GPL-3.0-or-later) could be added
         "keywords": ["PIConGPU", "Plasma Physics", "Particle-in-Cell", "Simulation"],
     }
 

@@ -165,6 +165,21 @@ class Simulation(RenderedObject, BaseModel):
                 )
         return self
 
+    @field_validator("customuserinput", mode="before")
+    @classmethod
+    def _parse_custom_user_input(cls, value):
+        # accept the flattened (merged) serialised form -- a single dict with a
+        # "tags" list plus the merged rendering context -- in addition to the
+        # native list-of-entries form, so that model_dump(mode="json") output
+        # can be validated again (round-trip safety). The inverse of
+        # _render_custom_user_input_list: the merged entries are rebuilt as a
+        # single CustomUserInput, which re-serialises to the same flat form.
+        if isinstance(value, dict):
+            tags = value.get("tags")
+            context = {key: val for key, val in value.items() if key != "tags"}
+            return [CustomUserInput(tags=tags, rendering_context=context or None)]
+        return value
+
     @field_serializer("customuserinput")
     def _render_custom_user_input_list(self, value) -> dict[str, Any] | None:
         if value is None:
@@ -172,8 +187,8 @@ class Simulation(RenderedObject, BaseModel):
         custom_rendering_context = {"tags": []}
 
         for entry in value:
-            add_context = entry.get_rendering_context()
-            tags = entry.get_tags()
+            add_context = entry.rendering_context or {}
+            tags = entry.tags or []
 
             entry.check_does_not_change_existing_key_values(custom_rendering_context, add_context)
             entry.check_tags(custom_rendering_context["tags"], tags)

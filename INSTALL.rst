@@ -284,3 +284,54 @@ FFTW3
 
   - ``export FFTW3_ROOT=$HOME/lib/fftw-3.3.10``
   - ``export LD_LIBRARY_PATH=$FFTW3_ROOT/lib:$LD_LIBRARY_PATH``
+
+
+Automatic Installation of Dependencies
+--------------------------------------
+
+.. sectionauthor:: PIConGPU contributors
+
+.. note::
+
+   This is a DRAFT feature (see ``TASK-12-FINDINGS.md`` in the repository
+   root for the design discussion).
+
+If no ready-made modules or installation exist for your system, PIConGPU
+ships a **general, parameterised autoinstall script** that builds the
+dependencies above **from source into user-owned prefixes** (no root
+required), against the *loaded* toolchain (compiler + MPI):
+
+.. literalinclude:: profiles/dependencies/picongpu-deps.sh
+   :language: bash
+   :caption: etc/picongpu/dependencies/picongpu-deps.sh (entry point)
+
+Usage, configuration variables, cache layout and the available providers
+(``source``, ``conda``, ``modules``, ``container``) are documented next to
+the script:
+
+.. literalinclude:: profiles/dependencies/README.md
+   :language: markdown
+   :caption: etc/picongpu/dependencies/README.md
+
+The old per-cluster ``dependencies_autoinstall.sh`` scripts (rosi-hzdr,
+delta-ncsa, perlmutter-nersc) are thin wrappers around this shared
+installer; per-cluster overrides remain possible via ``DEPS_*``
+environment variables.
+
+The workflow can also install the dependencies automatically (opt-in,
+``[dependencies]`` table in ``.picongpurc.toml``, disabled by default):
+
+.. code-block:: toml
+
+    [dependencies]
+    enabled = true
+    provider = "source"
+    jobs = 16
+    # only = ["fftw3", "pngwriter"]
+    # [dependencies.versions]
+    # openpmd = "0.17.1"
+
+The generated build script then runs the installer (idempotent, cached)
+before ``pic-build`` and sources the resulting environment, so CMake
+finds the dependencies via the usual ``*_ROOT`` / ``CMAKE_PREFIX_PATH``
+hints.

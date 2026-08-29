@@ -331,9 +331,7 @@ class Runner(BaseModel):
     def generate_build_command(self, rc_params=rc_params):
         self.build_script_path.parent.mkdir(parents=True, exist_ok=True)
         with self.build_script_path.open("w") as script:
-            script.write(
-                script_content_with([*self._deps_commands(rc_params), "pic-build $@"], rc_params=rc_params)
-            )
+            script.write(script_content_with([*self._deps_commands(rc_params), "pic-build $@"], rc_params=rc_params))
             script.flush()
         chmod(self.build_script_path, 0o755)
 

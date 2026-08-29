@@ -18,6 +18,7 @@ from picongpu.pypicongpu.field_solver import YeeSolver
 from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
 from picongpu.pypicongpu.laser import FromOpenPMDPulseLaser, GaussianLaser, TWTSLaser
 from picongpu.pypicongpu.movingwindow import MovingWindow
+from picongpu.pypicongpu.output.checkpoint import Checkpoint
 from picongpu.pypicongpu.output.radiation import (
     FrequenciesFromList,
     LinearFrequencies,
@@ -628,3 +629,44 @@ class TestRadiationConfigInvariants:
 
     def test_default_config_valid(self):
         assert make_radiation_config().gamma_filter_threshold is None
+
+
+class TestCheckpointInvariants:
+    def test_requires_period_or_time_period(self):
+        with pytest.raises(ValidationError, match="period"):
+            Checkpoint(directory="checkpoints")
+
+    def test_time_period_must_be_non_negative(self):
+        with pytest.raises(ValidationError, match="timePeriod"):
+            Checkpoint(timePeriod=-1)
+
+    def test_restart_step_must_be_non_negative(self):
+        with pytest.raises(ValidationError, match="restartStep"):
+            Checkpoint(timePeriod=0, restartStep=-1)
+
+    def test_restart_chunk_size_must_be_positive(self):
+        with pytest.raises(ValidationError, match="restartChunkSize"):
+            Checkpoint(timePeriod=0, restartChunkSize=0)
+
+    def test_restart_loop_must_be_non_negative(self):
+        with pytest.raises(ValidationError, match="restartLoop"):
+            Checkpoint(timePeriod=0, restartLoop=-1)
+
+    def test_file_prefix_must_not_be_empty(self):
+        with pytest.raises(ValidationError, match="file"):
+            Checkpoint(timePeriod=0, file="")
+
+    def test_restart_file_prefix_must_not_be_empty(self):
+        with pytest.raises(ValidationError, match="restartFile"):
+            Checkpoint(timePeriod=0, restartFile="")
+
+    def test_restart_directory_must_not_be_empty(self):
+        with pytest.raises(ValidationError, match="restartDirectory"):
+            Checkpoint(timePeriod=0, restartDirectory="")
+
+    def test_period_only_valid(self):
+        checkpoint = Checkpoint(period=TimeStepSpec([Spec(start=0, stop=-1, step=10)]))
+        assert checkpoint.period.specs[0].step == 10
+
+    def test_time_period_only_valid(self):
+        assert Checkpoint(timePeriod=5).timePeriod == 5

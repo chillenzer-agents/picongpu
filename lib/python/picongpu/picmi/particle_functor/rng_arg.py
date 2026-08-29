@@ -64,13 +64,12 @@ class RNGArg(BaseModel):
     def get(self, dist, return_type="float_X", shape=1, **kwargs):
         if self._dist_and_return_type is None:
             self._dist_and_return_type = (dist, return_type)
-        else:
-            if self._dist_and_return_type != (dist, return_type):
-                raise ValueError(
-                    "PIConGPU does not support drawing from multiple different distributions in one functor yet. "
-                    f"You're trying to draw from {(dist, return_type)=} but previously "
-                    f"you've drawn from {self._dist_and_return_type}."
-                )
+        elif self._dist_and_return_type != (dist, return_type):
+            raise ValueError(
+                "PIConGPU does not support drawing from multiple different distributions in one functor yet. "
+                f"You're trying to draw from {(dist, return_type)=} but previously "
+                f"you've drawn from {self._dist_and_return_type}."
+            )
 
         my_symbols = []
         count = np.prod(shape)

@@ -35,6 +35,7 @@ select = [
     "SIM", # flake8-simplify
     "A", # flake8-builtins
     "RET", # flake8-return
+    "PLR", # pylint: refactor
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -42,6 +43,19 @@ ignore = [
     # isinstance(), see the "note on typechecks" in that file; E721 would
     # force isinstance() and change behaviour.
     "E721",
+    # "Too many ..." (return statements, branches, arguments,
+    # statements): the functions in this codebase carry many
+    # simulation/physics parameters and cases, mirroring the C++ API and
+    # the openPMD plugin arguments. Splitting them up for the linter is
+    # out of scope and would obscure the physics logic.
+    "PLR0911",
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+    # Magic-value-comparison: physics code is full of numeric thresholds,
+    # tolerances, and unit values; naming every compared literal as a
+    # constant would add noise without clarifying the intent.
+    "PLR2004",
 ]
 
 [lint.isort]

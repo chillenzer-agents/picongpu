@@ -12,7 +12,7 @@ import sys
 import numpy as np
 import openpmd_api as opmd
 import scipy.constants as const
-import scipy.optimize as optimize
+from scipy import optimize
 
 
 def gauss(x, amplitude, sigma, mean):

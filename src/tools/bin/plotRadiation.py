@@ -286,9 +286,8 @@ colorNorm = LogNorm() if args.logIntensity else None
 if args.logOmega:
     if min(omega_min_data, omega_min_draw, omega_max_data, omega_max_draw) <= 0:
         raise Exception("omega <= 0 is not allowed")
-else:
-    if min(omega_min_data, omega_min_draw, omega_max_data, omega_max_draw) < 0:
-        raise Exception("omega < 0 is not allowed")
+elif min(omega_min_data, omega_min_draw, omega_max_data, omega_max_draw) < 0:
+    raise Exception("omega < 0 is not allowed")
 
 
 # set interpolation

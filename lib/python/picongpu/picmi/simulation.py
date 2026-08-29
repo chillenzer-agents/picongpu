@@ -278,17 +278,16 @@ class Simulation(picmistandard.PICMI_Simulation):
                     "(Courant-Friedrichs-Lewy) parameter! delta_t: {}; "
                     "expected from CFL: {}".format(self.time_step_size, delta_t_from_cfl)
                 )
-        else:
-            if self.time_step_size is not None:
-                # calculate cfl
-                self.solver.cfl = self.time_step_size * (
-                    constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
-                )
-            elif self.solver.cfl is not None:
-                # calculate delta_t
-                self.time_step_size = self.solver.cfl / (
-                    constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
-                )
+        elif self.time_step_size is not None:
+            # calculate cfl
+            self.solver.cfl = self.time_step_size * (
+                constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
+            )
+        elif self.solver.cfl is not None:
+            # calculate delta_t
+            self.time_step_size = self.solver.cfl / (
+                constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
+            )
 
             # if neither delta_t nor cfl are given simply silently pass
             # (might change in the future)

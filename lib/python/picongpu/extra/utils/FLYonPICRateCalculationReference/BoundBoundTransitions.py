@@ -106,17 +106,16 @@ class BoundBoundTransitions:
             )  # 1e6b
             crossSection[U < 1.0] = 0.0
 
+        elif U >= 1.0:
+            crossSection = (
+                c0
+                * (E_Rydberg / energyDiffLowerUpper) ** 2
+                * collisionalOscillatorStrength
+                * (energyDiffLowerUpper / energyElectron)
+                / 1e-22
+            )  # 1e6b
         else:
-            if U >= 1.0:
-                crossSection = (
-                    c0
-                    * (E_Rydberg / energyDiffLowerUpper) ** 2
-                    * collisionalOscillatorStrength
-                    * (energyDiffLowerUpper / energyElectron)
-                    / 1e-22
-                )  # 1e6b
-            else:
-                crossSection = 0.0
+            crossSection = 0.0
 
         statisticalRatio = BoundBoundTransitions._multiplicity(
             lowerStateLevelVector
@@ -128,14 +127,11 @@ class BoundBoundTransitions:
                 crossSection *= BoundBoundTransitions._gauntMewe(U)
             else:
                 crossSection *= BoundBoundTransitions._gauntMewe(U + 1.0) * statisticalRatio
+        #! @detail chung gaunt factor from 2007 publication if constants are specified
+        elif excitation:
+            crossSection *= BoundBoundTransitions._gauntChung(U, cxin1, cxin2, cxin3, cxin4, cxin5)
         else:
-            #! @detail chung gaunt factor from 2007 publication if constants are specified
-            if excitation:
-                crossSection *= BoundBoundTransitions._gauntChung(U, cxin1, cxin2, cxin3, cxin4, cxin5)
-            else:
-                crossSection *= (
-                    BoundBoundTransitions._gauntChung(U, cxin1, cxin2, cxin3, cxin4, cxin5) * statisticalRatio
-                )
+            crossSection *= BoundBoundTransitions._gauntChung(U, cxin1, cxin2, cxin3, cxin4, cxin5) * statisticalRatio
 
         return crossSection
 
@@ -188,8 +184,7 @@ class BoundBoundTransitions:
             excitation,
         )  # 1e6b
 
-        if sigma < 0.0:
-            sigma = 0.0
+        sigma = max(sigma, 0.0)
 
         electronRestMassEnergy = const.physical_constants["electron mass energy equivalent in MeV"][0] * 1e6  # eV
 

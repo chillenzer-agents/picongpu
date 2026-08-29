@@ -180,9 +180,6 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
                     raise ValueError(
                         f"GPU- and/or super-cell-distribution in {dim_name[dim]} dimension does not match grid size"
                     )
-            else:
-                # any returns true if there is at least one non zero (True) element
-                if any(x % self.picongpu_super_cell_size[dim] for x in self.picongpu_grid_dist[dim]):
-                    raise ValueError(
-                        f"grid distribution in {dim_name[dim]} dimension must be multiple of super cell size"
-                    )
+            # any returns true if there is at least one non zero (True) element
+            elif any(x % self.picongpu_super_cell_size[dim] for x in self.picongpu_grid_dist[dim]):
+                raise ValueError(f"grid distribution in {dim_name[dim]} dimension must be multiple of super cell size")

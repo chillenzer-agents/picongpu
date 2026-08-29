@@ -147,7 +147,7 @@ class MemoryCalculator(pydantic.BaseModel):
         if self.simulation_dimension > 3 or self.simulation_dimension < 2:
             raise ValueError("PIConGPU only supports 2D or 3D simulations.")
 
-        if (self.precision != 32) and (self.precision != 64):
+        if self.precision not in {32, 64}:
             raise ValueError("PIConGPU only supports either 32 or 64 bits precision.")
 
         if not (np.all(self.super_cell_size > 0)):

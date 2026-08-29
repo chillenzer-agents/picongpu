@@ -118,12 +118,12 @@ class _Operators(BaseModel):
         *map(get_as_pypicongpu, self.metadata.args),
         **{kv[0]: get_as_pypicongpu(kv[1]) for kv in self.metadata.kwargs.items()},
     )
-    try_update_with: Callable[[Any, Any], bool] = lambda self, other: False
+    try_update_with: Callable[[Any, Any], bool] = lambda _self, _other: False
     is_same_as: Callable[[Any, Any], bool] = lambda self, other: (
         isinstance(other, DelayedConstruction) and (self.metadata == other.metadata)
     )
     # This is supposed to raise in case of conflict:
-    check_for_conflict: Callable[[Any, Any], None] = lambda self, other: None
+    check_for_conflict: Callable[[Any, Any], None] = lambda _self, _other: None
 
 
 class _Metadata(BaseModel):

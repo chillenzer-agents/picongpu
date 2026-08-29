@@ -31,7 +31,7 @@ class Gaussian:
         self.distributions = {
             "predefined": picmi.GaussianDistribution(**self.parameters),
             "free_form": picmi.AnalyticDistribution(
-                lambda x, y, z: self.free_form(y, cell_size_y=CELL_SIZE[1], **self.parameters)
+                lambda _x, y, _z: self.free_form(y, cell_size_y=CELL_SIZE[1], **self.parameters)
             ),
         }
 
@@ -67,7 +67,7 @@ class Uniform:
         self.arbitrary_value = 8.0e24
         self.distributions = {
             "predefined": picmi.UniformDistribution(density=self.arbitrary_value),
-            "free_form": picmi.AnalyticDistribution(lambda x, y, z: self.arbitrary_value),
+            "free_form": picmi.AnalyticDistribution(lambda _x, _y, _z: self.arbitrary_value),
         }
 
 
@@ -84,7 +84,7 @@ class Foil:
         }
         self.distributions = {
             "predefined": picmi.FoilDistribution(**self.parameters),
-            "free_form": picmi.AnalyticDistribution(lambda x, y, z: self.free_form(y, **self.parameters)),
+            "free_form": picmi.AnalyticDistribution(lambda _x, y, _z: self.free_form(y, **self.parameters)),
         }
 
     @staticmethod
@@ -205,7 +205,7 @@ class LinearExponential:
             "gas_y_max": 25.0,
         }
         self.distributions = {
-            "free_form": picmi.AnalyticDistribution(lambda x, y, z: self.free_form(y, **self.parameters)),
+            "free_form": picmi.AnalyticDistribution(lambda _x, y, _z: self.free_form(y, **self.parameters)),
         }
 
     @staticmethod
@@ -253,7 +253,7 @@ class SphereFlanks:
 
 
 @picmi.AnalyticDistribution
-def uniformdec(x, y, z):
+def uniformdec(_x, _y, _z):
     return Uniform().arbitrary_value
 
 

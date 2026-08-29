@@ -101,7 +101,9 @@ class TestDecoratingClass(TestCase):
 
         @decorating_class
         class SpecialFunctor:
-            def __new__(cls, functor, **kwargs):
+            # the parameter name must match __init__'s first parameter, which
+            # decorating_class forwards to __new__ by keyword
+            def __new__(cls, functor, **kwargs):  # noqa: ARG004
                 assert kwargs == given_kwargs
                 return super().__new__(cls)
 

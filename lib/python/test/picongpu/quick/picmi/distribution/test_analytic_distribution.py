@@ -31,7 +31,7 @@ INVALID_DENSITIES = [
     (lambda x, y: x + y, TypeError),
     (lambda x, y, z, too_much: x + y + z + too_much, TypeError),
     # bad return type
-    (lambda x, y, z: "string", TypeError),
+    (lambda _x, _y, _z: "string", TypeError),
     # constructs not understood by sympy
     (lambda x, y, z: x if x > 0 else y * z, TypeError),
 ]

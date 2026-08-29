@@ -51,7 +51,7 @@ plot_xaxis = None
 # for more values see the documentation (e.g. 2D plot needs zaxis and yaxis)
 
 
-def theory(gamma, **kwargs):
+def theory(gamma, **_kwargs):
     """
     this function indicates how the theoretical values
     can be calculated from the data. Please complete this
@@ -69,7 +69,7 @@ def theory(gamma, **kwargs):
     return 1 / ((8**0.5) * gamma)
 
 
-def simData(Bx, **kwargs):
+def simData(Bx, **_kwargs):
     """
     this function indicates how the values from the simulation
     can be calculated from the data. Please complete this

@@ -154,7 +154,7 @@ class PhaseSpaceData(DataReader):
         series = opmd.Series(data_file_path, opmd.Access.read_only)
         return [key for key, _ in series.iterations.items()]
 
-    def _get_for_iteration(self, iteration, ps, species, species_filter="all", file_ext="h5", **kwargs):
+    def _get_for_iteration(self, iteration, ps, species, species_filter="all", file_ext="h5", **_kwargs):
         """
         Get a phase space histogram.
 

@@ -94,6 +94,6 @@ def _is_integral(value):
     return isinstance(value, Integral) or (isinstance(value, str) and "int" in value)
 
 
-def _range_of(value):
+def _range_of(_value):
     # Should be extended to actually extract that information from the value.
     return (0, 2**32)

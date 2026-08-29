@@ -316,7 +316,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         """add custom user input to previously stored input"""
         self.picongpu_custom_user_input = (self.picongpu_custom_user_input or []) + [custom_user_input]
 
-    def add_interaction(self, interaction) -> None:
+    def add_interaction(self, interaction) -> None:  # noqa: ARG002 -- parameter name follows the PICMI standard signature
         pypicongpu.util.unsupported(
             "PICMI standard interactions are not supported by PIConGPU, use the picongpu specific Interaction object instead"
         )

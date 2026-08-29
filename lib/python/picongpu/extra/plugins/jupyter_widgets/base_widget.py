@@ -362,14 +362,14 @@ class BaseWidget(widgets.VBox):
         # re-enable the callback
         self.sim_time_slider.observe(self._visualize_callback, names="value")
 
-    def _visualize_callback(self, change):
+    def _visualize_callback(self, _change):
         """
         Callback that is executed when one of the extra_ui_elements
         changes or the iteration changes."""
         self.visualize()
 
     @capture_output
-    def visualize(self, **kwargs):
+    def visualize(self, **_kwargs):
         """
         Draw the plot by getting all necessary parameter values from the
         exposed widgets.

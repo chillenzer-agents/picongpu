@@ -49,7 +49,7 @@ plt.contour(y, z, predefined_values)
 
 
 @AnalyticDistribution
-def custom_particle_distribution(x, y, z):
+def custom_particle_distribution(_x, y, _z):
     # PIConGPU's predefined GaussianDistribution is evaluated at the center of the cell
     y += -0.5 * CELL_SIZE[1]
     # The last term undoes the shift to the cell origin.

@@ -287,7 +287,7 @@ class TestConvertsTo(TestCase):
     def test_default_converts_to_uses_get_as_pypicongpu(self):
         DummyProvider, DummyReceiver = gen_two_classes(
             common_attributes={
-                "arbitrary_name": gen_class({"get_as_pypicongpu": lambda self: ARBITRARY_VALUE}, use_values=True)()
+                "arbitrary_name": gen_class({"get_as_pypicongpu": lambda _self: ARBITRARY_VALUE}, use_values=True)()
             }
         )
         dummy_provider = default_converts_to(DummyReceiver)(DummyProvider)()

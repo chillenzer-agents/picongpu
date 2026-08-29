@@ -55,7 +55,7 @@ class Visualizer(BaseVisualizer):
             im = self.plt_obj[idx] = self.ax.pcolormesh(theta_mesh, phi_mesh, spectral_power)
             self.ax.get_figure().colorbar(im, label=r"Spectral Power $d^2 W / d\omega d\Omega$ [Js]")
 
-    def _update_plt_obj(self, idx):
+    def _update_plt_obj(self, _idx):
         """
         Implementation of base class function.
         """

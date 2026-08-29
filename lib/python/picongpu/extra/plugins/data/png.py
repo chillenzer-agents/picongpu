@@ -157,7 +157,7 @@ class PNGData(DataReader):
 
         return np.array(sorted(iters))
 
-    def _get_for_iteration(self, iteration, species, species_filter="all", axis=None, slice_point=None, **kwargs):
+    def _get_for_iteration(self, iteration, species, species_filter="all", axis=None, slice_point=None, **_kwargs):
         """
         Get an array representation of a PNG file.
 

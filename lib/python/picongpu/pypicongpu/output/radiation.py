@@ -19,6 +19,7 @@ from sympy import Expr, Symbol
 from sympy.vector import CoordSys3D, Vector
 
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
+from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
 from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.species import Species
 
@@ -232,7 +233,7 @@ class RadiationPluginConfig(BaseModel):
 class RadiationPlugin(BaseModel):
     type_radiation: Literal[True] = True
     config: RadiationPluginConfig
-    species: list[Species]
+    species: list[Species | FilteredSpecies]
     period: TimeStepSpec
 
     @field_validator("period", mode="after")

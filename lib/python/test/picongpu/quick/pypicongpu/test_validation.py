@@ -143,3 +143,53 @@ class TestMovingWindowInvariants:
         window = MovingWindow(move_point=0.5, stop_iteration=10)
         assert window.move_point == 0.5
         assert window.stop_iteration == 10
+
+
+class TestGridInvariants:
+    """Grid3D physical/technical invariants."""
+
+    @pytest.mark.parametrize("cell_size", [(0.0, 1e-6, 1e-6), (-1e-6, 1e-6, 1e-6)])
+    def test_cell_size_must_be_positive(self, cell_size):
+        with pytest.raises(ValidationError):
+            make_grid(cell_size_si=cell_size)
+
+    @pytest.mark.parametrize("cell_cnt", [(0, 16, 16), (16, -1, 16)])
+    def test_cell_cnt_must_be_positive(self, cell_cnt):
+        with pytest.raises(ValidationError):
+            make_grid(cell_cnt=cell_cnt)
+
+    @pytest.mark.parametrize("n_gpus", [(0, 1, 1), (1, -1, 1)])
+    def test_gpu_cnt_must_be_positive(self, n_gpus):
+        with pytest.raises(ValidationError):
+            make_grid(n_gpus=n_gpus)
+
+    @pytest.mark.parametrize("super_cell_size", [(0, 2, 2), (2, -2, 2)])
+    def test_super_cell_size_must_be_positive(self, super_cell_size):
+        with pytest.raises(ValidationError):
+            make_grid(super_cell_size=super_cell_size)
+
+    @pytest.mark.parametrize("grid_dist", [([0, 16], [16], [16]), ([16], [-16], [16])])
+    def test_grid_dist_entries_must_be_positive(self, grid_dist):
+        with pytest.raises(ValidationError):
+            make_grid(grid_dist=grid_dist)
+
+    def test_grid_dist_sum_mismatch_raises(self):
+        with pytest.raises(ValidationError, match="sum of grid_dists"):
+            make_grid(n_gpus=(2, 1, 1), grid_dist=([10, 16], [16], [16]))
+
+    def test_grid_dist_not_multiple_of_super_cell_raises(self):
+        with pytest.raises(ValidationError, match="multiple of the super cell size"):
+            make_grid(super_cell_size=(3, 2, 2), grid_dist=([8, 8], [16], [16]))
+
+    def test_super_cell_does_not_divide_grid_raises(self):
+        # 16 cells in x cannot be split into a multiple of 3 super cells
+        with pytest.raises(ValidationError, match="does not match grid size"):
+            make_grid(super_cell_size=(3, 2, 2))
+
+    def test_gpu_cnt_does_not_divide_grid_raises(self):
+        with pytest.raises(ValidationError, match="does not match grid size"):
+            make_grid(n_gpus=(3, 1, 1))
+
+    def test_valid_grid(self):
+        grid = make_grid()
+        assert grid.cell_cnt == (16, 16, 16)

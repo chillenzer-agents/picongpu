@@ -38,6 +38,9 @@ class MacroParticleCount(BaseModel):
     """
 
     species: Species
+    """the species whose macro-particle count is dumped"""
+
     period: TimeStepSpec
+    """the time steps at which the count is dumped, [time-step number]"""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

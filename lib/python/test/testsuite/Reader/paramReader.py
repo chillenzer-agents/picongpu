@@ -190,14 +190,10 @@ class ParamReader(rF.ReadFiles):
               and the context of the line
         """
 
-        result = {}
-
         with open(self._direction + filename) as lines:
             allLines = lines.readlines()
 
-        for number, line in enumerate(allLines, start=1):
-            if parameter in line:
-                result[number] = line
+        result = {number: line for number, line in enumerate(allLines, start=1) if parameter in line}
 
         if not result:
             raise ValueError(f"The parameter {parameter} could not be found")

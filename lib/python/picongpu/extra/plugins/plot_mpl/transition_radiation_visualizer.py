@@ -158,9 +158,7 @@ class Visualizer(BaseVisualizer):
                 return rf"$10^{{ {exponent:2d} }}$"
 
             # create names for top ticks with log scale
-            lambda_names = []
-            for i in range(len(lambda_locations)):
-                lambda_names.append(maketentothepower(lambda_locations[i]))
+            lambda_names = [maketentothepower(lambda_location) for lambda_location in lambda_locations]
 
             # set tick labels and ax label for top label
             axtop.set_xticklabels(lambda_names)

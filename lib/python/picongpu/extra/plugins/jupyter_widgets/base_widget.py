@@ -101,7 +101,7 @@ class BaseWidget(widgets.VBox):
         # to expose the parameters of the plot_mpl object.
         self.widgets_for_vis_args = self._create_widgets_for_vis_args()
         # Its changes will result in changes to the plot
-        for _, widg in self.widgets_for_vis_args.items():
+        for widg in self.widgets_for_vis_args.values():
             widg.observe(self._visualize_callback, names="value")
 
         # register the ui elements that will be displayed

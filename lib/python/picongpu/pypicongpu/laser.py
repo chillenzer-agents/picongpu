@@ -18,6 +18,8 @@ from pydantic import (
     model_validator,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class PolarizationType(Enum):
     """represents a polarization of a laser (for PIConGPU)"""
@@ -101,7 +103,7 @@ class _BaseLaser(BaseModel):
 
 def all_ge(values, than_value):
     if any(wrong := [x < than_value for x in values]):
-        logging.warning(
+        logger.warning(
             "All values=%s should be greater or equal than_value=%s. The following are wrong=%s.",
             values,
             than_value,

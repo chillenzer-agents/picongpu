@@ -35,6 +35,8 @@ from .rendering import Renderer
 from .simulation import Simulation
 from .util import alt
 
+logger = logging.getLogger(__name__)
+
 
 def script_content_with(commands, rc_params=rc_params):
     if not isinstance(commands, str):
@@ -225,9 +227,9 @@ class Runner(BaseModel):
 
     def _log_dirs(self):
         """print human-readble list of paths to log"""
-        logging.info(" template dir: %s", self.template_dir)
-        logging.info("    setup dir: %s", self.setup_dir)
-        logging.info("      run dir: %s", self.run_dir)
+        logger.info(" template dir: %s", self.template_dir)
+        logger.info("    setup dir: %s", self.setup_dir)
+        logger.info("      run dir: %s", self.run_dir)
 
     def _render_templates(self, exist_ok=False):
         """
@@ -235,7 +237,7 @@ class Runner(BaseModel):
 
         Delegates work to Renderer(), see there for details.
         """
-        logging.info("rendering templates...")
+        logger.info("rendering templates...")
         # This is kind of a dirty hack:
         self.sim.spread_directory_information(self.setup_dir)
         # check 1 (implicit): according to schema?

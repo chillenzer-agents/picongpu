@@ -9,8 +9,8 @@ from functools import reduce
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
+import pytest
 from pydantic import ValidationError
-from pytest import fixture, raises
 
 from picongpu import rc_params
 from picongpu._rc_params import RCParams
@@ -26,12 +26,12 @@ from picongpu.pypicongpu.runner import (
 from picongpu.pypicongpu.util import UnpackChain
 
 
-@fixture
+@pytest.fixture
 def empty_rc_params():
     return type(rc_params)()
 
 
-@fixture
+@pytest.fixture
 def picmi_sim():
     number_of_cells = 32
     return Simulation(
@@ -51,7 +51,7 @@ def picmi_sim():
     )
 
 
-@fixture
+@pytest.fixture
 def arbitrary_string():
     return "Hello World"
 
@@ -159,13 +159,13 @@ def test_string_build_jobs_is_coerced_to_int(monkeypatch):
 
 def test_unparseable_build_jobs_is_rejected(monkeypatch):
     _rc_params_with_picongpurc(monkeypatch, 'build_jobs = "many"\n')
-    with raises(ValidationError):
+    with pytest.raises(ValidationError):
         PicBuildFlags().jobs
 
 
 def test_float_build_jobs_is_rejected(monkeypatch):
     _rc_params_with_picongpurc(monkeypatch, "build_jobs = 8.5\n")
-    with raises(ValidationError):
+    with pytest.raises(ValidationError):
         PicBuildFlags().jobs
 
 

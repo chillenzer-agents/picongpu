@@ -57,22 +57,33 @@ class PhaseSpace(BaseModel):
 
     min_momentum: float
         Minimum value for the phase-space coordinate range.
-        Unit: kg*m/s (momentum in SI units).
+        Unit: m_species * c (dimensionless multiple of the species rest momentum).
 
     max_momentum: float
         Maximum value for the phase-space coordinate range.
-        Unit: kg*m/s (momentum in SI units).
+        Unit: m_species * c (dimensionless multiple of the species rest momentum).
 
     name: string, optional
         Optional name for the phase-space plugin.
     """
 
     species: Species | FilteredSpecies
+    """the species (or filtered species) whose phase space is dumped"""
+
     period: TimeStepSpec
+    """the time steps at which the phase space is dumped, [time-step number]"""
+
     spatial_coordinate: Literal["x", "y", "z"]
+    """the spatial coordinate plotted against the momentum (x, y, or z)"""
+
     momentum_coordinate: Literal["px", "py", "pz"]
+    """the momentum component used for the phase space (px, py, or pz)"""
+
     min_momentum: float
+    """lower bound of the momentum range, [m_species * c]; must be < max_momentum"""
+
     max_momentum: float
+    """upper bound of the momentum range, [m_species * c]; must be > min_momentum"""
 
     def check(self, *args, **kwargs):
         if self.min_momentum >= self.max_momentum:

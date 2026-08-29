@@ -35,10 +35,8 @@ class EnergyHistogram(BaseModel):
     species: string
         Name of the particle species to track (e.g., "electron", "proton").
 
-    period: int
-        Number of simulation steps between consecutive outputs.
-        If set to a non-zero value, the energy histogram of all electrons is computed.
-        By default, the value is 0 and no histogram for the electrons is computed.
+    period: TimeStepSpec
+        Specify on which time steps the plugin should run.
         Unit: steps (simulation time steps).
 
     bin_count: int
@@ -63,9 +61,18 @@ class EnergyHistogram(BaseModel):
             raise ValueError("bin_count must be > 0")
 
     species: Species | FilteredSpecies
+    """the species (or filtered species) whose energy histogram is dumped"""
+
     period: TimeStepSpec
+    """the time steps at which the histogram is dumped, [time-step number]"""
+
     bin_count: int
+    """number of bins covering the energy range, [dimensionless]; must be > 0"""
+
     min_energy: float
+    """lower bound of the energy range, [keV]; must be >= 0 and < max_energy"""
+
     max_energy: float
+    """upper bound of the energy range, [keV]; must be > min_energy"""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

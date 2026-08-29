@@ -1,6 +1,13 @@
 Changelog
 =========
 
+Unreleased
+----------
+
+**Features:**
+- PICMI:
+    - stricter input validation: the `pypicongpu` pydantic models now enforce physical and technical invariants via pydantic-native constraints and validators at construction time (e.g. positive SI magnitudes, counts `>= 1`, `min < max` ranges, valid C++ identifiers for rendered names). Previously accepted but unphysical values now raise `pydantic.ValidationError` earlier and with a clearer message; the rendered C++ interface (`.param`/`.cfg`) is unchanged for valid inputs. Models also round-trip through `model_dump(mode="json")`.
+
 0.8.0
 -----
 

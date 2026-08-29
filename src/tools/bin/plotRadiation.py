@@ -24,7 +24,7 @@ import os
 import re
 import warnings
 
-import matplotlib
+import matplotlib as mpl
 import numpy as np
 import pylab
 from matplotlib import colors
@@ -53,11 +53,11 @@ is used.
 
 
 tested_matplotlib_version = ["1.2.0", "1.3.1", "2.0.0rc1"]
-if matplotlib.__version__ not in tested_matplotlib_version:
+if mpl.__version__ not in tested_matplotlib_version:
     warning_msg = f"""The matplotlib version differs from that used during
                      development. This might cause the output to appear
                      different.
-                     Version used: {matplotlib.__version__}, tested versions {tested_matplotlib_version}"""
+                     Version used: {mpl.__version__}, tested versions {tested_matplotlib_version}"""
     warnings.warn(warning_msg, stacklevel=2)
 
 # ------ argsparse --------
@@ -297,7 +297,7 @@ my_interpolation = "flat" if args.interpolSet else "gouraud"
 # ------ setup graphic output -------
 
 if args.outputPDF:
-    matplotlib.use("Agg")
+    mpl.use("Agg")
 
 # X-window/pdf size
 window_width = 14.4

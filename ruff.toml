@@ -20,58 +20,23 @@ line-length = 120
 target-version = "py311"
 
 [lint]
-# Today's effective rule set (ruff defaults), so introducing this config
-# changes nothing. Batches are added incrementally, one commit each, up to
-# select = ["ALL"].
-select = [
-    "E", # pycodestyle errors (E4, E5, E7, E9; E1/E2/E3/E6 are preview-only)
-    "W", # pycodestyle warnings
-    "F", # pyflakes
-    "I", # isort
-    "N", # pep8-naming
-    "B", # flake8-bugbear
-    "UP", # pyupgrade
-    "C4", # flake8-comprehensions
-    "SIM", # flake8-simplify
-    "A", # flake8-builtins
-    "RET", # flake8-return
-    "PLR", # pylint: refactor
-    "G", # flake8-logging-format
-    "FURB", # refurb
-    "PERF", # Perflint
-    "ISC", # flake8-implicit-str-concat
-    "PIE", # flake8-pie
-    "PT", # flake8-pytest-style
-    "RUF", # ruff-specific rules (RUF100 is enabled with the final ALL step)
-    "S", # bandit
-    "T20", # flake8-print
-    "ARG", # flake8-unused-arguments
-    "PLC", # pylint: conventional
-    "ERA", # eradicate (commented-out code)
-    "INP", # flake8-no-pep420
-    "PD", # pandas-vet
-    "LOG", # flake8-logging
-    "PLW", # pylint: warning
-    "PLE", # pylint: error
-    "NPY", # NumPy 2.x / legacy API
-    "EXE", # flake8-executable
-    "PGH", # pygrep-hooks
-    "DTZ", # flake8-datetimez
-    "PYI", # flake8-pyi
-    "SLOT", # flake8-slots
-    "YTT", # flake8-2020
-]
+# The complete stable rule set. Preview rules stay off (no `preview = true`):
+# they are unstable across ruff releases and the pre-commit rev is pinned, so
+# enabling them would shift the lint outcome on every ruff bump without a
+# corresponding code change.
+select = ["ALL"]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
     # compares *exact* types (type(x) is dict) rather than using
     # isinstance(), see the "note on typechecks" in that file; E721 would
     # force isinstance() and change behaviour.
     "E721",
-    # "Too many ..." (return statements, branches, arguments,
-    # statements): the functions in this codebase carry many
+    # "Too many ..." (returns, branches, arguments, statements) and
+    # cyclomatic complexity: the functions in this codebase carry many
     # simulation/physics parameters and cases, mirroring the C++ API and
     # the openPMD plugin arguments. Splitting them up for the linter is
     # out of scope and would obscure the physics logic.
+    "C901",
     "PLR0911",
     "PLR0912",
     "PLR0913",
@@ -91,11 +56,51 @@ ignore = [
     "PT009",
     "PT011",
     "PT012",
-    "PT018",
     "PT027",
-    # Unused-noqa directives are only meaningful once the full rule set
-    # (select = ["ALL"]) is active; cleaned up in the final step.
-    "RUF100",
+    # pydocstyle: the docstrings follow a mix of conventions (the
+    # "This file is part of PIConGPU" module headers, Google-style
+    # sections, and the project's @param/@detail style) and are also
+    # consumed by Sphinx; normalising ~4,600 docstrings to a single
+    # pydocstyle convention is a separate documentation project.
+    "D",
+    # flake8-annotations: ~3,500 missing type annotations would be a
+    # separate typing project; the public API boundaries are guarded at
+    # runtime with typeguard instead.
+    "ANN",
+    # flake8-try-except and flake8-errmsg: the codebase raises the
+    # built-in exceptions with descriptive inline messages and has no
+    # custom exception classes; introducing those is an API design
+    # change, and hoisting every message into a constant adds churn
+    # without user-visible benefit.
+    "TRY",
+    "EM",
+    # Missing trailing comma: ruff format's magic-trailing-comma
+    # behaviour owns this; COM812 would fight the formatter (the ruff
+    # docs recommend ignoring it when using ruff format).
+    "COM812",
+    # flake8-use-pathlib: the scripts, tools, and plugin code use
+    # os.path consistently; migrating ~120 call sites to pathlib is a
+    # separate modernisation.
+    "PTH",
+    # flake8-boolean-trap: boolean flags in the public API mirror the
+    # C++ parameters (prePlasma, ...); restructuring them (keyword-only,
+    # dataclasses, flags) would be a breaking change.
+    "FBT",
+    # flake8-blind-except: the broad `except Exception` catches are
+    # deliberate compatibility/fallback points (optional backends,
+    # plugin loading, version differences); narrowing them changes
+    # behaviour.
+    "BLE001",
+    # flake8-tidy-imports: the package convention is relative imports
+    # within picmi/pypicongpu (TID251 sibling imports are clean);
+    # rewriting the 78 parent-package imports to absolute form is churn
+    # without benefit.
+    "TID252",
+    # flake8-todos and flake8-fixme: the TODO/XXX tags in the codebase
+    # predate the "TODO(username):" convention; inventing assignees for
+    # the linter would be noise.
+    "TD",
+    "FIX",
 ]
 
 [lint.isort]
@@ -110,9 +115,10 @@ known-first-party = ["picongpu"]
 # quantities (E0, Z, ...). Renaming them would be a breaking change.
 "lib/python/picongpu/picmi/**" = ["N802", "N803", "N806", "N815", "N999"]
 "lib/python/picongpu/pypicongpu/**" = ["N802", "N803", "N806", "N815", "N999"]
-# _rc_params.py carries RO-Crate JSON-LD property names
-# (datePublished, mainEntity, ...) that must not be changed.
-"lib/python/picongpu/_rc_params.py" = ["N815"]
+# _rc_params.py carries RO-Crate JSON-LD property names (datePublished,
+# mainEntity, ...) that must not be changed (N815); the cross-instance
+# _data access is internal state bookkeeping within the class (SLF001).
+"lib/python/picongpu/_rc_params.py" = ["N815", "SLF001"]
 # extra/ holds experimental add-ons, several of which are ported from
 # external projects (FLYonPIC rate calculations, bunchInit scripts);
 # the original naming is kept so the port stays recognisable. Most of it
@@ -133,14 +139,16 @@ known-first-party = ["picongpu"]
 # convention (C++-mirrored reader/module names). It reads and writes
 # arbitrary config.py variables by evaluating "config.<name>" expressions,
 # which by design cannot be replaced with a safe literal evaluation.
-"lib/python/test/testsuite/**" = ["N802", "N803", "N806", "N813", "N816", "N999", "S102", "S307"]
+# (N802/N803/N806/N816 are covered by the broader lib/python/test/** entry.)
+"lib/python/test/testsuite/**" = ["N813", "N999", "S102", "S307"]
 # Test, example, and tool code uses conventional physics notation
 # (E, B, k, n_0, ...) and C++-derived names for simulation parameters.
 # assert is the idiomatic test primitive (S101); test helpers report
 # results to the console (T201). The test tree is collected by pytest on a
 # rootdir basis and is not a Python package, so no __init__.py is added
 # (INP001).
-"lib/python/test/**" = ["N802", "N803", "N806", "N816", "S101", "T201", "INP001"]
+# Tests may probe private state by design (SLF001).
+"lib/python/test/**" = ["N802", "N803", "N806", "N816", "S101", "T201", "INP001", "SLF001"]
 "lib/python/examples/**" = ["N802", "N816"]
 # synchrotronRadiationExtension is a standalone CLI tool (T201), not a
 # package (INP001).
@@ -187,7 +195,8 @@ known-first-party = ["picongpu"]
 # Bandit: the remaining findings are deliberate.
 # The runner generates user-facing build/prepare-submission shell scripts
 # that must be executable (S103). generate(printDirToConsole=True) is a
-# public API flag that explicitly requests console output (T201).
+# public API flag that explicitly requests console output (T201). The
+# temp-directory name carries a human-readable local timestamp (DTZ005).
 "lib/python/picongpu/pypicongpu/runner.py" = ["S103", "T201", "DTZ005"]
 # picrc_builder is an interactive questionary-based CLI wizard; its
 # stdout is the conversation with the user (T201).
@@ -197,6 +206,16 @@ known-first-party = ["picongpu"]
 # function so that importing a visualizer as a library does not pull in
 # matplotlib.pyplot or CLI modules (PLC0415).
 "lib/python/picongpu/extra/plugins/plot_mpl/**" = ["PLC0415"]
+# The widget delegates the axis cleanup to its plot_mpl helper's private
+# method (SLF001); the axis label carries a human-readable local timestamp
+# (DTZ005).
+"lib/python/picongpu/extra/plugins/jupyter_widgets/base_widget.py" = ["DTZ005", "SLF001"]
+# matplotlib's LinearSegmentedColormap has no public API to force LUT
+# construction; _init() is the documented workaround (SLF001).
+"lib/python/picongpu/extra/plugins/plot_mpl/utils.py" = ["SLF001"]
+# The PMAcc printer extends pycxxcode's C++17 printer, which only exposes
+# the keyword-fragment table as the private _kf attribute (SLF001).
+"lib/python/picongpu/pypicongpu/rendering/pmaccprinter.py" = ["SLF001"]
 # The testsuite dispatcher imports the sub-package managers inside its broad
 # try/except, so that import failures are reported as a test failure
 # (exit 42) instead of breaking at module import time (PLC0415).
@@ -225,8 +244,8 @@ known-first-party = ["picongpu"]
     "EXE005",
 ]
 "share/picongpu/examples/AtomicPhysics/validation/EvaluationScript.py" = ["EXE001", "EXE003", "EXE005"]
-# The timestamps here are human-readable local time for display (a jupyter
-# widget axis label, the template `_date`, and a temp-directory name);
-# forcing UTC would change what the user sees (DTZ005).
-"lib/python/picongpu/extra/plugins/jupyter_widgets/base_widget.py" = ["DTZ005"]
+# The template `_date` is a human-readable local timestamp for display;
+# forcing UTC would change what the user sees (DTZ005). The other two
+# local-timestamp sites (widget axis label, temp-directory name) are
+# covered by the per-file entries above.
 "lib/python/picongpu/pypicongpu/rendering/renderer.py" = ["DTZ005"]

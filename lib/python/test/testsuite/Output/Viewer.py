@@ -8,12 +8,12 @@ License: GPLv3+
 
 __all__ = ["plot_1D", "plot_2D"]
 
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 import testsuite._checkData as cD
 
-matplotlib.use("Agg")
+mpl.use("Agg")
 
 
 def plot_1D(

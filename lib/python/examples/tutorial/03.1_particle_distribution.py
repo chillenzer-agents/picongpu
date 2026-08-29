@@ -16,7 +16,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-import matplotlib
+import matplotlib as mpl
 import numpy as np
 from matplotlib import pyplot as plt
 from sympy import Abs, Piecewise, exp
@@ -43,7 +43,7 @@ x = NUM_CELLS[0] / 2 * CELL_SIZE[0]
 y, z = np.mgrid[: 2 * NUM_CELLS[1], : NUM_CELLS[2]] * CELL_SIZE[1:3, np.newaxis, np.newaxis]
 predefined_values = particle_distribution(x, y, z)
 
-matplotlib.use("module://mpl_ascii")
+mpl.use("module://mpl_ascii")
 plt.figure()
 plt.contour(y, z, predefined_values)
 

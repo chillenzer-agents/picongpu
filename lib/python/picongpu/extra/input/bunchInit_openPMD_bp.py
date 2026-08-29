@@ -377,7 +377,7 @@ class Chunk:
 
         """
         if len(offset) != len(extent):
-            raise AssertionError()
+            raise AssertionError
         self.offset = offset
         self.extent = extent
 
@@ -399,10 +399,10 @@ class Chunk:
             if v > maximum:
                 dimension = k
         if dimension >= len(self):
-            raise AssertionError()
+            raise AssertionError
         # no offset
         if self.offset != [0 for _ in range(len(self))]:
-            raise AssertionError()
+            raise AssertionError
         offset = [0 for _ in range(len(self))]
         extent = self.extent.copy()
 

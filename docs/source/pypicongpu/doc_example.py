@@ -31,9 +31,9 @@ def my_func(a_char: str, num: int) -> list[str]:
     :return: [".", "..", "..."]
     """
     if len(a_char) != 1:
-        raise AssertionError()
+        raise AssertionError
     if num < 0:
-        raise AssertionError()
+        raise AssertionError
 
     if num == 0:
         return []

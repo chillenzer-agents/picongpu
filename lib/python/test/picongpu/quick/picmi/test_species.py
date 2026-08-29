@@ -189,3 +189,63 @@ class TestSpeciesRequirementResolution(TestCase):
         ][0]
         assert set_charge_state_op.charge_state == ion.charge_state
         assert len(ion.get_as_pypicongpu().constants.ground_state_ionization.ionization_model_list) == len(ionizations)
+
+
+class TestIonizationBridging(TestCase):
+    """the picmi ionization models bridge to the pypicongpu (C++-named) ionizers"""
+
+    def _species(self):
+        ion = Species(name="ion", particle_type="H", charge_state=1)
+        electron = Species(name="electron", particle_type="electron")
+        return ion, electron
+
+    def test_adk_none_current_bridges_to_none_current_model(self):
+        ion, electron = self._species()
+        model = ADK(ion_species=ion, ionization_electron_species=electron, ADK_variant=0, ionization_current=None)
+        pypic = model.get_as_pypicongpu()
+        # no current given -> the pypicongpu None_ current (C++ default current::None)
+        from picongpu.pypicongpu.species.constant.ionizationcurrent import None_
+
+        self.assertIsInstance(pypic.ionization_current, None_)
+        self.assertEqual(pypic.ionization_electron_species.name, electron.name)
+
+    def test_adk_custom_current_not_silently_dropped(self):
+        from picongpu.picmi.interaction.ionization.fieldionization.ionizationcurrent import IonizationCurrent
+
+        ion, electron = self._species()
+
+        class UnsupportedCurrent(IonizationCurrent):
+            MODEL_NAME: str = "unsupported"
+
+        model = ADK(
+            ion_species=ion,
+            ionization_electron_species=electron,
+            ADK_variant=0,
+            ionization_current=UnsupportedCurrent(),
+        )
+        with pytest.raises(ValueError, match="Unsupported ionization current"):
+            model.get_as_pypicongpu()
+
+    def test_thomas_fermi_bridges_electron_species(self):
+        from picongpu.picmi.interaction.ionization.electroniccollisionalequilibrium import ThomasFermi
+
+        ion, electron = self._species()
+        model = ThomasFermi(ion_species=ion, ionization_electron_species=electron)
+        pypic = model.get_as_pypicongpu()
+        # the C++ ThomasFermi ionizer is parameterised by the electron species
+        self.assertEqual(pypic.ionization_electron_species.name, electron.name)
+        self.assertEqual(pypic.ionizer_picongpu_name, "ThomasFermi")
+
+    def test_thomas_fermi_rejects_ionization_current(self):
+        # the C++ ThomasFermi (byCollision) takes no ionization current template
+        # argument, so the pypicongpu model must not accept one
+        from picongpu.pypicongpu.species.constant.ionizationcurrent import None_
+        from picongpu.pypicongpu.species.constant.ionizationmodel import ThomasFermi as PypicongpuThomasFermi
+        from pydantic import ValidationError
+
+        ion, electron = self._species()
+        with pytest.raises(ValidationError):
+            PypicongpuThomasFermi(
+                ionization_electron_species=electron.get_as_pypicongpu(),
+                ionization_current=None_(),
+            )

@@ -61,8 +61,7 @@ class RenderedObject:
                 if value is not None:
                     hash_value += hash(value)
             except TypeError:
-                print(self)
-                print(type(self))
+                logging.debug("unhashable object: %s (%s)", self, type(self))
                 raise
         return hash_value
 

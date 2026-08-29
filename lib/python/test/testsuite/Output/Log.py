@@ -109,8 +109,7 @@ def resultLog(
             fobj_out.write(f"result of the test:{result} \n")
             fobj_out.write(f"difference: {difference}\n")
             fobj_out.write(f"difference in percentage: {perc_diff}\n")
-            for key in inputparameter:
-                fobj_out.write(f"input parameter: {key}={inputparameter[key]}\n")
+            fobj_out.writelines(f"input parameter: {key}={inputparameter[key]}\n" for key in inputparameter)
 
     except Exception:
         errorLog()

@@ -322,7 +322,7 @@ if not args.compact:
     print("stages:")
     for x in range(num_stages):
         print(f"  - job_{x}")
-    print("")
+    print()
 
 # generate all jobs
 for stage in range(num_stages):
@@ -373,4 +373,4 @@ for stage in range(num_stages):
             print("    - apt-get update -qq")
             print("    - apt-get install -y -qq libopenmpi-dev openmpi-bin openssh-server")
             print("  extends: " + get_base_image(pairs[0], pairs[1]) + image_prefix)
-            print("")
+            print()

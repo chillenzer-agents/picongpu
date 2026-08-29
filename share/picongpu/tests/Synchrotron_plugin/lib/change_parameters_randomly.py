@@ -73,7 +73,7 @@ def main():
         gamma = gamma[np.random.randint(len(gamma))]
         Heff = Heff[np.random.randint(len(Heff))]
         dt = calculate_dt(gamma, Heff) * 0.95
-        dt = dt if dt < 1e-16 else 1e-16  # if dt is larger than the grid condition, set it to the grid condition
+        dt = min(1e-16, dt)  # if dt is larger than the grid condition, set it to the grid condition
         yNum = predictNumPhotons(gamma, Heff, dt, 4000, 5e5)
 
     # make Heff, gamma and dt strings in scientific notation

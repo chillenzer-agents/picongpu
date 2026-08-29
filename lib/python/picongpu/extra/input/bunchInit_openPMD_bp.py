@@ -544,7 +544,7 @@ class pipe:
                 print(f"Iteration {in_iteration.iteration_index} contains {len(in_iteration.meshes)} meshes:")
                 for m in in_iteration.meshes:
                     print(f"\t {m}")
-                print("")
+                print()
                 print(
                     f"Iteration {in_iteration.iteration_index} contains {len(in_iteration.particles)} particle species:"
                 )

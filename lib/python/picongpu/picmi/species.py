@@ -60,7 +60,7 @@ _PUSHER_BY_NAME: Mapping[str, Pusher] = MappingProxyType(
     {
         "Boris": Pusher.Boris,
         "Vay": Pusher.Vay,
-        "Higuera-Cary": Pusher.Higuera,
+        "Higuera-Cary": Pusher.HigueraCary,
         "free-streaming": Pusher.Free,
         "LLRK4": Pusher.ReducedLandauLifshitz,
         "other:Acceleration": Pusher.Acceleration,

@@ -18,6 +18,14 @@ from picongpu.pypicongpu.field_solver import YeeSolver
 from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
 from picongpu.pypicongpu.laser import FromOpenPMDPulseLaser, GaussianLaser, TWTSLaser
 from picongpu.pypicongpu.movingwindow import MovingWindow
+from picongpu.pypicongpu.output.radiation import (
+    FrequenciesFromList,
+    LinearFrequencies,
+    LogFrequencies,
+    RadiationConfiguration,
+    RadiationObserverConfiguration,
+    RadiationPluginConfig,
+)
 from picongpu.pypicongpu.output.timestepspec import Spec, TimeStepSpec
 from picongpu.pypicongpu.species.constant import Charge, DensityRatio, Mass
 from picongpu.pypicongpu.species.constant.synchrotron import (
@@ -544,3 +552,79 @@ class TestTimeStepSpecInvariants:
         # since the test suite runs with warnings-as-errors).
         spec = TimeStepSpec([Spec(start=10, stop=5, step=1)])
         assert spec.specs[0].start == 10
+
+
+def make_radiation_config(**overrides):
+    kwargs = dict(
+        observer=RadiationObserverConfiguration(
+            N_observer=2,
+            index_to_direction=lambda index: (1, 0, 0),
+        ),
+    )
+    kwargs |= overrides
+    return RadiationPluginConfig(**kwargs)
+
+
+class TestRadiationFrequencyInvariants:
+    def test_linear_N_omega_must_be_positive(self):
+        with pytest.raises(ValidationError, match="N_omega"):
+            LinearFrequencies(N_omega=0)
+
+    def test_linear_omega_min_must_be_below_omega_max(self):
+        with pytest.raises(ValidationError, match="omega_min"):
+            LinearFrequencies(omega_min=1e17, omega_max=1e14)
+
+    def test_linear_equal_bounds_rejected(self):
+        with pytest.raises(ValidationError, match="omega_min"):
+            LinearFrequencies(omega_min=1e14, omega_max=1e14)
+
+    def test_log_omega_min_must_be_positive(self):
+        with pytest.raises(ValidationError, match="omega_min"):
+            LogFrequencies(omega_min=0.0)
+
+    def test_log_omega_min_must_be_below_omega_max(self):
+        with pytest.raises(ValidationError, match="omega_min"):
+            LogFrequencies(omega_min=1e17, omega_max=1e14)
+
+    def test_from_list_location_must_not_be_empty(self):
+        with pytest.raises(ValidationError, match="list_location"):
+            FrequenciesFromList(list_location="")
+
+    def test_linear_default_valid(self):
+        assert LinearFrequencies().omega_min == 0.0
+
+
+class TestRadiationConfigInvariants:
+    def test_nyquist_factor_must_be_in_open_unit_interval(self):
+        for factor in (0.0, 1.0, -0.5, 1.5):
+            with pytest.raises(ValidationError, match="nyquist_factor"):
+                RadiationConfiguration(nyquist_factor=factor)
+
+    def test_observer_count_must_be_positive(self):
+        with pytest.raises(ValidationError, match="N_observer"):
+            RadiationObserverConfiguration(N_observer=0, index_to_direction=lambda index: (1, 0, 0))
+
+    def test_gamma_filter_threshold_must_be_positive(self):
+        with pytest.raises(ValidationError, match="gamma_filter_threshold"):
+            make_radiation_config(gamma_filter_threshold=0.0)
+
+    def test_num_jobs_must_be_positive(self):
+        with pytest.raises(ValidationError, match="num_jobs"):
+            make_radiation_config(num_jobs=0)
+
+    def test_window_bounds_must_be_non_negative(self):
+        with pytest.raises(ValidationError, match="start"):
+            make_radiation_config(start=-1)
+        with pytest.raises(ValidationError, match="end"):
+            make_radiation_config(end=-1)
+
+    def test_accumulation_steps_must_be_non_negative(self):
+        with pytest.raises(ValidationError, match="num_accumulation_steps"):
+            make_radiation_config(num_accumulation_steps=-1)
+
+    def test_verbose_level_must_be_non_negative(self):
+        with pytest.raises(ValidationError, match="verbose_level"):
+            make_radiation_config(radiation=RadiationConfiguration(verbose_level=-1))
+
+    def test_default_config_valid(self):
+        assert make_radiation_config().gamma_filter_threshold is None

@@ -225,9 +225,9 @@ class Runner(BaseModel):
 
     def _log_dirs(self):
         """print human-readble list of paths to log"""
-        logging.info(f" template dir: {self.template_dir}")
-        logging.info(f"    setup dir: {self.setup_dir}")
-        logging.info(f"      run dir: {self.run_dir}")
+        logging.info(" template dir: %s", self.template_dir)
+        logging.info("    setup dir: %s", self.setup_dir)
+        logging.info("      run dir: %s", self.run_dir)
 
     def _render_templates(self, exist_ok=False):
         """

@@ -18,6 +18,7 @@ from picongpu.pypicongpu.field_solver import YeeSolver
 from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
 from picongpu.pypicongpu.laser import FromOpenPMDPulseLaser, GaussianLaser, TWTSLaser
 from picongpu.pypicongpu.movingwindow import MovingWindow
+from picongpu.pypicongpu.output.timestepspec import Spec, TimeStepSpec
 from picongpu.pypicongpu.species.constant import Charge, DensityRatio, Mass
 from picongpu.pypicongpu.species.constant.synchrotron import (
     FirstSynchrotronFunctionParams,
@@ -517,3 +518,29 @@ class TestFromOpenPMDPulseLaserInvariants:
     def test_valid_laser(self):
         laser = FromOpenPMDPulseLaser(**self.laser_kwargs())
         assert laser.iteration == 0
+
+
+class TestTimeStepSpecInvariants:
+    def test_negative_start_rejected(self):
+        with pytest.raises(ValidationError, match="start"):
+            TimeStepSpec([Spec(start=-1, stop=10, step=1)])
+
+    def test_stop_below_minus_one_rejected(self):
+        with pytest.raises(ValidationError, match="stop"):
+            TimeStepSpec([Spec(start=0, stop=-2, step=1)])
+
+    def test_zero_or_negative_step_rejected(self):
+        for step in (0, -1):
+            with pytest.raises(ValidationError, match="step"):
+                TimeStepSpec([Spec(start=0, stop=10, step=step)])
+
+    def test_valid_specs(self):
+        spec = TimeStepSpec([Spec(start=0, stop=-1, step=5)])
+        assert spec.specs[0].stop == -1
+
+    def test_start_greater_than_stop_allowed(self):
+        # PICMI slice semantics: such a spec selects an empty set of time
+        # steps, which is deliberately not rejected (not even as a warning,
+        # since the test suite runs with warnings-as-errors).
+        spec = TimeStepSpec([Spec(start=10, stop=5, step=1)])
+        assert spec.specs[0].start == 10

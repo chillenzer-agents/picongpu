@@ -59,7 +59,8 @@ def supergauss2D(xy, amp, x0, y0, w, n=4):
     w: waist size
     n: superpower (default is 4)
     """
-    assert n > 2, "n > 2 required"
+    if n <= 2:
+        raise AssertionError("n > 2 required")
     x, y = xy
     g = amp * np.exp(-(((x - x0) ** 2 / (w**2) + (y - y0) ** 2 / (w**2)) ** (n - 2)))
     return g.ravel()
@@ -314,17 +315,23 @@ class PrepRoutines:
         yidx_upp = y_ugly_idx + uglybins
 
         # safety check: are we still in the volume?
-        assert xidx_low >= 0, "Sorry, too close to the left border!"
-        assert yidx_low >= 0, "Sorry, too close to the lower border!"
-        assert xidx_upp < len(self.x_NF), "Sorry, too close to the right border!"
-        assert yidx_upp < len(self.y_NF), "Sorry, too close to the upper border!"
+        if xidx_low < 0:
+            raise AssertionError("Sorry, too close to the left border!")
+        if yidx_low < 0:
+            raise AssertionError("Sorry, too close to the lower border!")
+        if xidx_upp >= len(self.x_NF):
+            raise AssertionError("Sorry, too close to the right border!")
+        if yidx_upp >= len(self.y_NF):
+            raise AssertionError("Sorry, too close to the upper border!")
 
         # thickness of border surrounding the hole (number of bins)
         # for linear interpolation, 1 would be sufficient; but 3 is chosen so that cubic interpolation is still possible
         border_thickn = 3
         # safety check: are we still in the volume?
-        assert xidx_low - border_thickn >= 0, "Sorry, too close to the left border!"
-        assert xidx_upp + border_thickn < len(self.x_NF), "Sorry, too close to the right border!"
+        if xidx_low - border_thickn < 0:
+            raise AssertionError("Sorry, too close to the left border!")
+        if xidx_upp + border_thickn >= len(self.x_NF):
+            raise AssertionError("Sorry, too close to the right border!")
 
         # since it is pretty messy to work with meshgrids when there is a hole in the middle, we do the
         # interpolation only along the x direction (but any other direction would have been just as valid)
@@ -363,9 +370,8 @@ class PrepRoutines:
         ny = int(self.yc_NF / self.dy_NF + 0.5)
 
         # check shift for validity: should be less than half the size of the data extent
-        assert nx < len(self.x_NF) / 2 and ny < len(self.y_NF) / 2, (
-            "Something's off, can't shift more than half the size of the data extent!"
-        )
+        if not (nx < len(self.x_NF) / 2 and ny < len(self.y_NF) / 2):
+            raise AssertionError("Something's off, can't shift more than half the size of the data extent!")
 
         if nx == 0 and ny == 0:
             print("already centered, no corrections necessary")
@@ -669,13 +675,15 @@ class PrepRoutines:
         Returns:
         propagated (complex) field data; the corresponding scales are self.x, self.y and self.w.
         """
-        assert self.is_phase_corrected, "Oops, you forgot to correct the phase!"
+        if not self.is_phase_corrected:
+            raise AssertionError("Oops, you forgot to correct the phase!")
 
         # check that propagated beam will still fit into the window
         w_exp = self.waist * np.sqrt(1 + (z / self.zR) ** 2)
-        assert w_exp < 0.2 * min(self.dx * self.Ew.shape[0], self.dy * self.Ew.shape[1]), (
-            "Oops, you wanted to propagate too far! The pulse will not fit in the transverse window."
-        )
+        if w_exp >= 0.2 * min(self.dx * self.Ew.shape[0], self.dy * self.Ew.shape[1]):
+            raise AssertionError(
+                "Oops, you wanted to propagate too far! The pulse will not fit in the transverse window."
+            )
 
         a = 2 * np.pi * c * np.fft.fftfreq(self.x.size, d=np.diff(self.x)[0])
         b = 2 * np.pi * c * np.fft.fftfreq(self.y.size, d=np.diff(self.y)[0])
@@ -705,7 +713,8 @@ class PrepRoutines:
         lamb_supp: number of sampling points on one wavelength;
                    from this, the number of zeros to be padded will be derived. Default is 10.
         """
-        assert self.is_phase_corrected, "Oops, you forgot to correct the phase!"
+        if not self.is_phase_corrected:
+            raise AssertionError("Oops, you forgot to correct the phase!")
 
         # calculate the number of zeros to be padded at the right side of the spectrum
         # longitudinal axis length N_tot = 2 * pi / (dw * dt)
@@ -774,7 +783,8 @@ class PrepRoutines:
         is_complex: whether Et should be stored as complex-valued (np.complex64). Default is False (i.e. only
                     the real part of Et is written to openPMD)
         """
-        assert pol in {"x", "y"}, "Oops, invalid polarisation direction!"
+        if pol not in {"x", "y"}:
+            raise AssertionError("Oops, invalid polarisation direction!")
         idx_x = int(crop_x / self.dx + 0.5)
         idx_y = int(crop_y / self.dy + 0.5)
         idx_t_neg = int(crop_t_neg / self.dt + 0.5)

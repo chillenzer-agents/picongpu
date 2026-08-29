@@ -135,7 +135,8 @@ class RenderedObject:
         :param fqn: fully qualified class name
         :return: URI of corresponding json schema
         """
-        assert RenderedObject._BASE_URI.endswith("/")
+        if not RenderedObject._BASE_URI.endswith("/"):
+            raise AssertionError()
         return f"{RenderedObject._BASE_URI}{fqn}"
 
     @staticmethod

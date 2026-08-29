@@ -43,6 +43,7 @@ select = [
     "PIE", # flake8-pie
     "PT", # flake8-pytest-style
     "RUF", # ruff-specific rules (RUF100 is enabled with the final ALL step)
+    "S", # bandit
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -111,11 +112,14 @@ known-first-party = ["picongpu"]
     "N999",
 ]
 # testsuite is the legacy test framework, predating the current naming
-# convention (C++-mirrored reader/module names).
-"lib/python/test/testsuite/**" = ["N802", "N803", "N806", "N813", "N816", "N999"]
+# convention (C++-mirrored reader/module names). It reads and writes
+# arbitrary config.py variables by evaluating "config.<name>" expressions,
+# which by design cannot be replaced with a safe literal evaluation.
+"lib/python/test/testsuite/**" = ["N802", "N803", "N806", "N813", "N816", "N999", "S102", "S307"]
 # Test, example, and tool code uses conventional physics notation
 # (E, B, k, n_0, ...) and C++-derived names for simulation parameters.
-"lib/python/test/**" = ["N802", "N803", "N806", "N816"]
+# assert is the idiomatic test primitive (S101).
+"lib/python/test/**" = ["N802", "N803", "N806", "N816", "S101"]
 "lib/python/examples/**" = ["N802", "N816"]
 "lib/python/synchrotronRadiationExtension/**" = ["N802", "N803", "N806"]
 "share/picongpu/tests/**" = ["N801", "N802", "N803", "N806", "N816", "N999"]
@@ -131,8 +135,9 @@ known-first-party = ["picongpu"]
 # format = file format, input = the bunch-input package,
 # copyright = mandatory Sphinx conf variable). Renaming them would
 # break the public API, the correspondence to C++/openPMD plugin
-# arguments, or the Sphinx build.
-"docs/source/conf.py" = ["A001"]
+# arguments, or the Sphinx build. doxygen is a documentation build
+# prerequisite resolved from PATH (S607).
+"docs/source/conf.py" = ["A001", "S607"]
 "lib/python/picongpu/extra/__init__.py" = ["A004"]
 "lib/python/picongpu/extra/input/parameters.py" = ["A002"]
 "lib/python/picongpu/extra/plugins/data/transitionradiation.py" = ["A001"]
@@ -142,3 +147,12 @@ known-first-party = ["picongpu"]
 "lib/python/test/picongpu/end_to_end/test_diagnostics.py" = ["A002"]
 "share/ci/n_wise_generator.py" = ["A002"]
 "src/tools/bin/printField.py" = ["A001"]
+
+# Bandit: the remaining findings are deliberate.
+# The runner generates user-facing build/prepare-submission shell scripts
+# that must be executable (S103).
+"lib/python/picongpu/pypicongpu/runner.py" = ["S103"]
+# The e2e harness queries the SLURM job state via `sacct` from PATH (S607)
+# and executes the `link_results.sh` script that the CWL workflow itself
+# generates (S603), not untrusted input.
+"lib/python/test/picongpu/end_to_end/arbitrary_parameters.py" = ["S603", "S607"]

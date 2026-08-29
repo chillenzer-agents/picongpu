@@ -252,9 +252,12 @@ class Simulation(picmistandard.PICMI_Simulation):
         delta_t not set, cfl not set either:
           nop (do nothing)
         """
-        assert self.solver is not None
-        assert self.solver.method in ["Yee", "Lehe"]
-        assert isinstance(self.solver.grid, Cartesian3DGrid)
+        if self.solver is None:
+            raise AssertionError()
+        if self.solver.method not in ["Yee", "Lehe"]:
+            raise AssertionError()
+        if not isinstance(self.solver.grid, Cartesian3DGrid):
+            raise AssertionError()
 
         delta_x = (
             self.solver.grid.upper_bound[0] - self.solver.grid.lower_bound[0]

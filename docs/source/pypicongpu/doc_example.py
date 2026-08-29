@@ -30,8 +30,10 @@ def my_func(a_char: str, num: int) -> list[str]:
     :raises AssertionError: if num < 0
     :return: [".", "..", "..."]
     """
-    assert len(a_char) == 1
-    assert num >= 0
+    if len(a_char) != 1:
+        raise AssertionError()
+    if num < 0:
+        raise AssertionError()
 
     if num == 0:
         return []

@@ -61,7 +61,8 @@ class BaseWidget(widgets.VBox):
             # for a given output widget we don't add
             # it to the children but rely on the owner
             # of the widget to display it somewhere
-            assert isinstance(output_widget, widgets.Output)
+            if not isinstance(output_widget, widgets.Output):
+                raise AssertionError()
             add_out_to_children = False
         else:
             output_widget = widgets.Output(layout={"border": "1px solid black"})

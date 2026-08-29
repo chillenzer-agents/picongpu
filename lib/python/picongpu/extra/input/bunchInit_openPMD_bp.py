@@ -376,7 +376,8 @@ class Chunk:
                 extent of each slice
 
         """
-        assert len(offset) == len(extent)
+        if len(offset) != len(extent):
+            raise AssertionError()
         self.offset = offset
         self.extent = extent
 
@@ -397,9 +398,11 @@ class Chunk:
         for k, v in enumerate(self.extent):
             if v > maximum:
                 dimension = k
-        assert dimension < len(self)
+        if dimension >= len(self):
+            raise AssertionError()
         # no offset
-        assert self.offset == [0 for _ in range(len(self))]
+        if self.offset != [0 for _ in range(len(self))]:
+            raise AssertionError()
         offset = [0 for _ in range(len(self))]
         extent = self.extent.copy()
 

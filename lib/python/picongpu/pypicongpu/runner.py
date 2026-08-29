@@ -418,10 +418,8 @@ class Runner(BaseModel):
         if printDirToConsole:
             print(" [" + str(self.setup_dir) + "]")
 
-        if not exist_ok:
-            assert not self.setup_dir.is_dir(), (
-                "setup directory must not exist before generation -- did you call generate() already?"
-            )
+        if not exist_ok and self.setup_dir.is_dir():
+            raise AssertionError("setup directory must not exist before generation -- did you call generate() already?")
         preset = rc_params.preset_dir
         copytree(
             core.path("etc") / f"picongpu/{preset}",

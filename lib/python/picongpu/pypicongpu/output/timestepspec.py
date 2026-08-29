@@ -6,7 +6,9 @@ License: GPLv3+
 """
 
 from typing import Annotated
+
 from pydantic import BaseModel, PlainSerializer, field_validator
+
 from ..rendering.renderedobject import RenderedObject
 
 

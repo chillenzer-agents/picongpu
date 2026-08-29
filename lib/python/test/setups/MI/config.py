@@ -16,11 +16,12 @@ For information:
     two cases of KHI currently have to be treated differently.
 """
 
-from scipy.signal import argrelextrema
-from scipy.constants import c
-import numpy as np
 import os
 import sys
+
+import numpy as np
+from scipy.constants import c
+from scipy.signal import argrelextrema
 
 sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)) + "/../../")
 import testsuite as ts  # noqa

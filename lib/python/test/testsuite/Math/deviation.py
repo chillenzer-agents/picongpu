@@ -39,8 +39,9 @@ __all__ = [
     "getTestResult",
 ]
 
-import testsuite._checkData as cD
 import numpy as np
+
+import testsuite._checkData as cD
 
 
 def getMaxDifference(theory, simulation):

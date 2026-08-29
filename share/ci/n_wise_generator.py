@@ -3,11 +3,12 @@
 # generate a reduced test matrix based on the N-wise testing model
 # https://en.wikipedia.org/wiki/All-pairs_testing
 
-from allpairspy import AllPairs
 import argparse
-import sys
 import math
 import random
+import sys
+
+from allpairspy import AllPairs
 
 parser = argparse.ArgumentParser(description="Generate tesing pairs")
 parser.add_argument("-n", dest="n_pairs", default=1, action="store", help="number of tuple elements")

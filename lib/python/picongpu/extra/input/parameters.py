@@ -8,6 +8,7 @@ License: GPLv3+
 """
 
 import collections
+
 import pint
 
 ureg = pint.UnitRegistry()

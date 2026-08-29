@@ -7,9 +7,9 @@ Authors: Brian Marre, Marco Garten
 License: GPLv3+
 """
 
+import mpmath as mp
 import numpy as np
 import scipy.constants as sc
-import mpmath as mp
 
 """ @file reference implementation of the rate calculation for bound-free field based transitions """
 

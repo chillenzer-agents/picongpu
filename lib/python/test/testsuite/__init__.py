@@ -6,9 +6,6 @@ Authors: Mika Soren Voss
 License: GPLv3+
 """
 
-from . import Output
-from . import Reader
-from . import _checkData
-from . import Math
+from . import Math, Output, Reader, _checkData
 
 __all__ = ["Output", "Reader", "Math", "_checkData"]

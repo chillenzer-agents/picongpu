@@ -15,10 +15,11 @@ Returns whether they coincide or not.
 
 """
 
-import openpmd_api as opmd
-import numpy as np
-from grid_class import grid
 import sys
+
+import numpy as np
+import openpmd_api as opmd
+from grid_class import grid
 
 
 def get_params(path):

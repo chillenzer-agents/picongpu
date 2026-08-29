@@ -6,9 +6,9 @@ Authors: Mika Soren Voss
 License: GPLv3+
 """
 
-from . import Log
-from . import Viewer
 import testsuite._checkData as cD
+
+from . import Log, Viewer
 
 __all__ = ["Log", "Viewer", "_checkData"]
 __all__ += Log.__all__

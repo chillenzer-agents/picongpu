@@ -6,9 +6,12 @@ Authors: Mika Soren Voss
 License: GPLv3+
 """
 
-import config
-import testsuite.Output.Log as log
 import sys
+
+import config
+
+import testsuite.Output.Log as log
+
 from . import _checkData as cD
 
 

@@ -7,6 +7,7 @@ License: GPLv3+
 """
 
 import sys
+
 import numpy as np
 import openpmd_api as opmd
 

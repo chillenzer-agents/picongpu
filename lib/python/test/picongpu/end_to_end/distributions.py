@@ -6,8 +6,9 @@ License: GPLv3+
 """
 
 import sympy
-from picongpu import picmi
 from sympy.vector import CoordSys3D, Vector
+
+from picongpu import picmi
 
 from .arbitrary_parameters import CELL_SIZE
 

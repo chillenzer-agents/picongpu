@@ -47,7 +47,8 @@ __all__ = [
 ]
 
 import numpy as np
-from scipy.constants import c, epsilon_0, e, m_e
+from scipy.constants import c, e, epsilon_0, m_e
+
 from . import _searchData as sD
 
 

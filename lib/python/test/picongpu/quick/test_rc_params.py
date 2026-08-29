@@ -10,9 +10,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from moosetash import MissingVariable
+from pytest import fixture, raises, warns
+
 from picongpu import DirtyResetError, core, rc_params
 from picongpu._rc_params import search_for_in_parents
-from pytest import fixture, raises, warns
 
 
 @fixture

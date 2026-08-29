@@ -6,12 +6,12 @@ Authors: Pawel Ordyna
 License: GPLv3+
 """
 
-import numpy as np
-import happi
-import h5py
-import scipy.constants as cs
-
 from pathlib import Path
+
+import h5py
+import happi
+import numpy as np
+import scipy.constants as cs
 
 
 class SmileiBeamRelaxation:

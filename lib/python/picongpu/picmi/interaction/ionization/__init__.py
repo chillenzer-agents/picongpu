@@ -1,7 +1,6 @@
-from .ionizationmodel import IonizationModel
+from . import electroniccollisionalequilibrium, fieldionization
 from .groundstateionizationmodel import GroundStateIonizationModel
-from . import fieldionization
-from . import electroniccollisionalequilibrium
+from .ionizationmodel import IonizationModel
 
 __all__ = [
     "IonizationModel",

@@ -21,10 +21,9 @@ from pathlib import Path
 
 import questionary
 import tomli_w
-
 from moosetash import MissingVariable
 
-from picongpu._rc_params import RCParams, _KEEP_AS_DEFAULT, get_available_presets
+from picongpu._rc_params import _KEEP_AS_DEFAULT, RCParams, get_available_presets
 
 __all__ = ["main"]
 

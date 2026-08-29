@@ -10,8 +10,8 @@ from uuid import uuid4 as uuid
 
 from pydantic import BaseModel, BeforeValidator, computed_field, model_validator
 
-from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_to_cpp_type
 from picongpu.pypicongpu.particle_functor.rng_info import RNGInfo
+from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_to_cpp_type
 from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.rendering.renderedobject import RenderedObject

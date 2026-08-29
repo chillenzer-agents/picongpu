@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from typing import Annotated, Literal
+
 from pydantic import AfterValidator, BaseModel, Field, model_validator
 
 

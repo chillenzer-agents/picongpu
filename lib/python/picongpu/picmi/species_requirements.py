@@ -7,10 +7,10 @@ License: GPLv3+
 
 from types import UnionType
 from typing import Any, Callable
-from scipy.constants import electron_volt
 
 import numpy as np
 from pydantic import BaseModel, Field
+from scipy.constants import electron_volt
 
 from picongpu.pypicongpu.species.attribute.attribute import Attribute
 from picongpu.pypicongpu.species.constant.constant import Constant

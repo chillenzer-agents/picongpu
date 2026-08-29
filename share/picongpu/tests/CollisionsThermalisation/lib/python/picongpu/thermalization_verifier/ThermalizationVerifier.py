@@ -7,15 +7,16 @@ Authors: Pawel Ordyna
 License: GPLv3+
 """
 
+import itertools
+import textwrap
 from os import path
 from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.constants as cs
 import openpmd_api as api
-import textwrap
+import scipy.constants as cs
 import seaborn as sns
-import itertools
 
 
 def _get_debug_data(sim_path, collider_id, pair_id):

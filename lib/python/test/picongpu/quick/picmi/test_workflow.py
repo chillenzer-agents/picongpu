@@ -9,8 +9,9 @@ import json
 
 from cwltool.context import RuntimeContext
 from cwltool.factory import Factory, WorkflowStatus
-from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation
 from pytest import fixture, raises
+
+from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation
 
 
 @fixture

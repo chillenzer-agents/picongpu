@@ -18,7 +18,6 @@ they need to be at least of class Parameter (or inherited).
 
 from picongpu.input.parameters import Parameter
 
-
 dt = 1.39e-16
 
 PARAMETERS = {

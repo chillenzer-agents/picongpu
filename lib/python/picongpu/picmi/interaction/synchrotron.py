@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from pydantic import BaseModel
+
 from picongpu.picmi.species import DependsOn, Species
 from picongpu.picmi.species_requirements import SynchrotronConstantConstruction
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams

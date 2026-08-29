@@ -6,12 +6,13 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-from .base_reader import DataReader
+import collections
+import os
 
 import numpy as np
-import os
 from imageio import imread
-import collections
+
+from .base_reader import DataReader
 
 try:
     collectionsAbc = collections.abc

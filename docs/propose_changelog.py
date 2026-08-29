@@ -28,9 +28,10 @@ The most restricted one with public repository read access is sufficient.
 For adjustments to the categorisation, you can simply change the global variable `CATEGORIES`.
 """
 
-from github import Github
 import argparse
+
 import yaml
+from github import Github
 
 
 def make_lambda(main_condition, component=None):

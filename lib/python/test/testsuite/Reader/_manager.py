@@ -6,11 +6,10 @@ Authors: Mika Soren Voss
 License: GPLv3+
 """
 
-from . import dataReader
-from . import jsonReader
-from . import paramReader
-from . import cmakeFlagReader as cmakeReader
 import testsuite._checkData as cD
+
+from . import cmakeFlagReader as cmakeReader
+from . import dataReader, jsonReader, paramReader
 
 
 def mainsearch(

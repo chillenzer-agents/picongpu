@@ -6,8 +6,9 @@ Authors: Axel Huebl
 License: GPLv3+
 """
 
-import numpy as np
 import os
+
+import numpy as np
 
 
 class FindTime(object):

@@ -14,9 +14,10 @@ The deviation/width should be < 0.05.
 
 """
 
-import openpmd_api as opmd
-import numpy as np
 import sys
+
+import numpy as np
+import openpmd_api as opmd
 
 
 class Comparison:

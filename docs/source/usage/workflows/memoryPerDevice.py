@@ -8,9 +8,9 @@ Authors: Marco Garten, Pawel Ordyna,Brian Marre
 License: GPLv3+
 """
 
-from picongpu.extra.utils.memory_calculator import MemoryCalculator
-
 import numpy as np
+
+from picongpu.extra.utils.memory_calculator import MemoryCalculator
 
 """
 @file

@@ -6,8 +6,9 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-import matplotlib.pyplot as plt
 from warnings import warn
+
+import matplotlib.pyplot as plt
 
 from .utils import get_different_colors
 

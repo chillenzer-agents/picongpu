@@ -13,7 +13,7 @@ from .macro_particle_count import MacroParticleCount
 from .openpmd_plugin import OpenPMDPlugin
 from .particle_energy import ParticleEnergy
 from .phase_space import PhaseSpace
-from .radiation import RadiationConfiguration, RadiationPlugin, RadiationObserverConfiguration
+from .radiation import RadiationConfiguration, RadiationObserverConfiguration, RadiationPlugin
 from .timestepspec import TimeStepSpec
 
 AnyPlugin = (

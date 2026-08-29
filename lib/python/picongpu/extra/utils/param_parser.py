@@ -7,9 +7,9 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-import os
-import json
 import getopt
+import json
+import os
 import sys
 
 

@@ -6,8 +6,8 @@ License: GPLv3+
 """
 
 from functools import lru_cache
-from typing import Literal
 from pathlib import Path
+from typing import Literal
 
 
 @lru_cache

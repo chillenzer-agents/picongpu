@@ -7,8 +7,8 @@ License: LGPLv3+
 
 import sys
 
-import openpmd_api as opmd
 import numpy as np
+import openpmd_api as opmd
 
 
 class vec3D:

@@ -6,10 +6,11 @@ Authors: Axel Huebl, Finn-Ole Carstens
 License: GPLv3+
 """
 
-from .base_reader import DataReader
+import os
 
 import numpy as np
-import os
+
+from .base_reader import DataReader
 
 
 class TransitionRadiationData(DataReader):

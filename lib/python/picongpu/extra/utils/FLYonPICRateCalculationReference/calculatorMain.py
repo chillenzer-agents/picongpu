@@ -10,10 +10,9 @@ License: GPLv3+
 import BoundBoundTransitions as boundbound
 import BoundFreeCollisionalTransitions as boundfreecollisional
 import BoundFreeFieldTransitions as boundfreefield
-
-import scipy.constants as const
-import numpy as np
 import mpmath as mp
+import numpy as np
+import scipy.constants as const
 
 """ @file call to get print out of reference rates/crossections """
 

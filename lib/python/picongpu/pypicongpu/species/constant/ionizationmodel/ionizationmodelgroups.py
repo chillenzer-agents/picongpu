@@ -5,17 +5,18 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
+import copy
+
+from pydantic import BaseModel
+
+from .ADKcircularpolarization import ADKCircularPolarization
+from .ADKlinearpolarization import ADKLinearPolarization
 from .BSI import BSI
 from .BSIeffectiveZ import BSIEffectiveZ
 from .BSIstarkshifted import BSIStarkShifted
-from .ADKlinearpolarization import ADKLinearPolarization
-from .ADKcircularpolarization import ADKCircularPolarization
+from .ionizationmodel import IonizationModel
 from .keldysh import Keldysh
 from .thomasfermi import ThomasFermi
-from .ionizationmodel import IonizationModel
-
-import copy
-from pydantic import BaseModel
 
 
 class IonizationModelGroups(BaseModel):

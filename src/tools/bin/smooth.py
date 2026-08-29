@@ -18,6 +18,7 @@
 # If not, see <http://www.gnu.org/licenses/>.
 #
 from __future__ import division
+
 import numpy as np
 
 __doc__ = "This is the 'smooth' module which provides several functions that\n\

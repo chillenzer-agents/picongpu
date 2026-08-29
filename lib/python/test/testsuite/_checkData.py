@@ -23,9 +23,9 @@ checkExistVariables(variable:str) -> bool
 
 __all__ = ["checkDirection", "checkVariables"]
 
-import warnings
 import importlib.util
 import os
+import warnings
 
 if importlib.util.find_spec("config") is None:
     from testsuite.Template import config

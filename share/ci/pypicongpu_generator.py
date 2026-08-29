@@ -1,12 +1,13 @@
-from typing import List, Dict, Callable
+import re
 import sys
 import tomllib
-import re
+from typing import Callable, Dict, List
+
 import packaging.requirements
 import packaging.version
 import requests
-import yaml
 import typeguard
+import yaml
 
 """
 This file is part of PIConGPU.

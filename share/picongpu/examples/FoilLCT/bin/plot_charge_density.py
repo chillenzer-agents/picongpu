@@ -8,12 +8,12 @@ Authors: Axel Huebl
 License: GPLv3+
 """
 
-import matplotlib.pyplot as plt
-import h5py as h5
-import numpy as np
 import argparse
 import os
 
+import h5py as h5
+import matplotlib.pyplot as plt
+import numpy as np
 
 parser = argparse.ArgumentParser(description="Compare the electron charge density of FoilLCT simulations")
 parser.add_argument(

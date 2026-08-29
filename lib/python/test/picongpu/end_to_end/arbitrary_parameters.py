@@ -11,9 +11,10 @@ from subprocess import run
 from time import sleep
 
 import numpy as np
+from psutil import pid_exists
+
 from picongpu import rc_params
 from picongpu.pypicongpu.util import alt
-from psutil import pid_exists
 
 NUMBER_OF_CELLS = [64, 64, 32]
 LOWER_BOUNDARY = np.array([0.0, 0.0, 0.0])

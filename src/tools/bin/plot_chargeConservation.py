@@ -20,8 +20,9 @@
 #
 
 import argparse
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 import openpmd_api as opmd
 
 __doc__ = """

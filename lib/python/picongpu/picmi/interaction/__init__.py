@@ -1,6 +1,6 @@
 from . import ionization
-from .synchrotron import Synchrotron
 from .collision import Collision, CollisionalPhysicsSetup, ConstLogCollision, DynamicLogCollision
+from .synchrotron import Synchrotron
 
 Interaction = ionization.IonizationModel | Synchrotron | Collision | CollisionalPhysicsSetup
 

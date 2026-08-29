@@ -6,13 +6,14 @@ Authors: Sophie Rudat, Sebastian Starke
 License: GPLv3+
 """
 
-from ..data import EnergyHistogramData
-from .base_visualizer import Visualizer as BaseVisualizer
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from .utils import get_different_colormaps
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
-import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+from ..data import EnergyHistogramData
+from .base_visualizer import Visualizer as BaseVisualizer
+from .utils import get_different_colormaps
 
 
 class Visualizer(BaseVisualizer):
@@ -229,8 +230,8 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
 
         def usage():
             print("usage:")

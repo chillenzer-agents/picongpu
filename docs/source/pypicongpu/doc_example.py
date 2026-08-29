@@ -1,5 +1,6 @@
-import typeguard
 import typing
+
+import typeguard
 
 
 @typeguard.typechecked

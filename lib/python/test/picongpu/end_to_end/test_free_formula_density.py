@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest import TestCase
 
 import numpy as np
+
 from picongpu import picmi, rc_params
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 from picongpu.picmi.diagnostics.checkpoint import Checkpoint

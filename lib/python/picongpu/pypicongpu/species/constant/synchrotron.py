@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from typing import Any
+
 from pydantic import BaseModel
 
 from picongpu.pypicongpu.species.constant.constant import Constant

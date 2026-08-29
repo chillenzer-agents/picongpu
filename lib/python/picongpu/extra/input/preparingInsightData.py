@@ -4,12 +4,12 @@ This file is part of PIConGPU.
 Copyright 2024-2024 Fabia Dietrich
 """
 
-import openpmd_api as openpmd
-import numpy as np
 import h5py
+import numpy as np
+import openpmd_api as openpmd
+import scipy.constants as const
 from scipy.interpolate import RegularGridInterpolator
 from scipy.optimize import curve_fit
-import scipy.constants as const
 
 """
 ATTENTION!

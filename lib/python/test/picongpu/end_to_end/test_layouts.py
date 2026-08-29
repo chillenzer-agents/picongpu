@@ -11,6 +11,7 @@ from unittest import TestCase
 
 import numpy as np
 import pandas as pd
+
 from picongpu import rc_params
 from picongpu.picmi import (
     Cartesian3DGrid,

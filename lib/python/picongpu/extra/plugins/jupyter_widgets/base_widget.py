@@ -138,13 +138,12 @@ class BaseWidget(widgets.VBox):
         if len(run_dir_options) < 1:
             warn("Empty run_dir_options list was passed!", stacklevel=2)
             lut = {}
+        elif isinstance(run_dir_options[0], str):
+            # enumeration as labels
+            lut = {str(i): path for i, path in enumerate(run_dir_options)}
         else:
-            if isinstance(run_dir_options[0], str):
-                # enumeration as labels
-                lut = {str(i): path for i, path in enumerate(run_dir_options)}
-            else:
-                # assume run_dir_options is a list of tuples of length two
-                lut = dict(run_dir_options)
+            # assume run_dir_options is a list of tuples of length two
+            lut = dict(run_dir_options)
 
         # lookup table from label strings to paths
         self.label_path_lut = lut

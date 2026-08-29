@@ -129,8 +129,7 @@ class BoundFreeCollisionalTransitions:
             upperStateLevelVector,
         )  # 1e6b
 
-        if sigma < 0.0:
-            sigma = 0.0
+        sigma = max(sigma, 0.0)
 
         electronRestMassEnergy = const.value("electron mass energy equivalent in MeV") * 1e6  # eV
 

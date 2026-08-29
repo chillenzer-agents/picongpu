@@ -121,9 +121,8 @@ def check_params(num_iterations):
                         field_param["field_epsilon"],
                     ):
                         return False
-                else:
-                    if np.std(value) != 0:
-                        return False
+                elif np.std(value) != 0:
+                    return False
         # Check if the densities are correct
         densities = [
             "e_all_chargeDensity",
@@ -156,9 +155,8 @@ def check_params(num_iterations):
                     field_param["density_epsilon"],
                 ):
                     return False
-            else:
-                if np.std(value) != 0:
-                    return False
+            elif np.std(value) != 0:
+                return False
 
         x, y, z = ts.get_particle(
             var_list=["x", "y", "z"],

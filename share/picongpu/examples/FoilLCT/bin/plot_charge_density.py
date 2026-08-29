@@ -10,6 +10,7 @@ License: GPLv3+
 
 import argparse
 import os
+import sys
 
 import h5py as h5
 import matplotlib.pyplot as plt
@@ -34,7 +35,7 @@ args = parser.parse_args()
 
 if len(args.run_directory) > 4:
     print("Error: Can only compare up to 4 directories!")
-    exit(1)
+    sys.exit(1)
 
 sims = {}
 for D in args.run_directory:

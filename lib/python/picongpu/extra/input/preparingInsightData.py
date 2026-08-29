@@ -774,7 +774,7 @@ class PrepRoutines:
         is_complex: whether Et should be stored as complex-valued (np.complex64). Default is False (i.e. only
                     the real part of Et is written to openPMD)
         """
-        assert pol == "x" or pol == "y", "Oops, invalid polarisation direction!"
+        assert pol in {"x", "y"}, "Oops, invalid polarisation direction!"
         idx_x = int(crop_x / self.dx + 0.5)
         idx_y = int(crop_y / self.dy + 0.5)
         idx_t_neg = int(crop_t_neg / self.dt + 0.5)

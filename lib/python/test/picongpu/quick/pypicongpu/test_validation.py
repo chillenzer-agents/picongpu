@@ -29,7 +29,13 @@ from picongpu.pypicongpu.output.radiation import (
 from picongpu.pypicongpu.output.timestepspec import Spec, TimeStepSpec
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
 from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
-from picongpu.pypicongpu.species.constant import Charge, DensityRatio, Mass
+from picongpu.pypicongpu.species.constant import (
+    Charge,
+    DensityRatio,
+    Mass,
+    SPECIES_CONSTANTS,
+    SpeciesConstants,
+)
 from picongpu.pypicongpu.species.constant.synchrotron import (
     FirstSynchrotronFunctionParams,
     InterpolationParams,

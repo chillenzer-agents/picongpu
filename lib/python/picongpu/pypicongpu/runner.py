@@ -6,9 +6,12 @@ License: GPLv3+
 """
 
 import datetime
+import enum
 import json
 import logging
+import shutil
 import tempfile
+import urllib.parse
 from importlib.util import module_from_spec, spec_from_file_location
 from os import chmod
 from pathlib import Path
@@ -17,6 +20,7 @@ from typing import Annotated, Sequence
 
 from cwltool.context import RuntimeContext
 from cwltool.factory import Factory as WorkflowFactory
+from cwltool.factory import WorkflowStatus
 from pydantic import (
     AfterValidator,
     AliasChoices,
@@ -174,6 +178,239 @@ class TBGFlags(BaseModel):
         return {"class": "Directory", "location": str(value)}
 
 
+class Stage(str, enum.Enum):
+    """
+    Stable, user-facing execution stages of the PIConGPU workflow.
+
+    Stages are the milestones of a simulation run. They are deliberately
+    coarse-grained and decoupled from the individual CWL steps of
+    ``workflow.cwl`` (whose number and names may change over time, e.g. when
+    remote-execution steps are added). A stage may be implemented by one or
+    several CWL steps; the mapping lives in a :class:`StagePlan` inside the
+    runner, and both the public API and the persisted workflow state speak
+    only in stages, never in CWL step names.
+
+    The stages in execution order are:
+
+    - ``build``: compile the simulation executable (pic-build)
+    - ``prepare``: prepare the submission (tbg)
+    - ``submit``: launch the simulation job on the batch system
+    - ``collect``: organize the results into the run directory
+    """
+
+    build = "build"
+    prepare = "prepare"
+    submit = "submit"
+    collect = "collect"
+
+
+class StageArtifactRef(BaseModel):
+    """Reference to an artifact produced by an earlier, completed stage."""
+
+    stage: Stage
+    artifact: str
+
+
+class StepOutputRef(BaseModel):
+    """Reference to an output of a preceding step within the same stage."""
+
+    step: str
+    output: str
+
+
+class StageStepSpec(BaseModel):
+    """
+    How to run one CWL step of the workflow as part of a stage.
+
+    ``inputs`` maps the step's input parameters to their source: a bare
+    string names a workflow input (from ``workflow/input.yaml``), a
+    :class:`StageArtifactRef` takes the value from a completed stage's
+    recorded artifact, and a :class:`StepOutputRef` wires an output of a
+    preceding step of the same stage.
+
+    ``outputs`` maps stage artifact names to the step's output parameters;
+    the resulting artifact locations are recorded in the workflow state.
+    """
+
+    step: str
+    run: str
+    inputs: dict[str, str | StageArtifactRef | StepOutputRef]
+    outputs: dict[str, str] = {}
+
+
+class StageSpec(BaseModel):
+    """A stage: the stages it depends on and the CWL steps that implement it."""
+
+    name: Stage
+    depends_on: tuple[Stage, ...] = ()
+    steps: list[StageStepSpec]
+
+
+class StagePlan(BaseModel):
+    """
+    The stage -> CWL step adapter.
+
+    This is the single place in the code base that knows the current layout
+    of ``workflow.cwl``. ``order`` is the execution (topological) order of
+    the stages; ``stages`` maps each stage to its spec.
+    """
+
+    order: tuple[Stage, ...]
+    stages: dict[Stage, StageSpec]
+
+    def __getitem__(self, stage: Stage | str) -> StageSpec:
+        return self.stages[Stage(stage)]
+
+
+# The current mapping of the stable stages onto the CWL steps of
+# workflow.cwl. If steps are added, removed, or reorganised, only this
+# mapping (and the workflow templates) need to change, not the public API.
+DEFAULT_STAGE_PLAN = StagePlan(
+    order=(Stage.build, Stage.prepare, Stage.submit, Stage.collect),
+    stages={
+        Stage.build: StageSpec(
+            name=Stage.build,
+            steps=[
+                StageStepSpec(
+                    step="build_step",
+                    run="steps/build.cwl",
+                    inputs={
+                        "include_directory": "build_include_directory",
+                        "script": "build_script",
+                        "jobs": "build_jobs",
+                        "cmake": "build_cmake",
+                        "preset": "build_preset",
+                        "force": "build_force",
+                        "cmake_build_system": "build_cmake_build_system",
+                    },
+                    outputs={"bin_directory": "bin_directory"},
+                )
+            ],
+        ),
+        Stage.prepare: StageSpec(
+            name=Stage.prepare,
+            steps=[
+                StageStepSpec(
+                    step="prepare_submission_step",
+                    run="steps/prepare_submission.cwl",
+                    inputs={
+                        "etc_directory": "run_etc_directory",
+                        "script": "prepare_submission_script",
+                        "cfg_file": "run_cfg_file",
+                        "overwrite_vars": "run_overwrite_vars",
+                        "template_file": "run_template_file",
+                        "force": "run_force",
+                    },
+                    outputs={"tbg_directory": "tbg_directory"},
+                )
+            ],
+        ),
+        Stage.submit: StageSpec(
+            name=Stage.submit,
+            depends_on=(Stage.build, Stage.prepare),
+            steps=[
+                StageStepSpec(
+                    step="submit_step",
+                    run="steps/submit.cwl",
+                    inputs={
+                        "script": "submission_script",
+                        "bin_directory": StageArtifactRef(stage=Stage.build, artifact="bin_directory"),
+                        "etc_directory": "run_etc_directory",
+                        "tbg_link": StageArtifactRef(stage=Stage.prepare, artifact="tbg_directory"),
+                        "submit_system": "run_submit_system",
+                        "destination_path": "destination_path",
+                    },
+                    outputs={
+                        "submission_information": "submission_information",
+                        "link_results_script": "link_results_script",
+                        "tbg_directory": "tbg_directory",
+                    },
+                )
+            ],
+        ),
+        Stage.collect: StageSpec(
+            name=Stage.collect,
+            depends_on=(Stage.build, Stage.submit),
+            steps=[
+                StageStepSpec(
+                    step="organize_output_step",
+                    run="steps/organize_output.cwl",
+                    inputs={
+                        "script": "organize_output_script",
+                        "project_path": "run_project_path",
+                        "bin_directory": StageArtifactRef(stage=Stage.build, artifact="bin_directory"),
+                        "tbg_directory": StageArtifactRef(stage=Stage.submit, artifact="tbg_directory"),
+                        "submission_information": StageArtifactRef(
+                            stage=Stage.submit, artifact="submission_information"
+                        ),
+                        "link_results_script": StageArtifactRef(stage=Stage.submit, artifact="link_results_script"),
+                    },
+                    outputs={
+                        "input_directory": "input_directory",
+                        "tbg_directory": "tbg_directory",
+                        "submission_information": "submission_information",
+                        "link_results_script": "link_results_script",
+                    },
+                )
+            ],
+        ),
+    },
+)
+
+
+class WorkflowStageError(RuntimeError):
+    """A stage failed to execute."""
+
+
+class WorkflowPrerequisiteError(RuntimeError):
+    """A stage was requested whose prerequisites are not completed."""
+
+
+class StageStatus(str, enum.Enum):
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    invalidated = "invalidated"
+
+
+class StageState(BaseModel):
+    status: StageStatus
+    updated_at: datetime.datetime | None = None
+    artifacts: dict[str, dict[str, str]] = {}
+
+
+class WorkflowState(BaseModel):
+    """
+    Persisted, stage-keyed state of the workflow, stored in
+    ``run_dir/.workflow_state.json``.
+
+    Only stage names ever appear in this file (never CWL step names), so
+    reorganising the workflow steps does not invalidate the state.
+    Artifacts are stored as reduced CWL file objects (``class`` +
+    ``location``) so they can be re-staged as inputs of later steps.
+    """
+
+    version: int = 1
+    updated_at: datetime.datetime | None = None
+    stages: dict[Stage, StageState] = {}
+
+    @property
+    def completed(self) -> set[Stage]:
+        return {stage for stage, entry in self.stages.items() if entry.status is StageStatus.completed}
+
+
+def cwl_location_to_path(location: str) -> Path:
+    """Convert a cwltool file location (file:// URI or plain path) to a local path."""
+    if location.startswith("file://"):
+        return Path(urllib.parse.unquote(urllib.parse.urlparse(location).path))
+    return Path(location)
+
+
+def reduce_cwl_file(file: dict) -> dict[str, str]:
+    """Keep only what is needed to re-stage a cwltool File/Directory output as an input."""
+    return {"class": file["class"], "location": str(cwl_location_to_path(file["location"]))}
+
+
 class Runner(BaseModel):
     """
     Accepts a PyPIConGPU Simulation and runs it
@@ -222,6 +459,7 @@ class Runner(BaseModel):
         default_factory=lambda: Path(get_tmpdir_with_name("run")).absolute()
     )
     sim: Annotated[Simulation, BeforeValidator(lambda s: alt(lambda: s.get_as_pypicongpu(), s))]
+    stage_plan: StagePlan = Field(default_factory=lambda: DEFAULT_STAGE_PLAN)
 
     def _log_dirs(self):
         """print human-readble list of paths to log"""
@@ -302,6 +540,10 @@ class Runner(BaseModel):
     @property
     def cwl_cachedir(self):
         return self.run_dir / ".cwl_cache"
+
+    @property
+    def workflow_state_path(self):
+        return self.run_dir / ".workflow_state.json"
 
     def generate_profile(self):
         self.profile_path.parent.mkdir(parents=True, exist_ok=True)
@@ -480,3 +722,291 @@ class Runner(BaseModel):
                     }
                 )
             ).make(str(self.workflow_definition_path))(**json.load(file))
+
+    # ------------------------------------------------------------------
+    # Partial execution: stages, state, and stage ranges
+    # ------------------------------------------------------------------
+
+    def _load_workflow_state(self) -> WorkflowState:
+        if not self.workflow_state_path.is_file():
+            return WorkflowState()
+        try:
+            with self.workflow_state_path.open("r") as file:
+                return WorkflowState.model_validate(json.load(file))
+        except (OSError, ValueError) as error:
+            logging.warning(
+                "could not read workflow state %s: %s; starting with an empty state", self.workflow_state_path, error
+            )
+            return WorkflowState()
+
+    def _save_workflow_state(self, state: WorkflowState):
+        state.updated_at = datetime.datetime.now()
+        tmp_path = self.workflow_state_path.with_suffix(".json.tmp")
+        with tmp_path.open("w") as file:
+            json.dump(state.model_dump(mode="json"), file, indent=4)
+        tmp_path.replace(self.workflow_state_path)
+
+    def reset_workflow_state(self) -> None:
+        """Forget all recorded stage progress (e.g. because the inputs changed)."""
+        self.workflow_state_path.unlink(missing_ok=True)
+
+    @staticmethod
+    def _resolve_force(force, plan: StagePlan) -> set[Stage]:
+        if not force:
+            return set()
+        if force is True:
+            return set(plan.order)
+        stages = [Stage(stage) for stage in force] if isinstance(force, (list, tuple)) else [Stage(force)]
+        known = {stage.value for stage in plan.order}
+        unknown = sorted({stage.value for stage in stages} - known)
+        if unknown:
+            raise ValueError(
+                f"unknown stage(s) {unknown}; known stages in execution order: {[s.value for s in plan.order]}"
+            )
+        return set(stages)
+
+    @staticmethod
+    def _invalidated_dependents(forced: set[Stage], plan: StagePlan) -> set[Stage]:
+        """A forced stage invalidates itself and everything that depends on it."""
+        dependents: dict[Stage, set[Stage]] = {stage: set() for stage in plan.order}
+        for stage in plan.order:
+            for dependency in plan[stage].depends_on:
+                dependents[dependency].add(stage)
+        invalidated = set(forced)
+        queue = list(forced)
+        while queue:
+            for dependent in dependents[queue.pop()]:
+                if dependent not in invalidated:
+                    invalidated.add(dependent)
+                    queue.append(dependent)
+        return invalidated
+
+    def _record_full_run(self, state: WorkflowState, outputs: dict) -> None:
+        """
+        Record the stages as completed after a full single-invocation workflow run.
+
+        The workflow's final outputs are the stable, organized artifacts in the
+        run directory. The intermediate stages' outputs are only reachable
+        through them (e.g. the built binaries are part of the organized input
+        directory, cf. organize_output.sh), so they are recorded with the
+        stable locations they have there.
+        """
+
+        def reduced(parameter: str) -> dict[str, str] | None:
+            value = outputs.get(parameter)
+            if isinstance(value, dict) and "location" in value and value.get("class") in ("File", "Directory"):
+                return reduce_cwl_file(value)
+            return None
+
+        input_directory = reduced("input_directory")
+        tbg_directory = reduced("tbg_directory")
+        submission_information = reduced("submission_information")
+        link_results_script = reduced("link_results_script")
+
+        artifacts = {
+            Stage.collect: {
+                "input_directory": input_directory,
+                "tbg_directory": tbg_directory,
+                "submission_information": submission_information,
+                "link_results_script": link_results_script,
+            },
+            Stage.submit: {
+                "tbg_directory": tbg_directory,
+                "submission_information": submission_information,
+                "link_results_script": link_results_script,
+            },
+            Stage.prepare: {"tbg_directory": tbg_directory},
+            Stage.build: {"bin_directory": None},
+        }
+        if input_directory is not None:
+            # organize_output.sh copies the built binaries into input/bin
+            artifacts[Stage.build]["bin_directory"] = {
+                "class": "Directory",
+                "location": str(Path(input_directory["location"]) / "bin"),
+            }
+
+        now = datetime.datetime.now()
+        for stage, stage_artifacts in artifacts.items():
+            clean = {name: value for name, value in stage_artifacts.items() if value is not None}
+            if clean:
+                state.stages[stage] = StageState(status=StageStatus.completed, updated_at=now, artifacts=clean)
+        self._save_workflow_state(state)
+
+    def _stage_outdir(self, stage: Stage, step_index: int) -> Path:
+        # The final stage's last step writes its outputs directly into the run
+        # directory, exactly where the full workflow places them. The other
+        # steps write to private, numbered subdirectories (no CWL step names,
+        # so the on-disk layout survives step reorganisation, like the state).
+        spec = self.stage_plan[stage]
+        if stage is self.stage_plan.order[-1] and step_index == len(spec.steps) - 1:
+            return self.run_dir
+        return self.run_dir / ".stage_outputs" / stage.value / f"step-{step_index + 1}"
+
+    def _run_cwl_step(self, step_path: Path, inputs: dict, outdir: Path) -> dict:
+        outdir.mkdir(parents=True, exist_ok=True)
+        self.cwl_cachedir.mkdir(parents=True, exist_ok=True)
+        try:
+            return (
+                WorkflowFactory(
+                    runtime_context=RuntimeContext(
+                        kwargs={
+                            "outdir": str(outdir),
+                            "rm_tmpdir": False,
+                            "move_outputs": "copy",
+                            "cachedir": str(self.cwl_cachedir),
+                            "preserve_entire_environment": True,
+                        }
+                    )
+                ).make(str(step_path))(**inputs)
+                or {}
+            )
+        except WorkflowStatus as error:
+            raise WorkflowStageError(f"running CWL step {step_path.name} failed: {error}") from error
+
+    def _resolve_step_inputs(self, step_spec: StageStepSpec, state: WorkflowState, step_outputs: dict) -> dict:
+        with self.workflow_input_path.open("r") as file:
+            workflow_inputs = json.load(file)
+        inputs = {}
+        for input_name, source in step_spec.inputs.items():
+            if isinstance(source, str):
+                if source not in workflow_inputs:
+                    raise WorkflowStageError(
+                        f"workflow input '{source}' for step '{step_spec.step}' is missing from {self.workflow_input_path}"
+                    )
+                inputs[input_name] = workflow_inputs[source]
+            elif isinstance(source, StageArtifactRef):
+                stage_state = state.stages.get(source.stage)
+                artifact = stage_state.artifacts.get(source.artifact) if stage_state is not None else None
+                if artifact is None:
+                    raise WorkflowStageError(
+                        f"cannot run step '{step_spec.step}': artifact '{source.artifact}' of stage "
+                        f"'{source.stage.value}' is not available; run that stage first (or reset "
+                        f"{self.workflow_state_path})"
+                    )
+                inputs[input_name] = artifact
+            elif isinstance(source, StepOutputRef):
+                artifact = step_outputs.get(source.step, {}).get(source.output)
+                if artifact is None:
+                    raise WorkflowStageError(
+                        f"step '{step_spec.step}' references output '{source.output}' of step '{source.step}', "
+                        f"which is not part of the same stage"
+                    )
+                inputs[input_name] = artifact
+        return inputs
+
+    def _run_stage(self, stage: Stage, state: WorkflowState) -> dict:
+        spec = self.stage_plan[stage]
+        logging.info("running stage '%s' (steps: %s)", stage.value, [step.step for step in spec.steps])
+        state.stages[stage] = StageState(status=StageStatus.running, updated_at=datetime.datetime.now())
+        self._save_workflow_state(state)
+
+        try:
+            step_outputs: dict[str, dict[str, dict[str, str]]] = {}
+            stage_artifacts: dict[str, dict[str, str]] = {}
+            for step_index, step_spec in enumerate(spec.steps):
+                outdir = self._stage_outdir(stage, step_index)
+                # Private per-step output directory: start clean. Never touch
+                # the run directory itself.
+                if outdir != self.run_dir and outdir.exists():
+                    shutil.rmtree(outdir)
+                inputs = self._resolve_step_inputs(step_spec, state, step_outputs)
+                outputs = self._run_cwl_step(self.workflow_dir_path / step_spec.run, inputs, outdir)
+                for output_name, output in outputs.items():
+                    if (
+                        isinstance(output, dict)
+                        and "location" in output
+                        and output.get("class") in ("File", "Directory")
+                    ):
+                        step_outputs.setdefault(step_spec.step, {})[output_name] = reduce_cwl_file(output)
+                for artifact_name, output_name in step_spec.outputs.items():
+                    if output_name not in step_outputs.get(step_spec.step, {}):
+                        raise WorkflowStageError(
+                            f"step '{step_spec.step}' did not produce output '{output_name}' "
+                            f"required for artifact '{artifact_name}'"
+                        )
+                    stage_artifacts[artifact_name] = step_outputs[step_spec.step][output_name]
+        except Exception:
+            state.stages[stage] = StageState(status=StageStatus.failed, updated_at=datetime.datetime.now())
+            self._save_workflow_state(state)
+            raise
+
+        state.stages[stage] = StageState(
+            status=StageStatus.completed, updated_at=datetime.datetime.now(), artifacts=stage_artifacts
+        )
+        self._save_workflow_state(state)
+        return stage_artifacts
+
+    def run_range(self, up_to: Stage | str | None = None, from_: Stage | str | None = None, force=None):
+        """
+        Execute the stages in the range ``[from_, up_to]`` of the workflow.
+
+        - no arguments: the full pipeline. If no stage is recorded as
+          completed, the complete ``workflow.cwl`` is run in a single
+          cwltool invocation (the historical behavior). If earlier partial
+          runs completed some stages, the remaining stages are executed
+          individually and the completed ones are skipped.
+        - ``up_to``: run all stages up to and including this one.
+        - ``from_``: start with this stage; earlier stages must already be
+          completed, otherwise a :class:`WorkflowPrerequisiteError` is
+          raised (running the missing prerequisites is not done implicitly).
+        - ``force``: ``True`` re-runs every stage of the range; a stage or a
+          list of stages re-runs those stages. Stages that depend on a forced
+          stage are invalidated as well, so they are re-run too.
+
+        Progress is persisted in ``run_dir/.workflow_state.json`` (keyed by
+        stage, never by CWL step). Returns the artifacts of the last executed
+        stage, or ``None`` if everything was already up to date.
+        """
+        plan = self.stage_plan
+        up_to = Stage(up_to) if up_to is not None else None
+        from_ = Stage(from_) if from_ is not None else None
+        forced = self._resolve_force(force, plan)
+
+        order = list(plan.order)
+        if up_to is not None and from_ is not None and order.index(from_) > order.index(up_to):
+            raise ValueError(
+                f"from_ ({from_.value}) is after up_to ({up_to.value}) in the pipeline order "
+                f"({', '.join(stage.value for stage in order)})"
+            )
+
+        state = self._load_workflow_state()
+
+        if up_to is None and from_ is None and not forced and not state.completed:
+            # Historical full-run path: single cwltool invocation of workflow.cwl
+            outputs = self.run()
+            self._record_full_run(state, outputs)
+            return outputs
+
+        low = order.index(from_) if from_ is not None else 0
+        high = order.index(up_to) if up_to is not None else len(order) - 1
+        range_stages = order[low : high + 1]
+
+        invalidated = self._invalidated_dependents(forced, plan)
+        for stage in invalidated:
+            if state.stages.get(stage) is not None and state.stages[stage].status is StageStatus.completed:
+                state.stages[stage] = StageState(
+                    status=StageStatus.invalidated,
+                    updated_at=datetime.datetime.now(),
+                    artifacts=state.stages[stage].artifacts,
+                )
+        if forced:
+            self._save_workflow_state(state)
+
+        completed = state.completed - invalidated
+        for stage in range_stages:
+            missing = [dep for dep in plan[stage].depends_on if dep not in range_stages and dep not in completed]
+            if missing:
+                raise WorkflowPrerequisiteError(
+                    "cannot run stage '{}' without completed prerequisite(s) {}; run them first "
+                    "(e.g. picongpu_run(up_to=...)) or invoke the full pipeline without a range".format(
+                        stage.value, ", ".join(dep.value for dep in missing)
+                    )
+                )
+
+        last_artifacts = None
+        for stage in range_stages:
+            if stage in completed:
+                logging.info("stage '%s' already completed, skipping", stage.value)
+                continue
+            last_artifacts = self._run_stage(stage, state)
+        return last_artifacts

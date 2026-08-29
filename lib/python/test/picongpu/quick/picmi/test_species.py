@@ -5,6 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import re
 from unittest import TestCase
 
 import pytest
@@ -41,7 +42,7 @@ class TestSpeciesShapeAndMethod(TestCase):
         for method, expected in {
             "Boris": Pusher.Boris,
             "Vay": Pusher.Vay,
-            "Higuera-Cary": Pusher.Higuera,
+            "Higuera-Cary": Pusher.HigueraCary,
             "free-streaming": Pusher.Free,
             "LLRK4": Pusher.ReducedLandauLifshitz,
         }.items():
@@ -127,6 +128,24 @@ class TestSpeciesNameDefault(TestCase):
 def unique_in(elements, collection):
     collection = list(collection)
     return (collection.count(e) == 1 for e in elements)
+
+
+def _cpp_identifier(name: str) -> bool:
+    return re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is not None
+
+
+class TestPusherShapeTranslation(TestCase):
+    """the picmi->pypicongpu pusher/shape bridge must not drift from the C++ names"""
+
+    def test_pusher_members_match_cpp_struct_names(self):
+        # the pypicongpu Pusher values render into particles::pusher::<value>,
+        # so every value must be a valid C++ identifier
+        for pusher in Pusher:
+            assert _cpp_identifier(pusher.value), f"pusher value {pusher.value!r} is not a C++ identifier"
+
+    def test_particle_shape_members_match_cpp_struct_names(self):
+        for shape in Shape:
+            assert _cpp_identifier(shape.value), f"shape value {shape.value!r} is not a C++ identifier"
 
 
 class TestSpeciesRequirementResolution(TestCase):

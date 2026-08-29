@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from picongpu.pypicongpu.field_solver import YeeSolver
 from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
-from picongpu.pypicongpu.laser import GaussianLaser
+from picongpu.pypicongpu.laser import FromOpenPMDPulseLaser, GaussianLaser, TWTSLaser
 from picongpu.pypicongpu.movingwindow import MovingWindow
 from picongpu.pypicongpu.species.constant import Charge, DensityRatio, Mass
 from picongpu.pypicongpu.species.constant.synchrotron import (
@@ -375,3 +375,145 @@ class TestDensityProfileInvariants:
                 cylinder_axis=(0.0, 0.0, 1.0),
                 pre_plasma_ramp=Exponential(PlasmaLength=0.1, PlasmaCutoff=0.5),
             )
+
+
+def make_gaussian_laser(**overrides):
+    kwargs = dict(
+        propagation_direction=(0.0, 1.0, 0.0),
+        polarization_direction=(0.0, 0.0, 1.0),
+        polarization_type="Linear",
+        wavelength=0.8e-6,
+        duration=1e-15,
+        focal_position=(0.5, 0.5, 0.5),
+        phi0=0.0,
+        E0=1e10,
+        pulse_init=1.0,
+        huygens_surface_positions=[[1, -1], [1, -1], [1, -1]],
+        waist=1e-5,
+        laguerre_modes=[1.0],
+        laguerre_phases=[0.0],
+    )
+    kwargs |= overrides
+    return GaussianLaser(**kwargs)
+
+
+class TestLaserInvariants:
+    @pytest.mark.parametrize("wavelength", [0.0, -0.8e-6])
+    def test_wavelength_must_be_positive(self, wavelength):
+        with pytest.raises(ValidationError):
+            make_gaussian_laser(wavelength=wavelength)
+
+    @pytest.mark.parametrize("duration", [0.0, -1e-15])
+    def test_pulse_duration_must_be_positive(self, duration):
+        with pytest.raises(ValidationError):
+            make_gaussian_laser(duration=duration)
+
+    @pytest.mark.parametrize("E0", [0.0, -1e10])
+    def test_E0_must_be_positive(self, E0):
+        with pytest.raises(ValidationError):
+            make_gaussian_laser(E0=E0)
+
+    @pytest.mark.parametrize("waist", [0.0, -1e-5])
+    def test_waist_must_be_positive(self, waist):
+        with pytest.raises(ValidationError):
+            make_gaussian_laser(waist=waist)
+
+    @pytest.mark.parametrize("pulse_init", [-1.0, -0.5])
+    def test_pulse_init_must_be_non_negative(self, pulse_init):
+        with pytest.raises(ValidationError):
+            make_gaussian_laser(pulse_init=pulse_init)
+
+    def test_laguerre_modes_must_be_non_empty(self):
+        with pytest.raises(ValidationError):
+            make_gaussian_laser(laguerre_modes=[], laguerre_phases=[])
+
+    def test_laguerre_modes_phases_must_match(self):
+        with pytest.raises(ValidationError, match="equal length"):
+            make_gaussian_laser(laguerre_modes=[1.0, 2.0], laguerre_phases=[0.0])
+
+    def test_valid_gaussian_laser(self):
+        laser = make_gaussian_laser()
+        assert laser.wave_length_si == 0.8e-6
+
+
+def make_twts_laser(**overrides):
+    kwargs = dict(
+        propagation_direction=(0.0, 1.0, 0.0),
+        polarization_direction=(0.0, 0.0, 1.0),
+        polarization_type="Linear",
+        wavelength=0.8e-6,
+        duration=1e-15,
+        focal_position=(0.5, 0.5, 0.5),
+        phi0=0.0,
+        E0=1e10,
+        pulse_init=1.0,
+        huygens_surface_positions=[[1, -1], [1, -1], [1, -1]],
+        waist=1e-5,
+        laserIncidenceAngle=1.0,
+        laserIncidenceAnglePositive=True,
+        polarizationAngle=0.0,
+        beta0=1.0,
+        time_offset_si=0.0,
+        focus_lateral_offset_si=0.0,
+        windowStart=0.0,
+        windowEnd=0.0,
+        windowLength=0.0,
+    )
+    kwargs |= overrides
+    return TWTSLaser(**kwargs)
+
+
+class TestTWTSLaserInvariants:
+    @pytest.mark.parametrize("beta0", [1.5, -1.5])
+    def test_beta0_must_not_exceed_speed_of_light(self, beta0):
+        with pytest.raises(ValidationError):
+            make_twts_laser(beta0=beta0)
+
+    def test_beta0_at_c_allowed(self):
+        # the C++ default is beta0 = 1.0 (overlap propagates with c)
+        assert make_twts_laser(beta0=1.0).beta0 == 1.0
+
+    @pytest.mark.parametrize("field", ["windowStart", "windowEnd", "windowLength"])
+    @pytest.mark.parametrize("value", [-1.0, -10.0])
+    def test_window_parameters_must_be_non_negative(self, field, value):
+        with pytest.raises(ValidationError):
+            make_twts_laser(**{field: value})
+
+    def test_active_window_requires_end_after_start(self):
+        with pytest.raises(ValidationError, match="windowEnd"):
+            make_twts_laser(windowStart=100.0, windowEnd=50.0, windowLength=10.0)
+
+    def test_inactive_window_allows_default_values(self):
+        assert make_twts_laser().windowLength == 0.0
+
+    def test_active_window_valid(self):
+        assert make_twts_laser(windowStart=10.0, windowEnd=100.0, windowLength=10.0).windowEnd == 100.0
+
+
+class TestFromOpenPMDPulseLaserInvariants:
+    def laser_kwargs(self, iteration=0, file_path="pulse.h5"):
+        return dict(
+            propagation_direction=(0.0, 1.0, 0.0),
+            polarization_direction=(0.0, 0.0, 1.0),
+            file_path=file_path,
+            iteration=iteration,
+            dataset_name="E",
+            datatype="float",
+            time_offset_si=0.0,
+            polarisationAxisOpenPMD="x",
+            propagationAxisOpenPMD="y",
+            huygens_surface_positions=[[1, -1], [1, -1], [1, -1]],
+        )
+
+    @pytest.mark.parametrize("iteration", [-1, -100])
+    def test_iteration_must_be_non_negative(self, iteration):
+        with pytest.raises(ValidationError):
+            FromOpenPMDPulseLaser(**self.laser_kwargs(iteration=iteration))
+
+    def test_file_path_must_not_be_empty(self):
+        with pytest.raises(ValidationError):
+            FromOpenPMDPulseLaser(**self.laser_kwargs(file_path=""))
+
+    def test_valid_laser(self):
+        laser = FromOpenPMDPulseLaser(**self.laser_kwargs())
+        assert laser.iteration == 0

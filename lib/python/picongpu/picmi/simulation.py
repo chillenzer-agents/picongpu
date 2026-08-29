@@ -29,7 +29,7 @@ from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSe
 from picongpu.picmi.layout import AnyLayout
 from picongpu.picmi.species import Species
 from picongpu.picmi.species_requirements import (
-    SimpleDensityOperation,
+    CreateDensityOperation,
     SimpleMomentumOperation,
     get_as_pypicongpu,
     resolving_add,
@@ -57,7 +57,7 @@ class _DensityImpl(BaseModel):
         self.species.register_requirements(
             [
                 Weighting(),
-                SimpleDensityOperation(species=self.species, layout=self.layout, grid=self.grid),
+                CreateDensityOperation(species=self.species, layout=self.layout, grid=self.grid),
                 Momentum(),
                 SimpleMomentumOperation(species=self.species),
             ]
@@ -394,7 +394,9 @@ class Simulation(picmistandard.PICMI_Simulation):
         typical_ppc = (
             self.picongpu_typical_ppc
             if self.picongpu_typical_ppc is not None
-            else _mid_window(map(lambda op: op.layout.ppc, filter(lambda op: hasattr(op, "layout"), init_operations)))
+            else _mid_window(
+                map(lambda op: op.start_position.ppc, filter(lambda op: hasattr(op, "start_position"), init_operations))
+            )
         )
         moving_window = (
             None

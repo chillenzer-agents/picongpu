@@ -39,6 +39,9 @@ from picongpu.pypicongpu.species.operation.densityprofile import Uniform
 from picongpu.pypicongpu.species.operation.densityprofile.cylinder import Cylinder
 from picongpu.pypicongpu.species.operation.densityprofile.gaussian import Gaussian
 from picongpu.pypicongpu.species.operation.densityprofile.plasmaramp import Exponential
+from picongpu.pypicongpu.species.species import Species
+from picongpu.pypicongpu.species.attribute import Momentum, Position, Weighting
+from picongpu.pypicongpu.species.operation.createdensity import CreateDensity
 from picongpu.pypicongpu.species.operation.layout import OnePosition, Quiet, Random
 from picongpu.pypicongpu.species.operation.momentum import Drift, Temperature
 from picongpu.pypicongpu.walltime import Walltime
@@ -82,6 +85,51 @@ def test_typical_ppc_must_be_positive(typical_ppc):
     with pytest.raises(ValidationError):
         make_sim(typical_ppc=typical_ppc)
 
+class TestCreateDensityInvariants:
+    def test_created_and_derived_species(self):
+        op = CreateDensity(
+            profile=Uniform(density_si=42.0),
+            species=[make_species(name="a"), make_species(name="b"), make_species(name="c")],
+            start_position=Random(ppc=4),
+        )
+        assert [s.name for s in op.species] == ["a", "b", "c"]
+        assert op.created_species.name == "a"
+        assert [s.name for s in op.derived_species] == ["b", "c"]
+
+    def test_species_sorted_by_ratio_then_name(self):
+        # ratio-less species are placed first (as ratio 0), then increasing
+        # ratio; equal ratios (incl. ratio-less) are ordered by name, so the
+        # rendered species order is deterministic
+        op = CreateDensity(
+            profile=Uniform(density_si=42.0),
+            species=[
+                make_species(name="zeta"),
+                make_species(name="alpha", constants=[DensityRatio(ratio=4)]),
+                make_species(name="beta"),
+                make_species(name="gamma", constants=[DensityRatio(ratio=2)]),
+            ],
+            start_position=Random(ppc=4),
+        )
+        assert [s.name for s in op.species] == ["beta", "zeta", "gamma", "alpha"]
+
+    def test_species_must_be_a_list(self):
+        with pytest.raises(ValidationError, match="species must be a list"):
+            CreateDensity(
+                profile=Uniform(density_si=42.0),
+                species=make_species(name="a"),
+                start_position=Random(ppc=4),
+            )
+
+
+class TestMomentumInvariants:
+    @pytest.mark.parametrize("gamma", [0.5, 0.99])
+    def test_drift_gamma_must_be_at_least_one(self, gamma):
+        with pytest.raises(ValidationError):
+            Drift(direction_normalized=(1.0, 0.0, 0.0), gamma=gamma)
+
+    def test_drift_direction_must_be_unit_vector(self):
+        with pytest.raises(ValidationError, match="unit vector"):
+            Drift(direction_normalized=(2.0, 0.0, 0.0), gamma=1.0)
 
 def test_laser_exceeding_run_warns():
     with pytest.warns(UserWarning, match="exceeds the simulation time"):

@@ -58,7 +58,7 @@ class TestDecoratingClass(TestCase):
         with self.assertRaises(TypeError):
 
             @decorating_class
-            class _:
+            class _Throwaway:
                 def __init__(self):
                     pass
 
@@ -66,7 +66,7 @@ class TestDecoratingClass(TestCase):
         with self.assertRaises(TypeError):
 
             @decorating_class
-            class _:
+            class _Throwaway:
                 def __init__(self, *_):
                     pass
 
@@ -74,7 +74,7 @@ class TestDecoratingClass(TestCase):
         with self.assertRaises(TypeError):
 
             @decorating_class
-            class _:
+            class _Throwaway:
                 def __init__(self, **_):
                     pass
 

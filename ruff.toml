@@ -28,6 +28,7 @@ select = [
     "W", # pycodestyle warnings
     "F", # pyflakes
     "I", # isort
+    "N", # pep8-naming
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -39,3 +40,45 @@ ignore = [
 
 [lint.isort]
 known-first-party = ["picongpu"]
+
+# Naming conventions are deliberately deviated from in these areas.
+# Each entry needs to be justified per file group; prefer the smallest
+# set of rules that covers the intentional deviations.
+[lint.per-file-ignores]
+# picmi/pypicongpu is the public Python API: function, argument, and
+# attribute names mirror C++ parameters, the PICMI standard, and physics
+# quantities (E0, Z, ...). Renaming them would be a breaking change.
+"lib/python/picongpu/picmi/**" = ["N802", "N803", "N806", "N815", "N999"]
+"lib/python/picongpu/pypicongpu/**" = ["N802", "N803", "N806", "N815", "N999"]
+# _rc_params.py carries RO-Crate JSON-LD property names
+# (datePublished, mainEntity, ...) that must not be changed.
+"lib/python/picongpu/_rc_params.py" = ["N815"]
+# extra/ holds experimental add-ons, several of which are ported from
+# external projects (FLYonPIC rate calculations, bunchInit scripts);
+# the original naming is kept so the port stays recognisable.
+"lib/python/picongpu/extra/**" = [
+    "N801",
+    "N802",
+    "N803",
+    "N805",
+    "N806",
+    "N813",
+    "N814",
+    "N816",
+    "N999",
+]
+# testsuite is the legacy test framework, predating the current naming
+# convention (C++-mirrored reader/module names).
+"lib/python/test/testsuite/**" = ["N802", "N803", "N806", "N813", "N816", "N999"]
+# Test, example, and tool code uses conventional physics notation
+# (E, B, k, n_0, ...) and C++-derived names for simulation parameters.
+"lib/python/test/**" = ["N802", "N803", "N806", "N816"]
+"lib/python/examples/**" = ["N802", "N816"]
+"lib/python/synchrotronRadiationExtension/**" = ["N802", "N803", "N806"]
+"share/picongpu/tests/**" = ["N801", "N802", "N803", "N806", "N816", "N999"]
+"share/picongpu/examples/**" = ["N802", "N803", "N806"]
+"share/ci/**" = ["N806"]
+# docs/ contains the Sphinx conf and example model scripts, parts of which
+# are ported from published research code that uses physics notation.
+"docs/**" = ["N802", "N803", "N806", "N816"]
+"src/**" = ["N802", "N803", "N806", "N807", "N816"]

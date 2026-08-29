@@ -53,6 +53,13 @@ select = [
     "LOG", # flake8-logging
     "PLW", # pylint: warning
     "PLE", # pylint: error
+    "NPY", # NumPy 2.x / legacy API
+    "EXE", # flake8-executable
+    "PGH", # pygrep-hooks
+    "DTZ", # flake8-datetimez
+    "PYI", # flake8-pyi
+    "SLOT", # flake8-slots
+    "YTT", # flake8-2020
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -181,7 +188,7 @@ known-first-party = ["picongpu"]
 # The runner generates user-facing build/prepare-submission shell scripts
 # that must be executable (S103). generate(printDirToConsole=True) is a
 # public API flag that explicitly requests console output (T201).
-"lib/python/picongpu/pypicongpu/runner.py" = ["S103", "T201"]
+"lib/python/picongpu/pypicongpu/runner.py" = ["S103", "T201", "DTZ005"]
 # picrc_builder is an interactive questionary-based CLI wizard; its
 # stdout is the conversation with the user (T201).
 "lib/python/picongpu/picrc_builder.py" = ["T201"]
@@ -211,3 +218,15 @@ known-first-party = ["picongpu"]
 # and executes the `link_results.sh` script that the CWL workflow itself
 # generates (S603), not untrusted input.
 "lib/python/test/picongpu/end_to_end/arbitrary_parameters.py" = ["S603", "S607"]
+# These `#! @detail(s)` lines are documentation markers carried over from the
+# FLYonPIC port, not shebangs (EXE001/EXE003/EXE005).
+"lib/python/picongpu/extra/utils/FLYonPICRateCalculationReference/BoundBoundTransitions.py" = [
+    "EXE003",
+    "EXE005",
+]
+"share/picongpu/examples/AtomicPhysics/validation/EvaluationScript.py" = ["EXE001", "EXE003", "EXE005"]
+# The timestamps here are human-readable local time for display (a jupyter
+# widget axis label, the template `_date`, and a temp-directory name);
+# forcing UTC would change what the user sees (DTZ005).
+"lib/python/picongpu/extra/plugins/jupyter_widgets/base_widget.py" = ["DTZ005"]
+"lib/python/picongpu/pypicongpu/rendering/renderer.py" = ["DTZ005"]

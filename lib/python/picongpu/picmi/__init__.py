@@ -43,7 +43,9 @@ from .simulation import Simulation
 from .solver import BinomialSmoother, ElectromagneticSolver
 from .species import Species
 
-if not (sys.version_info.major > 3 or sys.version_info.minor >= 11):
+# friendly error for too-old interpreters; kept although it predates the
+# minimum supported version (UP036)
+if sys.version_info < (3, 11):  # noqa: UP036
     raise AssertionError("Python 3.11 is required for PIConGPU PICMI")
 
 __all__ = [

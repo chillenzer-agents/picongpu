@@ -147,7 +147,7 @@ def alt(expr, alternative, *exprs, ignore=(AttributeError, TypeError, IndexError
 
 
 class _Attribute(str):
-    pass
+    __slots__ = ()
 
 
 class _Item:

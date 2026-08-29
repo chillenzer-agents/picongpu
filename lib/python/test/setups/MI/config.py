@@ -24,7 +24,7 @@ from scipy.constants import c
 from scipy.signal import argrelextrema
 
 sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)) + "/../../")
-import testsuite as ts  # noqa
+import testsuite as ts
 
 # general information about the test
 title = "KHI Growthrate (2D MI)"

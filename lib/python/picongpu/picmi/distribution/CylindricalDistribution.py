@@ -82,8 +82,8 @@ class CylindricalDistribution(Distribution):
 
         if prePlasma:
             pre_plasma_ramp = species.operation.densityprofile.plasmaramp.Exponential(
-                PlasmaLength=self.exponential_pre_plasma_length,  # type: ignore
-                PlasmaCutoff=self.exponential_pre_plasma_cutoff,  # type: ignore
+                PlasmaLength=self.exponential_pre_plasma_length,  # type: ignore[arg-type]
+                PlasmaCutoff=self.exponential_pre_plasma_cutoff,  # type: ignore[arg-type]
             )
         elif explicitlyNoPrePlasma:
             pre_plasma_ramp = species.operation.densityprofile.plasmaramp.None_()

@@ -95,8 +95,8 @@ class CMAKEFlagReader(rF.ReadFiles):
 
         flags = []
 
-        file = open(self._direction + "cmakeFlags", "r")
-        lines = file.readlines()
+        with open(self._direction + "cmakeFlags", "r") as file:
+            lines = file.readlines()
 
         i = 0
         for line in lines:

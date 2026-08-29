@@ -27,8 +27,8 @@ note on drift:
 The drift ("velocity") is represented using either directed_velocity or centroid_velocity (v, gamma*v respectively) and
 for the pypicongpu representation stored in a separate object (Drift).
 
-To accommodate that, this separate Drift object can be requested by the method get_picongpu_drift(). In case of no drift,
-this method returns None.
+To accommodate that, this separate Drift object can be requested by the method get_picongpu_drift().
+In case of no drift, this method returns None.
 """
 
 

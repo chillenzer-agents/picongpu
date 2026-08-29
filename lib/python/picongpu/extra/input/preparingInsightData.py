@@ -294,7 +294,8 @@ class PrepRoutines:
 
     def correct_ugly_spot_in_nf(self, x_ugly, y_ugly, uglybins=3, method="linear"):
         """
-        In case there is an ugly spot in the near field (such as an unnatural peak), it can be smoothened out with this function.
+        In case there is an ugly spot in the near field (such as an unnatural peak),
+        it can be smoothened out with this function.
         It automatically also corrects the far field by propagating the corrected near field back into the focus.
 
         Arguments:
@@ -721,7 +722,8 @@ class PrepRoutines:
             (self.y, self.x, self.w), Ew, bounds_error=False, fill_value=0, method="linear"
         )
         Ew_fft = fft_interp((Y_fft, X_fft, W_fft))
-        # set the negative frequency part to 0 (instead of the complex conjugate) and neglect the imaginary part afterwards
+        # set the negative frequency part to 0 (instead of the complex conjugate)
+        # and neglect the imaginary part afterwards
         w_fft = np.concatenate((w_fft, -np.flip(w_fft[1:])))
         Ew_fft = np.concatenate((Ew_fft, np.zeros_like(Ew_fft[:, :, :-1])), axis=-1)
 

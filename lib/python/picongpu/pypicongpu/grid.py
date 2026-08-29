@@ -60,7 +60,10 @@ def all_gt(iterable, m):
     if all(correct := [x > m for x in iterable]):
         return iterable
     else:
-        message = f"{iterable=} contains values <= {m=} while all should be greater than m. Valid are the following: {correct=}."
+        message = (
+            f"{iterable=} contains values <= {m=} while all should be greater than m. "
+            f"Valid are the following: {correct=}."
+        )
         raise ValueError(message)
 
 

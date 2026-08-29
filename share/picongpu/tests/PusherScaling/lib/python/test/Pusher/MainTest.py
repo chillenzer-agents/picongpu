@@ -189,12 +189,17 @@ class Comparison:
 
 
 def correct_starting_values_for_technical_details(x_poss, y_poss, x_offSet, y_offSet, R_c, halfStepPhase):
-    """The particle is initialized at the arbitary position (5, 32) in the x-y-plane (some arbitrary z which is irrelevant for our computation...).
-    So we have to shift the coordinates in a form, that the initialization point is exactly on the circle with the radius of the particle trajectory with its center at the origin.
+    """The particle is initialized at the arbitary position (5, 32) in the x-y-plane
+    (some arbitrary z which is irrelevant for our computation...).
+    So we have to shift the coordinates in a form, that the initialization point is exactly on
+    the circle with the radius of the particle trajectory with its center at the origin.
     This shifting is done by the transformation (subtraction of the initialization coordinates and radius).
-    But we also need to compensate for a half-step, which is automatically done by PIConGPU to improve the accuracy of the Boris Pusher
-    (see: B. Ripperda et al 2018 ApJS 235 21 https://iopscience.iop.org/article/10.3847/1538-4365/aab114 ; 10.3847/1538-4365/aab114).
-    This half-step is the first data written by PIConGPU and is corrected by the trigonometry operations in the transformation.
+    But we also need to compensate for a half-step, which is automatically done by PIConGPU
+    to improve the accuracy of the Boris Pusher
+    (see: B. Ripperda et al 2018 ApJS 235 21
+    https://iopscience.iop.org/article/10.3847/1538-4365/aab114 ; 10.3847/1538-4365/aab114).
+    This half-step is the first data written by PIConGPU and is corrected by the trigonometry
+    operations in the transformation.
 
     """
     # the coordinates where the particle is initialized in the simulation

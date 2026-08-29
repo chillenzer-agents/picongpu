@@ -11,7 +11,8 @@
 """
 propose_changelog
 
-This little tool queries the Github API for merged pull requests corresponding to the given milestone and labelled by the label "changelog" or "affects latest release".
+This little tool queries the Github API for merged pull requests corresponding to the given milestone and labelled
+by the label "changelog" or "affects latest release".
 The obtained list is categorised and printed to stdout. Suggested usage is:
 
 ```bash
@@ -33,7 +34,8 @@ import yaml
 
 
 def make_lambda(main_condition, component=None):
-    """Factory for lambdas encoding the categorisation conditions. Only needed to capture the current iteration by value."""
+    """Factory for lambdas encoding the categorisation conditions. Only needed to capture the current iteration
+    by value."""
     if component:
         return lambda pr: contains_label(pr, f"component: {component}") and main_condition(pr)
 
@@ -88,7 +90,8 @@ def categorise(prs, categories_or_condition):
 
 
 def apply_to_leaves(function, dictionary):
-    """Helper function to recursively apply a function to the leaves of a nested dictionary (applying to values of a list individually)."""
+    """Helper function to recursively apply a function to the leaves of a nested dictionary (applying to values
+    of a list individually)."""
     if isinstance(dictionary, dict):
         return {key: apply_to_leaves(function, val) for key, val in dictionary.items()}
     if isinstance(dictionary, list):
@@ -104,7 +107,8 @@ def to_string(categories):
 def pull_requests(gh_key, version):
     """Query the Github API for the kind of PRs we need."""
     return Github(gh_key).search_issues(
-        f'repo:ComputationalRadiationPhysics/picongpu type:pr is:merged milestone:"{version}" label:changelog,"affects latest release"'
+        f'repo:ComputationalRadiationPhysics/picongpu type:pr is:merged milestone:"{version}" '
+        'label:changelog,"affects latest release"'
     )
 
 

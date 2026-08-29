@@ -16,7 +16,8 @@ class UnitDimension(BaseModel):
     def check(self):
         if len(self.unit_dimension) != self._num_unit_dimensions:
             raise ValueError(
-                f"Unit dimension vector has {len(self.unit_dimension)=} but {self._num_unit_dimensions=}. They must match."
+                f"Unit dimension vector has {len(self.unit_dimension)=} but "
+                f"{self._num_unit_dimensions=}. They must match."
             )
         return self
 

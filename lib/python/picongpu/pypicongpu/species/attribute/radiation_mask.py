@@ -10,7 +10,12 @@ from .attribute import Attribute
 
 class RadiationMask(Attribute):
     """
-    Radiation mask of a macroparticle
+    Radiation mask of a macroparticle, [dimensionless flag];
+    marks particles that are included in the radiation calculation
+    (e.g. above a gamma threshold).
+
+    C++ name: radiationMask (speciesDefinition.param).
     """
 
     picongpu_name: str = "radiationMask"
+    """C++ type name of the radiation mask attribute."""

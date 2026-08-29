@@ -35,7 +35,22 @@ Vec3_int = Annotated[
 
 
 class Quiet(BaseModel):
+    """
+    place macroparticles on a regular (quiet) grid inside each cell
+
+    C++ counterpart: the quiet layout in include/picongpu/param/particle.param
+    (numParticlesPerDimension).
+
+    Units policy: n_points is a count per dimension, ppc is a count.
+    """
+
     type_quiet: Literal[True] = True
-    n_points: Vec3_int = Field(default=(0, 0, 0))
-    ppc: int = Field(gt=0)
-    """particles per cell, >0"""
+    """discriminator for the AnyLayout union."""
+
+    n_points: Vec3_int = Field(default=(1, 1, 1))
+    """number of particles per dimension inside a cell as 3-integer tuple,
+    [dimensionless count]; must be > 0 in each direction.
+    C++ name: numParticlesPerDimension (particle.param)."""
+
+    ppc: Annotated[int, Field(gt=0)]
+    """particles per cell, [dimensionless count]; must be > 0."""

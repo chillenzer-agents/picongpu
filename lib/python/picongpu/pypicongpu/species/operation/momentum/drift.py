@@ -43,13 +43,23 @@ class Drift(RenderedObject, BaseModel):
     Note that the drift is specified by a direction (normalized velocity
     vector) and gamma. Helpers to load from other representations (originating
     from PICMI) are provided.
+
+    C++ counterpart: the drift (gamma * direction) in
+    include/picongpu/param/particle.param.
+
+    Units policy: direction_normalized is dimensionless (unit vector),
+    gamma is the dimensionless Lorentz factor; the drift velocity is
+    (gamma, direction) and is guaranteed < c by gamma >= 1 with a unit direction.
     """
 
     direction_normalized: Vec3_float
-    """direction of drift, length of one"""
+    """direction of drift, [dimensionless]; must be a normalized vector (length 1, no inf/nan).
+    C++ name: direction (particle.param)."""
 
-    gamma: float = Field(ge=1.0, allow_inf_nan=False)
-    """gamma, the physicists know"""
+    gamma: Annotated[float, Field(ge=1.0, allow_inf_nan=False)]
+    """Lorentz factor of the drift, [dimensionless]; must be >= 1 (the physical
+    invariant velocity < c).
+    C++ name: gamma (particle.param)."""
 
     @classmethod
     def from_velocity(cls, velocity: tuple[float, float, float]):
@@ -58,7 +68,7 @@ class Drift(RenderedObject, BaseModel):
 
         computes gamma and direction_normalized for self
 
-        :param velocity: velocity given as vector
+        :param velocity: velocity given as vector, [m/s]
         """
         if (0, 0, 0) == velocity:
             raise ValueError("velocity must not be zero")
@@ -81,7 +91,7 @@ class Drift(RenderedObject, BaseModel):
 
         computes gamma and direction_normalized for self
 
-        :param velocity: velocity given as vector multiplied with gamma
+        :param velocity: velocity given as vector multiplied with gamma, [kg*m/s] (gamma * m * v)
         """
         if (0, 0, 0) == gamma_velocity:
             raise ValueError("velocity must not be zero")

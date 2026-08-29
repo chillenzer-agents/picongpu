@@ -10,6 +10,10 @@ from pydantic import BaseModel
 
 
 class None_(BaseModel):
-    """no plasma ramp, either up or down"""
+    """no plasma ramp, either up or down
+
+    C++ counterpart: the absence of a ramp in include/picongpu/param/density.param.
+    """
 
     type_none: Literal[True] = True
+    """discriminator for the AllPlasmaRamps union."""

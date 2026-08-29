@@ -35,8 +35,23 @@ Vec3_float = Annotated[
 
 
 class OnePosition(BaseModel):
+    """
+    place exactly one macroparticle per cell at a fixed position inside the cell
+
+    C++ counterpart: the one-position layout in
+    include/picongpu/param/particle.param (inCellOffset).
+
+    Units policy: in_cell_offset is in units of the cell size (dimensionless),
+    ppc is a count.
+    """
+
     type_one_position: Literal[True] = True
+    """discriminator for the AnyLayout union."""
+
     in_cell_offset: Vec3_float = Field(default=(0.0, 0.0, 0.0))
-    """Offset inside of the cell relative to cell size, i.e., between 0 and 1"""
-    ppc: int = Field(gt=0)
-    """particles per cell, >0"""
+    """Offset inside of the cell relative to cell size, i.e., between 0 and 1,
+    [dimensionless]; each component must satisfy 0 <= x < 1.
+    C++ name: inCellOffset (particle.param)."""
+
+    ppc: Annotated[int, Field(gt=0)]
+    """particles per cell, [dimensionless count]; must be > 0."""

@@ -123,7 +123,7 @@ class Parameter:
             self.range = range
             self.pic_range = tuple(self.convert_to_PIC(range))
         else:
-            # raise ValueError("Need either 'values' or 'range' parameter!")
+            # silently fall back to the default instead of raising a ValueError
             self.values = self.default
             self.pic_values = self.convert_to_PIC(default)
             print(

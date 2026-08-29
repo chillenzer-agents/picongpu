@@ -143,7 +143,7 @@ class BoundFreeCollisionalTransitions:
         # => beta = sqrt(1 - 1/(1 + E_kin/(m*c^2))^2)
         # v = c * beta = c * sqrt(1 - 1/(1 + E_kin/(m*c^2))^2)
 
-        # dE * sigma(E) * rho_e * v
+        # product of dE, sigma(E), rho_e, and v
         # eV * 1e6b * m^2/(1e6b) * 1/(m^3 * eV) * m/s * unitless
         # = eV/(eV) * m^2 * 1/m^3 * m/s = 1/s
         return (

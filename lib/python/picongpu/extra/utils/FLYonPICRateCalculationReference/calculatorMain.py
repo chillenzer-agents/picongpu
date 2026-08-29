@@ -22,7 +22,7 @@ if __name__ == "__main__":
     energyElectron = 1000.0
     # eV
     energyElectronBinWidth = 10.0
-    # 1/(eV * m^3)
+    # in 1/(eV m^3) units
     densityElectrons = 1e28
 
     # bound-free collisional transition data

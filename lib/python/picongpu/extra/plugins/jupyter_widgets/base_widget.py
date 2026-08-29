@@ -307,8 +307,6 @@ class BaseWidget(widgets.VBox):
         if not isinstance(selected_sims, list):
             selected_sims = [selected_sims]
 
-        # print("in _update_plot_mpl_run_dir, selected_sims =", selected_sims)
-
         run_dirs = [self.label_path_lut[label] for label in selected_sims]
         # prepare nicer labels for run_dirs in the plots
         run_dirs = list(zip(selected_sims, run_dirs, strict=False))
@@ -333,14 +331,12 @@ class BaseWidget(widgets.VBox):
             except OSError as e:
                 print("Getting times failed!", e)
                 raise e
-            # print(reader.run_directory, ":", times_avail)
             all_sim_times.append(set(times_avail))
 
         # the simulation times shared by all selected simulations
         common_sim_times = sorted(set.intersection(*all_sim_times))
         if len(common_sim_times) == 0:
             common_sim_times = [""]
-        # print("common_sim_times = ", common_sim_times)
         # Note: this would trigger the callback function of the
         # iteration slider and we deactivate it here first
         self.sim_time_slider.unobserve(self._visualize_callback, names="value")

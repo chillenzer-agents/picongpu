@@ -104,9 +104,9 @@ class TestPicmiSimulation(TestCase):
         # case a: silently pass if they do match
         get_sim_cfl_helper(7.14500557764070900528e-9, 0.99, (3, 4, 5), "Yee")
 
-        # case b: raise error if no match
+        # case b: an error is raised on mismatch
         with pytest.raises(ValueError):
-            # delta_t does not match cfl at all
+            # the delta_t here does not match the cfl at all
             get_sim_cfl_helper(1, 0.99, (3, 4, 5), "Yee")
 
     def test_species_translation(self):

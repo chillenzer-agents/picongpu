@@ -50,7 +50,6 @@ def change_param_file(file_name, param_name, value):
         for line in lines:
             if param_name + " = " in line:
                 changedLine = line.split("=")[0] + "= " + value + ";\n"
-                # print(changedLine)
                 f.write(changedLine)
             else:
                 f.write(line)

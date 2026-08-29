@@ -842,8 +842,8 @@ class PrepRoutines:
 
         # conversion of field data to SI
         # total field energy: W = dV * eps0/2 * sum(E**2 + c**2 * B**2) in Joule
-        # B_trans = +- E_pol / c
-        # B_pol = 0
+        # B_trans is +- E_pol / c
+        # B_pol is 0
         # B_z = -+ i/w * d/d_trans E_pol; but neglectable since B_z << B_trans
         # 1st sign for pol = "x", 2nd for "y"
         dV = self.dx * self.dy * self.dt * c * 10**-9  # m**3

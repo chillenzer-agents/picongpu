@@ -28,9 +28,8 @@ def ADK_rate_simple(Z, E_i, F):
     n_eff = Z / ((2.0 * E_i) ** (1.0 / 2.0))  # effective principal quantum number
     D = ((4.0 * np.exp(1.0) * Z**3.0) / (F * n_eff**4.0)) ** n_eff  # some factor
 
-    # laser is circularly polarized
-    # pol_fac = 1.
-    # laser is lin. polarized
+    # for a circularly polarized laser, pol_fac would be 1; the laser is
+    # linearly polarized:
     pol_fac = ((3 * n_eff**3 * F) / (np.pi * Z**3)) ** (1.0 / 2)
     return pol_fac * (F * D**2.0) / (8.0 * np.pi * Z) * np.exp(-(2.0 * Z**3.0) / (3.0 * n_eff**3.0 * F))
 

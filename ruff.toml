@@ -52,6 +52,7 @@ select = [
     "PD", # pandas-vet
     "LOG", # flake8-logging
     "PLW", # pylint: warning
+    "PLE", # pylint: error
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately

@@ -220,13 +220,13 @@ class GroundStateIonizationConstruction(DelayedConstruction):
         operators = {"constructor": constructor, "try_update_with": try_update_with}
         metadata = {"Type": GroundStateIonization, "kwargs": {"ionization_model_list": [ionization_model]}}
 
-        return super().__init__(operators=operators, metadata=metadata, must_be_unique=True)
+        super().__init__(operators=operators, metadata=metadata, must_be_unique=True)
 
 
 class SetChargeStateOperation(DelayedConstruction):
     def __init__(self, /, species):
         metadata = {"Type": SetChargeState, "kwargs": {"species": species, "charge_state": species.charge_state}}
-        return super().__init__(metadata=metadata, must_be_unique=True)
+        super().__init__(metadata=metadata, must_be_unique=True)
 
 
 class SimpleDensityOperation(DelayedConstruction):
@@ -258,7 +258,7 @@ class SimpleDensityOperation(DelayedConstruction):
         }
         operators = {"constructor": constructor, "try_update_with": try_update_with}
 
-        return super().__init__(metadata=metadata, operators=operators)
+        super().__init__(metadata=metadata, operators=operators)
 
 
 class SimpleMomentumOperation(DelayedConstruction):
@@ -294,9 +294,9 @@ class SimpleMomentumOperation(DelayedConstruction):
         }
         operators = {"constructor": constructor}
 
-        return super().__init__(metadata=metadata, operators=operators)
+        super().__init__(metadata=metadata, operators=operators)
 
 
 class SynchrotronConstantConstruction(DelayedConstruction):
     def __init__(self, /, photon_species):
-        return super().__init__(metadata={"Type": SynchrotronConstant, "kwargs": {"photon_species": photon_species}})
+        super().__init__(metadata={"Type": SynchrotronConstant, "kwargs": {"photon_species": photon_species}})

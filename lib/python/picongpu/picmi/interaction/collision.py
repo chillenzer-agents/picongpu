@@ -58,7 +58,7 @@ class CollisionalPhysicsSetup(BaseModel):
                 args = ()
             else:
                 raise ValueError(f"Duplicated collisions argument given: You gave {args=} and {kwargs=}.")
-        return super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     @field_validator("collisions", mode="before")
     @classmethod

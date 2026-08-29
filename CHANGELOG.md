@@ -1,6 +1,13 @@
 Changelog
 =========
 
+Unreleased
+----------
+
+**Features:**
+- PICMI:
+    - radiation plugin: accept `FilteredSpecies` in PICMI (Python side; C++ dispatch is a follow-up)
+
 0.8.0
 -----
 

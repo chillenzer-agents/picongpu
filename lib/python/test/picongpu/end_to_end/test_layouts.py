@@ -20,8 +20,8 @@ from picongpu.picmi import (
     OnePositionLayout,
     PseudoRandomLayout,
     Simulation,
+    Species,
 )
-from picongpu.picmi import Species as Species
 from picongpu.picmi.diagnostics import (
     Checkpoint,
     TimeStepSpec,

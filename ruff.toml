@@ -46,6 +46,7 @@ select = [
     "S", # bandit
     "T20", # flake8-print
     "ARG", # flake8-unused-arguments
+    "PLC", # pylint: conventional
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -166,6 +167,21 @@ known-first-party = ["picongpu"]
 # picrc_builder is an interactive questionary-based CLI wizard; its
 # stdout is the conversation with the user (T201).
 "lib/python/picongpu/picrc_builder.py" = ["T201"]
+# The plot_mpl visualizers are dual-purpose modules: the CLI imports in
+# their script-mode main() (getopt, sys, matplotlib.pyplot) stay inside the
+# function so that importing a visualizer as a library does not pull in
+# matplotlib.pyplot or CLI modules (PLC0415).
+"lib/python/picongpu/extra/plugins/plot_mpl/**" = ["PLC0415"]
+# The testsuite dispatcher imports the sub-package managers inside its broad
+# try/except, so that import failures are reported as a test failure
+# (exit 42) instead of breaking at module import time (PLC0415).
+"lib/python/test/testsuite/_manager.py" = ["PLC0415"]
+# These picmi modules are re-export hubs: the self-aliasing imports
+# (`X as X`) deliberately re-export pypicongpu types into the picmi public
+# namespace (and silence F401); removing the alias (PLC0414) would drop the
+# names from the namespace.
+"lib/python/picongpu/picmi/diagnostics/radiation.py" = ["PLC0414"]
+"lib/python/picongpu/picmi/interaction/collision.py" = ["PLC0414"]
 # The e2e harness queries the SLURM job state via `sacct` from PATH (S607)
 # and executes the `link_results.sh` script that the CWL workflow itself
 # generates (S603), not untrusted input.

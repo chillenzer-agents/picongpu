@@ -9,6 +9,9 @@ from pydantic import ConfigDict, field_validator
 
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 from picongpu.picmi.species import Species
+
+# the self-aliasing imports are explicit re-exports into the picmi public
+# namespace (and mark the names as re-exports, which keeps F401 quiet)
 from picongpu.pypicongpu.output.radiation import (
     FormFactorConfiguration as FormFactorConfiguration,
 )

@@ -27,7 +27,7 @@ import warnings
 import matplotlib
 import numpy as np
 import pylab
-from matplotlib import colors as colors
+from matplotlib import colors
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 

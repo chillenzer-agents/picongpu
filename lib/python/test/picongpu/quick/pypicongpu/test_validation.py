@@ -11,6 +11,8 @@ enforced by the pypicongpu pydantic models (task 06).
 import warnings
 from datetime import timedelta
 
+from sympy import Symbol
+
 import pytest
 from pydantic import ValidationError
 
@@ -19,7 +21,9 @@ from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
 from picongpu.pypicongpu.laser import FromOpenPMDPulseLaser, GaussianLaser, TWTSLaser
 from picongpu.pypicongpu.movingwindow import MovingWindow
 from picongpu.pypicongpu.output.checkpoint import Checkpoint
+from picongpu.pypicongpu.output.binning import BinSpec, Binning, BinningAxis
 from picongpu.pypicongpu.output.openpmd_plugin import RangeSpec, RangeSpecEntry
+from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFunctor
 from picongpu.pypicongpu.output.radiation import (
     FrequenciesFromList,
     LinearFrequencies,
@@ -701,3 +705,138 @@ class TestOpenPMDRangeSpecInvariants:
         assert (
             RangeSpec(data=(RangeSpecEntry(data=1), RangeSpecEntry(), RangeSpecEntry(data=42))).model_dump() == "1,,42"
         )
+
+
+class TestEnergyHistogramInvariants:
+    def _histogram(self, **overrides):
+        from picongpu.pypicongpu.output.energy_histogram import EnergyHistogram
+
+        kwargs = dict(
+            species=make_species(),
+            period=TimeStepSpec([Spec(start=0, stop=-1, step=1)]),
+            bin_count=16,
+            min_energy=0.0,
+            max_energy=100.0,
+        )
+        kwargs |= overrides
+        return EnergyHistogram(**kwargs)
+
+    def test_bin_count_must_be_positive(self):
+        with pytest.raises(ValidationError, match="bin_count"):
+            self._histogram(bin_count=0)
+
+    def test_min_energy_must_be_non_negative(self):
+        with pytest.raises(ValidationError, match="min_energy"):
+            self._histogram(min_energy=-1.0)
+
+    def test_min_energy_must_be_below_max_energy(self):
+        with pytest.raises(ValidationError, match="min_energy"):
+            self._histogram(min_energy=100.0, max_energy=50.0)
+
+    def test_valid_histogram(self):
+        assert self._histogram().bin_count == 16
+
+
+def make_binning_functor(name="positionCell", return_type="float_X"):
+    return ParticleFunctor(
+        name=name,
+        functor_expression=Symbol("px"),
+        functor_preamble=[],
+        return_type=return_type,
+        unit_dimension=None,
+    )
+
+
+class TestBinningInvariants:
+    def test_bin_spec_nsteps_must_be_positive(self):
+        with pytest.raises(ValidationError, match="nsteps"):
+            BinSpec(kind="Linear", start=0.0, stop=1.0, nsteps=0)
+
+    def test_bin_spec_start_must_be_below_stop(self):
+        with pytest.raises(ValidationError, match="smaller than its stop"):
+            BinSpec(kind="Linear", start=1.0, stop=0.0, nsteps=1)
+
+    def test_bin_spec_equal_bounds_rejected(self):
+        with pytest.raises(ValidationError, match="smaller than its stop"):
+            BinSpec(kind="Linear", start=1.0, stop=1.0, nsteps=1)
+
+    def test_log_bin_spec_must_not_include_zero(self):
+        for start, stop in ((-1.0, 1.0), (0.0, 1.0), (-1.0, 0.0)):
+            with pytest.raises(ValidationError, match="zero"):
+                BinSpec(kind="Log", start=start, stop=stop, nsteps=4)
+
+    def test_bin_spec_kind_must_be_linear_or_log(self):
+        with pytest.raises(ValidationError, match="kind"):
+            BinSpec(kind="position", start=0.0, stop=1.0, nsteps=4)
+
+    def test_valid_bin_spec(self):
+        assert BinSpec(kind="Linear", start=0.0, stop=16.0, nsteps=16).nsteps == 16
+
+    def test_axis_name_must_be_c_identifier(self):
+        with pytest.raises(ValidationError, match="axis names"):
+            BinningAxis(
+                name="x-y",
+                functor=make_binning_functor(),
+                bin_spec=BinSpec(kind="Linear", start=0.0, stop=1.0, nsteps=1),
+                use_overflow_bins=True,
+            )
+
+    def test_binner_name_must_be_c_identifier(self):
+        with pytest.raises(ValidationError, match="binner names"):
+            Binning(
+                name="my-binner",
+                deposition_functor=make_binning_functor("deposition"),
+                axes=[
+                    BinningAxis(
+                        name="x",
+                        functor=make_binning_functor(),
+                        bin_spec=BinSpec(kind="Linear", start=0.0, stop=1.0, nsteps=1),
+                        use_overflow_bins=True,
+                    )
+                ],
+                species=[make_species()],
+                period=TimeStepSpec([Spec(start=0, stop=-1, step=1)]),
+                openPMDBackendConfig=None,
+                openPMDExt=None,
+                openPMDInfix=None,
+                dumpPeriod=1,
+            )
+
+    def test_binning_requires_axes_and_species(self):
+        kwargs = dict(
+            name="posBinning",
+            deposition_functor=make_binning_functor("deposition"),
+            period=TimeStepSpec([Spec(start=0, stop=-1, step=1)]),
+            dumpPeriod=1,
+        )
+        axis = BinningAxis(
+            name="x",
+            functor=make_binning_functor(),
+            bin_spec=BinSpec(kind="Linear", start=0.0, stop=1.0, nsteps=1),
+            use_overflow_bins=True,
+        )
+        with pytest.raises(ValidationError, match="axes"):
+            Binning(**kwargs, axes=[], species=[make_species()])
+        with pytest.raises(ValidationError, match="species"):
+            Binning(**kwargs, axes=[axis], species=[])
+
+    def test_binning_dump_period_must_be_non_negative(self):
+        with pytest.raises(ValidationError, match="dumpPeriod"):
+            Binning(
+                name="posBinning",
+                deposition_functor=make_binning_functor("deposition"),
+                axes=[
+                    BinningAxis(
+                        name="x",
+                        functor=make_binning_functor(),
+                        bin_spec=BinSpec(kind="Linear", start=0.0, stop=1.0, nsteps=1),
+                        use_overflow_bins=True,
+                    )
+                ],
+                species=[make_species()],
+                period=TimeStepSpec([Spec(start=0, stop=-1, step=1)]),
+                openPMDBackendConfig=None,
+                openPMDExt=None,
+                openPMDInfix=None,
+                dumpPeriod=-1,
+            )

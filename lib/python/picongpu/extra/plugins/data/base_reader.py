@@ -6,9 +6,9 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-from ...utils.find_time import FindTime
-
 import numpy as np
+
+from ...utils.find_time import FindTime
 
 
 class DataReader(object):

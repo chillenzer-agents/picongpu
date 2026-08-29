@@ -6,13 +6,14 @@ Authors: Marco Garten
 License: GPLv3+
 """
 
-import sys
 import os
+import sys
+from importlib import import_module
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.constants as sc
-from importlib import import_module
 
 picongpu_package_path = os.path.abspath("../../../lib/python/")
 

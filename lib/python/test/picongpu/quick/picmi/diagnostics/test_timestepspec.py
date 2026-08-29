@@ -5,9 +5,9 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from unittest import TestCase
 from functools import reduce
-from math import floor, ceil
+from math import ceil, floor
+from unittest import TestCase
 
 import pytest
 

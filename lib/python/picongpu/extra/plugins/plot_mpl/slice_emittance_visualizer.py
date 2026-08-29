@@ -6,9 +6,10 @@ Authors: Sophie Rudat, Sebastian Starke
 License: GPLv3+
 """
 
+import matplotlib.pyplot as plt
+
 from ..data import EmittanceData
 from .base_visualizer import Visualizer as BaseVisualizer
-import matplotlib.pyplot as plt
 
 
 class Visualizer(BaseVisualizer):
@@ -109,8 +110,8 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
 
         def usage():
             print("usage:")

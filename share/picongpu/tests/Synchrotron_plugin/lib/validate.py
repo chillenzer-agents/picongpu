@@ -19,9 +19,10 @@ If not, see <http://www.gnu.org/licenses/>.
 """
 
 import sys
-import openpmd_api as opmd
+
 import numpy as np
-from synchrotron_lib import analytical_Propability, momentum_to_energy, quad, const
+import openpmd_api as opmd
+from synchrotron_lib import analytical_Propability, const, momentum_to_energy, quad
 
 
 # Used when comparing two sets of histogram data with different binning

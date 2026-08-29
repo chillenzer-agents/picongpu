@@ -9,8 +9,8 @@ Note: only one point of data is currently covered
       in theory, more cases have yet to be added
 """
 
-import testsuite.Math.deviation as dv
 import testsuite._checkData as cD
+import testsuite.Math.deviation as dv
 
 
 def _calculate(theory, simulation):

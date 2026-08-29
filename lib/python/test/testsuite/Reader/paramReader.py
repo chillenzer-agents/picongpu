@@ -20,8 +20,9 @@ paramInLine(parameter:str, filename, direction:str = None) -> dict
 
 __all__ = ["ParamReader"]
 
-from . import jsonReader
 import warnings
+
+from . import jsonReader
 from . import readFiles as rF
 
 

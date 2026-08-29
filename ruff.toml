@@ -27,6 +27,7 @@ select = [
     "E", # pycodestyle errors (E4, E5, E7, E9; E1/E2/E3/E6 are preview-only)
     "W", # pycodestyle warnings
     "F", # pyflakes
+    "I", # isort
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately

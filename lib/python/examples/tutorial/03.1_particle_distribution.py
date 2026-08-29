@@ -19,8 +19,9 @@ License: GPLv3+
 import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
-from picongpu.picmi.distribution import GaussianDistribution, AnalyticDistribution
-from sympy import Piecewise, Abs, exp
+from sympy import Abs, Piecewise, exp
+
+from picongpu.picmi.distribution import AnalyticDistribution, GaussianDistribution
 
 NUM_CELLS = np.array([192, 2048, 192])
 CELL_SIZE = np.array([0.1772e-6, 0.4430e-7, 0.1772e-6])

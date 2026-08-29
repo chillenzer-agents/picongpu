@@ -12,8 +12,9 @@ searchParameter(parameter:str, directiontype:str = None)
 
 __all__ = ["searchParameter"]
 
-from .. import Reader
 import warnings
+
+from .. import Reader
 
 
 def searchParameter(parameter: str, directiontype: str = None, **kwargs):

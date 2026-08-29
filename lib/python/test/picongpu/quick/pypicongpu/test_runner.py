@@ -9,6 +9,9 @@ from functools import reduce
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
+from pydantic import ValidationError
+from pytest import fixture, raises
+
 from picongpu import rc_params
 from picongpu._rc_params import RCParams
 from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation
@@ -21,8 +24,6 @@ from picongpu.pypicongpu.runner import (
     generate_bare_profile_as_in,
 )
 from picongpu.pypicongpu.util import UnpackChain
-from pydantic import ValidationError
-from pytest import fixture, raises
 
 
 @fixture

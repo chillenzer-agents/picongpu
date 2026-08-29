@@ -7,10 +7,9 @@ License: GPLv3+
 """
 
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-import numpy as np
 
 from ..data import PhaseSpaceData
 from .base_visualizer import Visualizer as BaseVisualizer
@@ -233,8 +232,8 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
 
         def usage():
             print("usage:")

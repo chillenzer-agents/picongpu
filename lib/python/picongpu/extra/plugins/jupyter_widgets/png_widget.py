@@ -6,10 +6,10 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-from .base_widget import BaseWidget
-from ..plot_mpl import PNGMPL
-
 from ipywidgets import widgets
+
+from ..plot_mpl import PNGMPL
+from .base_widget import BaseWidget
 
 
 class PNGWidget(BaseWidget):

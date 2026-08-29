@@ -19,10 +19,11 @@
 # If not, see <http://www.gnu.org/licenses/>.
 #
 
+import argparse
 import os
+
 import numpy as np
 from matplotlib import pyplot as plt
-import argparse
 from matplotlib.colors import LogNorm
 
 __doc__ = """This tool analyzes spectra for different directions.

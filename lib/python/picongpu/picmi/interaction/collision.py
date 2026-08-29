@@ -7,10 +7,10 @@ License: GPLv3+
 
 from itertools import combinations, combinations_with_replacement
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from picongpu.picmi.species import Species
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
+from picongpu.picmi.species import Species
 from picongpu.pypicongpu.collisions import Collision as PyPIConGPUCollision
 from picongpu.pypicongpu.collisions import CollisionalPhysicsSetup as PyPIConGPUCollisionalPhysicsSetup
 from picongpu.pypicongpu.collisions import CollisionFunctor

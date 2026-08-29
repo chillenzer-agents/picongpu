@@ -9,6 +9,7 @@ License: GPLv3+
 
 import argparse
 import os
+
 from ThermalizationVerifier import ThermalizationVerifier
 
 smilei_import_error = None

@@ -6,8 +6,11 @@ License: GPLv3+
 """
 
 from functools import partial
+
 import numpy as np
 import sympy
+from scipy.constants import speed_of_light
+
 from picongpu.picmi.diagnostics.binning import (
     Binning,
     BinningAxis,
@@ -15,7 +18,6 @@ from picongpu.picmi.diagnostics.binning import (
     BinSpec,
 )
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
-from scipy.constants import speed_of_light
 
 from .arbitrary_parameters import (
     ALL_ORIGINS_WITHOUT_GUARDS,

@@ -9,6 +9,7 @@ License: GPLv3+
 
 import argparse
 import os
+
 from BeamRelaxationVerifier import BeamRelaxationVerifier
 
 smilei_import_error = None

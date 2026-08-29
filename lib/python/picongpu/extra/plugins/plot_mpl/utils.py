@@ -1,9 +1,9 @@
+from warnings import warn
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-
 from matplotlib.colors import colorConverter
-from warnings import warn
 
 
 def get_different_colors(n, cmap="tab20"):

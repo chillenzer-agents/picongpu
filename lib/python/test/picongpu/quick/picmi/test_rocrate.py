@@ -9,11 +9,12 @@ from operator import itemgetter
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation
-from picongpu._version import __version__
 from pytest import fixture, mark
 from rocrate.rocrate import ROCrate
 from rocrate_validator.services import validate
+
+from picongpu._version import __version__
+from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation
 
 
 @fixture

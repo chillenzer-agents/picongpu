@@ -19,6 +19,7 @@
 import os
 import subprocess
 import sys
+
 import sphinx_rtd_theme
 
 python_libs = os.path.abspath("../../lib/python")

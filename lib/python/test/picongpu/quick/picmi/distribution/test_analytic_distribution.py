@@ -6,12 +6,12 @@ License: GPLv3+
 """
 
 from unittest import TestCase
-import numpy as np
 
+import numpy as np
+import pytest
 from scipy.constants import c
 
 from picongpu.picmi import AnalyticDistribution
-import pytest
 
 # allow numpy broadcasting (see https://numpy.org/doc/stable/user/basics.broadcasting.html)
 # some examples to check:

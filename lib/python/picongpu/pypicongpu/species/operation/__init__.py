@@ -1,9 +1,7 @@
+from . import densityprofile, momentum
+from .setchargestate import SetChargeState
 from .simpledensity import SimpleDensity
 from .simplemomentum import SimpleMomentum
-from .setchargestate import SetChargeState
-
-from . import densityprofile
-from . import momentum
 
 AnyOperation = SimpleDensity | SimpleMomentum | SetChargeState
 

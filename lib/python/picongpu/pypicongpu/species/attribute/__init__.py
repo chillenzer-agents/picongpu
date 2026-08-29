@@ -1,8 +1,8 @@
 from .attribute import Attribute
+from .boundelectrons import BoundElectrons
+from .momentum import Momentum
 from .position import Position
 from .weighting import Weighting
-from .momentum import Momentum
-from .boundelectrons import BoundElectrons
 
 __all__ = [
     "Attribute",

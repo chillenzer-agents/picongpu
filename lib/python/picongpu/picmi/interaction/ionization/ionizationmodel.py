@@ -7,6 +7,7 @@ License: GPLv3+
 
 from pydantic import BaseModel, model_validator
 
+from picongpu import pypicongpu
 from picongpu.picmi.species import DependsOn, Species
 from picongpu.picmi.species_requirements import (
     GroundStateIonizationConstruction,
@@ -14,8 +15,6 @@ from picongpu.picmi.species_requirements import (
 )
 from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
 from picongpu.pypicongpu.species.util import Element
-
-from picongpu import pypicongpu
 
 
 class IonizationModel(BaseModel):

@@ -8,9 +8,10 @@ License: GPLv3+
 
 __all__ = ["plot_1D", "plot_2D"]
 
-import matplotlib.pyplot as plt
-import testsuite._checkData as cD
 import matplotlib
+import matplotlib.pyplot as plt
+
+import testsuite._checkData as cD
 
 matplotlib.use("Agg")
 

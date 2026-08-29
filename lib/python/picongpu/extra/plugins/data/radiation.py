@@ -16,9 +16,10 @@
 # along with PIConGPU.
 # If not, see <http://www.gnu.org/licenses/>.
 #
+import warnings
+
 import numpy as np
 import openpmd_api as opmd
-import warnings
 
 
 class RadiationData:

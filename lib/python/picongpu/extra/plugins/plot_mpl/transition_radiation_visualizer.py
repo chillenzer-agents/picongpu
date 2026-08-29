@@ -4,11 +4,12 @@ This file is part of PIConGPU and based on energy_histogram_visualizer.py.
 Authors: Finn-Ole Carstens, Sebastian Starke
 """
 
-from ..data import TransitionRadiationData
-from .base_visualizer import Visualizer as BaseVisualizer
-from matplotlib.ticker import FixedLocator
 import numpy as np
 import scipy.constants as const
+from matplotlib.ticker import FixedLocator
+
+from ..data import TransitionRadiationData
+from .base_visualizer import Visualizer as BaseVisualizer
 
 
 class Visualizer(BaseVisualizer):
@@ -181,8 +182,9 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
+
         import matplotlib.pyplot as plt
 
         def usage():

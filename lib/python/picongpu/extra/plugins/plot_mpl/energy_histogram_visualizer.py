@@ -6,11 +6,12 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
+from warnings import warn
+
 import numpy as np
 
 from ..data import EnergyHistogramData
 from .base_visualizer import Visualizer as BaseVisualizer
-from warnings import warn
 
 
 class Visualizer(BaseVisualizer):
@@ -117,8 +118,9 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
+
         import matplotlib.pyplot as plt
 
         def usage():

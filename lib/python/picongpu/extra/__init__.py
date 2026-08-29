@@ -1,6 +1,4 @@
-from . import input
-from . import plugins
-from . import utils
+from . import input, plugins, utils
 
 __all__ = ["input", "plugins", "utils"]
 

@@ -12,9 +12,10 @@ epsilon = 1e-5, the test fails. Also, the absolute phase change during one turn
 is regarded. It should be smaller than 0.2 rad.
 """
 
-import openpmd_api as opmd
-import numpy as np
 import sys
+
+import numpy as np
+import openpmd_api as opmd
 
 
 def get_params(path):

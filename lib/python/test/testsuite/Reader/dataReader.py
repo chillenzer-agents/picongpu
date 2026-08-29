@@ -34,6 +34,7 @@ getValue(parameter:str, direction:str = None)
 __all__ = ["DataReader"]
 
 import numpy as np
+
 from . import readFiles as rF
 
 

@@ -22,10 +22,11 @@ If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
 import sys
+
 import numpy as np
+import openpmd_viewer
 import scipy.constants as spc
 from openpmd_viewer import OpenPMDTimeSeries
-import openpmd_viewer
 
 print("openPMD-viewer version:", openpmd_viewer.__version__)
 parser = argparse.ArgumentParser(description="1")

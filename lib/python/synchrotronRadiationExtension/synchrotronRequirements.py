@@ -18,8 +18,11 @@
 #  */
 
 import argparse
+
 import numpy as np
-from scipy.constants import elementary_charge as e, m_e, c, hbar, epsilon_0 as eps0
+from scipy.constants import c, hbar, m_e
+from scipy.constants import elementary_charge as e
+from scipy.constants import epsilon_0 as eps0
 
 Es = m_e**2 * c**3 / e / hbar  # Schwinger limit in V/m
 

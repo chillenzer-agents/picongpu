@@ -10,6 +10,7 @@ from operator import attrgetter
 from pathlib import Path
 
 import pytest
+
 from picongpu import pypicongpu
 
 EXAMPLES = list((Path(__file__).parents[3] / "examples").glob("*/main.py"))

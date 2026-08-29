@@ -6,11 +6,11 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-import matplotlib.pyplot as plt
-
-from ipywidgets import widgets
 from datetime import datetime
 from warnings import warn
+
+import matplotlib.pyplot as plt
+from ipywidgets import widgets
 
 
 class BaseWidget(widgets.VBox):

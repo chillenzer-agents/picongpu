@@ -36,10 +36,11 @@ Developer: Richard Pausch
 
 import argparse
 import os
-import sys
 import re
-import numpy as np
+import sys
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 # set up argument parser #
 parser = argparse.ArgumentParser(description=__doc__, epilog="For further questions please contact Richard Pausch.")

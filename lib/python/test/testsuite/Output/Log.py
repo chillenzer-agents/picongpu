@@ -17,6 +17,7 @@ __all__ = ["resultLog", "errorLog"]
 
 import sys
 from time import localtime, strftime
+
 import testsuite._checkData as cD
 
 

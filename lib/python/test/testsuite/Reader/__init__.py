@@ -33,9 +33,7 @@ for reading data:
     getValue
 """
 
-from . import paramReader
-from . import jsonReader
-from . import dataReader
+from . import dataReader, jsonReader, paramReader
 
 __all__ = ["paramReader", "jsonReader", "dataReader"]
 __all__ += paramReader.__all__

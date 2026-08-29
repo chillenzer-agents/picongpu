@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from functools import lru_cache
+
 from picongpu import core
 
 

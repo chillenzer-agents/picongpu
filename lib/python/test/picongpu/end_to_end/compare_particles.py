@@ -11,6 +11,7 @@ import numpy as np
 import openpmd_api as opmd
 import pandas as pd
 from openpmd_api.openpmd_api_cxx import ErrorWrongAPIUsage
+
 from picongpu.picmi.diagnostics import Binning, ParticleDump
 from picongpu.picmi.species import Species
 

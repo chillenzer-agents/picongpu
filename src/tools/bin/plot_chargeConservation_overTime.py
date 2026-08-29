@@ -22,11 +22,12 @@
 # import system interface modules
 import argparse
 
+import matplotlib.pyplot as plt
+
 # import data analysis and plotting modules
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import openpmd_api as opmd
+from matplotlib.ticker import FormatStrFormatter, LinearLocator
 
 __doc__ = """
 This program reads electric field and charge density data

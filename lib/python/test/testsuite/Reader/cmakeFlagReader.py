@@ -9,8 +9,9 @@ License: GPLv3+
 
 __all__ = ["CMAKEFlagReader"]
 
-from . import readFiles as rF
 import os
+
+from . import readFiles as rF
 
 
 class CMAKEFlagReader(rF.ReadFiles):

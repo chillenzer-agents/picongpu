@@ -25,6 +25,7 @@ getValue(parameter:str, direction:str = None)
 __all__ = ["JSONReader"]
 
 import json
+
 from . import readFiles as rF
 
 

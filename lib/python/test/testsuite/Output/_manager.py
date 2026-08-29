@@ -12,13 +12,15 @@ Plots the given case and generates the log files.
 ToDo: So far only the 1D plot is integrated in the plot.
 """
 
-from . import Log
-from . import Viewer
-import config
 import sys
+from inspect import getmembers, isfunction
+
+import config
+
 import testsuite._checkData as cD
 import testsuite.Math.physics as ph
-from inspect import getmembers, isfunction
+
+from . import Log, Viewer
 
 
 def __calculate(axis, parameter, *args):

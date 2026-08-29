@@ -150,13 +150,8 @@ class DataReader(rF.ReadFiles):
             )
 
         all_files = self.getAllFiles()
-        result = []
 
-        for file in all_files:
-            if parameter in self.allParamsinFile(self._direction + file):
-                result.append(file)
-
-        return result
+        return [file for file in all_files if parameter in self.allParamsinFile(self._direction + file)]
 
     def getValue(self, parameter: str, step_direction: str = None, p_type: str = None):
         """

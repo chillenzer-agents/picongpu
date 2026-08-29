@@ -42,9 +42,7 @@ parser.add_argument(
 args = parser.parse_args()
 n_pairs = int(args.n_pairs)
 
-examples = []
-for i in sys.stdin:
-    examples.append(i.rstrip())
+examples = [line.rstrip() for line in sys.stdin]
 
 
 def get_version(tuple):
@@ -223,23 +221,15 @@ compilers = [clang_compiers, gnu_compilers]
 
 # generate clang cuda compiler list
 # add third component with the device compiler name
-cuda_clang_compilers = []
-for i in clang_compiers:
-    cuda_clang_compilers.append(i + ("clangCuda",))
+cuda_clang_compilers = [i + ("clangCuda",) for i in clang_compiers]
 compilers.append(cuda_clang_compilers)
 
 # nvcc compiler
-cuda_nvcc_compilers = []
-for i in clang_compiers:
-    cuda_nvcc_compilers.append(i + ("nvcc",))
-for i in gnu_compilers:
-    cuda_nvcc_compilers.append(i + ("nvcc",))
+cuda_nvcc_compilers = [i + ("nvcc",) for i in clang_compiers] + [i + ("nvcc",) for i in gnu_compilers]
 compilers.append(cuda_nvcc_compilers)
 
 # hipcc compiler
-hip_clang_compilers = []
-for i in clang_compiers:
-    hip_clang_compilers.append(i + ("hipcc",))
+hip_clang_compilers = [i + ("hipcc",) for i in clang_compiers]
 compilers.append(hip_clang_compilers)
 
 # PIConGPU backend list
@@ -304,8 +294,7 @@ for i in range(rounds):
 
     parameters = [used_compilers, backends, operating_system, boost_libs, examples]
 
-    for value in enumerate(AllPairs(parameters, filter_func=is_valid_combination, n=n_pairs)):
-        job_list.append(value)
+    job_list.extend(enumerate(AllPairs(parameters, filter_func=is_valid_combination, n=n_pairs)))
 
 # set seed to be deterministic in each CI run
 random.seed(42)

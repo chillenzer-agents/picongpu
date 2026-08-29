@@ -96,9 +96,7 @@ args = parser.parse_args()
 
 # get directories from parser #
 numDir = np.min((len(args.dir_run_all), 2))
-directories = []
-for i in range(numDir):
-    directories.append(args.dir_run_all[i])
+directories = [args.dir_run_all[i] for i in range(numDir)]
 
 
 # check if directories exit #

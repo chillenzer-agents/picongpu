@@ -408,6 +408,36 @@ def test_gaussian_center_ordering():
             density=1.0,
         )
 
+    def test_gaussian_density_si_field(self):
+        # the SI field name is density_si (like Uniform/Foil/Cylinder);
+        # the picmi attribute name `density` is accepted as an alias
+        g = Gaussian(
+            center_front=0.2,
+            center_rear=0.4,
+            sigma_front=0.01,
+            sigma_rear=0.01,
+            factor=-1.0,
+            power=2.0,
+            vacuum_cells_front=0,
+            density_si=42.0,
+        )
+        assert g.density_si == 42.0
+        # serialisation uses the field name, so round-trips via the alias-free key
+        assert Gaussian.model_validate(g.model_dump()).density_si == 42.0
+
+    @pytest.mark.parametrize("density_si", [0.0, -1.0])
+    def test_gaussian_density_must_be_positive(self, density_si):
+        with pytest.raises(ValidationError):
+            Gaussian(
+                center_front=0.2,
+                center_rear=0.4,
+                sigma_front=0.01,
+                sigma_rear=0.01,
+                factor=-1.0,
+                power=2.0,
+                vacuum_cells_front=0,
+                density_si=density_si,
+            )
 
 def test_cylinder_radius_too_small_for_ramp():
     with pytest.raises(ValidationError, match="reduced radius"):

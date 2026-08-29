@@ -152,7 +152,7 @@ for myfile in args.path2Data:
     selectedOnly = data[theta_min_index:theta_max_index, omega_min_index:omega_max_index]
 
     print(f"shape of data analyzed:   {np.shape(selectedOnly)}")
-    print("")
+    print()
 
     # statistics:
     my_sum = np.sum(selectedOnly)
@@ -163,9 +163,9 @@ for myfile in args.path2Data:
     print(f"sum:         {my_sum}")
     print(f"average:     {my_avg}")
     print(f"std:         {my_std}")
-    print("")
+    print()
     print(f"sum + error: {my_size * my_avg} +/- {np.sqrt(my_size) * my_std}")
 
     # finalize
-    print("")
-    print("")
+    print()
+    print()

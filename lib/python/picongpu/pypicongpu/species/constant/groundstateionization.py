@@ -8,7 +8,7 @@ License: GPLv3+
 from pydantic import model_validator
 
 from .constant import Constant
-from .ionizationmodel import IonizationModel, IonizationModelGroups
+from .ionizationmodel import AnyIonizationModel, IonizationModelGroups
 
 
 class GroundStateIonization(Constant):
@@ -21,7 +21,7 @@ class GroundStateIonization(Constant):
     include/picongpu/param/speciesDefinition.param.
     """
 
-    ionization_model_list: list[IonizationModel]
+    ionization_model_list: list[AnyIonizationModel]
     """list of ground state only ionization models to apply for the species;
     must be non-empty, at most one model per ionization model group."""
 

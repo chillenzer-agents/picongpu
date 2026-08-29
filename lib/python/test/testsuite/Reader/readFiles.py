@@ -30,7 +30,7 @@ class ReadFiles:
     superclass for all Reader
     """
 
-    def __init__(self, fileExtension: str, direction: str = None, directiontype: str = None):
+    def __init__(self, fileExtension: str, direction: str | None = None, directiontype: str | None = None):
         """
         constructor
 

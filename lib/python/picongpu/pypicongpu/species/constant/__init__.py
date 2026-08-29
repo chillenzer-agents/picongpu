@@ -6,10 +6,10 @@ from .groundstateionization import GroundStateIonization
 from .mass import Mass
 
 __all__ = [
-    "Constant",
-    "Mass",
     "Charge",
+    "Constant",
     "DensityRatio",
     "ElementProperties",
     "GroundStateIonization",
+    "Mass",
 ]

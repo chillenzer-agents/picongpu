@@ -8,4 +8,4 @@ License: GPLv3+
 
 from . import Math, Output, Reader, _checkData
 
-__all__ = ["Output", "Reader", "Math", "_checkData"]
+__all__ = ["Math", "Output", "Reader", "_checkData"]

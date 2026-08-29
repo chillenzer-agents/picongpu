@@ -152,7 +152,7 @@ class EmittanceData(DataReader):
         ).columns.values.astype(np.float64)
 
         # set DataFrame column names properly
-        data.columns = ["iteration", "sum"] + list(y_slices)
+        data.columns = ["iteration", "sum", *list(y_slices)]
 
         # set iteration as index
         data.set_index("iteration", inplace=True)

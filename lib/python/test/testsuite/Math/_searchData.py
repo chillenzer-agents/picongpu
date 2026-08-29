@@ -17,7 +17,7 @@ import warnings
 from .. import Reader
 
 
-def searchParameter(parameter: str, directiontype: str = None, **kwargs):
+def searchParameter(parameter: str, directiontype: str | None = None, **kwargs):
     """
     searches in the data (passed in config.py as a directory).
     To avoid errors, usage without directiontype is not recommended

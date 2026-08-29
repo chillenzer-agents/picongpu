@@ -14,10 +14,10 @@ AnyDistribution = (
 )
 
 __all__ = [
-    "UniformDistribution",
-    "FoilDistribution",
-    "Distribution",
-    "GaussianDistribution",
     "AnalyticDistribution",
     "CylindricalDistribution",
+    "Distribution",
+    "FoilDistribution",
+    "GaussianDistribution",
+    "UniformDistribution",
 ]

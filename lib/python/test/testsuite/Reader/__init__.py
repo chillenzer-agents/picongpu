@@ -35,7 +35,7 @@ for reading data:
 
 from . import dataReader, jsonReader, paramReader
 
-__all__ = ["paramReader", "jsonReader", "dataReader"]
+__all__ = ["dataReader", "jsonReader", "paramReader"]
 __all__ += paramReader.__all__
 __all__ += jsonReader.__all__
 __all__ += dataReader.__all__

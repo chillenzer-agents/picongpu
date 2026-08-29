@@ -17,14 +17,14 @@ from .timestepspec import TimeStepSpec
 AnyPlugin = Binning | Checkpoint | EnergyHistogram | MacroParticleCount | OpenPMDPlugin | PhaseSpace | RadiationPlugin
 
 __all__ = [
-    "OpenPMDPlugin",
     "AnyPlugin",
-    "PhaseSpace",
+    "Checkpoint",
     "EnergyHistogram",
     "MacroParticleCount",
-    "TimeStepSpec",
-    "Checkpoint",
-    "RadiationPlugin",
-    "RadiationObserverConfiguration",
+    "OpenPMDPlugin",
+    "PhaseSpace",
     "RadiationConfiguration",
+    "RadiationObserverConfiguration",
+    "RadiationPlugin",
+    "TimeStepSpec",
 ]

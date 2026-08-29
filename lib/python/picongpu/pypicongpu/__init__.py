@@ -13,21 +13,21 @@ from .runner import Runner
 from .simulation import Simulation
 
 __all__ = [
-    "Simulation",
+    "Checkpoint",
+    "EnergyHistogram",
+    "LeheSolver",
+    "MacroParticleCount",
+    "PhaseSpace",
     "Runner",
+    "Simulation",
+    "YeeSolver",
+    "customuserinput",
+    "grid",
     "laser",
     "output",
     "rendering",
-    "YeeSolver",
-    "LeheSolver",
     "species",
     "util",
-    "grid",
-    "customuserinput",
-    "PhaseSpace",
-    "EnergyHistogram",
-    "MacroParticleCount",
-    "Checkpoint",
 ]
 
 # note: put down here b/c linter complains if imports are not at top

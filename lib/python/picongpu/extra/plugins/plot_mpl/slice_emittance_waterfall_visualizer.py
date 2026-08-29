@@ -207,7 +207,7 @@ class Visualizer(BaseVisualizer):
     def adjust_plot(self, **kwargs):
         species = kwargs["species"]
         species_filter = kwargs.get("species_filter", "all")
-        idx = [i for i, cbar in enumerate(self.colorbars) if cbar is not None][0]
+        idx = next(i for i, cbar in enumerate(self.colorbars) if cbar is not None)
         self.colorbars[idx].ax.text(
             -1.2,
             0.5,

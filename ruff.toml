@@ -42,6 +42,7 @@ select = [
     "ISC", # flake8-implicit-str-concat
     "PIE", # flake8-pie
     "PT", # flake8-pytest-style
+    "RUF", # ruff-specific rules (RUF100 is enabled with the final ALL step)
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -75,6 +76,9 @@ ignore = [
     "PT012",
     "PT018",
     "PT027",
+    # Unused-noqa directives are only meaningful once the full rule set
+    # (select = ["ALL"]) is active; cleaned up in the final step.
+    "RUF100",
 ]
 
 [lint.isort]

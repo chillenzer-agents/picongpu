@@ -7,9 +7,9 @@ AnyOperation = SimpleDensity | SimpleMomentum | SetChargeState
 
 __all__ = [
     "AnyOperation",
+    "SetChargeState",
     "SimpleDensity",
     "SimpleMomentum",
-    "SetChargeState",
     "densityprofile",
     "momentum",
 ]

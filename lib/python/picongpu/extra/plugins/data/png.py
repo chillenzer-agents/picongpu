@@ -101,7 +101,7 @@ class PNGData(DataReader):
         if slice_point is None:
             # determine slice point manually as the slice point of the
             # first png file in alphabetical order
-            slice_point = [f.split("_")[3] for f in sorted(os.listdir(output_dir)) if f.endswith(".png")][0]
+            slice_point = next(f.split("_")[3] for f in sorted(os.listdir(output_dir)) if f.endswith(".png"))
             slice_point = float(slice_point)
 
         data_file_name = (

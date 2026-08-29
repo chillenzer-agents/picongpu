@@ -42,7 +42,7 @@ else:
     import config
 
 
-def checkDirection(variable: str = "undefined", direction: str = None, errorhandling: bool = False) -> str:
+def checkDirection(variable: str = "undefined", direction: str | None = None, errorhandling: bool = False) -> str:
     """
     Checks whether the value is present in config.py. If so, this is
     returned if the directory exists. If there is no corresponding

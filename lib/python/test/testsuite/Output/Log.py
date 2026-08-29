@@ -13,7 +13,7 @@ resultLog(direction:str = None, title:str = None)
 errorLog()
 """
 
-__all__ = ["resultLog", "errorLog"]
+__all__ = ["errorLog", "resultLog"]
 
 import sys
 from time import localtime, strftime
@@ -28,8 +28,8 @@ def resultLog(
     perc_diff: int,
     result: bool,
     difference: float,
-    direction: str = None,
-    title: str = None,
+    direction: str | None = None,
+    title: str | None = None,
     inputparameter=None,
 ):
     """
@@ -115,7 +115,7 @@ def resultLog(
         errorLog()
 
 
-def errorLog(direction: str = None):
+def errorLog(direction: str | None = None):
     """
     Catches errors while executing the test-suite and saves
     them in the error.log file.

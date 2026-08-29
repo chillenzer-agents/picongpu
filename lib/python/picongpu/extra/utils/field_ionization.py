@@ -7,6 +7,8 @@ Authors: Marco Garten, Brian Marre
 License: GPLv3+
 """
 
+from typing import ClassVar
+
 import numpy as np
 import scipy.constants as sc
 
@@ -19,7 +21,7 @@ class FieldIonization:
     """
 
     # dictionary of atomic units (AU) - values in SI units
-    atomic_unit = {
+    atomic_unit: ClassVar[dict[str, float]] = {
         "electric field": sc.physical_constants["atomic unit of electric field"][0],
         "intensity": sc.c * sc.epsilon_0 / 2.0 * sc.physical_constants["atomic unit of electric field"][0] ** 2,
         "energy": sc.physical_constants["atomic unit of energy"][0],

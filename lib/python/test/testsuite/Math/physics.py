@@ -39,11 +39,11 @@ plasmafrequence(density = None, gamma:float = None,
 """
 
 __all__ = [
-    "calculateV_O",
+    "calculateBeta",
     "calculateTime",
     "calculateTimeFreq",
+    "calculateV_O",
     "plasmafrequence",
-    "calculateBeta",
 ]
 
 import numpy as np
@@ -76,7 +76,7 @@ def calculateV_O(gamma=None):
     return np.sqrt((1 - 1 / gamma**2) * c**2)
 
 
-def calculateTimeFreq(frequency, steps=None, deltaT: float = None, **kwargs):
+def calculateTimeFreq(frequency, steps=None, deltaT: float | None = None, **kwargs):
     """
     calculate the time in [frequency ** -1]
 
@@ -107,7 +107,7 @@ def calculateTimeFreq(frequency, steps=None, deltaT: float = None, **kwargs):
     return steps * deltaT * frequency
 
 
-def calculateTime(steps=None, deltaT: float = None):
+def calculateTime(steps=None, deltaT: float | None = None):
     """
     calculate the time in s
 
@@ -175,7 +175,7 @@ def calculateBeta(v_0=None, gamma=None):
     return beta
 
 
-def plasmafrequence(density=None, gamma: float = None, relativistic: bool = True):
+def plasmafrequence(density=None, gamma: float | None = None, relativistic: bool = True):
     """
     calculate the plasmafrequency  using the formula
 

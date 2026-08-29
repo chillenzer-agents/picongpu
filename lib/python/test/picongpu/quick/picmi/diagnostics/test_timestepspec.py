@@ -253,8 +253,7 @@ class TestTimeStepSpec(TestCase):
                         filter(
                             lambda s: s.start < 0
                             # -1 is allowed as a value for stop only
-                            or (s is not None and s.stop < -1)
-                            and s.step < 1,
+                            or ((s is not None and s.stop < -1) and s.step < 1),
                             ts.get_as_pypicongpu(TIME_STEP_SIZE, INDEX_MAX).specs,
                         )
                     )

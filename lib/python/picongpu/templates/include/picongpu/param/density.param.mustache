@@ -57,7 +57,7 @@ namespace picongpu
 
                     //! factor to multiply BASE_DENSITY_SI by to get density
                     static constexpr float_X densityFactor
-                        = static_cast<float_X>({{{profile.density}}} / SI::BASE_DENSITY_SI);
+                        = static_cast<float_X>({{{profile.density_si}}} / SI::BASE_DENSITY_SI);
                 };
 
             using init_{{{created_species.typename}}} = GaussianImpl<init_{{{created_species.typename}}}_GaussianParam>;

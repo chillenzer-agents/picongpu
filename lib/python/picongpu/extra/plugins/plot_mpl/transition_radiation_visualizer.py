@@ -53,7 +53,7 @@ class Visualizer(BaseVisualizer):
         elif self.type == "heatmap":
             theta_mesh, phi_mesh, spectral_power = self.data[idx]
             im = self.plt_obj[idx] = self.ax.pcolormesh(theta_mesh, phi_mesh, spectral_power)
-            self.ax.get_figure().colorbar(im, label=r"Spectral Power $d^2 W / " r"d\omega d\Omega$ [Js]")
+            self.ax.get_figure().colorbar(im, label=r"Spectral Power $d^2 W / d\omega d\Omega$ [Js]")
 
     def _update_plt_obj(self, idx):
         """
@@ -166,11 +166,11 @@ class Visualizer(BaseVisualizer):
         elif self.type == "sliceovertheta":
             self.ax.set_title("Angular transition radiation distribution for " + species)
             self.ax.set_xlabel(r"Detector Angle $\theta$")
-            self.ax.set_ylabel(r"Spectral Power " r"$d^2 W / d\omega d\Omega$ [Js]")
+            self.ax.set_ylabel(r"Spectral Power $d^2 W / d\omega d\Omega$ [Js]")
         elif self.type == "sliceoverphi":
             self.ax.set_title("Angular transition radiation distribution for " + species)
             self.ax.set_xlabel(r"Detector Angle $\phi$")
-            self.ax.set_ylabel(r"Spectral Power " r"$d^2 W / d\omega d\Omega$ [Js]")
+            self.ax.set_ylabel(r"Spectral Power $d^2 W / d\omega d\Omega$ [Js]")
         elif self.type == "heatmap":
             self.ax.set_title("Angular transition radiation distribution for " + species)
             self.ax.set_xlabel(r"Detector Angle $\theta$")

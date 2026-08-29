@@ -76,8 +76,8 @@ class FieldIonization:
         if pol not in ["linear", "circular"]:
             raise NotImplementedError(
                 f"Cannot interpret polarization='{pol}'.\n"
-                + "So far, the only implemented options are: "
-                + "['linear', 'circular']"
+                "So far, the only implemented options are: "
+                "['linear', 'circular']"
             )
 
         nEff = np.float64(self.n_eff(Z, E_Ip))

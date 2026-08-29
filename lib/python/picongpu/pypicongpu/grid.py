@@ -12,6 +12,7 @@ from pydantic import AfterValidator, BaseModel, Field, PlainSerializer, model_va
 from typing_extensions import Self
 
 from .rendering import RenderedObject
+from .units import SI
 
 
 class BoundaryCondition(enum.Enum):
@@ -79,41 +80,77 @@ class Grid3D(BaseModel, RenderedObject):
     PIConGPU 3 dimensional (cartesian) grid
 
     Defined by the dimensions of each cell and the number of cells per axis.
+    The bounding box is implicitly given as `cell_size * cell_cnt`.
 
-    The bounding box is implicitly given as TODO.
+    C++ counterparts: include/picongpu/param/simulation.param (SI::CELL_*_SI),
+    include/picongpu/param/memory.param (SuperCellSize) and
+    etc/picongpu/N.cfg (device layout).
+
+    Units policy: cell sizes in meter, cell counts and super cell sizes in
+    cells (dimensionless).
     """
 
-    cell_size: Annotated[Vec3_float, AfterValidator(lambda x: all_gt(x, 0))] = Field(alias="cell_size_si")
-    """Width of individual cell in each direction"""
+    cell_size: Annotated[Vec3_float, AfterValidator(lambda x: all_gt(x, 0)), SI("m")] = Field(alias="cell_size_si")
+    """width of an individual cell in each direction, [m]; must be > 0 in every direction.
+    C++ name: SI::CELL_{WIDTH,HEIGHT,DEPTH}_SI (simulation.param)."""
 
     cell_cnt: Annotated[Vec3_int, AfterValidator(lambda x: all_gt(x, 0))]
-    """total number of cells in each direction"""
+    """total number of cells in each direction, [cells]; must be >= 1 in every direction."""
 
     boundary_condition: Annotated[
         tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition],
         PlainSerializer(lambda x: serialise_vec(map(BoundaryCondition.get_cfg_str, x)), return_type=dict),
     ]
-    """behavior towards particles crossing each boundary"""
+    """behavior towards particles crossing each boundary (one per axis)"""
 
     gpu_cnt: Annotated[Vec3_int, AfterValidator(lambda x: all_gt(x, 0))] = Field((1, 1, 1), alias="n_gpus")
-    """number of GPUs in x y and z direction as 3-integer tuple"""
+    """number of GPUs in x, y and z direction as 3-integer tuple, [dimensionless]; must be >= 1."""
 
     grid_dist: Annotated[
         tuple[list[int], list[int], list[int]] | None,
         PlainSerializer(serialise_grid_dist),
         AfterValidator(grid_dist_validate),
     ] = None
-    """distribution of grid cells to GPUs for each axis"""
+    """explicit distribution of grid cells to the GPUs per axis, [cells]; each entry must be > 0 and
+    the entries per axis must sum to cell_cnt; None distributes the cells evenly over gpu_cnt."""
 
-    super_cell_size: Vec3_int
-    """size of super cell in x y and z direction as 3-integer tuple in cells"""
+    super_cell_size: Annotated[Vec3_int, AfterValidator(lambda x: all_gt(x, 0))]
+    """size of the super cell in x, y and z direction as 3-integer tuple, [cells]; must be >= 1.
+    C++ name: SuperCellSize (memory.param).
+    The cells per device in each direction must be a multiple of the super cell size."""
 
     @model_validator(mode="after")
     def check(self) -> Self:
-        """serialized representation provided for RenderedObject"""
+        """cross-field invariants between cell_cnt, gpu_cnt, grid_dist and super_cell_size"""
         if self.grid_dist is not None:
-            assert sum(self.grid_dist[0]) == self.cell_cnt[0], "sum of grid_dists in x must be equal to number_of_cells"
-            assert sum(self.grid_dist[1]) == self.cell_cnt[1], "sum of grid_dists in y must be equal to number_of_cells"
-            assert sum(self.grid_dist[2]) == self.cell_cnt[2], "sum of grid_dists in z must be equal to number_of_cells"
-
+            for axis, message in enumerate(
+                (
+                    "sum of grid_dists in x must be equal to number_of_cells",
+                    "sum of grid_dists in y must be equal to number_of_cells",
+                    "sum of grid_dists in z must be equal to number_of_cells",
+                )
+            ):
+                if sum(self.grid_dist[axis]) != self.cell_cnt[axis]:
+                    raise ValueError(message)
+            # each device's chunk must be a multiple of the super cell size
+            for axis in range(3):
+                for chunk in self.grid_dist[axis]:
+                    if chunk % self.super_cell_size[axis] != 0:
+                        raise ValueError(
+                            f"grid distribution in {'xyz'[axis]} direction must be a multiple of the super cell size. "
+                            f"You gave chunk {chunk} and super_cell_size {self.super_cell_size[axis]}."
+                        )
+        else:
+            # without an explicit distribution the grid is split evenly over the GPUs,
+            # so each device's share must be a multiple of the super cell size
+            for axis in range(3):
+                cells = self.cell_cnt[axis]
+                n_gpus = self.gpu_cnt[axis]
+                super_cell = self.super_cell_size[axis]
+                if (cells // n_gpus // super_cell) * n_gpus * super_cell != cells:
+                    raise ValueError(
+                        f"GPU- and/or super-cell-distribution in {'xyz'[axis]} direction does not match grid size: "
+                        f"cell_cnt {cells} is not evenly divisible by "
+                        f"gpu_cnt {n_gpus} * super_cell_size {super_cell}."
+                    )
         return self

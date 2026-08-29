@@ -16,6 +16,8 @@ from .plasmaramp import AllPlasmaRamps, None_
 class _Component(BaseModel):
     component: float
 
+    __hash__ = None  # compared via __eq__, never used as a hash key
+
     def __eq__(self, other):
         if isinstance(other, float | int):
             return self.component == other

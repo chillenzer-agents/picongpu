@@ -32,6 +32,7 @@ from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.species.constant import (
     Charge,
     DensityRatio,
+    ElementProperties,
     Mass,
     SPECIES_CONSTANTS,
     SpeciesConstants,
@@ -46,8 +47,10 @@ from picongpu.pypicongpu.species.operation.densityprofile.cylinder import Cylind
 from picongpu.pypicongpu.species.operation.densityprofile.gaussian import Gaussian
 from picongpu.pypicongpu.species.operation.densityprofile.plasmaramp import Exponential
 from picongpu.pypicongpu.species.species import Species
-from picongpu.pypicongpu.species.attribute import Momentum, Position, Weighting
+from picongpu.pypicongpu.species.attribute import BoundElectrons, Momentum, Position, Weighting
 from picongpu.pypicongpu.species.operation.createdensity import CreateDensity
+from picongpu.pypicongpu.species.operation.setchargestate import SetChargeState
+from picongpu.pypicongpu.species.util import Element
 from picongpu.pypicongpu.species.operation.layout import OnePosition, Quiet, Random
 from picongpu.pypicongpu.species.operation.momentum import Drift, Temperature
 from picongpu.pypicongpu.walltime import Walltime

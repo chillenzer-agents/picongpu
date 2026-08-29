@@ -136,7 +136,7 @@ def get_constant_by_type(constants, needle_type: type[Constant]) -> Constant:
         if const is not None and needle_type is type(const):
             return const
 
-    raise RuntimeError("no constant of requested type available: {}".format(needle_type))
+    raise RuntimeError(f"no constant of requested type available: {needle_type}")
 
 
 class Species(RenderedObject, BaseModel):

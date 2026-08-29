@@ -65,9 +65,7 @@ class Drift(RenderedObject, BaseModel):
 
         velocity_linear = math.sqrt(sum(map(lambda x: x**2, velocity)))
         if velocity_linear >= constants.speed_of_light:
-            raise ValueError(
-                "linear velocity must be less than the speed of light (currently: {})".format(velocity_linear)
-            )
+            raise ValueError(f"linear velocity must be less than the speed of light (currently: {velocity_linear})")
 
         return cls(
             gamma=math.sqrt(1 / (1 - (velocity_linear**2 / constants.speed_of_light**2))),

@@ -116,7 +116,7 @@ def checkDirection(variable: str = "undefined", direction: str = None, errorhand
     elif val is None and direction is None and errorhandling:
         direction = os.path.abspath(os.getcwd())
     else:
-        exec("%s = direction" % (val_name))
+        exec(f"{val_name} = direction")
 
     # all cases are handled
 

@@ -42,18 +42,18 @@ class Renderer:
             # note on typechecks here: we want *exact* types,
             # so don't use instanceof()
             if str != type(key):
-                raise TypeError("all keys must be strings: {}".format(path))
+                raise TypeError(f"all keys must be strings: {path}")
             if "." in key:
-                raise ValueError("keys may NOT contain dot: {}.{}".format(path, key))
+                raise ValueError(f"keys may NOT contain dot: {path}.{key}")
             if key.startswith("_"):
-                raise ValueError("keys may NOT start with underscore: {}.{}".format(path, key))
+                raise ValueError(f"keys may NOT start with underscore: {path}.{key}")
 
             # value validation
             if type(value) is dict:
                 if {} == value:
                     raise TypeError("leaf must not be empty dict")
                 # dict -> recursive call
-                Renderer.__check_rendering_context_recursive("{}.{}".format(path, key), value)
+                Renderer.__check_rendering_context_recursive(f"{path}.{key}", value)
             elif key == "tags":
                 # tags do not need to be checked
                 return
@@ -65,21 +65,19 @@ class Renderer:
                 # {{#mylist}}{{{.}}}{{/mylist}}, which is somewhat unintuitive)
                 not_dict = list(filter(lambda e: type(e) is not dict, value))
                 if 0 != len(not_dict):
-                    raise TypeError("lists may only contains dicts: {}.{}".format(path, key))
+                    raise TypeError(f"lists may only contains dicts: {path}.{key}")
                 # check the children
                 for i in range(len(value)):
-                    Renderer.__check_rendering_context_recursive("{}[{}]".format(path, i), value[i])
+                    Renderer.__check_rendering_context_recursive(f"{path}[{i}]", value[i])
             else:
                 # leaf
                 invalid_floats = [math.inf, -math.inf, math.nan]
                 if value in invalid_floats:
-                    raise ValueError("invalid value for leaf: {} at {}.{}".format(value, path, key))
+                    raise ValueError(f"invalid value for leaf: {value} at {path}.{key}")
 
                 allowed_types = [str, bool, type(None), int, float]
                 if type(value) not in allowed_types:
-                    raise TypeError(
-                        "leaf may only be str, bool, None, number; found: {} at {}.{}".format(type(value), path, key)
-                    )
+                    raise TypeError(f"leaf may only be str, bool, None, number; found: {type(value)} at {path}.{key}")
 
     @staticmethod
     def check_rendering_context(context: typing.Any) -> None:
@@ -203,7 +201,7 @@ class Renderer:
             a previous generation into this directory
         """
         if not pathlib.Path(path).is_dir():
-            raise ValueError("is not a directory: {}".format(path))
+            raise ValueError(f"is not a directory: {path}")
 
         mustache_fileending_re = re.compile(r"[.]mustache$")
         all_mustache_files = list(
@@ -224,10 +222,10 @@ class Renderer:
             rendered_path = pathlib.Path(mustache_fileending_re.sub("", str(template_path)))
             if rendered_path.exists():
                 if not exist_ok:
-                    raise ValueError("would overwrite {}, aborting".format(rendered_path))
+                    raise ValueError(f"would overwrite {rendered_path}, aborting")
 
             with open(rendered_path, "w") as outfile:
-                with open(template_path, "r") as infile:
+                with open(template_path) as infile:
                     template_str = infile.read()
                     rendered = Renderer.get_rendered_template(context, template_str)
                     outfile.write(rendered)

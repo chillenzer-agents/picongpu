@@ -11,7 +11,7 @@ import os
 import numpy as np
 
 
-class FindTime(object):
+class FindTime:
     """
     Convert iterations (time steps) to time [seconds] and back.
     """
@@ -42,16 +42,16 @@ class FindTime(object):
         """
         sim_output_dir = os.path.join(self.run_directory, "simOutput")
         if not os.path.isdir(sim_output_dir):
-            raise IOError(
+            raise OSError(
                 "The simOutput/ directory does not exist inside "
-                "path:\n  {}\n"
+                f"path:\n  {self.run_directory}\n"
                 "Did you set the proper path to the run directory?\n"
-                "Did the simulation already run?".format(self.run_directory)
+                "Did the simulation already run?"
             )
 
         data_file_path = os.path.join(sim_output_dir, self.data_file)
         if not os.path.isfile(data_file_path):
-            raise IOError("The file {} does not exist.\nDid the simulation already run?".format(data_file_path))
+            raise OSError(f"The file {data_file_path} does not exist.\nDid the simulation already run?")
 
         return data_file_path
 
@@ -122,7 +122,7 @@ class FindTime(object):
 
         implemented_methods = ["previous", "closest", "next"]
         if method not in implemented_methods:
-            raise ValueError("The method needs to be one of: {}".format(implemented_methods))
+            raise ValueError(f"The method needs to be one of: {implemented_methods}")
 
         if iterations is None:
             guess = t / self.dt

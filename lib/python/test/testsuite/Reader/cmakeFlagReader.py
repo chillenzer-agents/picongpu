@@ -96,7 +96,7 @@ class CMAKEFlagReader(rF.ReadFiles):
 
         flags = []
 
-        file = open(self._direction + "cmakeFlags", "r")
+        file = open(self._direction + "cmakeFlags")
         lines = file.readlines()
 
         i = 0
@@ -134,7 +134,7 @@ class CMAKEFlagReader(rF.ReadFiles):
         allparameters = self.getAllSetups()[setup]
 
         if (parameter and parameter.upper()) not in allparameters:
-            raise ValueError("The parameter {} could not be found.".format(parameter))
+            raise ValueError(f"The parameter {parameter} could not be found.")
 
         allparameters = allparameters.split(";")
 

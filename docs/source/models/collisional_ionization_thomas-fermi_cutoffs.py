@@ -141,7 +141,7 @@ for temp in temp_array:
     plt.plot(
         mass_density,
         CS_H,
-        label="H @ {} eV".format(temp),
+        label=f"H @ {temp} eV",
         color="blue",
         alpha=alpha,
         ls=linestyles[i],
@@ -149,7 +149,7 @@ for temp in temp_array:
     plt.plot(
         mass_density,
         CS_C,
-        label="C @ {} eV".format(temp),
+        label=f"C @ {temp} eV",
         color="orange",
         alpha=alpha,
         ls=linestyles[i],

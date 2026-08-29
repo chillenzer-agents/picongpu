@@ -103,14 +103,14 @@ def resultLog(
         fobj_out.write(date + " " + timeOfDay + "\n")
         fobj_out.write("\n")
         fobj_out.write("testcase: " + title + "\n")
-        fobj_out.write("theoretically expected value: {}\n".format(theory))
-        fobj_out.write("Value from simulation: {}\n".format(value_sim))
-        fobj_out.write("acceptance: {}\n".format(acceptance))
-        fobj_out.write("result of the test:{} \n".format(result))
-        fobj_out.write("difference: {}\n".format(difference))
-        fobj_out.write("difference in percentage: {}\n".format(perc_diff))
+        fobj_out.write(f"theoretically expected value: {theory}\n")
+        fobj_out.write(f"Value from simulation: {value_sim}\n")
+        fobj_out.write(f"acceptance: {acceptance}\n")
+        fobj_out.write(f"result of the test:{result} \n")
+        fobj_out.write(f"difference: {difference}\n")
+        fobj_out.write(f"difference in percentage: {perc_diff}\n")
         for key in inputparameter.keys():
-            fobj_out.write("input parameter: {}={}\n".format(key, inputparameter[key]))
+            fobj_out.write(f"input parameter: {key}={inputparameter[key]}\n")
         fobj_out.close()
 
     except Exception:

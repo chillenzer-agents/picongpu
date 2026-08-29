@@ -9,11 +9,12 @@ import datetime
 import json
 import logging
 import tempfile
+from collections.abc import Sequence
 from importlib.util import module_from_spec, spec_from_file_location
 from os import chmod
 from pathlib import Path
 from shutil import copy2, copytree
-from typing import Annotated, Sequence
+from typing import Annotated
 
 from cwltool.context import RuntimeContext
 from cwltool.factory import Factory as WorkflowFactory
@@ -225,9 +226,9 @@ class Runner(BaseModel):
 
     def _log_dirs(self):
         """print human-readble list of paths to log"""
-        logging.info(" template dir: {}".format(self.template_dir))
-        logging.info("    setup dir: {}".format(self.setup_dir))
-        logging.info("      run dir: {}".format(self.run_dir))
+        logging.info(f" template dir: {self.template_dir}")
+        logging.info(f"    setup dir: {self.setup_dir}")
+        logging.info(f"      run dir: {self.run_dir}")
 
     def _render_templates(self, exist_ok=False):
         """

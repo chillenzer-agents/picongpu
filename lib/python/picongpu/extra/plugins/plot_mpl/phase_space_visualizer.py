@@ -158,8 +158,8 @@ class Visualizer(BaseVisualizer):
             transform=self.colorbar_axes[idx].transAxes,
         )
 
-        self.ax.set_xlabel(r"${0}$ [${1}$]".format(meta.r, r"\mathrm{\mu m}"))
-        self.ax.set_ylabel(r"$p_{0}$ [$\beta\gamma$]".format(meta.p))
+        self.ax.set_xlabel(r"${}$ [${}$]".format(meta.r, r"\mathrm{\mu m}"))
+        self.ax.set_ylabel(rf"$p_{meta.p}$ [$\beta\gamma$]")
 
     def _update_plt_obj(self, idx):
         """

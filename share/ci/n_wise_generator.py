@@ -331,7 +331,7 @@ num_stages = math.ceil(num_jobs / num_jobs_per_stage)
 if not args.compact:
     print("stages:")
     for x in range(num_stages):
-        print("  - job_{}".format(x))
+        print(f"  - job_{x}")
     print("")
 
 # generate all jobs
@@ -340,7 +340,7 @@ for stage in range(num_stages):
         print("---")
     for i, pairs in job_list[stage::num_stages]:
         if args.compact:
-            print("{:2d}: {}".format(i, pairs))
+            print(f"{i:2d}: {pairs}")
         else:
             compiler = pairs[0][0] + "-" + str(pairs[0][1])
             backend = pairs[1][0]
@@ -355,7 +355,7 @@ for stage in range(num_stages):
                 compiler + "_" + backend + v_cuda_hip_str + "_boost" + boost_version + "_" + folder.replace("/", ".")
             )
             print(job_name + ":")
-            print("  stage: job_{}".format(stage))
+            print(f"  stage: job_{stage}")
             print("  variables:")
             print("    CI_CONTAINER_NAME: '" + os_name + str(os_version) + "'")
             if backend == "cuda":

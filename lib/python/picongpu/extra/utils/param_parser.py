@@ -42,9 +42,9 @@ def read_range_file(file, values_only=True):
     True.
     """
     if not os.path.isfile(file):
-        raise IOError("File {} does not exist".format(file))
+        raise OSError(f"File {file} does not exist")
 
-    with open(file, "r") as json_file:
+    with open(file) as json_file:
         range_dict = json.load(json_file)
     if values_only:
         filtered_range_dict = dict()

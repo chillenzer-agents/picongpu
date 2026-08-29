@@ -143,7 +143,7 @@ class PrepRoutines:
         # read Insight far field data
         f = h5py.File(self.path + self.name, "r")
         groups = list(f.keys())
-        self.Ew = np.asarray(f["data/{}".format(*f["/{}".format(groups[0])].keys())])  # 3D array (x, y, w)
+        self.Ew = np.asarray(f["data/{}".format(*f[f"/{groups[0]}"].keys())])  # 3D array (x, y, w)
         # rescale the amplitude to 1
         self.Ew /= np.abs(self.Ew).max()
         # change scale name here if necessary
@@ -198,11 +198,11 @@ class PrepRoutines:
 
         # print fit parameters etc.
         print("Central wavelength: %.f nm" % (self.lamb[self.wc_idx] * 10**6))
-        print("Rayleigh length: zR = %.2f mm" % (self.zR))
-        print("Far field center coordinates: xc = %.2f um, yc = %.2f um" % (self.xc * 1000, self.yc * 1000))
+        print(f"Rayleigh length: zR = {self.zR:.2f} mm")
+        print(f"Far field center coordinates: xc = {self.xc * 1000:.2f} um, yc = {self.yc * 1000:.2f} um")
         print("Far field waist size: w = %.2f um" % (self.waist * 1000))
-        print("Near field center coordinates: xc = %.2f mm, yc = %.2f mm" % (self.xc_NF, self.yc_NF))
-        print("Near field waist size: w = %.2f mm" % (self.waist_NF))
+        print(f"Near field center coordinates: xc = {self.xc_NF:.2f} mm, yc = {self.yc_NF:.2f} mm")
+        print(f"Near field waist size: w = {self.waist_NF:.2f} mm")
 
     def ff_to_nf(self, d=0, method="linear"):
         """
@@ -288,8 +288,8 @@ class PrepRoutines:
         self.Ew = np.abs(self.Ew) * np.exp(1j * (np.angle(self.Ew) - phase_centr + dispersion))
         self.is_phase_corrected = True
         print(
-            "Phase has been corrected. \nApplied dispersion parameters: GDD = %.f fs**2/rad, TOD = %.f fs**3/rad**2"
-            % (GDD, TOD)
+            f"Phase has been corrected. \nApplied dispersion parameters: GDD = {GDD:.0f} fs**2/rad, "
+            f"TOD = {TOD:.0f} fs**3/rad**2"
         )
 
     def correct_ugly_spot_in_nf(self, x_ugly, y_ugly, uglybins=3, method="linear"):
@@ -350,7 +350,7 @@ class PrepRoutines:
         # correct the far field
         self.nf_to_ff()
 
-        print("corrected ugly spot in near field at x = %.2f mm, y = %.2f mm" % (x_ugly, y_ugly))
+        print(f"corrected ugly spot in near field at x = {x_ugly:.2f} mm, y = {y_ugly:.2f} mm")
 
     def shift_nf_to_center(self):
         """
@@ -392,7 +392,7 @@ class PrepRoutines:
         self.xc_NF = popt_NF[1]
         self.yc_NF = popt_NF[2]
         self.waist_NF = popt_NF[3]
-        print("new near field center coordinates: xc = %.2f mm, yc = %.2f mm" % (self.xc_NF, self.yc_NF))
+        print(f"new near field center coordinates: xc = {self.xc_NF:.2f} mm, yc = {self.yc_NF:.2f} mm")
 
         # correct the far field
         self.nf_to_ff()
@@ -439,12 +439,12 @@ class PrepRoutines:
             self.Ew = np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(MF_cropped, axes=(0, 1)), axes=(0, 1)), axes=(0, 1))
             self.Ew /= fac
             self.is_masked = True
-            print("Aperture of radius %.2f mm at distance %.2e mm has been applied." % (R, d))
+            print(f"Aperture of radius {R:.2f} mm at distance {d:.2e} mm has been applied.")
 
             # we need the integrated intensity ratio of the masked far field data to the original one to account in for
             # the energy loss due to the masking process
             self.field_ratio = np.sum(np.abs(self.Ew) ** 2) / int_orig
-            print("Pulse energy reduction to %.3f" % (self.field_ratio))
+            print(f"Pulse energy reduction to {self.field_ratio:.3f}")
 
     def measure_ad_in_nf(self):
         """
@@ -514,8 +514,8 @@ class PrepRoutines:
         AD_y = popt_y[0]
         e_AD_y = perr_y[0]
 
-        print("measured AD in NF in x direction: %.2e +- %.2e rad/nm" % (AD_x, e_AD_x))
-        print("measured AD in NF in y direction: %.2e +- %.2e rad/nm" % (AD_y, e_AD_y))
+        print(f"measured AD in NF in x direction: {AD_x:.2e} +- {e_AD_x:.2e} rad/nm")
+        print(f"measured AD in NF in y direction: {AD_y:.2e} +- {e_AD_y:.2e} rad/nm")
 
     def measure_ad_in_ff(self):
         """
@@ -582,8 +582,8 @@ class PrepRoutines:
         AD_y = popt_y[0]
         e_AD_y = perr_y[0]
 
-        print("measured AD in FF in x direction: %.2e +- %.2e rad/nm" % (AD_x, e_AD_x))
-        print("measured AD in FF in y direction: %.2e +- %.2e rad/nm" % (AD_y, e_AD_y))
+        print(f"measured AD in FF in x direction: {AD_x:.2e} +- {e_AD_x:.2e} rad/nm")
+        print(f"measured AD in FF in y direction: {AD_y:.2e} +- {e_AD_y:.2e} rad/nm")
 
     def measure_sd_in_nf(self):
         """
@@ -612,13 +612,13 @@ class PrepRoutines:
         perr = np.diag(pcov)
         SDx = popt[0]
         eSDx = perr[0]
-        print("measured SD in NF in x direction: %.2e +- %.2e mm / nm" % (SDx, eSDx))
+        print(f"measured SD in NF in x direction: {SDx:.2e} +- {eSDx:.2e} mm / nm")
 
         popt, pcov = curve_fit(lin, self.lamb[self.spectFWHMIdx[0] : self.spectFWHMIdx[1]] * 10**6, yc_SD)
         perr = np.diag(pcov)
         SDy = popt[0]
         eSDy = perr[0]
-        print("measured SD in NF in y direction: %.2e +- %.2e mm / nm" % (SDy, eSDy))
+        print(f"measured SD in NF in y direction: {SDy:.2e} +- {eSDy:.2e} mm / nm")
 
     def measure_sd_in_ff(self):
         """
@@ -647,13 +647,13 @@ class PrepRoutines:
         perr = np.diag(pcov)
         SDx = popt[0]
         eSDx = perr[0]
-        print("measured SD in FF in x direction:  %.2e +- %.2e mm / nm" % (SDx, eSDx))
+        print(f"measured SD in FF in x direction:  {SDx:.2e} +- {eSDx:.2e} mm / nm")
 
         popt, pcov = curve_fit(lin, self.lamb[self.spectFWHMIdx[0] : self.spectFWHMIdx[1]] * 10**6, yc_SD)
         perr = np.diag(pcov)
         SDy = popt[0]
         eSDy = perr[0]
-        print("measured SD in FF in y direction:  %.2e +- %.2e mm / nm" % (SDy, eSDy))
+        print(f"measured SD in FF in y direction:  {SDy:.2e} +- {eSDy:.2e} mm / nm")
 
     def propagate(self, z):
         """
@@ -695,7 +695,7 @@ class PrepRoutines:
         F_Ew[idx_out] *= np.exp(-W[idx_out] / c * np.sqrt(cond[idx_out] - 1) * np.abs(z))  # evanescent waves
         lin_phase = np.exp(1j * W * z / c)  # cancel out the time shift
 
-        print("far field propagated to z = %.2f mm" % (z))
+        print(f"far field propagated to z = {z:.2f} mm")
         return np.fft.fft2(F_Ew, axes=(0, 1)) * lin_phase
 
     def to_time_domain(self, Ew, lamb_supp=10):
@@ -741,7 +741,7 @@ class PrepRoutines:
             np.abs(self.Et[np.abs(self.y - self.yc).argmin(), np.abs(self.x - self.xc).argmin(), :]),
             p0=(1, 0, 15),
         )
-        print("Pulse duration: %.f fs / FHWM intensity: %.f fs" % (popt[2], 2 * np.sqrt(2 * np.log(2)) * popt[2]))
+        print(f"Pulse duration: {popt[2]:.0f} fs / FHWM intensity: {2 * np.sqrt(2 * np.log(2)) * popt[2]:.0f} fs")
 
         print("field data size: %.1f GB" % (np.prod(self.Et.shape) * 8 * 10**-9))  # assumes datatype double
 
@@ -846,10 +846,10 @@ class PrepRoutines:
         # correct the value if working with an applied aperture
         if self.is_masked:
             energy *= self.field_ratio
-            print("Masked pulse energy: %.3f J" % (energy))
+            print(f"Masked pulse energy: {energy:.3f} J")
         # scaling to actual beam energy
         amp_fac = np.sqrt(energy / W)
-        print("Maximum amplitude: %.2e V/m" % (amp_fac))
+        print(f"Maximum amplitude: {amp_fac:.2e} V/m")
 
         E_pol.unit_SI = amp_fac
         E_trans.unit_SI = 0.0

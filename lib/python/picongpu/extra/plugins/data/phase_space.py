@@ -20,7 +20,7 @@ except AttributeError:
     collectionsAbc = collections
 
 
-class PhaseSpaceMeta(object):
+class PhaseSpaceMeta:
     """
     Meta information for data of a phase space iteration.
     """
@@ -112,13 +112,13 @@ class PhaseSpaceData(DataReader):
 
         output_dir = os.path.join(self.run_directory, "simOutput", "phaseSpace")
         if not os.path.isdir(output_dir):
-            raise IOError(
+            raise OSError(
                 "The simOutput/phaseSpace/ directory does not "
-                "exist inside path:\n  {}\n"
+                f"exist inside path:\n  {self.run_directory}\n"
                 "Did you set the proper path to the "
                 "run directory?\n"
                 "Did you enable the phase space plugin?\n"
-                "Did the simulation already run?".format(self.run_directory)
+                "Did the simulation already run?"
             )
 
         iteration_str = "%T"
@@ -200,9 +200,7 @@ class PhaseSpaceData(DataReader):
             # verify requested iterations exist
             if not set(iteration).issubset(available_iterations):
                 raise IndexError(
-                    "Iteration {} is not available!\nList of available iterations: \n{}".format(
-                        iteration, available_iterations
-                    )
+                    f"Iteration {iteration} is not available!\nList of available iterations: \n{available_iterations}"
                 )
         else:
             # take all availble iterations
@@ -211,7 +209,7 @@ class PhaseSpaceData(DataReader):
         ret = []
         for index in iteration:
             it = series.iterations[index]
-            dataset_name = "{}_{}_{}".format(species, species_filter, ps)
+            dataset_name = f"{species}_{species_filter}_{ps}"
             mesh = it.meshes[dataset_name]
             ps_data = mesh[opmd.Mesh_Record_Component.SCALAR]
 

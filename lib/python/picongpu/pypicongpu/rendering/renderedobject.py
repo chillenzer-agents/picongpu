@@ -94,17 +94,17 @@ class RenderedObject:
             )
         )
 
-        logging.debug("found {} schemas in {}".format(len(all_json_files), schemas_path))
+        logging.debug(f"found {len(all_json_files)} schemas in {schemas_path}")
 
         for json_file_path in all_json_files:
-            with open(json_file_path, "r") as infile:
+            with open(json_file_path) as infile:
                 schema = json.load(infile)
             if "$id" not in schema:
-                logging.error("cant load schema, has no URI ($id) set: {}".format(json_file_path))
+                logging.error(f"cant load schema, has no URI ($id) set: {json_file_path}")
                 continue
             uri = schema["$id"]
             if type(uri) is not str:
-                raise TypeError("URI ($id) must be string: {}".format(json_file_path))
+                raise TypeError(f"URI ($id) must be string: {json_file_path}")
 
             resource = referencing.Resource(contents=schema, specification=referencing.jsonschema.DRAFT202012)
 
@@ -125,7 +125,7 @@ class RenderedObject:
         :param t: type to be resolved
         :return: pypicongpu.species.attributes.momentum.drift.Drift
         """
-        return "{}.{}".format(t.__module__, t.__qualname__)
+        return f"{t.__module__}.{t.__qualname__}"
 
     @staticmethod
     def _get_schema_uri_by_fully_qualified_class_name(fqn: str) -> str:
@@ -136,7 +136,7 @@ class RenderedObject:
         :return: URI of corresponding json schema
         """
         assert RenderedObject._BASE_URI.endswith("/")
-        return "{}{}".format(RenderedObject._BASE_URI, fqn)
+        return f"{RenderedObject._BASE_URI}{fqn}"
 
     @staticmethod
     def _get_schema_from_class(class_type: type) -> typing.Any:
@@ -167,7 +167,7 @@ class RenderedObject:
                 schema = class_type.model_json_schema(mode="serialization", by_alias=False) | {"$id": uri}
             except Exception as second_error:
                 raise referencing.exceptions.NoSuchResource(
-                    "schema not found for FQN {}: URI {}".format(fqn, uri)
+                    f"schema not found for FQN {fqn}: URI {uri}"
                 ) from second_error
 
         # validate schema

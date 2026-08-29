@@ -86,5 +86,5 @@ def searchParameter(parameter: str, directiontype: str = None, **kwargs):
                 result = None
 
     if result is None:
-        raise ValueError("The Parameter {} could not be found".format(parameter))
+        raise ValueError(f"The Parameter {parameter} could not be found")
     return result

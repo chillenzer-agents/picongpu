@@ -5,8 +5,9 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+from collections.abc import Callable
 from types import UnionType
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, Field

@@ -5,9 +5,10 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+from collections.abc import Callable
 from enum import Enum
 from operator import attrgetter, itemgetter
-from typing import Callable, Literal
+from typing import Literal
 
 from pydantic import (
     BaseModel,

@@ -44,7 +44,7 @@ paramsPath = Path(__file__).absolute().parent / "../include/picongpu/param"
 # read the files change the values and write them back
 def change_param_file(file_name, param_name, value):
     filePath = paramsPath / file_name
-    with open(filePath, "r") as f:
+    with open(filePath) as f:
         lines = f.readlines()
     with open(filePath, "w") as f:
         for line in lines:
@@ -77,9 +77,9 @@ def main():
         yNum = predictNumPhotons(gamma, Heff, dt, 4000, 5e5)
 
     # make Heff, gamma and dt strings in scientific notation
-    Heff = "{:.2e}".format(Heff)
-    gamma = "{:.3e}".format(gamma)
-    dt = "{:.2e}".format(dt)
+    Heff = f"{Heff:.2e}"
+    gamma = f"{gamma:.3e}"
+    dt = f"{dt:.2e}"
     changeParams(dt, Heff, gamma)
     print("gamma: ", gamma, "Heff: ", Heff, "dt: ", dt)
     print(f"Predicted number of photons: {yNum}")

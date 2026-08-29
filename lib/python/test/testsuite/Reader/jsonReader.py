@@ -144,6 +144,6 @@ class JSONReader(rF.ReadFiles):
                 if "value" not in locals():
                     value = data[parameter]
                 elif "value" in locals() and value != data[parameter]:
-                    raise ValueError("More than one value could be found for {}".format(parameter))
+                    raise ValueError(f"More than one value could be found for {parameter}")
 
         return value["values"]

@@ -155,7 +155,7 @@ class Visualizer(BaseVisualizer):
                 if x == 0:
                     return "$0$"
                 exponent = np.int32(np.log10(x))
-                return r"$10^{{ {:2d} }}$".format(exponent)
+                return rf"$10^{{ {exponent:2d} }}$"
 
             # create names for top ticks with log scale
             lambda_names = []

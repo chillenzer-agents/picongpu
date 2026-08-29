@@ -56,11 +56,11 @@ class TransitionRadiationData(DataReader):
 
         sim_output_dir = os.path.join(self.run_directory, "simOutput")
         if not os.path.isdir(sim_output_dir):
-            raise IOError(
+            raise OSError(
                 "The simOutput/ directory does not exist inside "
-                "path:\n  {}\n"
+                f"path:\n  {self.run_directory}\n"
                 "Did you set the proper path to the run directory?\n"
-                "Did the simulation already run?".format(self.run_directory)
+                "Did the simulation already run?"
             )
 
         if iteration is None:
@@ -70,7 +70,7 @@ class TransitionRadiationData(DataReader):
                 sim_output_dir, species + self.data_file_prefix + str(iteration) + self.data_file_suffix
             )
             if not os.path.isfile(data_file_path):
-                raise IOError("The file {} does not exist.\nDid the simulation already run?".format(data_file_path))
+                raise OSError(f"The file {data_file_path} does not exist.\nDid the simulation already run?")
             return data_file_path
 
     def _get_for_iteration(self, iteration=None, **kwargs):
@@ -223,7 +223,7 @@ class TransitionRadiationData(DataReader):
                     0,
                 )[0]
 
-            print("Spectrum is plotted at phi={:.2e} and theta={:.2e}".format(self.phis[phi], self.thetas[theta]))
+            print(f"Spectrum is plotted at phi={self.phis[phi]:.2e} and theta={self.thetas[theta]:.2e}")
             return self.omegas, self.data[theta * len(self.phis) + phi, :]
         elif type == "sliceovertheta":
             # find phi and omega with maximum intensity if they are not
@@ -239,9 +239,8 @@ class TransitionRadiationData(DataReader):
                 omega = 0
 
             print(
-                "Angular intensity distribution is sliced at phi={:.2e} with omega={:.2e}.".format(
-                    self.phis[phi], self.omegas[omega]
-                )
+                f"Angular intensity distribution is sliced at phi={self.phis[phi]:.2e} "
+                f"with omega={self.omegas[omega]:.2e}."
             )
             return self.thetas, self.data[phi :: len(self.phis), omega]
         elif type == "sliceoverphi":
@@ -258,9 +257,8 @@ class TransitionRadiationData(DataReader):
                 theta = int(np.floor(maxIndex / len(self.phis)))
 
             print(
-                "Angular intensity distribution is sliced at theta={:.2e} with omega={:.2e}.".format(
-                    self.thetas[theta], self.omegas[omega]
-                )
+                f"Angular intensity distribution is sliced at theta={self.thetas[theta]:.2e} "
+                f"with omega={self.omegas[omega]:.2e}."
             )
             return (
                 self.phis,
@@ -273,7 +271,7 @@ class TransitionRadiationData(DataReader):
             # meshgrids for visualization
             theta_mesh, phi_mesh = np.meshgrid(self.thetas, self.phis)
 
-            print("Heatmap is for omega={:.2e}.".format(self.omegas[omega]))
+            print(f"Heatmap is for omega={self.omegas[omega]:.2e}.")
             return (
                 theta_mesh,
                 phi_mesh,

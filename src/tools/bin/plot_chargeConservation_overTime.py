@@ -205,7 +205,7 @@ if __name__ == "__main__":
 
         for iteration in series.iterations:
             if iteration >= first_step and (iteration <= last_step or last_step == -1):
-                print("load iteration {:d}".format(iteration))
+                print(f"load iteration {iteration:d}")
                 cc_max, mean_abs, std, norm = deviation_charge_conservation(series, series.iterations[iteration])
                 data_tmp = np.array([[iteration, cc_max, mean_abs, std, norm]])
                 if collect_results is None:
@@ -224,7 +224,7 @@ if __name__ == "__main__":
         norm = collect_results[0, 4]  # first (t=0) norm
 
         # generate plot label based on directory and avoid underscore bug
-        plot_label = "{:s}".format(pattern)
+        plot_label = f"{pattern:s}"
         sim_dir_counter += 1
 
         # add plot for maximum difference

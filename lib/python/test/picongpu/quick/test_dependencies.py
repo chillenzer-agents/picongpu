@@ -37,9 +37,7 @@ def test_unknown_dependency_in_only():
 
 def test_unknown_dependency_in_versions():
     with raises(ValueError, match="openpmx"):
-        DependenciesConfig.from_rc_params(
-            {"dependencies": {"enabled": True, "versions": {"openpmx": "0.17.1"}}}
-        )
+        DependenciesConfig.from_rc_params({"dependencies": {"enabled": True, "versions": {"openpmx": "0.17.1"}}})
 
 
 def test_unknown_key():

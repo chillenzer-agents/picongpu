@@ -80,6 +80,7 @@ class CreateDensity(BaseModel):
             # proper error instead of failing with an AttributeError here
             raise ValueError(f"species must be a list of Species. You gave: {species=}.")
         species = [Species.model_validate(entry) if isinstance(entry, dict) else entry for entry in species]
+
         # the created species must be placed first: ratio-less species come
         # first, then species with increasing density ratio; ties are broken
         # by name, so the (rendered) species order is deterministic

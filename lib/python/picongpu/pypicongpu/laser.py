@@ -236,7 +236,8 @@ class TWTSLaser(_BaseLaser):
     """Offset from the middle of the simulation domain
        to the laser focus in z-direction [m]."""
     windowStart: float
-    """First time step number [#] at which the laser starts to be gradually switched on using a Blackman-Nuttall window"""
+    """First time step number [#] at which the laser starts to be gradually switched on using a
+    Blackman-Nuttall window"""
     windowEnd: float
     """Final time step number [#] after gradually switching off the laser using a Blackman-Nuttall window"""
     windowLength: float

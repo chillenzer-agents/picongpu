@@ -138,7 +138,8 @@ class Species(PICMI_Species):
             particle_type = data.get("particle_type")
             if particle_type is None:
                 raise ValueError(
-                    "Can't come up with a proper name for your species because neither name nor particle type are given."
+                    "Can't come up with a proper name for your species because neither name nor "
+                    "particle type are given."
                 )
             if isinstance(particle_type, str) and particle_type.startswith("other:"):
                 # "other:..." particle types are code-specific custom types and are

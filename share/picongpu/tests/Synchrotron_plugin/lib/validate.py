@@ -140,7 +140,8 @@ def main(dataPath):
     mask = a > 1000
     if mask.sum() < 5:
         print(
-            f"There is less than 5 bins with 1000 photons or more. Max photons in bin = {a.max()}. Increase your statistics: more iterations, more electrons, larger dt. Higher Heff or gamma"
+            f"There is less than 5 bins with 1000 photons or more. Max photons in bin = {a.max()}. "
+            "Increase your statistics: more iterations, more electrons, larger dt. Higher Heff or gamma"
         )
         return 1
 

@@ -71,9 +71,12 @@ def _make_wait_function_from(submission_information, submission_cmd="bash"):
             return lambda: any(
                 map(
                     lambda s: s.startswith(str(pid)) and _is_finished_slurm_status(s.split("|")[1]),
-                    # There are alternatives to running a subprocess ourselves but they aren't better at the time of writing:
-                    # - pyslurm: Links against slurm development libraries which are not necessarily installed on a cluster.
-                    # - simple_slurm: Just wraps the subprocess.run calls and doesn't have the full interface implemented.
+                    # There are alternatives to running a subprocess ourselves but they aren't better
+                    # at the time of writing:
+                    # - pyslurm: Links against slurm development libraries which are not necessarily
+                    #   installed on a cluster.
+                    # - simple_slurm: Just wraps the subprocess.run calls and doesn't have the full
+                    #   interface implemented.
                     run(["sacct", "-S", "2026-01-01", "-XPno", "jobid,state"], capture_output=True)
                     .stdout.decode()
                     .split("\n"),

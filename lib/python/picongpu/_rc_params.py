@@ -226,7 +226,8 @@ def _interpret_dirty_reset_handler(value):
 
 def _missing_variable_warn(variable, *_):
     warn(
-        f"Found a missing {variable=} while rendering your profile template. It is unlikely that the code will run. Check your rc_params!"
+        f"Found a missing {variable=} while rendering your profile template. "
+        "It is unlikely that the code will run. Check your rc_params!"
     )
     return ""
 
@@ -421,7 +422,8 @@ class RCParams:
             except MissingVariable as error:
                 message = (
                     "Rendering your profile template encountered a missing variable. "
-                    f"The following variables are expected from your preset: {self._data.get('required_information', [])}. "
+                    "The following variables are expected from your preset: "
+                    f"{self._data.get('required_information', [])}. "
                     "You can query this via rc_params['required_information']."
                 )
                 raise MissingVariable(message) from error
@@ -536,7 +538,8 @@ def make_workflow(workflow, crate):
 
 
 _DATASET_DESCRIPTIONS = {
-    "workflow": "Anything related to building and running this simulation setup, e.g., scripts, environment profiles, workflow definitions.",
+    "workflow": "Anything related to building and running this simulation setup, "
+    "e.g., scripts, environment profiles, workflow definitions.",
     "workflow/steps": "Workflow step definitions for building and running this simulation setup",
     "workflow/scripts": "Self-contained scripts for building and running this simulation setup",
     "etc": "Runtime configuration files for this simulation setup. "
@@ -547,7 +550,8 @@ _DATASET_DESCRIPTIONS = {
     "These files are C++ header files that are compiled into the binary during the build step. "
     "Some of these files have been rendered from mustache templates using metadata/pypicongpu_rendering_context.json. "
     "If so, the corresponding template is included with a suffix '.mustache'.",
-    "metadata": "These files constitute various forms of serialization of the entities involved in generating this simulation setup.",
+    "metadata": "These files constitute various forms of serialization of the entities "
+    "involved in generating this simulation setup.",
 }
 
 

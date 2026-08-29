@@ -116,7 +116,8 @@ def copy_attributes(
 
     if isinstance(to, type):
         try:
-            # First case: `to` is a class and can be constructed with a fully-qualified constructor call (pydantic.BaseModel).
+            # First case: `to` is a class and can be constructed with a fully-qualified constructor call
+            # (pydantic.BaseModel).
             return to(**assignments)
         except TypeError:
             try:
@@ -125,7 +126,8 @@ def copy_attributes(
             except (ValidationError, TypeError) as e:
                 message = (
                     "Instantiation failed. The receiving class must be default constructible. "
-                    f"You gave {to} which expects {len(inspect.signature(to.__init__).parameters) - 1} argument in its constructor. "
+                    f"You gave {to} which expects "
+                    f"{len(inspect.signature(to.__init__).parameters) - 1} argument in its constructor. "
                     "You can work with an instance instead of a class in this case."
                 )
                 raise ValueError(message) from e

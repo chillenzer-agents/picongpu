@@ -24,9 +24,7 @@ target-version = "py311"
 # changes nothing. Batches are added incrementally, one commit each, up to
 # select = ["ALL"].
 select = [
-    "E4", # import errors
-    "E7", # statement errors
-    "E9", # runtime and syntax errors
+    "E", # pycodestyle errors (E4, E5, E7, E9; E1/E2/E3/E6 are preview-only)
     "F", # pyflakes
 ]
 ignore = [

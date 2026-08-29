@@ -69,7 +69,8 @@ class RNGArg(BaseModel):
             if self._dist_and_return_type != (dist, return_type):
                 raise ValueError(
                     "PIConGPU does not support drawing from multiple different distributions in one functor yet. "
-                    f"You're trying to draw from {(dist, return_type)=} but previously you've drawn from {self._dist_and_return_type}."
+                    f"You're trying to draw from {(dist, return_type)=} but previously "
+                    f"you've drawn from {self._dist_and_return_type}."
                 )
 
         my_symbols = []

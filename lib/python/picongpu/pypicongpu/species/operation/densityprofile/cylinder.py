@@ -68,6 +68,8 @@ class Cylinder(BaseModel):
         min_radius = sqrt(2.0) * self.pre_plasma_ramp.PlasmaLength if type(self.pre_plasma_ramp) is not None_ else 0.0
         if self.radius_si < min_radius:
             raise ValueError(
-                f"radius must be > sqrt(2)*pre_plasma_length = {min_radius}, so that the reduced radius stays non negative. In case of no preplasma radius must be >= 0.0."
+                f"radius must be > sqrt(2)*pre_plasma_length = {min_radius}, "
+                f"so that the reduced radius stays non negative. "
+                f"In case of no preplasma radius must be >= 0.0."
             )
         return self

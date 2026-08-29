@@ -67,7 +67,9 @@ class CylindricalDistribution(Distribution):
         )
         if self.radius < min_radius:
             raise ValueError(
-                f"radius must be > sqrt(2)*pre_plasma_length = {min_radius}, so that the reduced radius stays non negative. In case of no preplasma radius must be >= 0.0., {self.exponential_pre_plasma_length}, {self.radius}"
+                f"radius must be > sqrt(2)*pre_plasma_length = {min_radius}, "
+                f"so that the reduced radius stays non negative. "
+                f"In case of no preplasma radius must be >= 0.0., {self.exponential_pre_plasma_length}, {self.radius}"
             )
 
         # create prePlasma ramp if indicated by settings
@@ -108,8 +110,8 @@ class CylindricalDistribution(Distribution):
     ):
         if self.cell_size is None:
             message = (
-                "Due to inconsistencies in the backend, evaluation of this function requires information about the cell_size."
-                " You can either set it manually "
+                "Due to inconsistencies in the backend, evaluation of this function requires information "
+                "about the cell_size. You can either set it manually "
                 " or you can perform anything that includes writing the input files on your simulation object."
                 " This is a temporary workaround and will be fixed in the future."
             )

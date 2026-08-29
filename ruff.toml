@@ -34,6 +34,7 @@ select = [
     "C4", # flake8-comprehensions
     "SIM", # flake8-simplify
     "A", # flake8-builtins
+    "RET", # flake8-return
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately

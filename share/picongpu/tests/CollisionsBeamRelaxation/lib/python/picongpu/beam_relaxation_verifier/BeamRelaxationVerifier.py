@@ -25,9 +25,8 @@ def plot_with_std(ax, x, y, y_std, label=None):
 
 def _get_debug_data(sim_path, collider_id):
     debug_file_path = Path(sim_path) / "simOutput" / f"debug_values_collider_{collider_id}_species_pair_0.dat"
-    debug_data = None
     with open(debug_file_path) as f:
-        debug_data = np.loadtxt(
+        return np.loadtxt(
             f,
             dtype=[
                 ("iteration", np.uint32),
@@ -35,7 +34,6 @@ def _get_debug_data(sim_path, collider_id):
                 ("s_param", np.float64),
             ],
         )
-    return debug_data
 
 
 class BeamRelaxationVerifier:

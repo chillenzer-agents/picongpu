@@ -169,5 +169,4 @@ class EmittanceData(DataReader):
         dt = self.get_dt()
         if len(iteration) > 1:
             return data.loc[iteration].values, y_slices, iteration, dt
-        else:
-            return data.loc[iteration].values[0, :], y_slices, iteration, dt
+        return data.loc[iteration].values[0, :], y_slices, iteration, dt

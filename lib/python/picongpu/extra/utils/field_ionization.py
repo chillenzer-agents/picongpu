@@ -89,9 +89,7 @@ class FieldIonization:
             rate = rate * np.sqrt((3.0 * nEff**3.0 * F) / (np.pi * Z**3.0))
 
         # set nan values due to near-zero field strengths to zero
-        rate = np.nan_to_num(rate)
-
-        return rate
+        return np.nan_to_num(rate)
 
     def KeldyshRate(self, E_Ip, F):
         """Keldysh model ionization rate.
@@ -105,11 +103,9 @@ class FieldIonization:
         charExpArg = np.sqrt((2.0 * E_Ip) ** 3) / F
 
         # ionization rate
-        rate = (
+        return (
             np.sqrt(6.0 * np.pi) / 2 ** (5.0 / 4.0) * E_Ip * np.sqrt(1.0 / charExpArg) * np.exp(-2.0 / 3.0 * charExpArg)
         )
-
-        return rate
 
     @staticmethod
     def convert_a0_to_Intensity(E_in_a0, lambda_laser=800.0e-9):
@@ -122,6 +118,4 @@ class FieldIonization:
         """
         E_in_SI = E_in_a0 * sc.m_e * sc.c * 2.0 * sc.pi * sc.c / (lambda_laser * sc.e)
 
-        intensity = 0.5 * sc.c * sc.epsilon_0 * E_in_SI**2.0
-
-        return intensity
+        return 0.5 * sc.c * sc.epsilon_0 * E_in_SI**2.0

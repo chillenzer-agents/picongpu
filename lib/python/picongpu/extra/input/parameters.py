@@ -104,7 +104,7 @@ class Parameter:
 
         if values is not None and range is not None:
             raise ValueError("Can only set either 'values' or 'range'!")
-        elif values is not None:
+        if values is not None:
             if not isinstance(values, collectionsAbc.Iterable):
                 values = [values]
             if not values:
@@ -120,9 +120,8 @@ class Parameter:
         elif range is not None:
             if len(range) != 2:
                 raise ValueError("Range needs to be a tuple of length 2!")
-            else:
-                self.range = range
-                self.pic_range = tuple(self.convert_to_PIC(range))
+            self.range = range
+            self.pic_range = tuple(self.convert_to_PIC(range))
         else:
             # raise ValueError("Need either 'values' or 'range' parameter!")
             self.values = self.default
@@ -204,9 +203,7 @@ class Parameter:
         if check_vals:
             self._check_input(vals)
 
-        ui_results = [ureg.convert(self.pic_to_SI(v), self.base_unit, self.unit) for v in vals]
-
-        return ui_results
+        return [ureg.convert(self.pic_to_SI(v), self.base_unit, self.unit) for v in vals]
 
     def dict_name(self):
         """

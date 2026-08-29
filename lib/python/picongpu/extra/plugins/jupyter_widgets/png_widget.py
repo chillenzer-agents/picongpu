@@ -34,9 +34,7 @@ class PNGWidget(BaseWidget):
         This should be a Dropdown since the underlying
         visualizer can not deal with multiple run_directories!
         """
-        sim_drop = widgets.Dropdown(description="Sims", options=options, value=None)
-
-        return sim_drop
+        return widgets.Dropdown(description="Sims", options=options, value=None)
 
     def _create_widgets_for_vis_args(self):
         """

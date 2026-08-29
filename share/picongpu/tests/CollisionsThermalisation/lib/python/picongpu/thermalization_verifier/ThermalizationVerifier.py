@@ -21,9 +21,8 @@ import seaborn as sns
 
 def _get_debug_data(sim_path, collider_id, pair_id):
     debug_file_path = Path(sim_path) / "simOutput" / f"debug_values_collider_{collider_id}_species_pair_{pair_id}.dat"
-    debug_data = None
     with open(debug_file_path) as f:
-        debug_data = np.loadtxt(
+        return np.loadtxt(
             f,
             dtype=[
                 ("iteration", np.uint32),
@@ -31,7 +30,6 @@ def _get_debug_data(sim_path, collider_id, pair_id):
                 ("s_param", np.float64),
             ],
         )
-    return debug_data
 
 
 class ThermalizationVerifier:

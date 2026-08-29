@@ -57,8 +57,7 @@ axes = [ax1, ax2, ax3, ax4]
 
 def get_nZ(flds, species):
     r = flds[species + "_chargeDensity"]
-    d = r[()] * r.attrs["unitSI"] / 1.602e-19 * 1.0e-6  # elements / cm^3
-    return d
+    return r[()] * r.attrs["unitSI"] / 1.602e-19 * 1.0e-6  # elements / cm^3
 
 
 def plot_sim(ax, sim):
@@ -84,17 +83,16 @@ def plot_sim(ax, sim):
             vmax=3.0e22,
             extent=[0.0, dx * 1.0e6 * d.shape[0], 0.0, dx * 1.0e6 * d.shape[1]],
         )
-    else:
-        return ax.imshow(
-            np.abs(ne),
-            cmap="CMRmap_r",
-            origin="lower",
-            aspect="auto",
-            interpolation="nearest",
-            vmin=0.0,
-            vmax=5.0e23,
-            extent=[0.0, dx * 1.0e6 * ne.shape[0], 0.0, dx * 1.0e6 * ne.shape[1]],
-        )
+    return ax.imshow(
+        np.abs(ne),
+        cmap="CMRmap_r",
+        origin="lower",
+        aspect="auto",
+        interpolation="nearest",
+        vmin=0.0,
+        vmax=5.0e23,
+        extent=[0.0, dx * 1.0e6 * ne.shape[0], 0.0, dx * 1.0e6 * ne.shape[1]],
+    )
 
 
 for i, sim in enumerate(sims):

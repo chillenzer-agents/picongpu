@@ -118,11 +118,9 @@ class BoundFreeFieldTransitions:
         dBase = (mp.mpf(4) * mp.e * Z ** mp.mpf(3)) / (F * nEff ** mp.mpf(4))
         D = dBase**nEff
 
-        rate = (
+        return (
             (F * D ** mp.mpf(2))
             / (mp.mpf(8) * mp.pi * Z)
             * mp.exp(-(mp.mpf(2) * Z ** mp.mpf(3)) / (mp.mpf(3) * nEff ** mp.mpf(3) * F))
             * mp.sqrt((mp.mpf(3) * nEff ** mp.mpf(3) * F) / (mp.pi * Z ** mp.mpf(3)))
         )
-
-        return rate

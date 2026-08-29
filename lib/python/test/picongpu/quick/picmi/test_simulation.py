@@ -47,9 +47,7 @@ class TestPicmiSimulation(TestCase):
     def __get_sim(self):
         grid = get_grid(1, 1, 1, 32)
         solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
-        sim = picmi.Simulation(time_step_size=17, max_steps=4, solver=solver)
-
-        return sim
+        return picmi.Simulation(time_step_size=17, max_steps=4, solver=solver)
 
     def __get_tmpdir_name(self):
         """

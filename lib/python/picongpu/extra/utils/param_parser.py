@@ -52,8 +52,7 @@ def read_range_file(file, values_only=True):
             filtered_range_dict[name] = attrs["values"]
 
         return filtered_range_dict
-    else:
-        return range_dict
+    return range_dict
 
 
 def to_macro_name(name):
@@ -63,8 +62,7 @@ def to_macro_name(name):
     """
     if not name.startswith("_"):
         return "PARAM_" + name.upper()
-    else:
-        return "PARAM" + name.upper()
+    return "PARAM" + name.upper()
 
 
 def parse(file, ptype):
@@ -93,12 +91,12 @@ def parse(file, ptype):
         cxx_defines = ";".join("-D" + s for s in ostr)
         return "-DPARAM_OVERWRITES:LIST='" + cxx_defines + "'"
 
-    elif ptype == "run":
+    if ptype == "run":
         ostr = [str(name) + "=" + str(value) for name, value in filtered_dict.items()]
         if not ostr:
             return ""
-        else:
-            return "-o " + "'" + " ".join(ostr) + "'"
+        return "-o " + "'" + " ".join(ostr) + "'"
+    return None
 
 
 if __name__ == "__main__":

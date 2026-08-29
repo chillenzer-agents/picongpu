@@ -65,13 +65,12 @@ class TransitionRadiationData(DataReader):
 
         if iteration is None:
             return sim_output_dir
-        else:
-            data_file_path = os.path.join(
-                sim_output_dir, species + self.data_file_prefix + str(iteration) + self.data_file_suffix
-            )
-            if not os.path.isfile(data_file_path):
-                raise OSError(f"The file {data_file_path} does not exist.\nDid the simulation already run?")
-            return data_file_path
+        data_file_path = os.path.join(
+            sim_output_dir, species + self.data_file_prefix + str(iteration) + self.data_file_suffix
+        )
+        if not os.path.isfile(data_file_path):
+            raise OSError(f"The file {data_file_path} does not exist.\nDid the simulation already run?")
+        return data_file_path
 
     def _get_for_iteration(self, iteration=None, **kwargs):
         """
@@ -224,7 +223,7 @@ class TransitionRadiationData(DataReader):
 
             print(f"Spectrum is plotted at phi={self.phis[phi]:.2e} and theta={self.thetas[theta]:.2e}")
             return self.omegas, self.data[theta * len(self.phis) + phi, :]
-        elif type == "sliceovertheta":
+        if type == "sliceovertheta":
             # find phi and omega with maximum intensity if they are not
             # given as parameters
             if omega is None and phi is None:
@@ -242,7 +241,7 @@ class TransitionRadiationData(DataReader):
                 f"with omega={self.omegas[omega]:.2e}."
             )
             return self.thetas, self.data[phi :: len(self.phis), omega]
-        elif type == "sliceoverphi":
+        if type == "sliceoverphi":
             # find theta and omega with maximum intensity if they are not
             # given as parameters
             if theta is None and omega is None:
@@ -263,7 +262,7 @@ class TransitionRadiationData(DataReader):
                 self.phis,
                 self.data[theta * len(self.phis) : (theta + 1) * len(self.phis), omega],
             )
-        elif type == "heatmap":
+        if type == "heatmap":
             # find omega with maximum intensity if it is not given as parameter
             if omega is None:
                 omega = 0
@@ -276,8 +275,7 @@ class TransitionRadiationData(DataReader):
                 phi_mesh,
                 self.data[::, omega].reshape((len(self.thetas), len(self.phis))).transpose(),
             )
-        else:
-            raise ValueError("Illegal type of figure!")
+        raise ValueError("Illegal type of figure!")
 
     def get_iterations(self, species):
         """

@@ -152,9 +152,7 @@ class PhaseSpaceData(DataReader):
         data_file_path = self.get_data_path(ps, species, species_filter, file_ext=file_ext)
 
         series = opmd.Series(data_file_path, opmd.Access.read_only)
-        iterations = [key for key, _ in series.iterations.items()]
-
-        return iterations
+        return [key for key, _ in series.iterations.items()]
 
     def _get_for_iteration(self, iteration, ps, species, species_filter="all", file_ext="h5", **kwargs):
         """
@@ -242,5 +240,4 @@ class PhaseSpaceData(DataReader):
 
         if len(iteration) == 1:
             return ret[0]
-        else:
-            return ret
+        return ret

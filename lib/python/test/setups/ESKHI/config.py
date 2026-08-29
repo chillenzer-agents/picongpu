@@ -86,5 +86,4 @@ def simData(Bx, **kwargs):
     frequency = ts.Math.physics.plasmafrequence()
     time = ts.Math.physics.calculateTimeFreq(frequency, step_direction="fields_energy.dat")
 
-    sim_values = ts.Math.math.growthRate(Bx, time)
-    return sim_values
+    return ts.Math.math.growthRate(Bx, time)

@@ -58,12 +58,10 @@ def serialise_grid_dist(value) -> None | dict[Literal["x", "y", "z"], list[dict[
 def all_gt(iterable, m):
     if all(correct := [x > m for x in iterable]):
         return iterable
-    else:
-        message = (
-            f"{iterable=} contains values <= {m=} while all should be greater than m. "
-            f"Valid are the following: {correct=}."
-        )
-        raise ValueError(message)
+    message = (
+        f"{iterable=} contains values <= {m=} while all should be greater than m. Valid are the following: {correct=}."
+    )
+    raise ValueError(message)
 
 
 def grid_dist_validate(grid_dist):
@@ -71,6 +69,7 @@ def grid_dist_validate(grid_dist):
         return None
     if all_gt(sum(grid_dist, []), 0):
         return grid_dist
+    return None
 
 
 class Grid3D(BaseModel, RenderedObject):

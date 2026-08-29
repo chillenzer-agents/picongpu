@@ -369,7 +369,7 @@ class PrepRoutines:
 
         if nx == 0 and ny == 0:
             print("already centered, no corrections necessary")
-            return None
+            return
 
         if nx != 0:
             if nx > 0:
@@ -410,40 +410,39 @@ class PrepRoutines:
         """
         if self.is_masked:
             print("Aperture has already been applied!")
-            return None
+            return
 
-        else:
-            # original field intensity integral (needed for energy ratio calculation)
-            int_orig = np.sum(np.abs(self.Ew) ** 2)
+        # original field intensity integral (needed for energy ratio calculation)
+        int_orig = np.sum(np.abs(self.Ew) ** 2)
 
-            # propagation FF to MF
-            X, Y, W = np.meshgrid(self.x, self.y, self.w)
-            fac = -1j * 2 * np.pi * c / W * d**2 / self.foc * np.exp(1j * W / c / 2 / d * (X**2 + Y**2))
-            MF = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(self.Ew * fac, axes=(0, 1)), axes=(0, 1)), axes=(0, 1))
-            # transversal scales in mid field, but still as spatial frequencies
-            a = np.fft.fftshift(np.fft.fftfreq(self.x.size, self.dx))  # = x / (lamb * d)
-            b = np.fft.fftshift(np.fft.fftfreq(self.y.size, self.dy))  # = y / (lamb * d)
+        # propagation FF to MF
+        X, Y, W = np.meshgrid(self.x, self.y, self.w)
+        fac = -1j * 2 * np.pi * c / W * d**2 / self.foc * np.exp(1j * W / c / 2 / d * (X**2 + Y**2))
+        MF = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(self.Ew * fac, axes=(0, 1)), axes=(0, 1)), axes=(0, 1))
+        # transversal scales in mid field, but still as spatial frequencies
+        a = np.fft.fftshift(np.fft.fftfreq(self.x.size, self.dx))  # = x / (lamb * d)
+        b = np.fft.fftshift(np.fft.fftfreq(self.y.size, self.dy))  # = y / (lamb * d)
 
-            # aperture = cropping MF content
-            MF_cropped = np.zeros_like(MF, dtype=complex)
-            for i in range(a.size):
-                for j in range(b.size):
-                    for k in range(self.w.size):
-                        if np.abs(a[i] * self.lamb[k] * d - xc) < R and np.abs(b[j] * self.lamb[k] * d - yc) < np.sqrt(
-                            R**2 - (a[i] * self.lamb[k] * d - xc) ** 2
-                        ):
-                            MF_cropped[j, i, k] = MF[j, i, k]
+        # aperture = cropping MF content
+        MF_cropped = np.zeros_like(MF, dtype=complex)
+        for i in range(a.size):
+            for j in range(b.size):
+                for k in range(self.w.size):
+                    if np.abs(a[i] * self.lamb[k] * d - xc) < R and np.abs(b[j] * self.lamb[k] * d - yc) < np.sqrt(
+                        R**2 - (a[i] * self.lamb[k] * d - xc) ** 2
+                    ):
+                        MF_cropped[j, i, k] = MF[j, i, k]
 
-            # propagation MF to FF
-            self.Ew = np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(MF_cropped, axes=(0, 1)), axes=(0, 1)), axes=(0, 1))
-            self.Ew /= fac
-            self.is_masked = True
-            print(f"Aperture of radius {R:.2f} mm at distance {d:.2e} mm has been applied.")
+        # propagation MF to FF
+        self.Ew = np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(MF_cropped, axes=(0, 1)), axes=(0, 1)), axes=(0, 1))
+        self.Ew /= fac
+        self.is_masked = True
+        print(f"Aperture of radius {R:.2f} mm at distance {d:.2e} mm has been applied.")
 
-            # we need the integrated intensity ratio of the masked far field data to the original one to account in for
-            # the energy loss due to the masking process
-            self.field_ratio = np.sum(np.abs(self.Ew) ** 2) / int_orig
-            print(f"Pulse energy reduction to {self.field_ratio:.3f}")
+        # we need the integrated intensity ratio of the masked far field data to the original one to account in for
+        # the energy loss due to the masking process
+        self.field_ratio = np.sum(np.abs(self.Ew) ** 2) / int_orig
+        print(f"Pulse energy reduction to {self.field_ratio:.3f}")
 
     def measure_ad_in_nf(self):
         """

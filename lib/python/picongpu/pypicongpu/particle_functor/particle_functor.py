@@ -94,6 +94,7 @@ def random_number_command(**kwargs):
         raise ValueError(f"{scale=} must be >= 0.")
     return f"random_number(rng, static_cast<typename RNGType::result_type>({kwargs.get('loc', 0)}), "
     f"static_cast<typename RNGType::result_type>({scale}))"
+    return None
 
 
 def filter_access(name, default):

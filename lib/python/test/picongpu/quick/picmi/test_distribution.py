@@ -186,8 +186,7 @@ class TestPicmiFoilDistribution(TestCase, HelperTestPicmiBoundaries):
             exponential_post_plasma_length=length,
         )
 
-        testFoils = [foil_pre, foil_post, foil_both]
-        return testFoils
+        return [foil_pre, foil_post, foil_both]
 
     def test_cutoff_zero(self):
         """cutoff set to zero is accepted"""

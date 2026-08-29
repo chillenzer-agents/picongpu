@@ -60,6 +60,7 @@ def _subtract_guards(position, unit, timestep):
 
     if unit == "pic":
         return position - NUMBER_OF_GUARD_CELLS * CELL_SIZE / (timestep * speed_of_light)
+    return None
 
 
 def origin_with_guards_check(particle, timestep):

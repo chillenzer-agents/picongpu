@@ -148,9 +148,8 @@ def checkExistVariables(variable: str) -> bool:
 
     if variable not in dir(config):
         return False
-    else:
-        val = eval(val_name)
-        return val is not None
+    val = eval(val_name)
+    return val is not None
 
 
 def checkVariables(variable: str = "undefined", default=None, parameter=None):

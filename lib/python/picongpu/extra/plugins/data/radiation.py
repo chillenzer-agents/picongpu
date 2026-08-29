@@ -155,7 +155,7 @@ class RadiationData:
         shapeDistAmp.append(RadiationData.N_vec_components)
 
         # prepare data array (with NaN as wrongly set values)
-        distAmp = np.ones(shape=shapeDistAmp, dtype=np.complex128) * np.NaN
+        distAmp = np.ones(shape=shapeDistAmp, dtype=np.complex128) * np.nan
 
         # load data
         for i, direction in enumerate(["x", "y", "z"]):

@@ -33,5 +33,7 @@ __all__ = [
 # note: put down here b/c linter complains if imports are not at top
 import sys
 
-if not (sys.version_info.major > 3 or sys.version_info.minor >= 9):
+# friendly error for too-old interpreters; kept although it predates the
+# minimum supported version (UP036)
+if sys.version_info < (3, 9):  # noqa: UP036
     raise AssertionError("Python 3.9 is required for PIConGPU")

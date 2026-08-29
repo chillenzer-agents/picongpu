@@ -11,6 +11,7 @@ from typing import Annotated
 from pydantic import BaseModel, PlainSerializer, field_validator
 
 from .rendering import RenderedObject
+from .units import SI
 
 
 def serialise_timedelta(value):
@@ -25,12 +26,21 @@ def serialise_timedelta(value):
 
 
 class Walltime(RenderedObject, BaseModel):
-    walltime: Annotated[timedelta, PlainSerializer(serialise_timedelta)]
-    """time after which the cluster scheduler will stop the simulation"""
+    """
+    Walltime limit of a PIConGPU simulation run.
+
+    Rendered into the batch submission configuration
+    (etc/picongpu/N.cfg, TBG_walltime).
+
+    Units policy: the walltime is a duration, serialized as HH:MM:SS.
+    """
+
+    walltime: Annotated[timedelta, PlainSerializer(serialise_timedelta), SI("s")]
+    """time after which the cluster scheduler will stop the simulation, [s]; must be > 0."""
 
     @field_validator("walltime", mode="after")
     @classmethod
-    def check(cls, value) -> None:
+    def check(cls, value) -> timedelta:
         if value.total_seconds() <= 0.0:
             raise ValueError("walltime must be > 0.")
         return value

@@ -21,9 +21,12 @@ from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
 from picongpu.pypicongpu.laser import FromOpenPMDPulseLaser, GaussianLaser, TWTSLaser
 from picongpu.pypicongpu.movingwindow import MovingWindow
 from picongpu.pypicongpu.output.checkpoint import Checkpoint
+from picongpu.pypicongpu.collisions import Collision, CollisionNumericsConfig, ConstLogCollision, DynamicLogCollision
 from picongpu.pypicongpu.output.binning import BinSpec, Binning, BinningAxis
 from picongpu.pypicongpu.output.openpmd_plugin import RangeSpec, RangeSpecEntry
+from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
 from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFunctor
+from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.output.radiation import (
     FrequenciesFromList,
     LinearFrequencies,
@@ -840,3 +843,59 @@ class TestBinningInvariants:
                 openPMDInfix=None,
                 dumpPeriod=-1,
             )
+
+
+class TestCollisionInvariants:
+    def test_coulomb_log_must_be_positive(self):
+        with pytest.raises(ValidationError, match="coulomb_log"):
+            ConstLogCollision(coulomb_log=0.0)
+        with pytest.raises(ValidationError, match="coulomb_log"):
+            ConstLogCollision(coulomb_log=-1.0)
+
+    def test_valid_const_log(self):
+        assert ConstLogCollision(coulomb_log=12.0).coulomb_log == 12.0
+
+    def test_valid_dynamic_log(self):
+        assert DynamicLogCollision().type_dynamiclog is True
+
+    def test_intra_species_differently_filtered_rejected(self):
+        e = make_species()
+        filtered = FilteredSpecies(species=e, functor=make_binning_functor("myFilter"))
+        with pytest.raises(ValidationError, match="not supported"):
+            Collision(species_pairs=[(e, filtered)], functor=ConstLogCollision(coulomb_log=10.0))
+
+    def test_cell_list_chunk_size_must_be_positive(self):
+        with pytest.raises(ValidationError, match="cell_list_chunk_size"):
+            CollisionNumericsConfig(cell_list_chunk_size=0)
+
+    def test_default_numerics_config_valid(self):
+        assert CollisionNumericsConfig().cell_list_chunk_size is None
+
+
+class TestParticleFunctorInvariants:
+    @pytest.mark.parametrize("name", ["with space", "with-dot", "1leading", "with\nnewline", ""])
+    def test_name_must_be_c_identifier(self, name):
+        with pytest.raises(ValidationError, match="c\\+\\+ identifiers"):
+            make_binning_functor(name=name)
+
+    def test_valid_functor(self):
+        functor = make_binning_functor()
+        assert functor.name == "positionCell"
+        assert functor.unit_dimension is None
+
+    def test_float_return_type_keeps_unit_dimension(self):
+        functor = ParticleFunctor(
+            name="positionCell",
+            functor_expression=Symbol("px"),
+            functor_preamble=[],
+            return_type="float_X",
+        )
+        assert functor.unit_dimension is not None
+
+    def test_unit_dimension_length_must_be_seven(self):
+        with pytest.raises(ValidationError, match="must match"):
+            UnitDimension(unit_dimension=[0.0] * 6)
+
+    def test_integral_return_type_forces_no_unit_dimension(self):
+        functor = make_binning_functor(return_type="int")
+        assert functor.unit_dimension is None

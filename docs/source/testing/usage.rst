@@ -10,10 +10,11 @@ If a test is simulated manually, only the associated bashscript has to be execut
 
 .. note::
 
-    When running the bashscript, a temporary folder is created, labeled with the current date. 
+    When running the bashscript, an output folder is created, labeled with the current date.
     This folder contains all essential data of the test including the test result.
-    By default, this folder is automatically deleted after the test has been run and only the result is reported to the system as 0 or 1.
-    If you are interested in the data, the corresponding line in the bashscript must be commented out.
+    By default, this folder is kept and only the result is reported to the system as an exit code
+    (0 = passed, 1 = failed, 42 = error).
+    Pass ``--delete`` to remove the folder after the test has been run.
 
 On the other hand, the test suite should also be able to be used to evaluate existing simulations.
 No ci.bash needs to be executed for this.
@@ -22,4 +23,4 @@ Instead, it is advisable to run the main.py of the respective test directly.
 .. code-block:: bash
    :emphasize-lines: 1
 
-   .lib/python/test/testsuite/Template/main.py --help
+   python lib/python/test/setups/ESKHI/main.py --help

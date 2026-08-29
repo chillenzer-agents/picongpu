@@ -153,7 +153,7 @@ def converts_to(
     preamble=None,
     remove_prefix="",
     ignore=(),
-    default_converter=lambda self, *args, **kwargs: self,
+    default_converter=lambda self, *_args, **_kwargs: self,
 ):
     """
     Add a get_as_pypicongpu method that uses copy_attributes.

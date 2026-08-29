@@ -45,6 +45,7 @@ select = [
     "RUF", # ruff-specific rules (RUF100 is enabled with the final ALL step)
     "S", # bandit
     "T20", # flake8-print
+    "ARG", # flake8-unused-arguments
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately

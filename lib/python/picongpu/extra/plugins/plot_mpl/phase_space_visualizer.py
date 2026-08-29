@@ -196,7 +196,7 @@ class Visualizer(BaseVisualizer):
         """
         super().visualize(**kwargs)
 
-    def adjust_plot(self, **kwargs):
+    def adjust_plot(self, **_kwargs):
         """Overridden from base."""
         # only for the first index that is not None we set the description
         # (which is the innermost colorbar)

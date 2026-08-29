@@ -148,7 +148,7 @@ def smooth(x, sigma, window_len=11, fkt=gaussWindow):
     return y[overlap : len(y) - overlap]  # smoothed data without added borders
 
 
-def smooth2D(data, sigma_x=10, len_x=50, sigma_y=10, len_y=50, fkt=gaussWindow):
+def smooth2D(data, sigma_x=10, len_x=50, sigma_y=10, len_y=50, fkt=gaussWindow):  # noqa: ARG001 -- documented parameter, kept for API stability
     """
     This function smoothes the noisy data of a 2D array.
 

@@ -237,7 +237,7 @@ def compare_radius(
 
 
 def compare_phases(
-    x_poss, y_poss, x_offSet, y_offSet, x_momentum, y_momentum, charge, mass, B, params, num_iter, period
+    x_poss, _y_poss, x_offSet, _y_offSet, x_momentum, y_momentum, charge, mass, B, params, num_iter, period
 ):
     """Tests if the phase difference from one revolution to the other is
     greater than delta = 0.25.

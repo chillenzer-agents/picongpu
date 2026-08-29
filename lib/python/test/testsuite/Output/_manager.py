@@ -76,7 +76,9 @@ def getInputparameter(parameter: dict) -> dict:
     return None
 
 
-def _output(direction, theory, simulation, max_diff, perc, acc_range, result, parameter):
+# the caller (testsuite/_manager.py) passes every parameter by keyword,
+# so the names are part of the call contract
+def _output(direction, theory, simulation, max_diff, perc, acc_range, result, parameter):  # noqa: ARG001
     """
     generates the output. For this purpose, the plot is created
     first and then the log file is written

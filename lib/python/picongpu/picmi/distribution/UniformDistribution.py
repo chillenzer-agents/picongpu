@@ -38,7 +38,7 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
     def picongpu_get_rms_velocity_si(self) -> tuple[float, float, float]:
         return tuple(self.rms_velocity)
 
-    def get_as_pypicongpu(self, grid):
+    def get_as_pypicongpu(self, _grid):
         util.unsupported("fill in", self.fill_in)
         util.unsupported("lower bound", self.lower_bound, [None, None, None])
         util.unsupported("upper bound", self.upper_bound, [None, None, None])

@@ -102,7 +102,7 @@ class ThermalizationVerifier:
             self.i_T_std_mean[i] = self.i_T_std_dist[i] / np.sqrt(average_i_energy.size)
             self.e_T_std_mean[i] = self.e_T_std_dist[i] / np.sqrt(average_e_energy.size)
 
-    def _calc_coulomb_log(self, temp_e, temp_i):
+    def _calc_coulomb_log(self, temp_e, _temp_i):
         n_e_cgs = self.ELECTRON_DENSITY / 100**3
         return 24 - np.log(np.sqrt(n_e_cgs) / temp_e)
 

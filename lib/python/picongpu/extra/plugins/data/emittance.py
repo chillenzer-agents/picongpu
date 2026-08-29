@@ -100,7 +100,7 @@ class EmittanceData(DataReader):
         # the first column contains the iterations
         return pd.read_csv(data_file_path, usecols=(0,), delimiter=" ", dtype=np.uint64).values[:, 0]
 
-    def _get_for_iteration(self, iteration, species, species_filter="all", **kwargs):
+    def _get_for_iteration(self, iteration, species, species_filter="all", **_kwargs):
         """
         Get a histogram.
 

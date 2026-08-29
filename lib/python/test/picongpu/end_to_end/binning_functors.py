@@ -78,7 +78,7 @@ def origin_with_guards_check(particle, timestep):
             tuple(zip(p["local"], _subtract_guards(p["local_with_guards"], unit, timestep), strict=False))
             for (_, unit), p in positions.items()
         ),
-        tuple(),
+        (),
     )
     return sum(sympy.Piecewise((1, sympy.Eq(*x)), (0, True)) for x in all_combinations) / len(all_combinations)
 
@@ -123,18 +123,18 @@ def position_binning_for(species, timestep):
     # The best I could come up with for debugging is cd'ing into the setup directory
     # and manually changing the generated C++ files.
     # That worked quite okay.
-    kwargs = dict(
-        axes=[
+    kwargs = {
+        "axes": [
             BinningAxis(
                 functor=BinningFunctor(name="dummy", functor=lambda x: 0, return_type=float),
                 bin_spec=BinSpec(kind="linear", start=-0.5, stop=0.5, nsteps=1),
             )
         ],
-        species=species,
-        period=TimeStepSpec[:],
-        openPMDBackendConfig={"hdf5": {"dataset": {"chunks": "auto"}}},
-        openPMDExt="h5",
-    )
+        "species": species,
+        "period": TimeStepSpec[:],
+        "openPMDBackendConfig": {"hdf5": {"dataset": {"chunks": "auto"}}},
+        "openPMDExt": "h5",
+    }
     return [
         Binning(
             name=f"origin_{species.name}",

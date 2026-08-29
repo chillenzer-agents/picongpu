@@ -235,7 +235,7 @@ class Renderer:
             # reassembling paths from parts)
             parts = list(template_path.parts)
             parts[-1] = "." + parts[-1]
-            new_path = functools.reduce(lambda a, b: a / b, map(lambda s: pathlib.Path(s), parts))
+            new_path = functools.reduce(lambda a, b: a / b, (pathlib.Path(s) for s in parts))
 
             template_path.rename(new_path)
 

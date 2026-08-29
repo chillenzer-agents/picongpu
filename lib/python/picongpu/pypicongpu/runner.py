@@ -434,9 +434,9 @@ class Runner(BaseModel):
                 copy2(path, self.setup_dir / f"etc/picongpu/{path.name}")
 
         for t in self.template_dir:
-            for src, dst in map(
-                lambda f: (t / f, self.setup_dir / f),
-                ("etc/picongpu", "bin", "include/picongpu", "lib", "validation", "workflow"),
+            for src, dst in (
+                (t / f, self.setup_dir / f)
+                for f in ("etc/picongpu", "bin", "include/picongpu", "lib", "validation", "workflow")
             ):
                 if src.is_dir():
                     dst.mkdir(parents=True, exist_ok=True)

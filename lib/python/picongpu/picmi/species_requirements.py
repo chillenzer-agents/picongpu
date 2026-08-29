@@ -115,7 +115,7 @@ class _Operators(BaseModel):
     # and I've got more urgent matters to deal with.
     constructor: Callable[[Any], Any] = lambda self: self.metadata.Type(
         *map(get_as_pypicongpu, self.metadata.args),
-        **dict(map(lambda kv: (kv[0], get_as_pypicongpu(kv[1])), self.metadata.kwargs.items())),
+        **{kv[0]: get_as_pypicongpu(kv[1]) for kv in self.metadata.kwargs.items()},
     )
     try_update_with: Callable[[Any, Any], bool] = lambda self, other: False
     is_same_as: Callable[[Any, Any], bool] = lambda self, other: (
@@ -127,7 +127,7 @@ class _Operators(BaseModel):
 
 class _Metadata(BaseModel):
     Type: type
-    args: tuple[Any, ...] = tuple()
+    args: tuple[Any, ...] = ()
     kwargs: dict[str, Any] = Field(default_factory=dict)
 
     # This might be necessary to distinguish

@@ -535,7 +535,7 @@ class pipe:
             opmd.Particle_Patches,
             opmd.Patch_Record,
         ]
-        is_container = any([isinstance(src, container_type) for container_type in container_types])
+        is_container = any(isinstance(src, container_type) for container_type in container_types)
 
         if isinstance(src, opmd.Series):
             # main loop: read iterations of src, write to dest

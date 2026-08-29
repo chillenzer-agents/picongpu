@@ -20,7 +20,7 @@ def custom_conversion(self):
 
 def gen_class(attributes=None, use_values=True):
     attributes = {key: value if use_values else None for key, value in (attributes or {}).items()}
-    return type(CLASS_NAME, tuple(), attributes)
+    return type(CLASS_NAME, (), attributes)
 
 
 def gen_two_classes(common_attributes=None, only_provider=None, only_receiver=None):

@@ -55,7 +55,7 @@ class CollisionalPhysicsSetup(BaseModel):
         if len(args) == 1:
             if "collisions" not in kwargs:
                 kwargs["collisions"] = args[0]
-                args = tuple()
+                args = ()
             else:
                 raise ValueError(f"Duplicated collisions argument given: You gave {args=} and {kwargs=}.")
         return super().__init__(*args, **kwargs)

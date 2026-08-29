@@ -126,7 +126,7 @@ def read_densities_into_mesh(data_or_filename, number_of_cells, cell_size):
         df[key] = df[key].round()
 
     return (
-        df.astype(dict(x=int, y=int, z=int))
+        df.astype({"x": int, "y": int, "z": int})
         .set_index(["x", "y", "z"])
         .groupby(["setup", "impl"])
         .apply(

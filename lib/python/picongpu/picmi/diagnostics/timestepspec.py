@@ -107,9 +107,9 @@ class TimeStepSpec(metaclass=_TimeStepSpecMeta):
 
     unit_system = None
 
-    def __init__(self, *args, specs_in_seconds=tuple()):
-        self.specs = tuple()
-        self.specs_in_seconds = tuple()
+    def __init__(self, *args, specs_in_seconds=()):
+        self.specs = ()
+        self.specs_in_seconds = ()
 
         # allow copy initialisation from another TimeStepSpec.
         if len(args) == 1 and isinstance(args[0], TimeStepSpec):
@@ -140,7 +140,7 @@ class TimeStepSpec(metaclass=_TimeStepSpecMeta):
         self.unit_system = unit_system
         if unit_system == "seconds":
             self.specs_in_seconds = self.specs
-            self.specs = tuple()
+            self.specs = ()
         return self
 
     def __add__(self, other):

@@ -86,7 +86,7 @@ class BaseWidget(widgets.VBox):
         # widgets for selecting the simulation and the simulation step
         # dependent on the derived class which widget it should be
         # use the simulation labels of the plot_mpl visualizer from picongpu
-        self.sim_drop = self._create_sim_dropdown(sorted(list(self.label_path_lut.keys())))
+        self.sim_drop = self._create_sim_dropdown(sorted(self.label_path_lut.keys()))
         self.sim_drop.observe(self._handle_run_dir_selection_callback, names="value")
 
         self.sim_time_slider = widgets.SelectionSlider(
@@ -147,7 +147,7 @@ class BaseWidget(widgets.VBox):
                 lut = {str(i): path for i, path in enumerate(run_dir_options)}
             else:
                 # assume run_dir_options is a list of tuples of length two
-                lut = {label: path for label, path in run_dir_options}
+                lut = dict(run_dir_options)
 
         # lookup table from label strings to paths
         self.label_path_lut = lut
@@ -157,7 +157,7 @@ class BaseWidget(widgets.VBox):
         Make the labels of the run_dir_options lookup table available for
         selection as options for the dropdown.
         """
-        sim_options = sorted(list(self.label_path_lut.keys()))
+        sim_options = sorted(self.label_path_lut.keys())
         self.sim_drop.unobserve(self._handle_run_dir_selection_callback, names="value")
         # set the UI
         self.sim_drop.options = sim_options
@@ -342,7 +342,7 @@ class BaseWidget(widgets.VBox):
             all_sim_times.append(set(times_avail))
 
         # the simulation times shared by all selected simulations
-        common_sim_times = sorted(list(set.intersection(*all_sim_times)))
+        common_sim_times = sorted(set.intersection(*all_sim_times))
         if len(common_sim_times) == 0:
             common_sim_times = [""]
         # print("common_sim_times = ", common_sim_times)

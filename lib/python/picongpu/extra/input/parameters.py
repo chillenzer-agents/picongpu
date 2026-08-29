@@ -145,14 +145,14 @@ class Parameter:
         """
         if self.values is not None:
             # check for valid values
-            res = all([v in self.pic_values for v in vals])
+            res = all(v in self.pic_values for v in vals)
             if not res:
                 raise ValueError(
                     f"Invalid values found! Values should be elements of {self.pic_values} but are {vals}!"
                 )
         else:
             # check for valid range
-            res = all([self.pic_range[0] <= v <= self.pic_range[1] for v in vals])
+            res = all(self.pic_range[0] <= v <= self.pic_range[1] for v in vals)
             if not res:
                 raise ValueError(
                     f"Invalid values found! Values should be contained in {self.pic_range} but are {vals}!"

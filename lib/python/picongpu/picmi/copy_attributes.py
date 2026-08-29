@@ -14,7 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 def has_attribute(instance, name):
     if isinstance(instance, type) and issubclass(instance, BaseModel):
-        return name in instance.model_fields or name in map(lambda x: x.alias, instance.model_fields.values())
+        return name in instance.model_fields or name in (x.alias for x in instance.model_fields.values())
 
     # Using hasattr() interacts weirdly with pydantic models,
     # so we use dir() directly.
@@ -52,7 +52,7 @@ def copy_attributes(
     to,
     conversions: None | dict[str, str | Callable] = None,
     remove_prefix: str = "",
-    ignore=tuple(),
+    ignore=(),
     default_converter=lambda self: self,
 ):
     """
@@ -152,7 +152,7 @@ def converts_to(
     conversions=None,
     preamble=None,
     remove_prefix="",
-    ignore=tuple(),
+    ignore=(),
     default_converter=lambda self, *args, **kwargs: self,
 ):
     """
@@ -197,7 +197,7 @@ def converts_to(
     return decorator
 
 
-def default_converts_to(to_class, conversions=None, preamble=None, remove_prefix="", ignore=tuple()):
+def default_converts_to(to_class, conversions=None, preamble=None, remove_prefix="", ignore=()):
     return converts_to(
         to_class,
         conversions=conversions,

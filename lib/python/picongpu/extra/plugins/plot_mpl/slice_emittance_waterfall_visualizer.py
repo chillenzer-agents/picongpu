@@ -133,7 +133,7 @@ class Visualizer(BaseVisualizer):
         """
         slice_emit, y_slices, all_iterations, dt = self.data[idx]
         np_data = np.zeros((len(y_slices), len(all_iterations)))
-        for index, ts in enumerate(all_iterations):
+        for index, _ in enumerate(all_iterations):
             np_data[:, index] = slice_emit[index][1:]
         ps = 1.0e12  # for conversion from s to ps
         max_iter = max(all_iterations * dt * ps)
@@ -171,7 +171,7 @@ class Visualizer(BaseVisualizer):
         """
         slice_emit, y_slices, all_iterations, dt = self.data[idx]
         np_data = np.zeros((len(y_slices), len(all_iterations)))
-        for index, ts in enumerate(all_iterations):
+        for index, _ in enumerate(all_iterations):
             np_data[:, index] = slice_emit[index][1:]
         # np_data.T*1.e6 for conversion of emittance to pi mm mrad
         self.plt_obj[idx].set_data(np_data.T * 1.0e6)

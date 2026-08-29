@@ -63,7 +63,7 @@ class RenderedObject:
             except TypeError:
                 print(self)
                 print(type(self))
-                raise TypeError
+                raise
         return hash_value
 
     @staticmethod

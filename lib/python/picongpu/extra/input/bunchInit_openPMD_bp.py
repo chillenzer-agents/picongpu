@@ -450,7 +450,7 @@ class pipe:
         self,
         infile,
         outfile,
-        particles=[],
+        particles=None,
         inconfig="{}",
         # can increase write performance with no known downsides, see:
         # https://adios2.readthedocs.opmd/en/latest/engines/engines.html#bp5
@@ -474,6 +474,8 @@ class pipe:
         verbose: bool
                 prints verbose messages to the screen if True
         """
+        if particles is None:
+            particles = []
         self.infile = infile
         self.outfile = outfile
         self.particles = particles  # particle data to write

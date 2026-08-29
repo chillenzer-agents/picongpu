@@ -129,7 +129,7 @@ def _make_vector(coefficients, basis_vectors):
     # In sympy, vectors are represented as linear combinations of basis vectors.
     # The last argument is important.
     # Otherwise Python tries to start from an integer (scalar) 0 which is not well-defined.
-    return sum((coeff * vec for coeff, vec in zip(coefficients, basis_vectors)), Vector.zero)
+    return sum((coeff * vec for coeff, vec in zip(coefficients, basis_vectors, strict=False)), Vector.zero)
 
 
 class Cylinder:

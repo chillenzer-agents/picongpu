@@ -115,7 +115,7 @@ class TestLayouts(TestCase):
         self.position_names = ["position_x", "position_y", "position_z"]
         self.particles = (
             sort_particles(read_particles(self.result_path / "simOutput" / "checkpoints" / "checkpoint_000000.bp5"))
-            .rename_axis(index=dict(zip(["setup", "impl"], self.index)))
+            .rename_axis(index=dict(zip(["setup", "impl"], self.index, strict=False)))
             .reset_index((0, 1), drop=True)
         )
 

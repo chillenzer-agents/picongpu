@@ -17,7 +17,7 @@ def serialise_vec(value) -> dict:
     value = tuple(value)
     if len(value) == 2:
         value = (value[0], value[1], 1)
-    return dict(zip("xyz", value))
+    return dict(zip("xyz", value, strict=False))
 
 
 def broadcast_validation(values, condition, message="Condition not met."):

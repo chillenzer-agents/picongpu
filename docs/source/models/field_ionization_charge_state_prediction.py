@@ -157,7 +157,7 @@ if __name__ == "__main__":
     for i in np.arange(t_res):
         # calculate the transition matrix of this step
         trans_mat = trans_mat_base
-        for k, cs in enumerate(Z):
+        for k, _ in enumerate(Z):
             # probability to stay bound
             trans_mat[k, k] = np.exp(-rate_matrix[k, i] * dt)
             # probability to ionize
@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
     # find times when BSI fields are exceeded
     time_BSI = np.zeros([Z_max])
-    for i, cs in enumerate(Z):
+    for i, _ in enumerate(Z):
         idx = np.where(e_field_envelope_AU > electric_field_BSI[i])[0][0]
         time_BSI[i] = time[idx - 1]
 

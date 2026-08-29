@@ -53,7 +53,7 @@ def set_colorbar(cb):
         t.set_fontsize(16)
 
 
-def plotError(file_pattern, slice_pos=[0.5, 0.5, 0.5], timestep=-1):
+def plotError(file_pattern, slice_pos=None, timestep=-1):
     """
     read field data from an openPMD file
     compute div(E) - rho/epsilon_0
@@ -71,6 +71,8 @@ def plotError(file_pattern, slice_pos=[0.5, 0.5, 0.5], timestep=-1):
         simulation step used if file is an
         openPMD file series pattern e.g. simData_%%T.bp
     """
+    if slice_pos is None:
+        slice_pos = [0.5, 0.5, 0.5]
     # load file
     series = opmd.Series(file_pattern, opmd.Access.read_only)
 

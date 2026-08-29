@@ -75,11 +75,13 @@ class WindowFunctionConfiguration(Enum):
     NONE = "None"
 
 
-def _make_vector(coefficients, basis_vectors=CoordSys3D("e")):
+def _make_vector(coefficients, basis_vectors=None):
+    if basis_vectors is None:
+        basis_vectors = CoordSys3D("e")
     # In sympy, vectors are represented as linear combinations of basis vectors.
     # The last argument is important.
     # Otherwise Python tries to start from an integer (scalar) 0 which is not well-defined.
-    return sum((coeff * vec for coeff, vec in zip(coefficients, basis_vectors)), Vector.zero)
+    return sum((coeff * vec for coeff, vec in zip(coefficients, basis_vectors, strict=False)), Vector.zero)
 
 
 class RadiationObserverConfiguration(BaseModel):
@@ -104,7 +106,8 @@ class RadiationObserverConfiguration(BaseModel):
     @computed_field
     def component_expressions(self) -> dict[str, str]:
         return {
-            key: PMAccPrinter().doprint(value) for key, value in zip("xyz", self.index_to_direction(Symbol("index")))
+            key: PMAccPrinter().doprint(value)
+            for key, value in zip("xyz", self.index_to_direction(Symbol("index")), strict=False)
         }
 
 

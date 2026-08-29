@@ -37,11 +37,11 @@ class BoundaryCondition(enum.Enum):
 
 
 def serialise_vec3(value) -> dict:
-    return dict(zip("xyz", value))
+    return dict(zip("xyz", value, strict=False))
 
 
 def serialise_vec2(value) -> dict:
-    return dict(zip("xy", value))
+    return dict(zip("xy", value, strict=False))
 
 
 Vec3_float = Annotated[tuple[float, float, float], PlainSerializer(serialise_vec3)]

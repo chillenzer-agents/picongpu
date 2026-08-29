@@ -40,7 +40,7 @@ def _normalize_range_spec_entry(data):
 
 
 def apply_range(particles, range):
-    lower_bound, upper_bound = zip(*map(_normalize_range_spec_entry, range.data))
+    lower_bound, upper_bound = zip(*map(_normalize_range_spec_entry, range.data), strict=False)
     cells = np.round(
         particles[["positionOffset_x", "positionOffset_y", "positionOffset_z"]].to_numpy() / CELL_SIZE
     ).astype(int)
@@ -62,7 +62,7 @@ def read_fields(series_name, names=("E", "B")):
 
 def read_particles(series_name):
     series = opmd.Series(str(series_name), opmd.Access.read_only)
-    names, particles = zip(*series.iterations[0].particles.items())
+    names, particles = zip(*series.iterations[0].particles.items(), strict=False)
 
     data = pd.concat((particle.to_df() for particle in particles), keys=names)
     return data.assign(

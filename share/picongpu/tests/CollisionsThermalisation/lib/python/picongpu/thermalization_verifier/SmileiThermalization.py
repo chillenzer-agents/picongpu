@@ -35,7 +35,7 @@ class SmileiThermalization:
         n_i_m = self.sim.ParticleBinning(8, units=["1/m^3"]).get()
         eps_e_m = self.sim.ParticleBinning(7, units=["eV/m^3"]).get()
         eps_i_m = self.sim.ParticleBinning(6, units=["eV/m^3"]).get()
-        for i, t in enumerate(self.times):
+        for i, _ in enumerate(self.times):
             n_e = n_e_m["data"][i]
             n_i = n_i_m["data"][i]
             eps_e = eps_e_m["data"][i]

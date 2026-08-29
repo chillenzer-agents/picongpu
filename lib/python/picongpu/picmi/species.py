@@ -230,7 +230,9 @@ class Species(PICMI_Species):
         return {
             key: [run_construction(value) for value in values]
             for key, values in zip(
-                ("constants", "attributes"), evaluate_requirements(self._requirements, [Constant, Attribute])
+                ("constants", "attributes"),
+                evaluate_requirements(self._requirements, [Constant, Attribute]),
+                strict=False,
             )
         }
 

@@ -206,7 +206,7 @@ def _dirty_reset_handler_warn(trigger_key, trigger_value, previous, current):
         "You can set 'dirty_reset_policy' to 'ignore', 'raise' or a custom handler "
         "to stop this warning from being raised."
     )
-    warn(message)
+    warn(message, stacklevel=2)
     return current
 
 
@@ -227,7 +227,8 @@ def _interpret_dirty_reset_handler(value):
 def _missing_variable_warn(variable, *_):
     warn(
         f"Found a missing {variable=} while rendering your profile template. "
-        "It is unlikely that the code will run. Check your rc_params!"
+        "It is unlikely that the code will run. Check your rc_params!",
+        stacklevel=2,
     )
     return ""
 

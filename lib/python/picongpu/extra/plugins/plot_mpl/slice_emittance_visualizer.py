@@ -100,7 +100,7 @@ class Visualizer(BaseVisualizer):
         # tied to the data readers index directly.
         handles = []
         labels = []
-        for plt_obj, lab in zip(self.plt_obj, self.sim_labels):
+        for plt_obj, lab in zip(self.plt_obj, self.sim_labels, strict=False):
             if plt_obj is not None:
                 handles.append(plt_obj)
                 labels.append(lab)

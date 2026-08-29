@@ -98,7 +98,7 @@ class EnergyHistogramData(DataReader):
         data_file_path = self.get_data_path(species, species_filter)
 
         # the first column contains the iterations
-        return pd.read_csv(data_file_path, usecols=(0,), delimiter=" ", dtype=np.uint64).values[:, 0]
+        return pd.read_csv(data_file_path, usecols=(0,), delimiter=" ", dtype=np.uint64).to_numpy()[:, 0]
 
     def _get_for_iteration(self, iteration, species, species_filter="all", include_overflow=False, **_kwargs):
         """
@@ -139,28 +139,32 @@ class EnergyHistogramData(DataReader):
         data = pd.read_csv(data_file_path, delimiter=" ")
         # upper range of each bin in keV
         #    note: only reads first row and selects the valid energy bins
-        bins = pd.read_csv(
-            data_file_path,
-            comment=None,
-            nrows=0,
-            delimiter=" ",
-            usecols=range(2, data.shape[1] - 2),
-            dtype=np.float64,
-        ).columns.values.astype(np.float64)
+        bins = (
+            pd.read_csv(
+                data_file_path,
+                comment=None,
+                nrows=0,
+                delimiter=" ",
+                usecols=range(2, data.shape[1] - 2),
+                dtype=np.float64,
+            )
+            .columns.to_numpy()
+            .astype(np.float64)
+        )
 
         # set DataFrame column names properly
         data.columns = ["iteration", "underflow", *list(bins), "overflow", "sum"]
         # set iteration as index
-        data.set_index("iteration", inplace=True)
+        data = data.set_index("iteration")
 
         # all iterations requested
         if iteration is None:
-            iteration = np.array(data.index.values)
+            iteration = np.array(data.index.to_numpy())
 
         # verify requested iterations exist
-        if not set(iteration).issubset(data.index.values):
+        if not set(iteration).issubset(data.index.to_numpy()):
             raise IndexError(
-                f"Iteration {iteration} is not available!\nList of available iterations: \n{data.index.values}"
+                f"Iteration {iteration} is not available!\nList of available iterations: \n{data.index.to_numpy()}"
             )
 
         # remove unused columns
@@ -170,5 +174,5 @@ class EnergyHistogramData(DataReader):
             del data["overflow"]
         dt = self.get_dt()
         if len(iteration) > 1:
-            return data.loc[iteration].values, bins, iteration, dt
-        return data.loc[iteration].values[0, :], bins, iteration, dt
+            return data.loc[iteration].to_numpy(), bins, iteration, dt
+        return data.loc[iteration].to_numpy()[0, :], bins, iteration, dt

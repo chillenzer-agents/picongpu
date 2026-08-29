@@ -36,9 +36,7 @@ class TestReadFiles:
 
     def test_set_direction(self, tmp_path):
         # regression test: setDirection used to raise AttributeError
-        rf = readFiles.ReadFiles(
-            fileExtension=".dat", direction="/tmp", directiontype="test_set_direction"
-        )
+        rf = readFiles.ReadFiles(fileExtension=".dat", direction="/tmp", directiontype="test_set_direction")
         # the constructor persists the directory into the (global) template
         # config; per the docstring, reset the directiontype before re-setting
         rf.setDirectiontype("test_set_direction_reset")
@@ -80,7 +78,7 @@ class TestDataReader:
     # "Bx" must not be the last header column: the parser keeps the trailing
     # newline of the header line on the last column name
     def _make_reader(self, tmp_path):
-        data = np.column_stack((np.arange(4.0), 2.0**np.arange(4.0), 3.0**np.arange(4.0)))
+        data = np.column_stack((np.arange(4.0), 2.0 ** np.arange(4.0), 3.0 ** np.arange(4.0)))
         with open(tmp_path / "fields_energy.dat", "w") as fh:
             fh.write("step Bx By\n")
             np.savetxt(fh, data)

@@ -248,11 +248,9 @@ class Visualizer:
         """
         Executed after the plotting is done for adjusting legends etc...
         """
-        pass
 
     def clear_cbar(self):
         """
         Clear colorbars if present. Should be implemented
         in derived classes that use colorbars.
         """
-        pass

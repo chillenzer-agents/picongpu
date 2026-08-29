@@ -144,4 +144,3 @@ def plot_1D(
 
 def plot_2D():
     """ """
-    pass

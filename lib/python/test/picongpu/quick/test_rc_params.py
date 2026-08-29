@@ -9,34 +9,34 @@ from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
 from moosetash import MissingVariable
-from pytest import fixture, raises, warns
 
 from picongpu import DirtyResetError, core, rc_params
 from picongpu._rc_params import search_for_in_parents
 
 
-@fixture
+@pytest.fixture
 def my_rc_params():
     return type(rc_params)()
 
 
-@fixture
+@pytest.fixture
 def any_key():
     return "any_key"
 
 
-@fixture
+@pytest.fixture
 def any_content():
     return "any content"
 
 
-@fixture
+@pytest.fixture
 def arbitrary_filename():
     return "tmp-custom-filename"
 
 
-@fixture
+@pytest.fixture
 def dirty_rc_params(my_rc_params, any_key, any_content):
     my_rc_params["dirty_reset_policy"] = "ignore"
     my_rc_params[any_key] = any_content
@@ -56,13 +56,13 @@ def test_presets_clear_previous_settings(dirty_rc_params, any_key):
 
 def test_dirty_resets_can_raise(dirty_rc_params):
     dirty_rc_params["dirty_reset_policy"] = "raise"
-    with raises(DirtyResetError):
+    with pytest.raises(DirtyResetError):
         dirty_rc_params["preset"] = "bash/bash_picongpu"
 
 
 def test_dirty_resets_can_warn(dirty_rc_params):
     dirty_rc_params["dirty_reset_policy"] = "warn"
-    with warns():
+    with pytest.warns():
         dirty_rc_params["preset"] = "bash/bash_picongpu"
 
 
@@ -95,14 +95,14 @@ def test_knows_about_its_required_information(my_rc_params):
 
 def test_rendering_profile_with_incomplete_info_raises(my_rc_params):
     my_rc_params["preset"] = "hemera-hzdr/defq_picongpu"
-    with raises(MissingVariable):
+    with pytest.raises(MissingVariable):
         _ = my_rc_params.profile_content  # read for its side effect (rendering)
 
 
 def test_rendering_profile_with_incomplete_info_can_warn(my_rc_params):
     my_rc_params["preset"] = "hemera-hzdr/defq_picongpu"
     my_rc_params["missing_variable_policy"] = "warn"
-    with warns():
+    with pytest.warns():
         _ = my_rc_params.profile_content  # read for its side effect (rendering)
 
 
@@ -149,12 +149,12 @@ def test_hemera_profile_is_reproduced(my_rc_params):
 
 
 def test_raises_on_non_existent_preset(my_rc_params):
-    with raises(ValueError):
+    with pytest.raises(ValueError):
         my_rc_params["preset"] = "bogus"
 
 
 def test_raises_on_ambiguous_preset(my_rc_params):
-    with raises(ValueError):
+    with pytest.raises(ValueError):
         my_rc_params["preset"] = "hemera-hzdr"
 
 

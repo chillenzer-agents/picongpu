@@ -41,6 +41,7 @@ select = [
     "PERF", # Perflint
     "ISC", # flake8-implicit-str-concat
     "PIE", # flake8-pie
+    "PT", # flake8-pytest-style
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
@@ -61,6 +62,19 @@ ignore = [
     # tolerances, and unit values; naming every compared literal as a
     # constant would add noise without clarifying the intent.
     "PLR2004",
+    # The quick test suite is written in a mix of unittest.TestCase style
+    # (assertDictEqual, assertRaises, subTest) and plain pytest style.
+    # The following pytest-idiom rules would force a migration of the
+    # TestCase-based tests to bare asserts / pytest.raises, changing
+    # failure diagnostics (diff output, subTest reporting) and, for
+    # PT011, pinning exception messages that are intentionally left open
+    # (e.g. "varies by distribution"). That is a test-quality refactor,
+    # out of scope for the lint-tightening pass.
+    "PT009",
+    "PT011",
+    "PT012",
+    "PT018",
+    "PT027",
 ]
 
 [lint.isort]

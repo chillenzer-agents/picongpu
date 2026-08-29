@@ -33,7 +33,33 @@ NATIVE_FIELDS = ["E", "B", "J"]
 
 
 class RangeSpecEntry(BaseModel):
+    """
+    the output range in cells for one spatial dimension
+
+    C++ counterpart: one of the three comma-separated dimension ranges in
+    the `--<plugin>.range` parameter of the openPMD backend
+    (e.g. `1:10`, `42`, or empty for the full dimension).
+
+    Units policy: cell indices (dimensionless).
+    """
+
     data: None | int | tuple[int, int] = None
+    """the range, [cell index]: None = the full dimension, a single index >= 0,
+    or a (lo, hi) pair with 0 <= lo <= hi"""
+
+    @field_validator("data")
+    @classmethod
+    def _validate_range_entry(cls, value):
+        if isinstance(value, int):
+            if value < 0:
+                raise ValueError(f"cell indices must be >= 0. You gave {value}.")
+        elif isinstance(value, tuple):
+            lo, hi = value
+            if lo < 0 or hi < 0:
+                raise ValueError(f"cell indices must be >= 0. You gave {value}.")
+            if lo > hi:
+                raise ValueError(f"the range start must not exceed its end. You gave lo={lo}, hi={hi}.")
+        return value
 
     @model_serializer(mode="plain")
     def _serialize(self) -> str:
@@ -47,7 +73,18 @@ class RangeSpecEntry(BaseModel):
 
 
 class RangeSpec(BaseModel):
+    """
+    the output range in cells for each spatial dimension
+
+    C++ counterpart: the `--<plugin>.range` parameter of the openPMD backend
+    (e.g. `1:10,:,42:`); rendered as three comma-separated dimension ranges.
+
+    Units policy: cell indices (dimensionless).
+    """
+
     data: tuple[RangeSpecEntry, RangeSpecEntry, RangeSpecEntry] = (RangeSpecEntry(), RangeSpecEntry(), RangeSpecEntry())
+    """exactly three entries (x, y, z); each entry is None (full dimension),
+    a single cell index >= 0, or a (lo, hi) cell range"""
 
     @model_serializer()
     def _serialize_data(self) -> str:
@@ -55,12 +92,36 @@ class RangeSpec(BaseModel):
 
 
 class OpenPMDConfig(BaseModel):
+    """
+    the openPMD backend configuration of a plugin
+
+    C++ counterpart: the openPMD backend configuration file
+    (file, infix, ext, backend_config, data_preparation_strategy, range).
+
+    Units policy: cell indices (dimensionless).
+    """
+
     file: PathLike | str
+    """file prefix for the openPMD output (C++: file); combined with `infix`
+    and `ext` into the full filename"""
+
     infix: str = "_%06T"
+    """iteration expansion pattern between `file` and `ext` (C++: infix);
+    `%T` is replaced by the zero-padded iteration"""
+
     ext: Annotated[str, AfterValidator(lambda s: s.strip("."))] = "bp5"
+    """file extension (C++: ext); leading dots are stripped, so "h5" and
+    ".h5" are equivalent"""
+
     backend_config: PathLike | None = None
+    """path to an additional openPMD backend configuration file
+    (C++: backend_config); None = none"""
+
     data_preparation_strategy: Literal["mappedMemory", "doubleBuffer"] = "mappedMemory"
+    """how the backend prepares the output data (C++: dataPreparationStrategy)"""
+
     range: RangeSpec = RangeSpec()
+    """output range in cells per dimension (C++: range); default = full domain"""
 
     @field_validator("range", mode="before")
     @classmethod
@@ -94,19 +155,51 @@ def to_string(timestepspec: TimeStepSpec):
 
 
 class FieldDump(BaseModel):
+    """
+    a dump of a single (derived) field into the openPMD output
+
+    C++ counterpart: one entry of the openPMD backend sink configuration
+    (the variable name, optionally with a particle filter and functor).
+
+    Units policy: see the functor.
+    """
+
     name: str
+    """name of the field variable in the openPMD output"""
+
     functor: ParticleFunctor | None = None
-    filtername: None | str
+    """the particle functor computing the derived field; None for native
+    fields (E, B, J)"""
+
+    filtername: None | str = None
+    """name of the particle filter applied to the species, [C++ identifier];
+    rendered as `picongpu::particles::filter::{filtername}`, so it must be a
+    valid C++ identifier (it is derived from the filter functor's name)"""
 
     def get_rendering_context(self) -> dict:
         return self.model_dump(mode="json")
 
 
 class OpenPMDPlugin(BaseModel):
+    """
+    the openPMD plugin (top level)
+
+    C++ counterpart: the openPMD plugin instance (a list of
+    (period, source) pairs plus the openPMD backend configuration).
+
+    Units policy: see the sub-models.
+    """
+
     sources: list[tuple[TimeStepSpec, Species | FieldDump | FilteredSpecies]]
+    """the output sources: one (period, source) pair per dumped field,
+    species, or filtered species"""
+
     config: OpenPMDConfig = OpenPMDConfig(file="simData")
+    """the openPMD backend configuration"""
 
     type_openPMD: Literal[True] = True
+    """tag field identifying the openPMD plugin (discriminator)"""
+
     _setup_dir: Path | None = PrivateAttr(None)
     # We're using a negation here because now `False` and `None` (evaluating to `False`)
     # both mean that we can't rely on `setup_dir` being anything permanent:

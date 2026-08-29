@@ -19,6 +19,7 @@ from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
 from picongpu.pypicongpu.laser import FromOpenPMDPulseLaser, GaussianLaser, TWTSLaser
 from picongpu.pypicongpu.movingwindow import MovingWindow
 from picongpu.pypicongpu.output.checkpoint import Checkpoint
+from picongpu.pypicongpu.output.openpmd_plugin import RangeSpec, RangeSpecEntry
 from picongpu.pypicongpu.output.radiation import (
     FrequenciesFromList,
     LinearFrequencies,
@@ -670,3 +671,33 @@ class TestCheckpointInvariants:
 
     def test_time_period_only_valid(self):
         assert Checkpoint(timePeriod=5).timePeriod == 5
+
+
+class TestOpenPMDRangeSpecInvariants:
+    def test_negative_single_index_rejected(self):
+        with pytest.raises(ValidationError, match="cell indices"):
+            RangeSpecEntry(data=-1)
+
+    def test_negative_range_rejected(self):
+        with pytest.raises(ValidationError, match="cell indices"):
+            RangeSpecEntry(data=(-1, 5))
+
+    def test_inverted_range_rejected(self):
+        with pytest.raises(ValidationError, match="start must not exceed"):
+            RangeSpecEntry(data=(5, 1))
+
+    def test_equal_bounds_allowed(self):
+        assert RangeSpecEntry(data=(3, 3)).data == (3, 3)
+
+    def test_valid_range_entries(self):
+        assert RangeSpecEntry(data=None).data is None
+        assert RangeSpecEntry(data=42).data == 42
+        assert RangeSpecEntry(data=(1, 10)).data == (1, 10)
+
+    def test_range_serialization_unchanged(self):
+        assert RangeSpecEntry(data=None).model_dump() == ""
+        assert RangeSpecEntry(data=42).model_dump() == "42"
+        assert RangeSpecEntry(data=(1, 10)).model_dump() == "1:10"
+        assert (
+            RangeSpec(data=(RangeSpecEntry(data=1), RangeSpecEntry(), RangeSpecEntry(data=42))).model_dump() == "1,,42"
+        )

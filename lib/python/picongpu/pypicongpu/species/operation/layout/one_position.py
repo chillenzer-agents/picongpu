@@ -8,11 +8,23 @@ License: GPLv3+
 from functools import partial
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, Field, PlainSerializer
+from pydantic import AfterValidator, BeforeValidator, BaseModel, Field, PlainSerializer
 
 
 def serialise_vec(value) -> dict:
     return dict(zip("xyz", value))
+
+
+def deserialise_vec(value):
+    # accept the serialised form (dict with x/y/z keys) in addition to the
+    # native tuple form, so that model_dump(mode="json") output can be
+    # validated again (round-trip safety)
+    if isinstance(value, dict):
+        try:
+            return (value["x"], value["y"], value["z"])
+        except KeyError as error:
+            raise ValueError(f"Expected a vector with the keys x, y, z. You gave: {value=}.") from error
+    return value
 
 
 def broadcast_validation(values, condition, message="Condition not met."):
@@ -23,6 +35,7 @@ def broadcast_validation(values, condition, message="Condition not met."):
 
 Vec3_float = Annotated[
     tuple[float, float, float],
+    BeforeValidator(deserialise_vec),
     PlainSerializer(serialise_vec),
     AfterValidator(
         partial(

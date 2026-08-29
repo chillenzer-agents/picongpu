@@ -12,6 +12,7 @@ from typing import Annotated, Literal
 from pydantic import (
     BaseModel,
     BeforeValidator,
+    ConfigDict,
     Field,
     PlainSerializer,
     computed_field,
@@ -46,6 +47,18 @@ def _get_huygens_surface_serialized(huygens_surface_positions) -> dict:
     }
 
 
+def deserialise_huygens(value):
+    # accept the serialised form (nested dict with row_x/row_y/row_z) in
+    # addition to the native 3x2 list form, so that model_dump(mode="json")
+    # output can be validated again (round-trip safety)
+    if isinstance(value, dict):
+        try:
+            return [[value[f"row_{axis}"]["negative"], value[f"row_{axis}"]["positive"]] for axis in ("x", "y", "z")]
+        except (KeyError, TypeError) as error:
+            raise ValueError(f"Expected a serialised huygens surface position. You gave: {value=}.") from error
+    return value
+
+
 class _Component(BaseModel):
     """single (float) component of a 3D vector argument (direction/position)"""
 
@@ -74,6 +87,11 @@ class _BaseLaser(BaseModel):
 
     Units policy: SI (m for lengths, s for times, V/m for E0, rad for phases).
     """
+
+    # accept both the field names (as produced by model_dump) and the aliases
+    # (e.g. wavelength) upon construction, so that serialised output can be
+    # validated again (round-trip safety)
+    model_config = ConfigDict(populate_by_name=True)
 
     # Common properties for all lasers
     propagation_direction: Annotated[
@@ -109,7 +127,11 @@ class _BaseLaser(BaseModel):
     C++ name: PULSE_INIT (incidentField.param)."""
 
     # Huygens surface position (common to all lasers)
-    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
+    huygens_surface_positions: Annotated[
+        list[list[int]],
+        BeforeValidator(deserialise_huygens),
+        PlainSerializer(_get_huygens_surface_serialized),
+    ]
     """Position in cells of the Huygens surface relative to start/
        edge(negative numbers) of the total domain, [cells];
        a 3x2 list: per axis (positive edge, negative edge).

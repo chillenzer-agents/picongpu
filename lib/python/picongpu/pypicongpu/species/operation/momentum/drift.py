@@ -9,7 +9,7 @@ import math
 from typing import Annotated
 
 import numpy as np
-from pydantic import AfterValidator, BaseModel, Field, PlainSerializer
+from pydantic import AfterValidator, BeforeValidator, BaseModel, Field, PlainSerializer
 from scipy import constants
 
 from ....rendering import RenderedObject
@@ -24,6 +24,18 @@ def serialise_vec(value) -> dict:
     return dict(zip("xyz", value))
 
 
+def deserialise_vec(value):
+    # accept the serialised form (dict with x/y/z keys) in addition to the
+    # native tuple form, so that model_dump(mode="json") output can be
+    # validated again (round-trip safety)
+    if isinstance(value, dict):
+        try:
+            return (value["x"], value["y"], value["z"])
+        except KeyError as error:
+            raise ValueError(f"Expected a vector with the keys x, y, z. You gave: {value=}.") from error
+    return value
+
+
 def validate_unit_vec(value):
     epsilon = 1.0e-5
     if any(np.isinf(value)) or any(np.isnan(value)):
@@ -33,7 +45,12 @@ def validate_unit_vec(value):
     return value
 
 
-Vec3_float = Annotated[tuple[float, float, float], PlainSerializer(serialise_vec), AfterValidator(validate_unit_vec)]
+Vec3_float = Annotated[
+    tuple[float, float, float],
+    BeforeValidator(deserialise_vec),
+    PlainSerializer(serialise_vec),
+    AfterValidator(validate_unit_vec),
+]
 
 
 class Drift(RenderedObject, BaseModel):

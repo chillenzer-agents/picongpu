@@ -7,7 +7,7 @@ License: GPLv3+
 
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, Field, PlainSerializer, model_validator
+from pydantic import AfterValidator, BeforeValidator, BaseModel, Field, PlainSerializer, model_validator
 
 from ....rendering import RenderedObject
 
@@ -22,6 +22,18 @@ def serialise_vec(value) -> dict:
     return dict(zip("xyz", value))
 
 
+def deserialise_vec(value):
+    # accept the serialised form (dict with x/y/z keys) in addition to the
+    # native tuple form, so that model_dump(mode="json") output can be
+    # validated again (round-trip safety)
+    if isinstance(value, dict):
+        try:
+            return (value["x"], value["y"], value["z"])
+        except KeyError as error:
+            raise ValueError(f"Expected a vector with the keys x, y, z. You gave: {value=}.") from error
+    return value
+
+
 def all_ge_0(values):
     wrong = [v < 0 for v in values]
     if any(wrong):
@@ -31,7 +43,12 @@ def all_ge_0(values):
     return values
 
 
-Vec3_float_temperature = Annotated[tuple[float, float, float], PlainSerializer(serialise_vec), AfterValidator(all_ge_0)]
+Vec3_float_temperature = Annotated[
+    tuple[float, float, float],
+    BeforeValidator(deserialise_vec),
+    PlainSerializer(serialise_vec),
+    AfterValidator(all_ge_0),
+]
 
 
 class Temperature(RenderedObject, BaseModel):

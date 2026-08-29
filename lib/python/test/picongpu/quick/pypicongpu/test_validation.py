@@ -18,6 +18,20 @@ from picongpu.pypicongpu.field_solver import YeeSolver
 from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
 from picongpu.pypicongpu.laser import GaussianLaser
 from picongpu.pypicongpu.movingwindow import MovingWindow
+from picongpu.pypicongpu.species.constant import Charge, DensityRatio, Mass
+from picongpu.pypicongpu.species.constant.synchrotron import (
+    FirstSynchrotronFunctionParams,
+    InterpolationParams,
+    SynchrotronParams,
+)
+from picongpu.pypicongpu.species.species import Species
+from picongpu.pypicongpu.species.attribute import Momentum, Position, Weighting
+from picongpu.pypicongpu.species.operation.layout import OnePosition, Quiet, Random
+from picongpu.pypicongpu.species.operation.momentum import Drift, Temperature
+from picongpu.pypicongpu.species.operation.densityprofile import Uniform
+from picongpu.pypicongpu.species.operation.densityprofile.gaussian import Gaussian
+from picongpu.pypicongpu.species.operation.densityprofile.cylinder import Cylinder
+from picongpu.pypicongpu.species.operation.densityprofile.plasmaramp import Exponential
 from picongpu.pypicongpu.simulation import Simulation
 from picongpu.pypicongpu.walltime import Walltime
 
@@ -193,3 +207,171 @@ class TestGridInvariants:
     def test_valid_grid(self):
         grid = make_grid()
         assert grid.cell_cnt == (16, 16, 16)
+
+
+def make_species(name="electron", constants=(), attributes=None, **overrides):
+    kwargs = dict(
+        name=name,
+        constants=list(constants),
+        attributes=attributes if attributes is not None else [Position(), Weighting(), Momentum()],
+    )
+    kwargs |= overrides
+    return Species(**kwargs)
+
+
+class TestSpeciesConstantInvariants:
+    def test_mass_negative_rejected(self):
+        with pytest.raises(ValidationError):
+            Mass(mass_si=-9.1e-31)
+
+    def test_mass_zero_accepted_for_massless_particles(self):
+        # photons are legitimately massless (Photon pusher)
+        assert Mass(mass_si=0.0).mass_si == 0.0
+
+    def test_charge_negative_accepted(self):
+        # electrons carry a negative charge; the sign is free
+        assert Charge(charge_si=-1.6e-19).charge_si == -1.6e-19
+
+    @pytest.mark.parametrize("ratio", [0.0, -1.0])
+    def test_density_ratio_must_be_positive(self, ratio):
+        with pytest.raises(ValidationError):
+            DensityRatio(ratio=ratio)
+
+
+class TestSynchrotronInvariants:
+    def test_log_end_must_be_positive(self):
+        with pytest.raises(ValidationError):
+            FirstSynchrotronFunctionParams(log_end=0.0)
+
+    def test_num_sample_points_must_be_positive(self):
+        with pytest.raises(ValidationError):
+            FirstSynchrotronFunctionParams(num_sample_points=0)
+
+    def test_number_table_entries_must_be_positive(self):
+        with pytest.raises(ValidationError):
+            InterpolationParams(number_table_entries=0)
+
+    def test_max_zq_exponent_must_be_at_most_10(self):
+        with pytest.raises(ValidationError):
+            InterpolationParams(max_Zq_exponent=11.0)
+
+    def test_min_zq_exponent_must_be_smaller_than_max(self):
+        with pytest.raises(ValidationError, match="min_Zq_exponent"):
+            InterpolationParams(min_Zq_exponent=10.0, max_Zq_exponent=10.0)
+
+    def test_min_energy_must_be_positive(self):
+        with pytest.raises(ValidationError):
+            SynchrotronParams(min_energy=-1.0)
+
+
+class TestSpeciesModelInvariants:
+    @pytest.mark.parametrize("name", ["with space", "with.dot", "with-dash", "with_newline\n", ""])
+    def test_name_must_be_cpp_identifier(self, name):
+        with pytest.raises(ValidationError, match="c\\+\\+ compatible"):
+            make_species(name=name)
+
+    def test_valid_name(self):
+        assert make_species(name="my_species2").name == "my_species2"
+
+    def test_position_attribute_mandatory(self):
+        with pytest.raises(ValidationError, match="position attribute"):
+            make_species(attributes=[Weighting(), Momentum()])
+
+    def test_momentum_attribute_mandatory(self):
+        with pytest.raises(ValidationError, match="momentum attribute"):
+            make_species(attributes=[Position(), Weighting()])
+
+    def test_duplicate_attribute_rejected(self):
+        with pytest.raises(ValidationError, match="unique"):
+            make_species(attributes=[Position(), Weighting(), Momentum(), Weighting()])
+
+
+class TestLayoutInvariants:
+    @pytest.mark.parametrize("offset", [(1.0, 0.0, 0.0), (-0.1, 0.0, 0.0)])
+    def test_one_position_offset_must_be_in_unit_interval(self, offset):
+        with pytest.raises(ValidationError, match="between 0 and 1"):
+            OnePosition(ppc=1, in_cell_offset=offset)
+
+    @pytest.mark.parametrize("n_points", [(0, 1, 1), (1, -1, 1)])
+    def test_quiet_n_points_must_be_positive(self, n_points):
+        with pytest.raises(ValidationError, match="greater than 0"):
+            Quiet(ppc=1, n_points=n_points)
+
+    def test_quiet_default_satisfies_constraints(self):
+        assert Quiet(ppc=1).n_points == (1, 1, 1)
+
+    @pytest.mark.parametrize("ppc", [0, -1])
+    def test_ppc_must_be_positive(self, ppc):
+        with pytest.raises(ValidationError):
+            Random(ppc=ppc)
+
+
+class TestMomentumInvariants:
+    @pytest.mark.parametrize("gamma", [0.5, 0.99])
+    def test_drift_gamma_must_be_at_least_one(self, gamma):
+        with pytest.raises(ValidationError):
+            Drift(direction_normalized=(1.0, 0.0, 0.0), gamma=gamma)
+
+    def test_drift_direction_must_be_unit_vector(self):
+        with pytest.raises(ValidationError, match="unit vector"):
+            Drift(direction_normalized=(2.0, 0.0, 0.0), gamma=1.0)
+
+    def test_drift_from_velocity_above_c_rejected(self):
+        from scipy.constants import c as speed_of_light
+
+        with pytest.raises(ValueError, match="less than the speed of light"):
+            Drift.from_velocity((2 * speed_of_light, 0.0, 0.0))
+
+    def test_temperature_negative_directional_rejected(self):
+        with pytest.raises(ValidationError, match=">= 0"):
+            Temperature(temperature_kev_directional=(1.0, -1.0, 1.0))
+
+    def test_temperature_exactly_one_set(self):
+        with pytest.raises(ValidationError, match="Exactly one"):
+            Temperature(temperature_kev=1.0, temperature_kev_directional=(1.0, 1.0, 1.0))
+
+    def test_temperature_scalar_ok(self):
+        assert Temperature(temperature_kev=1.0).temperature_kev == 1.0
+
+
+class TestDensityProfileInvariants:
+    @pytest.mark.parametrize("density_si", [0.0, -1.0])
+    def test_uniform_density_must_be_positive(self, density_si):
+        with pytest.raises(ValidationError):
+            Uniform(density_si=density_si)
+
+    def test_gaussian_center_ordering(self):
+        with pytest.raises(ValidationError, match="gas_center_rear"):
+            Gaussian(
+                center_front=0.2,
+                center_rear=0.1,
+                sigma_front=0.01,
+                sigma_rear=0.01,
+                factor=-1.0,
+                power=2.0,
+                vacuum_cells_front=0,
+                density=1.0,
+            )
+
+    def test_gaussian_valid(self):
+        g = Gaussian(
+            center_front=0.2,
+            center_rear=0.4,
+            sigma_front=0.01,
+            sigma_rear=0.01,
+            factor=-1.0,
+            power=2.0,
+            vacuum_cells_front=0,
+            density=1.0,
+        )
+        assert g.gas_center_rear == 0.4
+
+    def test_cylinder_radius_too_small_for_ramp(self):
+        with pytest.raises(ValidationError, match="reduced radius"):
+            Cylinder(
+                density_si=1.0,
+                center_position_si=(0.5, 0.5, 0.5),
+                radius_si=0.01,
+                cylinder_axis=(0.0, 0.0, 1.0),
+                pre_plasma_ramp=Exponential(PlasmaLength=0.1, PlasmaCutoff=0.5),
+            )

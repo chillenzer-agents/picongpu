@@ -12,8 +12,18 @@ from .ionizationmodel import IonizationModel, IonizationModelGroups
 
 
 class GroundStateIonization(Constant):
+    """
+    ground state ionization of a species
+
+    Bundles the ground state only ionization models that apply to the species.
+
+    C++ counterpart: the `ionizers<...>` particle flag in
+    include/picongpu/param/speciesDefinition.param.
+    """
+
     ionization_model_list: list[IonizationModel]
-    """list of ground state only ionization models to apply for the species"""
+    """list of ground state only ionization models to apply for the species;
+    must be non-empty, at most one model per ionization model group."""
 
     @model_validator(mode="after")
     def check(self) -> None:

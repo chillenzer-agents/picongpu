@@ -10,7 +10,11 @@ from .attribute import Attribute
 
 class MomentumPrev1(Attribute):
     """
-    Momentum at previous time step of a macroparticle
+    Momentum at the previous time step of a macroparticle, [kg*m/s].
+    Required by the radiation plugin to compute the radiation mask.
+
+    C++ name: momentumPrev1 (speciesDefinition.param).
     """
 
     picongpu_name: str = "momentumPrev1"
+    """C++ type name of the previous-step momentum attribute."""

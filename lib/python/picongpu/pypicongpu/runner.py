@@ -209,44 +209,6 @@ class TBGFlags(BaseModel):
         return {"class": "Directory", "location": str(value)}
 
 
-class TBGFlags(BaseModel):
-    # We explicitly disallow the some shorthands like `-c`, `-t`, ...
-    # because they overlap with pic-build flags and could thus lead to confusion.
-    cfg_file: str = Field(
-        default="etc/picongpu/N.cfg",
-        description="Configuration file to set up batch file.",
-        validation_alias=AliasChoices("cfg"),
-    )
-
-    submit_system: str | None = Field(
-        default_factory=lambda: rc_params.get("tbg_submit", "bash"),
-        description="Submit command (qsub, 'qsub -h', sbatch, ...).",
-        validation_alias=AliasChoices("submit", "s"),
-    )
-
-    template_file: str | None = Field(
-        default_factory=lambda: rc_params.get("tbg_tpl_file", None), validation_alias=AliasChoices("tpl")
-    )
-
-    overwrite_vars: list[str] | None = Field(
-        default=None,
-        description="Overwrite any template variable.",
-        validation_alias=AliasChoices("o"),
-    )
-
-    force: bool = Field(
-        default=False,
-        description="Override if 'destinationPath' exists.",
-        validation_alias=AliasChoices("force", "f"),
-    )
-
-    project_path: Path = Field(description="Simulation setup directory to run.")
-
-    @field_serializer("project_path")
-    def _serialize_project_path(self, value) -> dict[str, str]:
-        return {"class": "Directory", "location": str(value)}
-
-
 class Runner(BaseModel):
     """
     Accepts a PyPIConGPU Simulation and runs it

@@ -137,7 +137,7 @@ class RenderedObject:
         :return: URI of corresponding json schema
         """
         if not RenderedObject._BASE_URI.endswith("/"):
-            raise AssertionError()
+            raise AssertionError
         return f"{RenderedObject._BASE_URI}{fqn}"
 
     @staticmethod

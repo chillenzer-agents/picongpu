@@ -255,11 +255,11 @@ class Simulation(picmistandard.PICMI_Simulation):
           nop (do nothing)
         """
         if self.solver is None:
-            raise AssertionError()
+            raise AssertionError
         if self.solver.method not in ["Yee", "Lehe"]:
-            raise AssertionError()
+            raise AssertionError
         if not isinstance(self.solver.grid, Cartesian3DGrid):
-            raise AssertionError()
+            raise AssertionError
 
         delta_x = (
             self.solver.grid.upper_bound[0] - self.solver.grid.lower_bound[0]

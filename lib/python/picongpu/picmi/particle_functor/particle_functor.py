@@ -47,7 +47,7 @@ _COORDINATE_SYSTEM = {
 class Particle:
     # The stub documents the signature implemented by AbstractParticle.get,
     # so the parameter names are kept in sync with the override.
-    def get(self, attribute, **kwargs) -> Expr | Iterable[Expr]:  # noqa: ARG002
+    def get(self, attribute, **kwargs) -> Expr | Iterable[Expr]:
         raise NotImplementedError("abstract base class only")
 
 

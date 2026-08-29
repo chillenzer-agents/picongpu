@@ -96,6 +96,12 @@ class Species(PICMI_Species):
     """
 
     picongpu_fixed_charge: bool = False
+    charge_state: int | None = None
+    """initial charge state of an ion species: the number of stripped
+    electrons (its positive charge), 0 <= charge_state <= atomic number.
+    Distinct from the bound-electron count (atomic number - charge state),
+    which PIConGPU stores on the ion; the charge state is what the C++
+    ChargeState<T_chargeState> init manipulator is parameterised with."""
     particle_shape: str | None = "quadratic"
     method: str | None = "Boris"
 

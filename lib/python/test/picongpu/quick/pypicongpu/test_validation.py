@@ -14,8 +14,15 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
-from picongpu.pypicongpu.collisions import Collision, CollisionNumericsConfig, ConstLogCollision
+from picongpu.pypicongpu.collisions import (
+    Collision,
+    CollisionalPhysicsSetup,
+    CollisionNumericsConfig,
+    ConstLogCollision,
+    DynamicLogCollision,
+)
 from picongpu.pypicongpu.movingwindow import MovingWindow
+from picongpu.pypicongpu.output.checkpoint import Checkpoint
 from picongpu.pypicongpu.output.binning import BinSpec, Binning, BinningAxis
 from picongpu.pypicongpu.output.checkpoint import Checkpoint
 from picongpu.pypicongpu.output.openpmd_plugin import FieldDump, RangeSpec, RangeSpecEntry
@@ -782,6 +789,75 @@ def test_binner_name_must_be_c_identifier():
             openPMDExt=None,
             openPMDInfix=None,
             dumpPeriod=1,
+        )
+
+
+class TestCollisionInvariants:
+    def test_coulomb_log_must_be_positive(self):
+        with pytest.raises(ValidationError, match="coulomb_log"):
+            ConstLogCollision(coulomb_log=0.0)
+        with pytest.raises(ValidationError, match="coulomb_log"):
+            ConstLogCollision(coulomb_log=-1.0)
+
+    def test_valid_const_log(self):
+        assert ConstLogCollision(coulomb_log=12.0).coulomb_log == 12.0
+
+    def test_valid_dynamic_log(self):
+        assert DynamicLogCollision().type_dynamiclog is True
+
+    def test_intra_species_differently_filtered_rejected(self):
+        e = make_species()
+        filtered = FilteredSpecies(species=e, functor=make_binning_functor("myFilter"))
+        with pytest.raises(ValidationError, match="not supported"):
+            Collision(species_pairs=[(e, filtered)], functor=ConstLogCollision(coulomb_log=10.0))
+
+    def test_cell_list_chunk_size_must_be_positive(self):
+        with pytest.raises(ValidationError, match="cell_list_chunk_size"):
+            CollisionNumericsConfig(cell_list_chunk_size=0)
+
+    def test_default_numerics_config_valid(self):
+        assert CollisionNumericsConfig().cell_list_chunk_size is None
+
+    def test_dynamic_log_requires_screening_species(self):
+        # C++ requirement: the dynamic Coulomb logarithm is computed from the
+        # Debye screening length, which needs at least one screening species
+        e = make_species()
+        with pytest.raises(ValidationError, match="screening"):
+            CollisionalPhysicsSetup(collisions=[Collision(species_pairs=[(e, e)], functor=DynamicLogCollision())])
+
+    def test_dynamic_log_with_screening_species_valid(self):
+        e = make_species()
+        setup = CollisionalPhysicsSetup(
+            collisions=[Collision(species_pairs=[(e, e)], functor=DynamicLogCollision())],
+            screening_species=[e],
+        )
+        assert len(setup.screening_species) == 1
+
+    def test_const_log_without_screening_species_valid(self):
+        e = make_species()
+        setup = CollisionalPhysicsSetup(
+            collisions=[Collision(species_pairs=[(e, e)], functor=ConstLogCollision(coulomb_log=10.0))]
+        )
+        assert setup.screening_species == []
+
+
+class TestParticleFunctorInvariants:
+    @pytest.mark.parametrize("name", ["with space", "with-dot", "1leading", "with\nnewline", ""])
+    def test_name_must_be_c_identifier(self, name):
+        with pytest.raises(ValidationError, match="c\\+\\+ identifiers"):
+            make_binning_functor(name=name)
+
+    def test_valid_functor(self):
+        functor = make_binning_functor()
+        assert functor.name == "positionCell"
+        assert functor.unit_dimension is None
+
+    def test_float_return_type_keeps_unit_dimension(self):
+        functor = ParticleFunctor(
+            name="positionCell",
+            functor_expression=Symbol("px"),
+            functor_preamble=[],
+            return_type="float_X",
         )
 
 

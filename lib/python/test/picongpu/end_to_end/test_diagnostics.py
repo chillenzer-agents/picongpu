@@ -212,7 +212,7 @@ class RandomParticleFilter(ParticleFilter):
 
             # If we've requested a specific shape of our random numbers,
             # we do a quick check that we actually got what we asked for:
-            assert np.shape(nums) == distribution.get("shape", tuple())
+            assert np.shape(nums) == distribution.get("shape", ())
             # But it's just for checking that it works.
             # We don't actually use it here:
             nums = np.reshape(nums, -1)

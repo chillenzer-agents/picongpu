@@ -90,7 +90,7 @@ if __name__ == "__main__":
     ]
 
     if not_found := set(packages.keys()).difference(
-        map(lambda d: Requirement(d).name, pyproject_toml["project"]["dependencies"])
+        Requirement(d).name for d in pyproject_toml["project"]["dependencies"]
     ):
         exit_error(f"could not find {not_found=} in pyproject.toml dependencies")
 

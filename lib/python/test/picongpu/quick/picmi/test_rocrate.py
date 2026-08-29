@@ -29,7 +29,7 @@ def sim():
             grid=Cartesian3DGrid(
                 number_of_cells=[number_of_cells, number_of_cells, number_of_cells],
                 lower_bound=[0, 0, 0],
-                upper_bound=list(map(lambda x: number_of_cells * x, [cell_size, cell_size, cell_size])),
+                upper_bound=[number_of_cells * x for x in [cell_size, cell_size, cell_size]],
                 # required, otherwise won't spawn
                 lower_boundary_conditions=["open", "open", "periodic"],
                 upper_boundary_conditions=["open", "open", "periodic"],
@@ -63,7 +63,7 @@ def test_all_files_tracked_by_rocrate(setup_dir, crate):
     "and to spare the trouble to write the test again if we decide positively."
 )
 def test_all_directories_record_their_content_as_has_part(setup_dir, crate):
-    for id_, parent_id in map(lambda p: _as_ids(p, setup_dir), setup_dir.rglob("*")):
+    for id_, parent_id in (_as_ids(p, setup_dir) for p in setup_dir.rglob("*")):
         if id_ != "ro-crate-metadata.json":
             entity = crate.get(parent_id)
             assert entity is not None
@@ -75,7 +75,7 @@ def test_all_directories_record_their_content_as_has_part(setup_dir, crate):
 
 def _as_ids(p: Path, relative_to: Path):
     local = p.relative_to(relative_to)
-    return map(lambda x: str(x) + ("/" if (relative_to / x).is_dir() else ""), (local, local.parent))
+    return (str(x) + ("/" if (relative_to / x).is_dir() else "") for x in (local, local.parent))
 
 
 def test_rocrate_has_basic_metadata(crate):
@@ -97,7 +97,7 @@ def test_rocrate_indicates_the_software_it_has_been_produced_with(crate):
 @mark.xfail(reason="Not implemented yet.")
 def test_adds_default_information_to_datasets(crate):
     # explicitly instantiating a list here for pytest to provide better assertion error messages
-    assert all(["description" in dataset.properties() for dataset in crate.get_by_type("Dataset")])
+    assert all("description" in dataset.properties() for dataset in crate.get_by_type("Dataset"))
 
 
 # rdflib 7.x deprecates ConjunctiveGraph, which the pyshacl-backed json-ld SHACL

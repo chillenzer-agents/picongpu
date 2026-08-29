@@ -80,7 +80,7 @@ CATEGORIES = {
 
 def contains_label(issue, label):
     """Helper function to check if an issue is labelled by label."""
-    return label in map(lambda lab: lab.name, issue.labels)
+    return label in (lab.name for lab in issue.labels)
 
 
 def categorise(prs, categories_or_condition):

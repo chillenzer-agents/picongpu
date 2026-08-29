@@ -157,7 +157,7 @@ PRESET_STORAGE_PATH = core.path("etc") / "picongpu"
 
 def get_available_presets() -> list[str]:
     """Return a list of available preset names from etc/picongpu."""
-    return list(map(lambda p: str(p.relative_to(PRESET_STORAGE_PATH)), PRESET_STORAGE_PATH.rglob("*.profile*")))
+    return [str(p.relative_to(PRESET_STORAGE_PATH)) for p in PRESET_STORAGE_PATH.rglob("*.profile*")]
 
 
 def _preset_path(preset) -> Path:
@@ -260,7 +260,7 @@ def _path_to_str(value):
 
 
 _RETAINED_CONTENT = {"dirty_reset_policy": "raise", "missing_variable_policy": "raise"}
-_DEFAULT_CONTENT = _RETAINED_CONTENT | {"required_information": tuple(), "pic_src_path": core.path()}
+_DEFAULT_CONTENT = _RETAINED_CONTENT | {"required_information": (), "pic_src_path": core.path()}
 
 
 def _read_picongpurc(path):

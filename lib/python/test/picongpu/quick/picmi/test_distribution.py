@@ -268,18 +268,18 @@ class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
 
     def _get_distribution(self, lower_bound=[None, None, None], upper_bound=[None, None, None], **kwargs):
         return picmi.GaussianDistribution(
-            **dict(
-                density=self.values["density"],
-                center_front=self.values["center_front"],
-                center_rear=self.values["center_rear"],
-                sigma_front=self.values["sigma_front"],
-                sigma_rear=self.values["sigma_rear"],
-                power=self.values["power"],
-                factor=self.values["factor"],
-                vacuum_front=self.values["vacuum_front"],
-                lower_bound=lower_bound,
-                upper_bound=upper_bound,
-            )
+            **{
+                "density": self.values["density"],
+                "center_front": self.values["center_front"],
+                "center_rear": self.values["center_rear"],
+                "sigma_front": self.values["sigma_front"],
+                "sigma_rear": self.values["sigma_rear"],
+                "power": self.values["power"],
+                "factor": self.values["factor"],
+                "vacuum_front": self.values["vacuum_front"],
+                "lower_bound": lower_bound,
+                "upper_bound": upper_bound,
+            }
             | kwargs
         )
 

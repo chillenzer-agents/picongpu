@@ -59,12 +59,12 @@ TESTCASES_IN_STEPS = [
         TimeStepSpec[20:50:10, ::7],
         set(inclusive_range(20, 50, 10)) | set(inclusive_range(0, INDEX_MAX, 7)),
     ),
-    (TimeStepSpec[11], set([11])),
-    (TimeStepSpec[11:12, 11], set([11, 12])),
-    (TimeStepSpec[10:12, 11], set([10, 11, 12])),
+    (TimeStepSpec[11], {11}),
+    (TimeStepSpec[11:12, 11], {11, 12}),
+    (TimeStepSpec[10:12, 11], {10, 11, 12}),
     (
         TimeStepSpec[20:50:10, ::7, 11],
-        set(inclusive_range(20, 50, 10)) | set(inclusive_range(0, INDEX_MAX, 7)) | set([11]),
+        set(inclusive_range(20, 50, 10)) | set(inclusive_range(0, INDEX_MAX, 7)) | {11},
     ),
     (TimeStepSpec[-10:], set(inclusive_range(INDEX_MAX - 10, INDEX_MAX))),
     (TimeStepSpec[:-10:], set(inclusive_range(0, INDEX_MAX - 10))),
@@ -80,7 +80,7 @@ TESTCASES_IN_STEPS = [
         TimeStepSpec[-20:-50:10],
         set(inclusive_range(INDEX_MAX - 20, INDEX_MAX - 50, 10)),
     ),
-    (TimeStepSpec[-11], set([INDEX_MAX - 11])),
+    (TimeStepSpec[-11], {INDEX_MAX - 11}),
 ]
 
 TESTCASES_IN_STEPS_RAISING = [
@@ -113,12 +113,12 @@ TESTCASES_IN_SECONDS = [
         TimeStepSpec[20:50:10, ::7]("seconds"),
         set(inclusive_range(40, 100, 20)) | set(inclusive_range(0, INDEX_MAX, 14)),
     ),
-    (TimeStepSpec[11]("seconds"), set([22])),
-    (TimeStepSpec[11:12, 11]("seconds"), set([22, 23, 24])),
+    (TimeStepSpec[11]("seconds"), {22}),
+    (TimeStepSpec[11:12, 11]("seconds"), {22, 23, 24}),
     (TimeStepSpec[10:12, 11]("seconds"), set(inclusive_range(20, 24))),
     (
         TimeStepSpec[20:50:10, ::7, 11]("seconds"),
-        set(inclusive_range(40, 100, 20)) | set(inclusive_range(0, INDEX_MAX, 14)) | set([22]),
+        set(inclusive_range(40, 100, 20)) | set(inclusive_range(0, INDEX_MAX, 14)) | {22},
     ),
     (TimeStepSpec[-10:]("seconds"), set(inclusive_range(INDEX_MAX - 20, INDEX_MAX))),
     (TimeStepSpec[:-10:]("seconds"), set(inclusive_range(0, INDEX_MAX - 20))),
@@ -140,7 +140,7 @@ TESTCASES_IN_SECONDS = [
         TimeStepSpec[-20:-50:10]("seconds"),
         set(inclusive_range(INDEX_MAX - 40, INDEX_MAX - 100, 20)),
     ),
-    (TimeStepSpec[-11]("seconds"), set([INDEX_MAX - 22])),
+    (TimeStepSpec[-11]("seconds"), {INDEX_MAX - 22}),
 ]
 
 

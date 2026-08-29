@@ -76,7 +76,7 @@ def _not_allowed_template_directories(directories: tuple[Path]) -> dict[Path, st
     """
     Check the directories and return a path->reason mapping of non-allowed ones.
     """
-    return {d: "is not an existing directory" for d in filter(lambda p: not p.is_dir(), directories)}
+    return dict.fromkeys(filter(lambda p: not p.is_dir(), directories), "is not an existing directory")
 
 
 def _normalise_template_dir(directory: None | PathLike | Iterable[PathLike]) -> tuple[Path]:
@@ -85,13 +85,13 @@ def _normalise_template_dir(directory: None | PathLike | Iterable[PathLike]) -> 
     """
     # The ordering of these recursions matters!
     if directory is None:
-        return tuple()
+        return ()
 
     try:
         directory = (Path(directory),)
     except TypeError:
         try:
-            directory = sum(map(_normalise_template_dir, directory), tuple())
+            directory = sum(map(_normalise_template_dir, directory), ())
         except TypeError:
             pass
 
@@ -350,7 +350,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                 ],
                 config=options,
             )
-            for options in unique(map(lambda x: x.options, diagnostics))
+            for options in unique(x.options for x in diagnostics)
         ]
 
     def _generate_plugins(self, num_steps):
@@ -400,7 +400,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         typical_ppc = (
             self.picongpu_typical_ppc
             if self.picongpu_typical_ppc is not None
-            else _mid_window(map(lambda op: op.layout.ppc, filter(lambda op: hasattr(op, "layout"), init_operations)))
+            else _mid_window(op.layout.ppc for op in filter(lambda op: hasattr(op, "layout"), init_operations))
         )
         moving_window = (
             None
@@ -467,7 +467,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         if self._runner is None:
             self._runner = Runner(
                 **_drop_none(
-                    dict(sim=self.get_as_pypicongpu(), template_dir=self.picongpu_template_dir or (templates.path(),))
+                    {"sim": self.get_as_pypicongpu(), "template_dir": self.picongpu_template_dir or (templates.path(),)}
                     | kwargs
                 )
             )

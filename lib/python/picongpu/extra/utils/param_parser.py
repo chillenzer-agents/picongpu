@@ -47,7 +47,7 @@ def read_range_file(file, values_only=True):
     with open(file) as json_file:
         range_dict = json.load(json_file)
     if values_only:
-        filtered_range_dict = dict()
+        filtered_range_dict = {}
         for name, attrs in range_dict.items():
             filtered_range_dict[name] = attrs["values"]
 
@@ -81,7 +81,7 @@ def parse(file, ptype):
     """
     range_dict = read_range_file(file, values_only=False)
     # filter for correct ptype
-    filtered_dict = dict()
+    filtered_dict = {}
     for param_name, attrs in range_dict.items():
         if attrs["type"] == ptype:
             # name, value mapping
@@ -90,7 +90,7 @@ def parse(file, ptype):
     # construct the statement passed to picongpu
     if ptype == "compile":
         ostr = [to_macro_name(name) + "=" + str(value) for name, value in filtered_dict.items()]
-        cxx_defines = ";".join(map(lambda s: "-D" + s, ostr))
+        cxx_defines = ";".join("-D" + s for s in ostr)
         return "-DPARAM_OVERWRITES:LIST='" + cxx_defines + "'"
 
     elif ptype == "run":

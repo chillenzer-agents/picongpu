@@ -26,7 +26,7 @@ def sim():
             grid=Cartesian3DGrid(
                 number_of_cells=[number_of_cells, number_of_cells, number_of_cells],
                 lower_bound=[0, 0, 0],
-                upper_bound=list(map(lambda x: number_of_cells * x, [cell_size, cell_size, cell_size])),
+                upper_bound=[number_of_cells * x for x in [cell_size, cell_size, cell_size]],
                 # required, otherwise won't spawn
                 lower_boundary_conditions=["open", "open", "periodic"],
                 upper_boundary_conditions=["open", "open", "periodic"],

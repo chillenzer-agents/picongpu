@@ -34,5 +34,5 @@ class RangeSpec(PyPIConGPURangeSpec):
             data = (kwargs.pop("x", None), kwargs.pop("y", None), kwargs.pop("z", None))
         else:
             raise ValueError(f"Unknown RangeSpec construction. You gave {args=}.")
-        data = _apply_units(map(lambda x: RangeSpecEntry(data=x), data), unit)
+        data = _apply_units((RangeSpecEntry(data=x) for x in data), unit)
         return super().__init__(data=data, **kwargs)

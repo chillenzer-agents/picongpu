@@ -131,7 +131,7 @@ def test_bash_profile_is_reproduced(my_rc_params):
 
 
 def _no_comment_or_blank_line(line):
-    return not line.startswith("#") and not line.strip() == ""
+    return not line.startswith("#") and line.strip() != ""
 
 
 def test_hemera_profile_is_reproduced(my_rc_params):
@@ -206,12 +206,11 @@ def test_search_for_file_in_same_directory(any_content, arbitrary_filename):
 
 
 def test_search_for_file_in_parent_directory(any_content, arbitrary_filename):
-    with TemporaryDirectory() as d1:
+    with TemporaryDirectory() as d1, TemporaryDirectory(prefix=f"{d1}/") as d2:
         with (Path(d1) / arbitrary_filename).open("w") as file:
             file.write(any_content)
-        with TemporaryDirectory(prefix=f"{d1}/") as d2:
-            with search_for_in_parents(filename=arbitrary_filename, start_path=d2).open("rb") as file:
-                assert file.read().decode() == any_content
+        with search_for_in_parents(filename=arbitrary_filename, start_path=d2).open("rb") as file:
+            assert file.read().decode() == any_content
 
 
 def test_search_for_file_returns_none_if_not_found(arbitrary_filename):

@@ -112,10 +112,7 @@ class BaseWidget(widgets.VBox):
                 widgets.VBox(children=list(self.widgets_for_vis_args.values())),
             ]
         )
-        if add_fig_to_children:
-            top = widgets.HBox(children=[vis_widgets, self.fig.canvas])
-        else:
-            top = vis_widgets
+        top = widgets.HBox(children=[vis_widgets, self.fig.canvas]) if add_fig_to_children else vis_widgets
 
         if add_out_to_children:
             bottom = widgets.VBox(children=[self.sim_time_slider, self.output_widget])
@@ -422,10 +419,9 @@ class BaseWidget(widgets.VBox):
             # handle SelectMultiple -> Dropdown
             if isinstance(val, tuple):
                 val = val[0]
-        elif isinstance(self.sim_drop, widgets.SelectMultiple):
+        elif isinstance(self.sim_drop, widgets.SelectMultiple) and not isinstance(val, tuple):
             # handle Dropdown -> SelectMultiple
-            if not isinstance(val, tuple):
-                val = (val,)
+            val = (val,)
 
         return val
 

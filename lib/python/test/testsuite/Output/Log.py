@@ -99,19 +99,18 @@ def resultLog(
 
         direction = cD.checkDirection(variable="resultDirection", direction=direction)
 
-        fobj_out = open(direction + "/testresult.log", "w+")
-        fobj_out.write(date + " " + timeOfDay + "\n")
-        fobj_out.write("\n")
-        fobj_out.write("testcase: " + title + "\n")
-        fobj_out.write(f"theoretically expected value: {theory}\n")
-        fobj_out.write(f"Value from simulation: {value_sim}\n")
-        fobj_out.write(f"acceptance: {acceptance}\n")
-        fobj_out.write(f"result of the test:{result} \n")
-        fobj_out.write(f"difference: {difference}\n")
-        fobj_out.write(f"difference in percentage: {perc_diff}\n")
-        for key in inputparameter.keys():
-            fobj_out.write(f"input parameter: {key}={inputparameter[key]}\n")
-        fobj_out.close()
+        with open(direction + "/testresult.log", "w+") as fobj_out:
+            fobj_out.write(date + " " + timeOfDay + "\n")
+            fobj_out.write("\n")
+            fobj_out.write("testcase: " + title + "\n")
+            fobj_out.write(f"theoretically expected value: {theory}\n")
+            fobj_out.write(f"Value from simulation: {value_sim}\n")
+            fobj_out.write(f"acceptance: {acceptance}\n")
+            fobj_out.write(f"result of the test:{result} \n")
+            fobj_out.write(f"difference: {difference}\n")
+            fobj_out.write(f"difference in percentage: {perc_diff}\n")
+            for key in inputparameter:
+                fobj_out.write(f"input parameter: {key}={inputparameter[key]}\n")
 
     except Exception:
         errorLog()
@@ -142,10 +141,9 @@ def errorLog(direction: str = None):
     error2 = str(sys.exc_info()[2])
 
     # print error0 + error1 + error2
-    fobj_out = open(direction + "/error.log", "w")
-    fobj_out.write(date + " " + timeOfDay + "\n")
-    fobj_out.write("\n")
-    fobj_out.write(error0 + " " + error1 + " " + error2 + "\n")
-    fobj_out.close()
+    with open(direction + "/error.log", "w") as fobj_out:
+        fobj_out.write(date + " " + timeOfDay + "\n")
+        fobj_out.write("\n")
+        fobj_out.write(error0 + " " + error1 + " " + error2 + "\n")
 
     sys.exit(42)

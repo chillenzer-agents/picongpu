@@ -50,7 +50,7 @@ class Renderer:
 
             # value validation
             if type(value) is dict:
-                if {} == value:
+                if value == {}:
                     raise TypeError("leaf must not be empty dict")
                 # dict -> recursive call
                 Renderer.__check_rendering_context_recursive(f"{path}.{key}", value)
@@ -64,7 +64,7 @@ class Renderer:
                 # mylist: [1, 2, 3] is performed by
                 # {{#mylist}}{{{.}}}{{/mylist}}, which is somewhat unintuitive)
                 not_dict = list(filter(lambda e: type(e) is not dict, value))
-                if 0 != len(not_dict):
+                if len(not_dict) != 0:
                     raise TypeError(f"lists may only contains dicts: {path}.{key}")
                 # check the children
                 for i in range(len(value)):
@@ -124,7 +124,7 @@ class Renderer:
                 new_list = []
                 for i in range(len(value)):
                     elem = Renderer.__get_context_preprocessed_recursive(value[i])
-                    elem["_first"] = 0 == i
+                    elem["_first"] = i == 0
                     elem["_last"] = len(value) - 1 == i
                     elem["_idx"] = i
                     new_list.append(elem)
@@ -177,7 +177,7 @@ class Renderer:
         mustache_block_re = re.compile(r"{{({*(?:}?[^}]+)*}*)}}")
         for match in mustache_block_re.finditer(template):
             block_content = match.group(1)
-            if "" == block_content:
+            if block_content == "":
                 logging.warning("empty mustache block encountered")
             if block_content[0] not in "{^#/>!":
                 # note: use string composition instead of normal formatstrings
@@ -224,11 +224,10 @@ class Renderer:
                 if not exist_ok:
                     raise ValueError(f"would overwrite {rendered_path}, aborting")
 
-            with open(rendered_path, "w") as outfile:
-                with open(template_path) as infile:
-                    template_str = infile.read()
-                    rendered = Renderer.get_rendered_template(context, template_str)
-                    outfile.write(rendered)
+            with open(rendered_path, "w") as outfile, open(template_path) as infile:
+                template_str = infile.read()
+                rendered = Renderer.get_rendered_template(context, template_str)
+                outfile.write(rendered)
 
             # prefix filename with .
             # (on that note: screw pathlib for only disassembling, but not

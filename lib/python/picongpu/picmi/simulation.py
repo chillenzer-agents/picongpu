@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 # make pypicongpu classes accessible for conversion to pypicongpu
+import contextlib
 import datetime
 import logging
 import math
@@ -90,10 +91,8 @@ def _normalise_template_dir(directory: None | PathLike | Iterable[PathLike]) -> 
     try:
         directory = (Path(directory),)
     except TypeError:
-        try:
+        with contextlib.suppress(TypeError):
             directory = sum(map(_normalise_template_dir, directory), ())
-        except TypeError:
-            pass
 
     if not isinstance(directory, (tuple, list)) or any(filter(lambda p: not isinstance(p, Path), directory)):
         raise ValueError(

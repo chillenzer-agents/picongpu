@@ -113,9 +113,8 @@ for i in range(numDir):
     if not os.path.isdir(directories[i] + simDir):
         sys.exit(warningText2.format(i + 1, simDir))
 
-if numDir == 2:
-    if directories[0] == directories[1]:
-        sys.exit("We do not allow cheating! Compare two different runs.")
+if numDir == 2 and directories[0] == directories[1]:
+    sys.exit("We do not allow cheating! Compare two different runs.")
 
 
 # lists for data from simulations #
@@ -191,11 +190,8 @@ startEnergy = Energies[:][0]
 
 # plot numerical heating #
 
-# choose normalization
-if args.boolRelative:
-    norm = 100.0 / startEnergy[0]  # relative to startEnergy in percent
-else:
-    norm = 1.0  # absolute values
+# choose normalization (relative to startEnergy in percent, or absolute)
+norm = 100.0 / startEnergy[0] if args.boolRelative else 1.0
 
 if not args.boolDiff:
     # plot energy evolution

@@ -97,11 +97,9 @@ def plot_sim(ax, sim):
         )
 
 
-i = 0
-for sim in sims:
+for i, sim in enumerate(sims):
     print(sim)
     im = plot_sim(axes[i], sim)
-    i += 1
 
 if args.sum:
     fig.colorbar(im, cax=cax, label=r"$n_{Z,\Sigma{e,H,C,N}}$ [$q_e \cdot$ cm$^{-3}$]")

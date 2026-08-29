@@ -133,9 +133,8 @@ class EmittanceData(DataReader):
         dt: float
             time for itteration
         """
-        if iteration is not None:
-            if not isinstance(iteration, collectionsAbc.Iterable):
-                iteration = np.array([iteration])
+        if iteration is not None and not isinstance(iteration, collectionsAbc.Iterable):
+            iteration = np.array([iteration])
 
         data_file_path = self.get_data_path(species, species_filter)
 

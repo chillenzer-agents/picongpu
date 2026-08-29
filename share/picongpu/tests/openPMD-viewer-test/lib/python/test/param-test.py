@@ -122,7 +122,7 @@ def check_params(num_iterations):
                     ):
                         return False
                 else:
-                    if not np.std(value) == 0:
+                    if np.std(value) != 0:
                         return False
         # Check if the densities are correct
         densities = [
@@ -157,7 +157,7 @@ def check_params(num_iterations):
                 ):
                     return False
             else:
-                if not np.std(value) == 0:
+                if np.std(value) != 0:
                     return False
 
         x, y, z = ts.get_particle(

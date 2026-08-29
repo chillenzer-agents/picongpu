@@ -178,7 +178,7 @@ class TestFreeFormulaDensity(TestCase):
         )
 
         for setup, dists in DISTRIBUTIONS.items():
-            for impl in dists.keys():
+            for impl in dists:
                 mesh = read_binning(
                     self.result_path
                     / "simOutput"

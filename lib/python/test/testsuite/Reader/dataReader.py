@@ -209,9 +209,9 @@ class DataReader(rF.ReadFiles):
         if len(all_files) >= 2 and p_type is None and "step" not in parameter:
             raise ValueError("The parameter could be found more than once. Please use the parameter p_type for this")
 
-        if "step" == parameter and step_direction is None:
+        if parameter == "step" and step_direction is None:
             result = np.loadtxt(self._direction + all_files[0])[:, 0]
-        elif "step" == parameter:
+        elif parameter == "step":
             result = np.loadtxt(self._direction + step_direction)[:, 0]
         elif len(all_files) == 1:
             params = self.allParamsinFile(self._direction + all_files[0])

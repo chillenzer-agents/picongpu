@@ -276,13 +276,15 @@ def main(argv=None):
 
         new_path = Path(new_path_str)
 
-        if new_path.exists():
-            if not questionary.confirm(
+        if (
+            new_path.exists()
+            and not questionary.confirm(
                 f"{new_path} already exists. Overwrite?",
                 default=False,
-            ).ask():
-                questionary.print("Aborted. Nothing was written.")
-                return
+            ).ask()
+        ):
+            questionary.print("Aborted. Nothing was written.")
+            return
         write_output(output, new_path)
         questionary.print(f"Written to {new_path}.")
         questionary.print("You can start your simulation now.")

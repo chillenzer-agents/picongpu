@@ -48,7 +48,7 @@ def get_as_pypicongpu(obj, *args, **kwargs):
 
 def must_be_unique(requirement):
     return (hasattr(requirement, "must_be_unique") and requirement.must_be_unique) or (
-        isinstance(requirement, Constant) or isinstance(requirement, Attribute)
+        isinstance(requirement, Constant | Attribute)
     )
 
 
@@ -82,9 +82,12 @@ def check_for_conflict(obj1, obj2):
             obj1.check_for_conflict(obj2)
         if hasattr(obj2, "check_for_conflict"):
             obj2.check_for_conflict(obj1)
-        if isinstance(obj1, Constant) and (isinstance(obj1, type(obj2)) or isinstance(obj2, type(obj1))):
-            if obj1 != obj2:
-                raise RequirementConflict(f"Conflicting constants {obj1=} and {obj2=} required.")
+        if (
+            isinstance(obj1, Constant)
+            and (isinstance(obj1, type(obj2)) or isinstance(obj2, type(obj1)))
+            and obj1 != obj2
+        ):
+            raise RequirementConflict(f"Conflicting constants {obj1=} and {obj2=} required.")
     except Exception as err:
         raise RequirementConflict(
             f"A conflict in requirements between {obj1=} and {obj2=} has been detected."
@@ -97,7 +100,7 @@ def run_construction(obj):
 
 
 def evaluate_requirements(requirements, Types):
-    if isinstance(Types, type) or isinstance(Types, UnionType):
+    if isinstance(Types, type | UnionType):
         return next(evaluate_requirements(requirements, [Types]))
     return (
         filter(

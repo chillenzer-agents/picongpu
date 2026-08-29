@@ -429,11 +429,10 @@ class PrepRoutines:
             for i in range(a.size):
                 for j in range(b.size):
                     for k in range(self.w.size):
-                        if np.abs(a[i] * self.lamb[k] * d - xc) < R:
-                            if np.abs(b[j] * self.lamb[k] * d - yc) < np.sqrt(
-                                R**2 - (a[i] * self.lamb[k] * d - xc) ** 2
-                            ):
-                                MF_cropped[j, i, k] = MF[j, i, k]
+                        if np.abs(a[i] * self.lamb[k] * d - xc) < R and np.abs(b[j] * self.lamb[k] * d - yc) < np.sqrt(
+                            R**2 - (a[i] * self.lamb[k] * d - xc) ** 2
+                        ):
+                            MF_cropped[j, i, k] = MF[j, i, k]
 
             # propagation MF to FF
             self.Ew = np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(MF_cropped, axes=(0, 1)), axes=(0, 1)), axes=(0, 1))
@@ -817,10 +816,7 @@ class PrepRoutines:
         E.axis_labels = ["y", "x", "z"]
         E.data_order = "C"
         E_pol = E[pol]
-        if pol == "x":
-            E_trans = E["y"]
-        else:
-            E_trans = E["x"]
+        E_trans = E["y"] if pol == "x" else E["x"]
         E_z = E["z"]
         data_E = openpmd.Dataset(E_save.dtype, E_save.shape)
         E_pol.reset_dataset(data_E)

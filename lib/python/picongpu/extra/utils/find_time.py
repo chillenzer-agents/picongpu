@@ -141,10 +141,7 @@ class FindTime:
         times_sorted = iterations_sorted * self.dt
 
         next_i = np.argmax(times_sorted > t)
-        if next_i > 0:
-            prev_i = next_i - 1
-        else:
-            prev_i = 0
+        prev_i = next_i - 1 if next_i > 0 else 0
 
         if method == "previous":
             iteration = iterations_sorted[prev_i]

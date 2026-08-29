@@ -214,7 +214,7 @@ def main(path):
             popt[2], sign_omega, omega_thresh, f"[{sf[1]}-{sf[0]}] omega"
         )
 
-    ret_value = np.array([test_results[test] for test in test_results.keys()]).all()
+    ret_value = np.array([test_results[test] for test in test_results]).all()
     sys.exit(int(not ret_value))
 
 

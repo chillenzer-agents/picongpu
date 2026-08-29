@@ -163,7 +163,7 @@ class TimeStepSpec(metaclass=_TimeStepSpecMeta):
         return tuple(
             slice(
                 int(spec.start / time_step_size if spec.start is not None else 0),
-                int(ceil(spec.stop / time_step_size)) if spec.stop is not None else None,
+                ceil(spec.stop / time_step_size) if spec.stop is not None else None,
                 int(spec.step / time_step_size if spec.step is not None else 1) or 1,
             )
             for spec in specs_in_seconds

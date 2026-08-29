@@ -428,7 +428,7 @@ class RCParams:
                 )
                 raise MissingVariable(message) from error
         else:
-            return f'export PATH="{str(core.path("bin"))}:$PATH"'
+            return f'export PATH="{core.path("bin")!s}:$PATH"'
 
     @property
     def shebang(self):
@@ -444,7 +444,7 @@ class RCParams:
             return self._data["preamble"]
         return f"""
 set -exo pipefail
-export PATH="{str(core.path("bin"))}:$PATH"
+export PATH="{core.path("bin")!s}:$PATH"
 """
 
     @property

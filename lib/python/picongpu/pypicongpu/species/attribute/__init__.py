@@ -6,8 +6,8 @@ from .weighting import Weighting
 
 __all__ = [
     "Attribute",
+    "BoundElectrons",
+    "Momentum",
     "Position",
     "Weighting",
-    "Momentum",
-    "BoundElectrons",
 ]

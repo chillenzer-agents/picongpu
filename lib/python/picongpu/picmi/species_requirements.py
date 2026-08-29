@@ -37,7 +37,7 @@ def resolving_add(new, to):
         if try_update_with(into_instance, new):
             return to
 
-    return to + [new]
+    return [*to, new]
 
 
 def get_as_pypicongpu(obj, *args, **kwargs):

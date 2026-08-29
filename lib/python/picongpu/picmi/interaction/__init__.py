@@ -5,11 +5,11 @@ from .synchrotron import Synchrotron
 Interaction = ionization.IonizationModel | Synchrotron | Collision | CollisionalPhysicsSetup
 
 __all__ = [
-    "Interaction",
-    "ionization",
-    "Synchrotron",
     "Collision",
+    "CollisionalPhysicsSetup",
     "ConstLogCollision",
     "DynamicLogCollision",
-    "CollisionalPhysicsSetup",
+    "Interaction",
+    "Synchrotron",
+    "ionization",
 ]

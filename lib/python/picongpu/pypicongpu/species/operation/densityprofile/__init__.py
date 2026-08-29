@@ -16,10 +16,10 @@ AnyDensityProfile = Uniform | Foil | Gaussian | FreeFormula | Cylinder
 
 __all__ = [
     "AnyDensityProfile",
-    "Uniform",
-    "Foil",
-    "plasmaramp",
-    "Gaussian",
-    "FreeFormula",
     "Cylinder",
+    "Foil",
+    "FreeFormula",
+    "Gaussian",
+    "Uniform",
+    "plasmaramp",
 ]

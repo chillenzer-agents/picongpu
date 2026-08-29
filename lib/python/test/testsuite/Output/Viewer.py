@@ -20,13 +20,13 @@ def plot_1D(
     theory,
     simulation,
     x_value,
-    xlabel: str = None,
-    ylabel: str = None,
-    title: str = None,
-    plotLog: str = None,
-    acceptance: float = None,
+    xlabel: str | None = None,
+    ylabel: str | None = None,
+    title: str | None = None,
+    plotLog: str | None = None,
+    acceptance: float | None = None,
     savefig: bool = True,
-    direction: str = None,
+    direction: str | None = None,
 ):
     """
     Input:

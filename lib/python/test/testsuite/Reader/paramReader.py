@@ -30,8 +30,8 @@ class ParamReader(rF.ReadFiles):
     def __init__(
         self,
         fileExtension: str = r".param",
-        direction: str = None,
-        directiontype: str = None,
+        direction: str | None = None,
+        directiontype: str | None = None,
     ):
         """
         constructor

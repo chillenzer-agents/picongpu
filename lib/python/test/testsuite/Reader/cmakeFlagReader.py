@@ -17,9 +17,9 @@ from . import readFiles as rF
 class CMAKEFlagReader(rF.ReadFiles):
     def __init__(
         self,
-        fileExtension: str = None,
-        direction: str = None,
-        directiontype: str = None,
+        fileExtension: str | None = None,
+        direction: str | None = None,
+        directiontype: str | None = None,
     ):
         """
         constructor

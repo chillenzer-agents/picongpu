@@ -39,7 +39,7 @@ def __calculate(axis, parameter, *args):
         error1 = str(sys.exc_info()[1])
         for var in parameter:
             if var in error1.split(":")[-1]:
-                args = args + (parameter[var],)
+                args = (*args, parameter[var])
                 return __calculate(axis, parameter, *args)
 
 

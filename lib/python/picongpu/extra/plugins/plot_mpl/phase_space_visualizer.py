@@ -200,7 +200,7 @@ class Visualizer(BaseVisualizer):
         """Overridden from base."""
         # only for the first index that is not None we set the description
         # (which is the innermost colorbar)
-        idx = [i for i, cbar in enumerate(self.colorbars) if cbar is not None][0]
+        idx = next(i for i, cbar in enumerate(self.colorbars) if cbar is not None)
 
         self.colorbars[idx].ax.text(
             -1.2,

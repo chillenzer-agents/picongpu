@@ -200,4 +200,8 @@ def density_binning_for(species):
 
 
 def binning_diagnostics(all_species, timestep):
-    return sum((density_binning_for(species) + position_binning_for(species, timestep) for species in all_species), [])
+    return [
+        diag
+        for species in all_species
+        for diag in density_binning_for(species) + position_binning_for(species, timestep)
+    ]

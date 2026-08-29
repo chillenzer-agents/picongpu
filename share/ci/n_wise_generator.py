@@ -221,15 +221,15 @@ compilers = [clang_compiers, gnu_compilers]
 
 # generate clang cuda compiler list
 # add third component with the device compiler name
-cuda_clang_compilers = [i + ("clangCuda",) for i in clang_compiers]
+cuda_clang_compilers = [(*i, "clangCuda") for i in clang_compiers]
 compilers.append(cuda_clang_compilers)
 
 # nvcc compiler
-cuda_nvcc_compilers = [i + ("nvcc",) for i in clang_compiers] + [i + ("nvcc",) for i in gnu_compilers]
+cuda_nvcc_compilers = [(*i, "nvcc") for i in clang_compiers] + [(*i, "nvcc") for i in gnu_compilers]
 compilers.append(cuda_nvcc_compilers)
 
 # hipcc compiler
-hip_clang_compilers = [i + ("hipcc",) for i in clang_compiers]
+hip_clang_compilers = [(*i, "hipcc") for i in clang_compiers]
 compilers.append(hip_clang_compilers)
 
 # PIConGPU backend list

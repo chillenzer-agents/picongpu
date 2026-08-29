@@ -9,4 +9,4 @@ from .pmaccprinter import PMAccPrinter
 from .renderedobject import RenderedObject
 from .renderer import Renderer
 
-__all__ = ["PMAccPrinter", "Renderer", "RenderedObject"]
+__all__ = ["PMAccPrinter", "RenderedObject", "Renderer"]

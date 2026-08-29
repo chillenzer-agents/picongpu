@@ -97,7 +97,7 @@ def main(path):
 
     # Load data from simulation
     series = opmd.Series(path + "/shadowgraphy_" + "%T." + "bp5", opmd.Access.read_only)
-    i = series.iterations[list(series.iterations)[0]]
+    i = series.iterations[next(iter(series.iterations))]
 
     shadowgram = i.meshes["shadowgram"][opmd.Mesh_Record_Component.SCALAR].load_chunk()
     unit = i.meshes["shadowgram"].get_attribute("unitSI")
@@ -153,7 +153,7 @@ def main(path):
     possible_fields = ["Ex", "Ey", "Bx", "By"]
     for sf in itertools.product(possible_signs, possible_fields):
         series = opmd.Series(path + "/shadowgraphy_fourierdata_" + "%T." + "bp5", opmd.Access.read_only)
-        i = series.iterations[list(series.iterations)[0]]
+        i = series.iterations[next(iter(series.iterations))]
 
         chunkdata = i.meshes[f"Fourier Domain Fields - {sf[0]}"][sf[1]].load_chunk()
         unit = i.meshes[f"Fourier Domain Fields - {sf[0]}"][sf[1]].get_attribute("unitSI")

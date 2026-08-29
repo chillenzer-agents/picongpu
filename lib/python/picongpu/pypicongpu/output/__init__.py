@@ -29,16 +29,16 @@ AnyPlugin = (
 )
 
 __all__ = [
-    "OpenPMDPlugin",
     "AnyPlugin",
-    "PhaseSpace",
+    "Checkpoint",
     "EnergyHistogram",
     "FieldEnergyMonitor",
     "MacroParticleCount",
+    "OpenPMDPlugin",
     "ParticleEnergy",
-    "TimeStepSpec",
-    "Checkpoint",
-    "RadiationPlugin",
-    "RadiationObserverConfiguration",
+    "PhaseSpace",
     "RadiationConfiguration",
+    "RadiationObserverConfiguration",
+    "RadiationPlugin",
+    "TimeStepSpec",
 ]

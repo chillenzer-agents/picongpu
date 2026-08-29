@@ -15,10 +15,10 @@ from . import dataReader, jsonReader, paramReader
 
 
 def mainsearch(
-    dataDirection: str = None,
-    paramDirection: str = None,
-    jsonDirection: str = None,
-    cmakeDirection: str = None,
+    dataDirection: str | None = None,
+    paramDirection: str | None = None,
+    jsonDirection: str | None = None,
+    cmakeDirection: str | None = None,
 ):
     json = {}
     param = {}

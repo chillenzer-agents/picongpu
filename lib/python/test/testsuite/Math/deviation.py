@@ -32,10 +32,10 @@ getTestResult(theory, simulation, acceptance:float = None) -> bool:
 """
 
 __all__ = [
-    "getDifference",
-    "getMaxDifference",
-    "getDifferenceInPercentage",
     "getAcceptanceRange",
+    "getDifference",
+    "getDifferenceInPercentage",
+    "getMaxDifference",
     "getTestResult",
 ]
 
@@ -172,7 +172,7 @@ def getDifferenceInPercentage(theory, simulation):
     return (theory - simMax) / theory * 100
 
 
-def getAcceptanceRange(theory, acceptance: float = None):
+def getAcceptanceRange(theory, acceptance: float | None = None):
     """
     represents the range around the theoretical value,
     which as a limit leads to the acceptance of the test
@@ -197,7 +197,7 @@ def getAcceptanceRange(theory, acceptance: float = None):
     return theory * (1 - acceptance), theory * (1 + acceptance)
 
 
-def getTestResult(theory, simulation, acceptance: float = None) -> bool:
+def getTestResult(theory, simulation, acceptance: float | None = None) -> bool:
     """
     determines whether a test passes or fails based on the acceptance range
 

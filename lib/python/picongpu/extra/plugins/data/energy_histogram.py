@@ -149,7 +149,7 @@ class EnergyHistogramData(DataReader):
         ).columns.values.astype(np.float64)
 
         # set DataFrame column names properly
-        data.columns = ["iteration", "underflow"] + list(bins) + ["overflow", "sum"]
+        data.columns = ["iteration", "underflow", *list(bins), "overflow", "sum"]
         # set iteration as index
         data.set_index("iteration", inplace=True)
 

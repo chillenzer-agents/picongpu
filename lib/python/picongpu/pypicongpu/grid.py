@@ -92,7 +92,7 @@ def all_ge(iterable, m):
 def grid_dist_validate(grid_dist):
     if grid_dist is None:
         return None
-    if all_gt(sum(grid_dist, []), 0):
+    if all_gt([cell for sub in grid_dist for cell in sub], 0):
         return grid_dist
     return None
 

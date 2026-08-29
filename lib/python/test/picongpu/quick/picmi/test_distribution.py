@@ -5,6 +5,7 @@ Authors: Hannes Troepgen, Brian Edward Marre
 License: GPLv3+
 """
 
+from typing import ClassVar
 from unittest import TestCase
 
 import pytest
@@ -254,7 +255,7 @@ class TestPicmiFoilDistribution(TestCase, HelperTestPicmiBoundaries):
 
 
 class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
-    values = {
+    values: ClassVar[dict[str, float]] = {
         "density": 42.42,
         "center_front": 1.0,
         "center_rear": 2.0,

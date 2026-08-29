@@ -108,7 +108,7 @@ class addParticles2Checkpoint:
         self.filename_in = filename_in
         self.filename_out = filename_out
         self.f = opmd.Series(self.filename_in, opmd.Access.read_only)
-        if int(list(self.f.iterations)[0]) != self.timestep:
+        if int(next(iter(self.f.iterations))) != self.timestep:
             # throw error if not time step zero
             raise NameError("Not time step zero")
         # TODO: maybe raise error, when filename_out already exists

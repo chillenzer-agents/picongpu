@@ -135,7 +135,7 @@ def _validate_collisional_physics_setup(interactions):
     if "collision" in types:
         # We've found one or more bare collision flying around in the list,
         # so we've gotta merge them into one setup.
-        return list(types.get("other", [])) + [CollisionalPhysicsSetup(collisions=list(types["collision"]))]
+        return [*list(types.get("other", [])), CollisionalPhysicsSetup(collisions=list(types["collision"]))]
 
     # No collisions whatsoever...
     return interactions
@@ -459,9 +459,10 @@ class Simulation(picmistandard.PICMI_Simulation):
         )
         time_steps = self.max_steps if self.max_steps is not None else math.ceil(self.max_time / self.time_step_size)
         # We provide the default as last element and we'll only read the first element:
-        synchrotron_params = unique(
-            [x.synchrotron_parameters for x in self.picongpu_interaction if isinstance(x, Synchrotron)]
-        ) + [SynchrotronParams()]
+        synchrotron_params = [
+            *unique([x.synchrotron_parameters for x in self.picongpu_interaction if isinstance(x, Synchrotron)]),
+            SynchrotronParams(),
+        ]
         if len(synchrotron_params) > 2:
             raise ValueError(
                 f"You have configured the Synchrotron extension multiple times with different arguments. This is not allowed! You gave {synchrotron_params[:-1]=}."

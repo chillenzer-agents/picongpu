@@ -10,11 +10,11 @@ from .slice_emittance_waterfall_visualizer import (
 from .transition_radiation_visualizer import Visualizer as TransitionRadiationMPL
 
 __all__ = [
-    "EnergyHistogramMPL",
-    "PhaseSpaceMPL",
     "PNGMPL",
-    "EnergyWaterfallMPL",
     "EmitanceEvolutionMPL",
+    "EnergyHistogramMPL",
+    "EnergyWaterfallMPL",
+    "PhaseSpaceMPL",
     "SliceEmitanceMPL",
     "SliceEmitanceWaterfallMPL",
     "TransitionRadiationMPL",

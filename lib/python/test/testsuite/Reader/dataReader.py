@@ -42,8 +42,8 @@ class DataReader(rF.ReadFiles):
     def __init__(
         self,
         fileExtension: str = r".dat",
-        direction: str = None,
-        directiontype: str = None,
+        direction: str | None = None,
+        directiontype: str | None = None,
     ):
         """
         constructor
@@ -153,7 +153,7 @@ class DataReader(rF.ReadFiles):
 
         return [file for file in all_files if parameter in self.allParamsinFile(self._direction + file)]
 
-    def getValue(self, parameter: str, step_direction: str = None, p_type: str = None):
+    def getValue(self, parameter: str, step_direction: str | None = None, p_type: str | None = None):
         """
         the function returns all data of the passed parameter as an array
         the function uses the names of the parameters in the .dat files

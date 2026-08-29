@@ -36,4 +36,4 @@ def my_func(a_char: str, num: int) -> list[str]:
     if num == 0:
         return []
 
-    return my_func(a_char, num - 1) + [num * a_char]
+    return [*my_func(a_char, num - 1), num * a_char]

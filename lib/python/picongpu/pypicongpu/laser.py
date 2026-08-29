@@ -101,7 +101,12 @@ class _BaseLaser(BaseModel):
 
 def all_ge(values, than_value):
     if any(wrong := [x < than_value for x in values]):
-        logging.warning(f"All {values=} should be greater or equal {than_value=}. The following are {wrong=}.")
+        logging.warning(
+            "All values=%s should be greater or equal than_value=%s. The following are wrong=%s.",
+            values,
+            than_value,
+            wrong,
+        )
     return values
 
 

@@ -77,8 +77,8 @@ class BaseLaser:
         if pulse_init < 3.0:
             logging.warning(
                 "set centroid_position and propagation_direction indicate that laser "
-                + "initalization might be too short.\n"
-                + f"Details: {pulse_init=} < 3"
+                "initalization might be too short.\nDetails: pulse_init=%s < 3",
+                pulse_init,
             )
         return pulse_init
 

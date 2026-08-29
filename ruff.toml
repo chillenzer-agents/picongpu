@@ -36,6 +36,7 @@ select = [
     "A", # flake8-builtins
     "RET", # flake8-return
     "PLR", # pylint: refactor
+    "G", # flake8-logging-format
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately

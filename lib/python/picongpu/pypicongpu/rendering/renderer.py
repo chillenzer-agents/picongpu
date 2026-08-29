@@ -182,7 +182,8 @@ class Renderer:
             if block_content[0] not in "{^#/>!":
                 # note: use string composition instead of normal formatstrings
                 logging.warning(
-                    "do NOT use HTML escaped syntax (only {{two braces}}) for vars, offending var: " + match.group(1)
+                    "do NOT use HTML escaped syntax (only {{two braces}}) for vars, offending var: %s",
+                    match.group(1),
                 )
         return render(template, context, missing_variable_handler=_allow_only_missing_type_variables)
 

@@ -94,13 +94,13 @@ class RenderedObject:
             )
         )
 
-        logging.debug(f"found {len(all_json_files)} schemas in {schemas_path}")
+        logging.debug("found %d schemas in %s", len(all_json_files), schemas_path)
 
         for json_file_path in all_json_files:
             with open(json_file_path) as infile:
                 schema = json.load(infile)
             if "$id" not in schema:
-                logging.error(f"cant load schema, has no URI ($id) set: {json_file_path}")
+                logging.error("cant load schema, has no URI ($id) set: %s", json_file_path)
                 continue
             uri = schema["$id"]
             if type(uri) is not str:

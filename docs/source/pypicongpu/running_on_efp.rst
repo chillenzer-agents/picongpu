@@ -113,12 +113,14 @@ Workflows need.
 
    (After sourcing the profile, ``tbg -c etc/picongpu/N.cfg $SCRATCH/efp-run``
    uses the preset defaults.)
-   This creates ``$SCRATCH/efp-run/tbg/submit.start`` (the rendered job
-   script) and ``$SCRATCH/efp-run/input/`` (``bin/``, ``etc/``, ...).
-   Per-run overrides (queue, account, wall time, ...) work as usual through
-   ``tbg -o``, e.g. ``tbg -o "TBG_queue=debug" ...``;
-   in the Python interface the same overrides are passed as
-   ``overwrite_vars`` to ``picongpu_run()``/``TBGFlags``.
+    This creates ``$SCRATCH/efp-run/tbg/submit.start`` (the rendered job
+    script) and ``$SCRATCH/efp-run/input/`` (``bin/``, ``etc/``, ...).
+    Per-run overrides (queue, account, wall time, ...) work as usual
+    through ``tbg -o``, e.g.
+    ``tbg -c etc/picongpu/N.cfg -o "TBG_queue=debug TBG_wallTime=01:00:00"
+    $SCRATCH/efp-run``;
+    the overwritable variables are the ``.TBG_*`` computation lines of the
+    template.
 5. **Ship the environment profile with the input dataset**:
 
    .. code-block:: bash
@@ -194,9 +196,14 @@ Configurability
   per-system template is required anyway, and the preset mechanism already
   provides per-system selection without new machinery.
 - **Per-run overrides** (queue/partition, account, wall time, ...):
-  ``tbg -o "VAR=value"`` or ``TBGFlags(overwrite_vars=[...])``; the
-  overwritable template variables are the ``.TBG_*`` computation lines
-  (``TBG_queue``, ``TBG_nameProject``, ``TBG_wallTime``, ...).
+  ``tbg -o "VAR=value ..."``; the overwritable template variables are the
+  ``.TBG_*`` computation lines (``TBG_queue``, ``TBG_nameProject``,
+  ``TBG_wallTime``, ...).
+  (The Python interface exposes the same mechanism as
+  ``TBGFlags(overwrite_vars=[...])``/``o=[...]`` for the CWL runner; note
+  that the CWL workflow currently declares that input as a string, so the
+  list form is rejected by cwltool — a pre-existing issue independent of
+  the EFP flow, which uses ``tbg`` directly.)
 
 Pending verification (requires EFP access)
 -------------------------------------------

@@ -160,6 +160,26 @@ Queue: gpus (4 x Nvidia V100 GPUs)
 .. literalinclude:: profiles/juwels-jsc/gpus_picongpu.profile.example
    :language: bash
 
+EFP (JUPITER, JSC)
+------------------
+
+**EFP Workflows:** `link <https://docs.my-eurohpc.eu/workflows/quickstart/>`__
+
+**JUPITER:** see the JSC HPC system documentation.
+
+Profile for running PIConGPU on JUPITER via the :ref:`EuroHPC Federation Platform (EFP) Workflows <pypicongpu-running-efp>`
+(a.k.a. LEXIS platform), i.e. by uploading a self-contained job script instead of submitting it from the system's login node.
+The profile selects the self-contained job script template ``gh200_efp.tpl``;
+the rendered job script can be uploaded to the EFP Workflows as-is with JUPITER as target system.
+For direct (interactive/SSH) submission on JUPITER, use the ``jupiter-jsc`` preset instead.
+See :ref:`running on EFP <pypicongpu-running-efp>` for the full workflow.
+
+Queue: booster (4 x Nvidia GH200 per node)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. literalinclude:: profiles/efp-jupiter-jsc/efp_picongpu.profile.example
+   :language: bash
+
 ARIS (GRNET)
 ------------
 

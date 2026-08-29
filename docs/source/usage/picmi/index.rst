@@ -19,4 +19,5 @@ PIConGPU supports `PICMI <https://picmi-standard.github.io/>`_ to create simulat
    :maxdepth: 1
 
    intro
+   partial_workflow
    custom_template

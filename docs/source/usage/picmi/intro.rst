@@ -141,6 +141,10 @@ Parameters/Methods prefixed with ``picongpu_`` are PIConGPU-exclusive.
     convert the PICMI simulation object to an equivalent :ref:`PyPIConGPU <PyPIConGPU_Intro>` simulation object.
   - ``picongpu_get_runner()``:
     Retrieve a :ref:`PyPIConGPU Runner <pypicongpu-running>` for running a PIConGPU simulation from Python, **not recommended, see :ref:`PICMI setup generation <generating_setups_with_PICMI>`**.
+  - ``picongpu_run(up_to=..., from_=..., force=...)``:
+    build and run the simulation, optionally executing only a subset of the
+    workflow stages (build/prepare/submit/collect) and resuming previously
+    completed stages, see :ref:`Partial Workflow Execution (Stages) <picmi-partial-workflow>`.
   - ``picongpu_add_custom_user_input()``:
     pass custom user input to the code generation.
     This may be used in conjunction with custom templates to change the code generation.

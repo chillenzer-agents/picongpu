@@ -571,7 +571,7 @@ class _ROCrateInfo(BaseModel):
     keywords: list[str] = []
 
     def __init__(self, data):
-        return super().__init__(**(_generate_rocrate_defaults(data) | data.get("rocrate", {}).get("info", {})))
+        super().__init__(**(_generate_rocrate_defaults(data) | data.get("rocrate", {}).get("info", {})))
 
     def add_metadata_to(self, crate):
         crate = deepcopy(crate)

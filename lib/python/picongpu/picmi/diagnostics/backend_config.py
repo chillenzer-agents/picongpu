@@ -35,4 +35,4 @@ class RangeSpec(PyPIConGPURangeSpec):
         else:
             raise ValueError(f"Unknown RangeSpec construction. You gave {args=}.")
         data = _apply_units((RangeSpecEntry(data=x) for x in data), unit)
-        return super().__init__(data=data, **kwargs)
+        super().__init__(data=data, **kwargs)

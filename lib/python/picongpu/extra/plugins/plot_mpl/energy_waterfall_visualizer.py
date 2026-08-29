@@ -132,7 +132,7 @@ class Visualizer(BaseVisualizer):
         """
         counts, bins, all_iterations, dt = self.data[idx]
         np_data = np.zeros((len(bins), len(all_iterations)))
-        for index, ts in enumerate(all_iterations):
+        for index, _ in enumerate(all_iterations):
             np_data[:, index] = counts[index]
         ps = 1.0e12  # for conversion from s to ps
         max_iter = max(all_iterations * dt * ps)
@@ -164,7 +164,7 @@ class Visualizer(BaseVisualizer):
         """
         counts, bins, all_iterations, dt = self.data[idx]
         np_data = np.zeros((len(bins), len(all_iterations)))
-        for index, ts in enumerate(all_iterations):
+        for index, _ in enumerate(all_iterations):
             np_data[:, index] = counts[index]
         self.plt_obj[idx].set_data(np_data)
         if self.plt_lin:

@@ -183,7 +183,7 @@ class Comparison:
         timestep = self.params["dt"] * self.params["unit_time"]
 
         total_phasediff = 0
-        for counter in range(0, len(theta) - 1, 1):
+        for _ in range(0, len(theta) - 1, 1):
             total_phasediff = np.sum(np.abs(np.diff(theta)))
 
         return total_phasediff, timestep
@@ -242,7 +242,7 @@ def main():
         phaseDifferences[j - 1], timesteps[j - 1] = phase_class.get_total_phasediff()
 
     quotients = np.zeros(len(phaseDifferences) - 1)
-    for j in range(len(phaseDifferences) - 1):
+    for _ in range(len(phaseDifferences) - 1):
         quotients = phaseDifferences[1:] / phaseDifferences[:-1]
 
     b = np.mean(quotients)  # base b

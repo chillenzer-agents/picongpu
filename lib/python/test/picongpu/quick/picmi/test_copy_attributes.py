@@ -183,9 +183,7 @@ class TestCopyAttributes(TestCase):
     def test_copies_property_by_value(self):
         dummy_provider = ClassWithProperty()
         DummyReceiver = gen_class({"attribute": None})
-        assert isinstance(
-            getattr(copy_attributes(dummy_provider, DummyReceiver), "attribute"), type(dummy_provider._attribute)
-        )
+        assert isinstance(copy_attributes(dummy_provider, DummyReceiver).attribute, type(dummy_provider._attribute))
 
 
 class TestConvertsTo(TestCase):

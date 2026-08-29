@@ -151,7 +151,7 @@ def range_filter(particle, range):
     # But that's not implemented for filters.
     # "total" is identical because we don't have moving window active.
     pos = particle.get("position", unit="cell", origin="total")
-    return And(*(in_range_expression(p, r) for p, r in zip(pos, range.data)))
+    return And(*(in_range_expression(p, r) for p, r in zip(pos, range.data, strict=False)))
 
 
 def generate_range_restricted_particle_dumps(species):
@@ -374,7 +374,9 @@ class TestDiagnostics(TestCase):
 
     def test_compare_derived_fields_and_binning(self):
         for dump, binning in zip(
-            generate_derived_field_dumps(SPECIES, FUNCTORS), generate_derived_field_dumps_as_binnings(SPECIES, FUNCTORS)
+            generate_derived_field_dumps(SPECIES, FUNCTORS),
+            generate_derived_field_dumps_as_binnings(SPECIES, FUNCTORS),
+            strict=False,
         ):
             np.testing.assert_allclose(
                 load_diagnostic_result(dump, self.result_path), load_diagnostic_result(binning, self.result_path)

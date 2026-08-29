@@ -62,7 +62,8 @@ def searchParameter(parameter: str, directiontype: str = None, **kwargs):
         warnings.warn(
             "The test suite now searches for the parameters"
             " independently. To prevent this please specify"
-            " directiontype."
+            " directiontype.",
+            stacklevel=2,
         )
         try:
             pR = Reader.paramReader.ParamReader(directiontype="paramDirection")

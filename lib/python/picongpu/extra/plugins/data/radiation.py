@@ -146,7 +146,7 @@ class RadiationData:
         try:
             h_distAmp = self.iteration.meshes["Amplitude_distributed"]
         except IndexError:
-            warnings.warn("Warning: no distributed amplitude available.")
+            warnings.warn("Warning: no distributed amplitude available.", stacklevel=2)
             return None
 
         # get shape of distributed amplitude

@@ -135,7 +135,7 @@ def main(dataPath):
 
     delta = bins
     analytical_integrated = []
-    for x0, x1 in zip(delta[:-1], delta[1:]):
+    for x0, x1 in zip(delta[:-1], delta[1:], strict=False):
         analytical_integrated.append(quad(lambda x: analytical_Propability(x, gamma, Heff, dt), x0, x1)[0])
 
     mask = a > 1000

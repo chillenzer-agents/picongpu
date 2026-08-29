@@ -70,7 +70,7 @@ class IonizationModel(BaseModel):
             except TypeError:
                 print(self)
                 print(type(self))
-                raise TypeError
+                raise
         return hash_value
 
     def get_constants(self) -> list[pypicongpu.species.constant.Constant]:

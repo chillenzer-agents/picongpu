@@ -91,7 +91,10 @@ class ParamReader(rF.ReadFiles):
             all_paramFiles = self.getParam(parameter)
 
             if len(all_paramFiles) > 1:
-                warnings.warn('Multiple files could be found with an "undefined block" for the same parameter.')
+                warnings.warn(
+                    'Multiple files could be found with an "undefined block" for the same parameter.',
+                    stacklevel=2,
+                )
 
             parameter = None
 

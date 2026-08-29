@@ -46,7 +46,7 @@ def origin_no_guards_check(particle):
     }
 
     all_combinations = tuple(
-        x for ps in positions.values() for a in ps.values() for b in ps.values() for x in zip(a, b)
+        x for ps in positions.values() for a in ps.values() for b in ps.values() for x in zip(a, b, strict=False)
     )
     return sum(sympy.Piecewise((1, sympy.Eq(*x)), (0, True)) for x in all_combinations) / len(all_combinations)
 
@@ -75,7 +75,7 @@ def origin_with_guards_check(particle, timestep):
 
     all_combinations = sum(
         (
-            tuple(zip(p["local"], _subtract_guards(p["local_with_guards"], unit, timestep)))
+            tuple(zip(p["local"], _subtract_guards(p["local_with_guards"], unit, timestep), strict=False))
             for (_, unit), p in positions.items()
         ),
         tuple(),

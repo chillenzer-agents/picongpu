@@ -139,7 +139,7 @@ class BaseWidget(widgets.VBox):
             run_dir_options = [run_dir_options]
 
         if len(run_dir_options) < 1:
-            warn("Empty run_dir_options list was passed!")
+            warn("Empty run_dir_options list was passed!", stacklevel=2)
             lut = {}
         else:
             if isinstance(run_dir_options[0], str):
@@ -316,7 +316,7 @@ class BaseWidget(widgets.VBox):
 
         run_dirs = [self.label_path_lut[label] for label in selected_sims]
         # prepare nicer labels for run_dirs in the plots
-        run_dirs = list(zip(selected_sims, run_dirs))
+        run_dirs = list(zip(selected_sims, run_dirs, strict=False))
 
         self.plot_mpl.set_run_directories(run_dirs)
 
@@ -395,7 +395,7 @@ class BaseWidget(widgets.VBox):
         try:
             self.plot_mpl.visualize(time=time, **vis_params)
         except Exception as e:
-            warn("{}: visualization failed! Reason: {} ".format(type(self), e))
+            warn("{}: visualization failed! Reason: {} ".format(type(self), e), stacklevel=2)
             # raise e
 
         # since interactive mode should be turned off, we have
@@ -403,7 +403,7 @@ class BaseWidget(widgets.VBox):
         try:
             self.update_plot()
         except ValueError as e:
-            warn("{}: drawing the plot failed! Reason: {}".format(type(self), e))
+            warn("{}: drawing the plot failed! Reason: {}".format(type(self), e), stacklevel=2)
             # raise e
 
     def update_plot(self):

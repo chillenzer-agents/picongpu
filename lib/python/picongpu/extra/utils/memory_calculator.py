@@ -283,7 +283,7 @@ class MemoryCalculator(pydantic.BaseModel):
         particle_filled_cells: nptype.NDArray,
         particles_per_cell: int,
         species_attribute_list: list[str],
-        custom_attributes_size_dict: dict[str, int] = {},
+        custom_attributes_size_dict: dict[str, int] | None = None,
     ) -> int:
         """
         Memory required for a species' particles per device.
@@ -300,6 +300,8 @@ class MemoryCalculator(pydantic.BaseModel):
 
         @return unit: bytes
         """
+        if custom_attributes_size_dict is None:
+            custom_attributes_size_dict = {}
 
         # in byte
         minimum_particle_attributes = {"multiMask": 1, "cellIndex": 2}

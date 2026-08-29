@@ -21,7 +21,7 @@ from ....rendering import RenderedObject
 
 
 def serialise_vec(value) -> dict:
-    return dict(zip("xyz", value))
+    return dict(zip("xyz", value, strict=False))
 
 
 def validate_unit_vec(value):

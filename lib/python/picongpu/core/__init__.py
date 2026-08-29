@@ -33,4 +33,4 @@ def path(component: Literal["bin", "etc", "include"] | None = None):
             f"We have looked for {here / component} and "
             f"{alternative_location_in_source / component / expected_components} without success."
         )
-        raise FileNotFoundError(message)
+        raise FileNotFoundError(message) from None

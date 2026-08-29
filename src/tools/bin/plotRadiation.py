@@ -58,7 +58,7 @@ if matplotlib.__version__ not in tested_matplotlib_version:
                      development. This might cause the output to appear
                      different.
                      Version used: {}, tested versions {}""".format(matplotlib.__version__, tested_matplotlib_version)
-    warnings.warn(warning_msg)
+    warnings.warn(warning_msg, stacklevel=2)
 
 # ------ argsparse --------
 """

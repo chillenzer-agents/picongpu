@@ -231,7 +231,7 @@ class DataReader(rF.ReadFiles):
                 raise ValueError(
                     "More than one file containing the parameter"
                     " could be found. Therefore, a particle type"
-                    " must be passed."
-                )
+                    " must be passed.",
+                ) from None
 
         return result

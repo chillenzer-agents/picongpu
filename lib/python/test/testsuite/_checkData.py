@@ -35,7 +35,8 @@ if importlib.util.find_spec("config") is None:
         " optional parameters must be passed. Otherwise error"
         " messages will be generated or default values will"
         " be used. See the documentation for more"
-        " information."
+        " information.",
+        stacklevel=2,
     )
 else:
     import config
@@ -99,7 +100,10 @@ def checkDirection(variable: str = "undefined", direction: str = None, errorhand
     # if there are two use config.py value
 
     if val is not None and direction is not None:
-        warnings.warn("Both " + variable + " and direction are set.Note that the value from config.py is used.")
+        warnings.warn(
+            "Both " + variable + " and direction are set.Note that the value from config.py is used.",
+            stacklevel=2,
+        )
 
         direction = val
 
@@ -118,7 +122,10 @@ def checkDirection(variable: str = "undefined", direction: str = None, errorhand
 
     # check if the direction exist
     if not os.path.isdir(direction):
-        warnings.warn("The specified directory does not exist. The current working directory is used for the output.")
+        warnings.warn(
+            "The specified directory does not exist. The current working directory is used for the output.",
+            stacklevel=2,
+        )
 
         direction = os.path.abspath(os.getcwd())
 
@@ -200,7 +207,8 @@ def checkVariables(variable: str = "undefined", default=None, parameter=None):
 
     if val is not None and parameter is not None:
         warnings.warn(
-            "Both " + val_name + " and the optional parameter are set. Note that the value from config.py is used."
+            "Both " + val_name + " and the optional parameter are set. Note that the value from config.py is used.",
+            stacklevel=2,
         )
 
         value = val
@@ -210,7 +218,7 @@ def checkVariables(variable: str = "undefined", default=None, parameter=None):
 
     # standard value if both are None
     elif val is None and parameter is None:
-        warnings.warn("Both " + val_name + " and the optional parameter are empty.")
+        warnings.warn("Both " + val_name + " and the optional parameter are empty.", stacklevel=2)
 
         value = default
 

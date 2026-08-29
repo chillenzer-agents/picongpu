@@ -71,7 +71,7 @@ def try_update_with(into_instance, from_instance):
     return False
 
 
-class RequirementConflict(Exception):
+class RequirementConflict(Exception):  # noqa: N818 (name mirrors the domain term; renaming would be a breaking API change)
     pass
 
 

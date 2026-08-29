@@ -1,6 +1,19 @@
 Changelog
 =========
 
+0.9.0
+-----
+
+**Date:** TBD
+
+**Features:**
+- tools:
+    - add draft EFP/LEXIS submission preset (``efp-jupiter-jsc``) to render a self-contained job script for running PIConGPU via the EuroHPC Federation Platform (EFP) Workflows
+
+**Documentation:**
+- tools:
+    - add a "Running on the EuroHPC Federation Platform (EFP)" page and a profile entry for the EFP JUPITER preset
+
 0.8.0
 -----
 

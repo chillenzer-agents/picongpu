@@ -14,6 +14,8 @@ import typing
 import jsonschema
 import referencing
 
+logger = logging.getLogger(__name__)
+
 
 class RenderedObject:
     """
@@ -61,7 +63,7 @@ class RenderedObject:
                 if value is not None:
                     hash_value += hash(value)
             except TypeError:
-                logging.debug("unhashable object: %s (%s)", self, type(self))
+                logger.debug("unhashable object: %s (%s)", self, type(self))
                 raise
         return hash_value
 
@@ -93,13 +95,13 @@ class RenderedObject:
             )
         )
 
-        logging.debug("found %d schemas in %s", len(all_json_files), schemas_path)
+        logger.debug("found %d schemas in %s", len(all_json_files), schemas_path)
 
         for json_file_path in all_json_files:
             with open(json_file_path) as infile:
                 schema = json.load(infile)
             if "$id" not in schema:
-                logging.error("cant load schema, has no URI ($id) set: %s", json_file_path)
+                logger.error("cant load schema, has no URI ($id) set: %s", json_file_path)
                 continue
             uri = schema["$id"]
             if type(uri) is not str:

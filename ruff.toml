@@ -50,6 +50,7 @@ select = [
     "ERA", # eradicate (commented-out code)
     "INP", # flake8-no-pep420
     "PD", # pandas-vet
+    "LOG", # flake8-logging
 ]
 ignore = [
     # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately

@@ -48,6 +48,8 @@ from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
 from picongpu.pypicongpu.util import UnpackChain, unique
 from picongpu.pypicongpu.walltime import Walltime
 
+logger = logging.getLogger(__name__)
+
 
 class _DensityImpl(BaseModel):
     layout: AnyLayout
@@ -336,7 +338,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         :param pypicongpu_simulation: manipulated pypicongpu simulation
         """
         if self._runner is not None:
-            logging.warning("runner already initialized, overwriting")
+            logger.warning("runner already initialized, overwriting")
 
         self._runner = Runner(
             sim=self, template_dir=self.picongpu_template_dir or (templates.path(),), setup_dir=Path(file_name)

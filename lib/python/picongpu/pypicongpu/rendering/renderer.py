@@ -16,6 +16,8 @@ import typing
 import sympy
 from moosetash import MissingVariable, render
 
+logger = logging.getLogger(__name__)
+
 
 class Renderer:
     """
@@ -178,10 +180,10 @@ class Renderer:
         for match in mustache_block_re.finditer(template):
             block_content = match.group(1)
             if block_content == "":
-                logging.warning("empty mustache block encountered")
+                logger.warning("empty mustache block encountered")
             if block_content[0] not in "{^#/>!":
                 # note: use string composition instead of normal formatstrings
-                logging.warning(
+                logger.warning(
                     "do NOT use HTML escaped syntax (only {{two braces}}) for vars, offending var: %s",
                     match.group(1),
                 )

@@ -48,7 +48,7 @@ class RadiationData:
         # extract time step
         self.timestep = timestep
         if self.timestep not in self.rad_series.iterations:
-            raise Exception("The selected timestep {} ".format(self.timestep) + "is not available in the series.")
+            raise Exception(f"The selected timestep {self.timestep} " + "is not available in the series.")
         self.iteration = self.rad_series.iterations[self.timestep]
 
         # Amplitude

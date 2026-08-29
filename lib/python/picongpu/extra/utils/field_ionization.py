@@ -75,7 +75,7 @@ class FieldIonization:
         pol = polarization
         if pol not in ["linear", "circular"]:
             raise NotImplementedError(
-                "Cannot interpret polarization='{}'.\n".format(pol)
+                f"Cannot interpret polarization='{pol}'.\n"
                 + "So far, the only implemented options are: "
                 + "['linear', 'circular']"
             )

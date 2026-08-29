@@ -135,12 +135,12 @@ for sim in directories:
     ]
     # check if file list is empty
     if len(files) == 0:
-        sys.exit('There were no energy files in "{}".'.format(mydir))
+        sys.exit(f'There were no energy files in "{mydir}".')
     # verbose output
-    print("\nFor directory: \n\t{}".format(sim))
+    print(f"\nFor directory: \n\t{sim}")
     print("the following files are considered for calculating the total energy:")
     for f in files:
-        print("\t \t - {}".format(f))
+        print(f"\t \t - {f}")
 
     # read time steps from first file in list
     Time = np.loadtxt(os.path.join(mydir, files[0]))[:, 0]

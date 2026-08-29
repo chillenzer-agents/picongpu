@@ -22,7 +22,7 @@ import seaborn as sns
 def _get_debug_data(sim_path, collider_id, pair_id):
     debug_file_path = Path(sim_path) / "simOutput" / f"debug_values_collider_{collider_id}_species_pair_{pair_id}.dat"
     debug_data = None
-    with open(debug_file_path, "r") as f:
+    with open(debug_file_path) as f:
         debug_data = np.loadtxt(
             f,
             dtype=[
@@ -73,7 +73,7 @@ class ThermalizationVerifier:
         debug_file_path = Path(sim_output_path) / "simOutput" / "average_debye_length_for_collisions.dat"
         self.average_debye_present = True
         try:
-            with open(debug_file_path, "r") as f:
+            with open(debug_file_path) as f:
                 self.debug_values["all"] = np.loadtxt(f, dtype=[("iteration", np.uint32), ("debye_length", np.float64)])
         except FileNotFoundError:
             print("No average debye length output present")
@@ -347,7 +347,7 @@ class ThermalizationVerifier:
             ax.legend()
             ax.set_xlabel(r"$t [fs]$")
 
-        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup", "r") as file:
+        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup") as file:
             f.suptitle(file.readline() + "\n" + textwrap.fill(file.readline(), 80))
         f.tight_layout()
         plt.subplots_adjust(top=0.90)
@@ -440,7 +440,7 @@ class ThermalizationVerifier:
             ax.legend()
             ax.set_xlabel(r"$t [fs]$")
 
-        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup", "r") as file:
+        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup") as file:
             f.suptitle(file.readline() + "\n" + textwrap.fill(file.readline(), 80))
         plt.tight_layout()
         if to_file:

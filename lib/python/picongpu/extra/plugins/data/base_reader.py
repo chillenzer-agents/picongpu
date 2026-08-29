@@ -11,7 +11,7 @@ import numpy as np
 from ...utils.find_time import FindTime
 
 
-class DataReader(object):
+class DataReader:
     """
     Base class that all data readers should inherit from.
     """

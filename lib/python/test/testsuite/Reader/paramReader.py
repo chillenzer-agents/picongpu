@@ -194,7 +194,7 @@ class ParamReader(rF.ReadFiles):
 
         result = {}
 
-        lines = open(self._direction + filename, "r")
+        lines = open(self._direction + filename)
 
         allLines = lines.readlines()
 
@@ -207,7 +207,7 @@ class ParamReader(rF.ReadFiles):
                 result[number] = line
 
         if not result:
-            raise ValueError("The parameter {} could not be found".format(parameter))
+            raise ValueError(f"The parameter {parameter} could not be found")
         else:
             return result
 
@@ -244,7 +244,7 @@ class ParamReader(rF.ReadFiles):
             )
 
         for file in self.getAllFiles():
-            fileParam = open(self._direction + file, "r")
+            fileParam = open(self._direction + file)
 
             if fileParam.read().find(parameter) != -1:
                 searchResult.append(file)

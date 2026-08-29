@@ -21,7 +21,7 @@ def serialise_timedelta(value):
     hours, rest = divmod(value, HOUR)
     minutes, rest = divmod(rest, MINUTE)
     seconds, _ = divmod(rest, SECOND)
-    return "{:d}:{:02d}:{:02d}".format(hours, minutes, seconds)
+    return f"{hours:d}:{minutes:02d}:{seconds:02d}"
 
 
 class Walltime(RenderedObject, BaseModel):

@@ -275,14 +275,12 @@ def compare_phases(
 
     x = x_poss + x_offSet  # real x coordinates
     R_c = np.mean(
-        (
-            np.sqrt(x_momentum**2 + y_momentum**2)
-            * params["unit_mass"]
-            * params["unit_speed"]
-            / (abs(charge[0]) * params["unit_charge"] * B)
-            / params["cell_depth"]
-            / params["unit_length"]
-        )
+        np.sqrt(x_momentum**2 + y_momentum**2)
+        * params["unit_mass"]
+        * params["unit_speed"]
+        / (abs(charge[0]) * params["unit_charge"] * B)
+        / params["cell_depth"]
+        / params["unit_length"]
     )
 
     theta = np.arccos(x / R_c)  # calculate the phase

@@ -203,19 +203,19 @@ if __name__ == "__main__":
             ax_rate.plot(
                 time / fs,
                 rate_matrix[i, :],
-                label="{}+ to {}+".format(Z[i] - 1, Z[i]),
+                label=f"{Z[i] - 1}+ to {Z[i]}+",
                 color=color[i],
             )
             ax_bsi.axvline(
                 time_BSI[i] / fs,
-                label="{}+ to {}+".format(Z[i] - 1, Z[i]),
+                label=f"{Z[i] - 1}+ to {Z[i]}+",
                 color=color[i],
             )
 
         ax_pop.plot(
             time / fs,
             charge_dist[i, :-1] / percent,
-            label="{}+".format(i),
+            label=f"{i}+",
             color=color[i],
         )
         ax_pop.fill_between(

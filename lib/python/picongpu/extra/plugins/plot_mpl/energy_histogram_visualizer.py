@@ -49,7 +49,7 @@ class Visualizer(BaseVisualizer):
         label = self.sim_labels[idx]
 
         if np.all(counts == 0.0):
-            warn("All counts were 0 for {}. ".format(label) + "No log-plot can be created!", stacklevel=2)
+            warn(f"All counts were 0 for {label}. " + "No log-plot can be created!", stacklevel=2)
             return
 
         self.plt_obj[idx] = self.ax.semilogy(bins, counts, nonpositive="clip", label=label, color=self.colors[idx])[0]
@@ -62,7 +62,7 @@ class Visualizer(BaseVisualizer):
         label = self.sim_labels[idx]
 
         if np.all(counts == 0.0):
-            warn("All counts were 0 for {}. ".format(label) + "Log-plot will not be updated!", stacklevel=2)
+            warn(f"All counts were 0 for {label}. " + "Log-plot will not be updated!", stacklevel=2)
             return
 
         self.plt_obj[idx].set_data(bins, counts)

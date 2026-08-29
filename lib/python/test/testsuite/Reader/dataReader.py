@@ -204,7 +204,7 @@ class DataReader(rF.ReadFiles):
         all_files = self.getDatwithParam(parameter)
 
         if step_direction is not None and step_direction not in all_files:
-            raise ValueError("{} is not in the direction".format(step_direction))
+            raise ValueError(f"{step_direction} is not in the direction")
 
         if len(all_files) >= 2 and p_type is None and "step" not in parameter:
             raise ValueError("The parameter could be found more than once. Please use the parameter p_type for this")

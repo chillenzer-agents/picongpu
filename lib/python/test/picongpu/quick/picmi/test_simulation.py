@@ -330,7 +330,7 @@ class TestPicmiSimulation(TestCase):
         )
         solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
         sim = picmi.Simulation(
-            time_step_size=1.39e-16, max_steps=int(2048), solver=solver, picongpu_moving_window_move_point=0.9
+            time_step_size=1.39e-16, max_steps=2048, solver=solver, picongpu_moving_window_move_point=0.9
         )
         pypic = sim.get_as_pypicongpu()
 

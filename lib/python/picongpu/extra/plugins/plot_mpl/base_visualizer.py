@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from .utils import get_different_colors
 
 
-class Visualizer(object):
+class Visualizer:
     """
     Abstract base class for matplotlib visualizers that implements
     the visualization logic.
@@ -231,7 +231,7 @@ class Visualizer(object):
             if data is None:
                 # no data for the current combination of kwargs
                 # so we should just omit the data from this input file
-                warn("Data from {} is None! Will omit!".format(self.sim_labels[i]), stacklevel=2)
+                warn(f"Data from {self.sim_labels[i]} is None! Will omit!", stacklevel=2)
                 if plt_obj is not None:
                     self._remove_plt_obj(i)
 

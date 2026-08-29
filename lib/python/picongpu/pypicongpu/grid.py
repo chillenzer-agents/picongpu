@@ -6,10 +6,9 @@ License: GPLv3+
 """
 
 import enum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from pydantic import AfterValidator, BaseModel, Field, PlainSerializer, model_validator
-from typing_extensions import Self
 
 from .rendering import RenderedObject
 

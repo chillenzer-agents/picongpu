@@ -160,7 +160,7 @@ def main(dataPath):
     poornessBound = 0.1  # 10% error. We want poorness to be less than 10%
     print(f"Poorness: {poorness}")
 
-    retValue = int(0) if poorness <= poornessBound else int(1)
+    retValue = 0 if poorness <= poornessBound else 1
     print(f"Test {'passed' if retValue == 0 else 'failed'}")
 
     sys.exit(retValue)

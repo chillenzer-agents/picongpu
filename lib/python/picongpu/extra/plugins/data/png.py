@@ -89,11 +89,11 @@ class PNGData(DataReader):
         output_dir = os.path.join(self.run_directory, "simOutput", dir_name)
 
         if not os.path.isdir(output_dir):
-            raise IOError(
-                "The simOutput/{0} directory does not "
-                "exist inside path:\n  {1}\n"
+            raise OSError(
+                f"The simOutput/{dir_name} directory does not "
+                f"exist inside path:\n  {self.run_directory}\n"
                 "Did you set the proper path to the run directory?\n"
-                "Did the simulation already run?".format(dir_name, self.run_directory)
+                "Did the simulation already run?"
             )
 
         if iteration is None:
@@ -110,7 +110,7 @@ class PNGData(DataReader):
                     species,
                     axis,
                     str(slice_point),
-                    "{:0>#6d}".format(iteration),  # leading zeros for iter
+                    f"{iteration:0>#6d}",  # leading zeros for iter
                 )
                 + self.data_file_suffix
             )
@@ -118,10 +118,10 @@ class PNGData(DataReader):
             data_file_path = os.path.join(output_dir, data_file_name)
 
             if not os.path.isfile(data_file_path):
-                raise IOError(
-                    "The file {} does not exist.\n"
+                raise OSError(
+                    f"The file {data_file_path} does not exist.\n"
                     "Did the simulation already run?\n"
-                    "Is there a png for this iteration?".format(data_file_path)
+                    "Is there a png for this iteration?"
                 )
 
             return data_file_path
@@ -194,9 +194,7 @@ class PNGData(DataReader):
             # verify requested iterations exist
             if not set(iteration).issubset(available_iterations):
                 raise IndexError(
-                    "Iteration {} is not available!\nList of available iterations: \n{}".format(
-                        iteration, available_iterations
-                    )
+                    f"Iteration {iteration} is not available!\nList of available iterations: \n{available_iterations}"
                 )
         else:
             # iteration is None, so we use all available data

@@ -62,11 +62,11 @@ class EmittanceData(DataReader):
 
         sim_output_dir = os.path.join(self.run_directory, "simOutput")
         if not os.path.isdir(sim_output_dir):
-            raise IOError(
+            raise OSError(
                 "The simOutput/ directory does not exist inside "
-                "path:\n  {}\n"
+                f"path:\n  {self.run_directory}\n"
                 "Did you set the proper path to the run directory?\n"
-                "Did the simulation already run?".format(self.run_directory)
+                "Did the simulation already run?"
             )
 
         data_file_path = os.path.join(
@@ -74,7 +74,7 @@ class EmittanceData(DataReader):
             species + self.data_file_prefix + species_filter + self.data_file_suffix,
         )
         if not os.path.isfile(data_file_path):
-            raise IOError("The file {} does not exist.\nDid the simulation already run?".format(data_file_path))
+            raise OSError(f"The file {data_file_path} does not exist.\nDid the simulation already run?")
 
         return data_file_path
 
@@ -165,9 +165,7 @@ class EmittanceData(DataReader):
         # verify requested iterations exist
         if not set(iteration).issubset(data.index.values):
             raise IndexError(
-                "Iteration {} is not available!\nList of available iterations: \n{}".format(
-                    iteration, data.index.values
-                )
+                f"Iteration {iteration} is not available!\nList of available iterations: \n{data.index.values}"
             )
         dt = self.get_dt()
         if len(iteration) > 1:

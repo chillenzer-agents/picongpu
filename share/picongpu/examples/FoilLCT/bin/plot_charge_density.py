@@ -108,7 +108,7 @@ if args.sum:
 else:
     fig.colorbar(im, cax=cax, label=r"$n_e$ [$q_e \cdot$ cm$^{-3}$]")
 
-fig.suptitle("time = {:5.3f} fs".format(dt * step * 1.0e15))
+fig.suptitle(f"time = {dt * step * 1.0e15:5.3f} fs")
 ax3.set_xlabel(r"$x$ [$\mu$m]")
 ax4.set_xlabel(r"$x$ [$\mu$m]")
 ax1.set_ylabel(r"$y$ [$\mu$m]")

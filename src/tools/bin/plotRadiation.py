@@ -54,10 +54,10 @@ is used.
 
 tested_matplotlib_version = ["1.2.0", "1.3.1", "2.0.0rc1"]
 if matplotlib.__version__ not in tested_matplotlib_version:
-    warning_msg = """The matplotlib version differs from that used during
+    warning_msg = f"""The matplotlib version differs from that used during
                      development. This might cause the output to appear
                      different.
-                     Version used: {}, tested versions {}""".format(matplotlib.__version__, tested_matplotlib_version)
+                     Version used: {matplotlib.__version__}, tested versions {tested_matplotlib_version}"""
     warnings.warn(warning_msg, stacklevel=2)
 
 # ------ argsparse --------
@@ -489,7 +489,7 @@ for myfile in args.path2Data:
         # one or many file?
         if manyFiles:
             filename_temp = filename_template.format(index_filename)
-            filename_temp = "{}_{}.pdf".format(args.outputName, filename_temp)
+            filename_temp = f"{args.outputName}_{filename_temp}.pdf"
             plt.savefig(filename_temp, format="pdf")
         else:
             plt.savefig(args.outputName + ".pdf", format="pdf")

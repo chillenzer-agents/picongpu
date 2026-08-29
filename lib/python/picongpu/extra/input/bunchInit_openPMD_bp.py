@@ -46,9 +46,9 @@ class vec3D:
         """
         helper function to print values to screen
         """
-        print("x: {}".format(self.x))
-        print("y: {}".format(self.y))
-        print("z: {}".format(self.z))
+        print(f"x: {self.x}")
+        print(f"y: {self.y}")
+        print(f"z: {self.z}")
 
     def __truediv__(self, other):
         """
@@ -207,13 +207,13 @@ class addParticles2Checkpoint:
             self.has_probeE = True
             # type of E-Field
             self.dtype_probeE = self.f.iterations[self.timestep].particles[self.speciesName]["probeE"]["x"].dtype
-        self.print("contains probeE = {}".format(self.has_probeE))
+        self.print(f"contains probeE = {self.has_probeE}")
 
         if "probeB" in self.f.iterations[self.timestep].particles[self.speciesName]:
             self.has_probeB = True
             # type of B-Field
             self.dtype_probeB = self.f.iterations[self.timestep].particles[self.speciesName]["probeB"]["x"].dtype
-        self.print("contains probeB {}".format(self.has_probeB))
+        self.print(f"contains probeB {self.has_probeB}")
 
         # extract data type for weighting
         self.dtype_weighting = (
@@ -230,7 +230,7 @@ class addParticles2Checkpoint:
                 .particles[self.speciesName]["id"][opmd.Mesh_Record_Component.SCALAR]
                 .dtype
             )
-        self.print("contains id =  {}".format(self.has_id))
+        self.print(f"contains id =  {self.has_id}")
 
         if "momentumPrev1" in self.f.iterations[self.timestep].particles[self.speciesName]:
             self.has_momentumPrev1 = True
@@ -238,7 +238,7 @@ class addParticles2Checkpoint:
             self.dtype_momentumPrev1 = (
                 self.f.iterations[self.timestep].particles[self.speciesName]["momentumPrev1"]["x"].dtype
             )
-        self.print("contains momentumPrev1 =  {}".format(self.has_momentumPrev1))
+        self.print(f"contains momentumPrev1 =  {self.has_momentumPrev1}")
 
         if "transitionRadiationMask" in self.f.iterations[self.timestep].particles[self.speciesName]:
             self.has_transitionRadiationMask = True
@@ -248,7 +248,7 @@ class addParticles2Checkpoint:
                 .particles[self.speciesName]["transitionRadiationMask"][opmd.Mesh_Record_Component.SCALAR]
                 .dtype
             )
-        self.print("contains transitionRadiationMask =  {}".format(self.has_transitionRadiationMask))
+        self.print(f"contains transitionRadiationMask =  {self.has_transitionRadiationMask}")
 
         del self.f  # close checkpoint file
 
@@ -541,22 +541,18 @@ class pipe:
             # main loop: read iterations of src, write to dest
             write_iterations = dest.write_iterations()
             for in_iteration in src.read_iterations():
-                print(
-                    "Iteration {0} contains {1} meshes:".format(in_iteration.iteration_index, len(in_iteration.meshes))
-                )
+                print(f"Iteration {in_iteration.iteration_index} contains {len(in_iteration.meshes)} meshes:")
                 for m in in_iteration.meshes:
-                    print("\t {0}".format(m))
+                    print(f"\t {m}")
                 print("")
                 print(
-                    "Iteration {0} contains {1} particle species:".format(
-                        in_iteration.iteration_index, len(in_iteration.particles)
-                    )
+                    f"Iteration {in_iteration.iteration_index} contains {len(in_iteration.particles)} particle species:"
                 )
                 for ps in in_iteration.particles:
-                    print("\t {0}".format(ps))
+                    print(f"\t {ps}")
                     print("With records:")
                     for r in in_iteration.particles[ps]:
-                        print("\t {0}".format(r))
+                        print(f"\t {r}")
                 out_iteration = write_iterations[in_iteration.iteration_index]
                 sys.stdout.flush()
                 self.__particle_patches = []

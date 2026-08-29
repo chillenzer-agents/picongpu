@@ -130,7 +130,7 @@ def plotError(file_pattern, slice_pos=None, timestep=-1):
 
     plt.subplot(131)
     slice_cell_z = int(np.floor((diff.shape[0] - 1) * slice_pos[0]))
-    plt.title("slice in z at {}".format(slice_cell_z), fontsize=20)
+    plt.title(f"slice in z at {slice_cell_z}", fontsize=20)
     plt.imshow(
         diff[slice_cell_z, :, :],
         vmin=-limit,
@@ -153,7 +153,7 @@ def plotError(file_pattern, slice_pos=None, timestep=-1):
 
     plt.subplot(132)
     slice_cell_y = int(np.floor((diff.shape[1] - 1) * slice_pos[1]))
-    plt.title("slice in y at {}".format(slice_cell_y), fontsize=20)
+    plt.title(f"slice in y at {slice_cell_y}", fontsize=20)
     plt.imshow(
         diff[:, slice_cell_y, :],
         vmin=-limit,
@@ -176,7 +176,7 @@ def plotError(file_pattern, slice_pos=None, timestep=-1):
 
     plt.subplot(133)
     slice_cell_x = int(np.floor((diff.shape[2] - 1) * slice_pos[2]))
-    plt.title("slice in x at {}".format(slice_cell_x), fontsize=20)
+    plt.title(f"slice in x at {slice_cell_x}", fontsize=20)
     plt.imshow(
         diff[:, :, slice_cell_x],
         vmin=-limit,

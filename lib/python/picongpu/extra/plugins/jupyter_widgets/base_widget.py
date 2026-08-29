@@ -335,7 +335,7 @@ class BaseWidget(widgets.VBox):
             try:
                 vis_params = self._get_widget_args()
                 times_avail = reader.get_times(**vis_params)
-            except IOError as e:
+            except OSError as e:
                 print("Getting times failed!", e)
                 raise e
             # print(reader.run_directory, ":", times_avail)
@@ -359,9 +359,8 @@ class BaseWidget(widgets.VBox):
             self.sim_time_slider.value = last_selected_val
         else:
             print(
-                "last selected time {0} not present with newly selected sim_times, set to {1}".format(
-                    last_selected_val, common_sim_times[0]
-                )
+                f"last selected time {last_selected_val} not present with newly selected sim_times, "
+                f"set to {common_sim_times[0]}"
             )
             self.sim_time_slider.value = common_sim_times[0]
 
@@ -395,7 +394,7 @@ class BaseWidget(widgets.VBox):
         try:
             self.plot_mpl.visualize(time=time, **vis_params)
         except Exception as e:
-            warn("{}: visualization failed! Reason: {} ".format(type(self), e), stacklevel=2)
+            warn(f"{type(self)}: visualization failed! Reason: {e} ", stacklevel=2)
             # raise e
 
         # since interactive mode should be turned off, we have
@@ -403,7 +402,7 @@ class BaseWidget(widgets.VBox):
         try:
             self.update_plot()
         except ValueError as e:
-            warn("{}: drawing the plot failed! Reason: {}".format(type(self), e), stacklevel=2)
+            warn(f"{type(self)}: drawing the plot failed! Reason: {e}", stacklevel=2)
             # raise e
 
     def update_plot(self):

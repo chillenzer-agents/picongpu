@@ -1,3 +1,5 @@
+SPDX-FileCopyrightText: 2013 PIConGPU contributors
+SPDX-License-Identifier: CC-BY-4.0
 ```
 @inproceedings{PIConGPU2013,
  author = {Bussmann, M. and Burau, H. and Cowan, T. E. and Debus, A. and Huebl, A. and Juckeland, G. and Kluge, T. and Nagel, W. E. and Pausch, R. and Schmitt, F. and Schramm, U. and Schuchart, J. and Widera, R.},

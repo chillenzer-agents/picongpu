@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2017 PIConGPU contributors
+.. SPDX-License-Identifier: CC-BY-4.0
 .. _usage-basics:
 
 .. seealso::

@@ -216,8 +216,15 @@ class TBGFlags(BaseModel):
         # CWL-style Directory object {"class": "Directory",
         # "location": <path>}; accept it (and a plain str) so that
         # model_dump(mode="json") output can be validated again (round-trip
-        # safety)
-        if isinstance(value, dict) and "location" in value:
+        # safety). A dict is only accepted if it is actually a Directory
+        # (or carries no class at all), so that unrelated dicts are not
+        # silently treated as a project path.
+        if isinstance(value, dict):
+            if value.get("class") not in (None, "Directory") or "location" not in value:
+                raise ValueError(
+                    "A serialised project path must be a CWL-style Directory object "
+                    f'(a dict with "class": "Directory" and a "location"). You gave: {value=}.'
+                )
             return value["location"]
         return value
 

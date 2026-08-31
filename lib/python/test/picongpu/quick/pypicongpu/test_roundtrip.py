@@ -24,7 +24,13 @@ import pytest
 from picongpu.pypicongpu.collisions import CollisionNumericsConfig, ConstLogCollision
 from picongpu.pypicongpu.field_solver import YeeSolver
 from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
-from picongpu.pypicongpu.laser import GaussianLaser
+from picongpu.pypicongpu.laser import (
+    DispersivePulseLaser,
+    FromOpenPMDPulseLaser,
+    GaussianLaser,
+    PlaneWaveLaser,
+    TWTSLaser,
+)
 from picongpu.pypicongpu.movingwindow import MovingWindow
 from picongpu.pypicongpu.output.checkpoint import Checkpoint
 from picongpu.pypicongpu.output.energy_histogram import EnergyHistogram
@@ -57,8 +63,8 @@ def _make_grid():
     )
 
 
-def _make_laser():
-    return GaussianLaser(
+def _base_laser_kwargs():
+    return dict(
         propagation_direction=(0.0, 1.0, 0.0),
         polarization_direction=(0.0, 0.0, 1.0),
         polarization_type="Linear",
@@ -69,10 +75,11 @@ def _make_laser():
         E0=1e10,
         pulse_init=1.0,
         huygens_surface_positions=[[1, -1], [1, -1], [1, -1]],
-        waist=1e-5,
-        laguerre_modes=[1.0],
-        laguerre_phases=[0.0],
     )
+
+
+def _make_laser():
+    return GaussianLaser(**(_base_laser_kwargs() | dict(waist=1e-5, laguerre_modes=[1.0], laguerre_phases=[0.0])))
 
 
 def _spec(**kwargs):
@@ -90,6 +97,45 @@ def _build(name: str):
         return YeeSolver()
     if name == "GaussianLaser":
         return _make_laser()
+    if name == "PlaneWaveLaser":
+        return PlaneWaveLaser(**(_base_laser_kwargs() | dict(laser_nofocus_constant_si=1.0)))
+    if name == "DispersivePulseLaser":
+        return DispersivePulseLaser(
+            **(_base_laser_kwargs() | dict(waist=1e-5, spectral_support=2.0, sd_si=0.0, ad_si=0.0, gdd_si=0.0, tod_si=0.0))
+        )
+    if name == "TWTSLaser":
+        return TWTSLaser(
+            **(
+                _base_laser_kwargs()
+                | dict(
+                    waist=1e-5,
+                    laserIncidenceAngle=1.0,
+                    laserIncidenceAnglePositive=True,
+                    polarizationAngle=0.0,
+                    beta0=1.0,
+                    time_offset_si=0.0,
+                    focus_lateral_offset_si=0.0,
+                    windowStart=0.0,
+                    windowEnd=0.0,
+                    windowLength=0.0,
+                )
+            )
+        )
+    if name == "FromOpenPMDPulseLaser":
+        return FromOpenPMDPulseLaser(
+            **dict(
+                propagation_direction=(0.0, 1.0, 0.0),
+                polarization_direction=(0.0, 0.0, 1.0),
+                file_path="pulse.h5",
+                iteration=0,
+                dataset_name="E",
+                datatype="float",
+                time_offset_si=0.0,
+                polarisationAxisOpenPMD="x",
+                propagationAxisOpenPMD="y",
+                huygens_surface_positions=[[1, -1], [1, -1], [1, -1]],
+            )
+        )
     if name == "TimeStepSpec":
         return TimeStepSpec([_spec(start=0, stop=-1, step=10)])
     if name == "Checkpoint":
@@ -142,6 +188,10 @@ _MODELS = [
     "MovingWindow",
     "YeeSolver",
     "GaussianLaser",
+    "PlaneWaveLaser",
+    "DispersivePulseLaser",
+    "TWTSLaser",
+    "FromOpenPMDPulseLaser",
     "TimeStepSpec",
     "Checkpoint",
     "LinearFrequencies",

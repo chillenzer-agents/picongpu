@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 from itertools import chain
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -138,7 +138,7 @@ class Collision(BaseModel):
     def has_filters(self) -> bool:
         return any(isinstance(s, FilteredSpecies) for p in self.species_pairs for s in (p.species_lhs, p.species_rhs))
 
-    @field_serializer("functor")
+    @field_serializer("functor", return_type=dict[str, Any])
     def _serialize_functor(self, value):
         # The rendered form carries the discriminator (type_constlog /
         # type_dynamiclog) plus, for the constant-log functor, the parameters

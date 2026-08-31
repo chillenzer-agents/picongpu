@@ -75,8 +75,12 @@ Diff: 38 files changed, ~2756 insertions, 35 deletions — all under
      (AttributeError at generation).
    - `ThomasFermi` ionization: pypicongpu rendering is missing
      `ionization_electron_species`.
-   - `PlaneWaveLaser` / `TWTSLaser`: rendering path incomplete.
-   These deserve a separate bug-fix task/PR.
+    - `PlaneWaveLaser`: the frontend does not provide the
+      `focal_position` / `laser_nofocus_constant_si` fields the
+      pypicongpu rendering requires (ValidationError at
+      `write_input_file`). `TWTSLaser` was verified to render a
+      complete `PyPIConGPUTWTSParam` and is documented as supported.
+    These deserve a separate bug-fix task/PR.
 2. **`picrc-builder` does not exist in this branch** (no module, no script,
    no entry point) — the task's ground-truth list mentions it, but there is
    nothing to document; the docs cover preset configuration via

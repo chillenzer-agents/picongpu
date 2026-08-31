@@ -1,3 +1,7 @@
+/* SPDX-FileCopyrightText: 2018 Codeplay Software Limited
+ * SPDX-FileCopyrightText: 2023 Tapish Narwal
+ * SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-or-later
+ */
 /***************************************************************************
  *
  *  Copyright (C) 2018 Codeplay Software Limited

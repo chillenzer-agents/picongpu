@@ -5,6 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import re
 from functools import reduce
 from hashlib import sha256
 from os import PathLike
@@ -175,6 +176,16 @@ class FieldDump(BaseModel):
     """name of the particle filter applied to the species, [C++ identifier];
     rendered as `picongpu::particles::filter::{filtername}`, so it must be a
     valid C++ identifier (it is derived from the filter functor's name)"""
+
+    @field_validator("filtername")
+    @classmethod
+    def _validate_filtername(cls, value):
+        # The name renders verbatim into `picongpu::particles::filter::{name}`,
+        # so it must be a valid C++ identifier (same rule as the functor name
+        # it is derived from).
+        if value is not None and not re.fullmatch(r"^[A-Za-z_][A-Za-z0-9_]*$", value):
+            raise ValueError(f"filtername must be a valid C++ identifier. You gave {value!r}.")
+        return value
 
     def get_rendering_context(self) -> dict:
         return self.model_dump(mode="json")

@@ -69,9 +69,17 @@ class SimpleDensity(BaseModel):
             # proper error instead of failing with an AttributeError here
             raise ValueError(f"species must be a list of Species. You gave: {species=}.")
         species = [Species.model_validate(entry) if isinstance(entry, dict) else entry for entry in species]
+        # the tie-break on name makes the order a pure function of the
+        # species (not of set iteration order, which depends on the
+        # per-process string hash seed and the insertion order), so that
+        # the serialised form is deterministic and re-serialisation is
+        # stable (round-trip safety)
         return sorted(
             set(species),
-            key=lambda species: 0 if species.constants.density_ratio is None else species.constants.density_ratio.ratio,
+            key=lambda species: (
+                0 if species.constants.density_ratio is None else species.constants.density_ratio.ratio,
+                species.name,
+            ),
         )
 
     @computed_field

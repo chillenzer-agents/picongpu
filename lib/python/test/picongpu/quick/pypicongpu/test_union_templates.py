@@ -35,7 +35,7 @@ from picongpu.pypicongpu.output import (
     PhaseSpace,
     RadiationPlugin,
 )
-from picongpu.pypicongpu.species.operation import AnyOperation, SetChargeState, SimpleDensity, SimpleMomentum
+from picongpu.pypicongpu.species.operation import AnyOperation, CreateDensity, SetChargeState, SimpleMomentum
 from picongpu.pypicongpu.species.operation.layout import AnyLayout, OnePosition, Quiet, Random
 
 TEMPLATES = Path(picongpu.templates.path())
@@ -69,7 +69,7 @@ _UNION_TEMPLATE_ANCHORS = {
         OnePosition: ("include/picongpu/param/particle.param.mustache", "{{#layout.type_one_position}}"),
     },
     AnyOperation: {
-        SimpleDensity: ("include/picongpu/param/speciesInitialization.param.mustache", "{{#type_simpledensity}}"),
+        CreateDensity: ("include/picongpu/param/speciesInitialization.param.mustache", "{{#type_createdensity}}"),
         SimpleMomentum: ("include/picongpu/param/speciesInitialization.param.mustache", "{{#type_simplemomentum}}"),
         SetChargeState: ("include/picongpu/param/speciesInitialization.param.mustache", "{{#type_setchargestate}}"),
     },

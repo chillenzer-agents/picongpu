@@ -311,19 +311,27 @@ simulation -- `slow`/`end_to_end` class, not unit tests.
    modernised check can consume anything.
 2. The legacy `--fields_energy` flag no longer resolves to a plugin in this
    checkout (L5), so the old `validate.sh` path is not a working fallback.
-3. A decision is needed on whether the KHI growth-rate flow is still
+3. `KHI_growthRate/bin/ci.sh` cannot be invoked as-is: it passes the dead
+   `--fields_energy.period 10` flag (ci.sh:120, L5) and ends with the dead
+   legacy `validate.sh` call (ci.sh:124, L5/B6). It must either be fixed
+   (drop the dead flag, replace the `validate.sh` call with the openPMD
+   pytest step) or bypassed, as in the corrected proposal below.
+4. A decision is needed on whether the KHI growth-rate flow is still
    load-bearing (requester: uncertain).
 
 ### 6.3 Recommendation (proposal only -- not wired into CI)
 
 Do **not** add this to the default MR pipeline: it would be the first
-simulation run ever executed in CI, it needs pre-conditions 1-2 to be met
+simulation run ever executed in CI, it needs pre-conditions 1-3 to be met
 first, and its load-bearing status is unconfirmed. Instead:
 
-**Proposed job** (to add once pre-conditions are met and the requester
+**Proposed job** (to add once pre-conditions 1-3 are met and the requester
 confirms), e.g. in a new `share/ci/run_khi_growthrate.sh` invoked by a
 GitLab job tagged `cpuonly`, `x86_64`, triggered **manually and/or on a
-scheduled (weekly) pipeline**, not per-MR:
+scheduled (weekly) pipeline**, not per-MR. It mirrors
+`KHI_growthRate/bin/ci.sh` but drops the dead `--fields_energy.period 10`
+flag and the dead `validate.sh` call (pre-condition 3), and validates the
+openPMD output with the modernised pytest check added on this branch:
 
 ```yaml
 khi-growthrate-validation:
@@ -335,22 +343,32 @@ khi-growthrate-validation:
   script:
     - source $CI_PROJECT_DIR/share/ci/install/cmake.sh && source $CI_PROJECT_DIR/share/ci/install/gcc.sh
     - source $CI_PROJECT_DIR/share/ci/install/pypicongpu.sh   # python env + pytest
-    - $CI_PROJECT_DIR/share/picongpu/tests/KHI_growthRate/bin/ci.sh <test> <outdir> --keep-logs
-      # ci.sh: pic-create + pic-build + mpiexec -n 1 ... -s 3000 + validate
+    - pic-create -f $CI_PROJECT_DIR/share/picongpu/tests/KHI_growthRate $CI_PROJECT_DIR/khi_run
+    - cd $CI_PROJECT_DIR/khi_run && pic-build
+    - mkdir -p simOutput && cd simOutput
+    - mpiexec -n 1 ../bin/picongpu -d 1 1 1 -g 192 512 12 --periodic 1 1 1 -s 3000
     - cd $CI_PROJECT_DIR/lib/python/test/picongpu
-    - PIC_KHI_OPENPMD=<outdir>/simOutput/.../openpmd python3 -m pytest
-        end_to_end/test_khi_growthrate.py -v
+    - PIC_KHI_OPENPMD=$CI_PROJECT_DIR/khi_run/simOutput/<filePrefix>/openpmd
+        python3 -m pytest end_to_end/test_khi_growthrate.py -v
+      # <filePrefix>: the openPMD file prefix of the picongpu.cfg added per
+      # pre-condition 1 (the input set writes no openPMD output until then)
 ```
 
-- Cost: ~15-40 min of one CPU runner per run (weekly = < 5 h/week).
+- Cost: ~15-40 min of one CPU runner per run (weekly = < 1 h/week of one
+  CPU runner).
 - Benefit: continuous physics regression signal for KHI + openPMD field
   output + the validation pipeline itself; failures surface as a normal CI
   job failure instead of an exit code in a manual log.
 - Cheaper alternative for the *pipeline logic only*: run the synthetic
-  `test_khi_growthrate.py` in the existing `pypicongpu` job (it is fast,
-  < 2 s) -- this needs a one-line change in `share/ci/install/pypicongpu.sh`
-  and would also guard against the L7 class of environment regressions;
-  propose, don't wire.
+  `test_khi_growthrate.py` in the existing `pypicongpu` quick job -- it is
+  fast (< 2 s) and would also guard against the L7 class of environment
+  regressions. The change is one line in `share/ci/install/pypicongpu.sh`,
+  after `python3 -m pytest quick/`:
+  `python3 -m pytest end_to_end/test_khi_growthrate.py -q`. The
+  auto-applied `slow`/`end_to_end` markers are metadata only (no `-m`
+  filter is active there), and `test_real_khi_run_validation` self-skips
+  without `PIC_KHI_OPENPMD`. Propose, don't wire: adopting it is the
+  requester's call along with the open question below.
 
 **Open question for the requester:** slow job on the main pipeline vs
 manual/periodic trigger (recommendation above: manual/periodic until the

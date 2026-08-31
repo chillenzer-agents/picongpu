@@ -60,6 +60,26 @@ hosts the federation, [A7][A8][A9]), it has first-class bots, private
 rooms, federation (so a self-hosted homeserver can join Helmholtz rooms),
 and well-maintained Python client libraries (section 3.1).
 
+Alternatives considered (why Matrix for the PoC, and what it costs):
+both RCP endpoints (MCP server and simclient) run on the same local
+machine (1.2), so for the PoC a direct channel (plain HTTP/WebSocket,
+or even a local socket) between them would give the same RCP semantics
+with zero external infrastructure, and a bare MCP tool that shells out
+`sbatch` would meet the M1 acceptance criterion on its own. The task
+prescribes Matrix, and the defensible position is that Matrix buys what
+a bespoke channel would have to re-build later: a human-readable room
+that doubles as the audit trail, multi-device access, and a path to a
+federated, multi-user control plane across Helmholtz homeservers. The
+price paid in the PoC is account provisioning, an OIDC-login bootstrap,
+token lifecycle, and a homeserver dependency, while federation (a key
+Matrix benefit) is not yet used. Mitigation: M1 may be offered as an
+optional direct-echo variant (same `hello` tool, transport swapped) to
+de-risk the PoC before the Matrix path is proven; the RCP (section 2)
+is deliberately independent of the transport so that swap is cheap.
+Note the design still uses SLURM-native mechanisms where they are the
+right tool (`scontrol` polling for job state, `scancel --signal` for
+control, 2.4) - that division of labor is intentional.
+
 ### 1.2 Diagram
 
 ```mermaid
@@ -648,11 +668,20 @@ surface - either mechanism is fine; the public method is simpler to
 test.
 
 Until the hook exists, the picongpu-mcp repo wraps `Runner.run()` from
-the outside (start/stop of the Matrix client around it) and derives
-step boundaries by watching the workflow's on-disk effects
-(`submission_information.txt` appearing [steps/submit.cwl:43-48],
-`organize_output` outputs [steps/organize_output.cwl]) - workable for
-M1/M2, to be replaced by the hook.
+the outside (start/stop of the Matrix client around it). This
+interim wrapper yields only *workflow-level* events - it can detect
+`workflow.started`/`workflow.finished` (the `run()` call boundary),
+`simulation.submitted` (parse the job id once
+`submission_information.txt` is copied to the run directory by
+`organize_output` [steps/organize_output.cwl:54-57]), and
+`results.ready`. It cannot produce per-step
+`workflow.step_started`/`workflow.step_finished`: `submission_information.txt`
+is only visible in the run directory as the output of the *last* step;
+inside the `submit` step it exists only in cwltool's per-step workdir
+(an undocumented tmp dir), so watching it cannot delimit individual
+steps. M2's per-step events therefore require the observer hook, or
+option (i) above (running the four step tools sequentially instead of
+the composed workflow), which the simclient can then bracket directly.
 
 ### 7.2 Concrete anchors (file:line)
 

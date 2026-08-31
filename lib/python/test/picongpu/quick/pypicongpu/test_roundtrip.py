@@ -101,7 +101,10 @@ def _build(name: str):
         return PlaneWaveLaser(**(_base_laser_kwargs() | dict(laser_nofocus_constant_si=1.0)))
     if name == "DispersivePulseLaser":
         return DispersivePulseLaser(
-            **(_base_laser_kwargs() | dict(waist=1e-5, spectral_support=2.0, sd_si=0.0, ad_si=0.0, gdd_si=0.0, tod_si=0.0))
+            **(
+                _base_laser_kwargs()
+                | dict(waist=1e-5, spectral_support=2.0, sd_si=0.0, ad_si=0.0, gdd_si=0.0, tod_si=0.0)
+            )
         )
     if name == "TWTSLaser":
         return TWTSLaser(

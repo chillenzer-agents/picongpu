@@ -275,7 +275,7 @@ an `ack` (`accepted` / `rejected` + reason).
 
 | Command            | Effect (SLURM)                                   | Implemented in |
 |--------------------|--------------------------------------------------|----------------|
-| `hello {message}`  | submit a trivial job `sbatch --wrap="echo '<message>' <sim_id>"`, capture output, ack with job id + output (M1) | simclient (new, in picongpu-mcp) |
+| `hello {message}`  | submit a trivial job that prints `message` WITHOUT interpolating it into the shell: simclient writes `message` to an absolute, server-generated path (safe charset) on the shared FS and runs `sbatch --wrap="cat '<path>'" --output=<outfile>`, waits for the job, and acks with job id + captured output (M1). The only value interpolated into the shell is the server-generated path | simclient (new, in picongpu-mcp); see 6.4 (no payload-to-shell rule) |
 | `query_status`     | `scontrol show job <id>` + last progress event; ack with `{slurm_state, step, percent, walltime}` | simclient (new) |
 | `request_checkpoint` | `scancel --signal=USR1 --batch <jobid>` - checkpoint at next step boundary, run continues | simclient sends the signal; PIConGPU core handles it: signal.cpp:63, TaskSignal.hpp:49-133, Checkpointing.hpp (addCheckpoint). Requires the checkpoint plugin to be enabled [signals.rst:10; picmi/diagnostics/checkpoint.py:18-33] |
 | `cancel`           | graceful: `scancel --signal=USR2 --batch <jobid>` (stop at the next step boundary, exit normally [signal.cpp:64; signals.rst:23]); hard: `scancel --signal=KILL <jobid>` (SIGKILL, no clean shutdown). A plain `scancel <jobid>` is NOT "hard" under the standard templates - see "Cancel semantics" below | simclient sends; core: signal.cpp:59-66, TaskSignal.hpp:139; wrapper: handleSlurmSignals.sh:46 |
@@ -570,6 +570,15 @@ declared via MCP tool annotations where the spec/SDK supports them
 - Command whitelist: the simclient rejects any `type` outside 2.4 with
   `rejected_by_policy`.
 - Replay/loss: `seq` counters + `in_reply_to` command ids (2.5).
+- No payload-to-shell concatenation: RCP command payloads (including the
+  `hello` `message`) are LLM-supplied and are NEVER interpolated into a
+  shell command string. The only values that reach a shell are
+  (a) server-generated identifiers/paths with a fixed safe charset
+  (`[A-Za-z0-9._-]`), or (b) out-of-band file contents read by a fixed
+  command (e.g. `cat '<server-generated path>'`). See 2.4 (`hello`) and
+  8.1 (M1). This closes the shell-injection vector of the previous
+  revision, which embedded `message` in
+  `sbatch --wrap="echo '<message>'"`.
 
 ### 6.5 LLM code execution (PICMI scripts)
 
@@ -662,13 +671,18 @@ M1/M2, to be replaced by the hook.
   2. Matrix room: scratch/private room `#picongpu-mcp-poc` (per-sim
      rooms come in M2); bot account credentials from environment
      (6.1).
-  3. Simulation-side client: standalone script (no Runner yet): joins
-     the room with matrix-nio `AsyncClient`, waits for
-     `kind: "command", type: "hello"`, verifies HMAC (6.4), runs
-     `sbatch --wrap="echo 'Hello World from <sim_id>'"` (+ `--output`
-     to a known file, or capture via `scontrol show job`), then posts
-     `rcp.hello_ack` with `job_id` and the captured output.
-  4. MCP server relays the ack to the LLM as the tool result.
+   3. Simulation-side client: standalone script (no Runner yet): joins
+      the room with matrix-nio `AsyncClient`, waits for
+      `kind: "command", type: "hello"`, verifies HMAC (6.4). It writes
+      the `message` payload (default "Hello World from <sim_id>") to an
+      absolute, server-generated path on the shared FS (safe charset)
+      and submits `sbatch --wrap="cat '<path>'" --output=<outfile>` -
+      the message is never interpolated into the shell (6.4). It then
+      polls `scontrol show job <id>` until DONE/FAILED (5 s interval,
+      60 s timeout), reads `<outfile>`, and posts `rcp.hello_ack` with
+      `job_id` and the captured output; on timeout it acks with
+      `job_id` and `cluster_output: null`.
+   4. MCP server relays the ack to the LLM as the tool result.
   Acceptance: an LLM agent using the MCP tool sends "Hello World" and
   observes the acknowledgement containing the SLURM job id. SLURM
   assumed; no real simulation involved.

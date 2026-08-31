@@ -5,6 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import re
 from functools import reduce
 from hashlib import sha256
 from os import PathLike
@@ -184,6 +185,16 @@ class FieldDump(BaseModel):
     that the ``SpeciesEligibleForSolver`` trait can be specialised on the
     species' compile-time name, restricting the derived field to only the
     species(es) it is actually used for."""
+
+    @field_validator("filtername")
+    @classmethod
+    def _validate_filtername(cls, value):
+        # The name renders verbatim into `picongpu::particles::filter::{name}`,
+        # so it must be a valid C++ identifier (same rule as the functor name
+        # it is derived from).
+        if value is not None and not re.fullmatch(r"^[A-Za-z_][A-Za-z0-9_]*$", value):
+            raise ValueError(f"filtername must be a valid C++ identifier. You gave {value!r}.")
+        return value
 
     def get_rendering_context(self) -> dict:
         return self.model_dump(mode="json")

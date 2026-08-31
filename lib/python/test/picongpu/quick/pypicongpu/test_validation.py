@@ -23,7 +23,7 @@ from picongpu.pypicongpu.movingwindow import MovingWindow
 from picongpu.pypicongpu.output.checkpoint import Checkpoint
 from picongpu.pypicongpu.collisions import Collision, CollisionNumericsConfig, ConstLogCollision, DynamicLogCollision
 from picongpu.pypicongpu.output.binning import BinSpec, Binning, BinningAxis
-from picongpu.pypicongpu.output.openpmd_plugin import RangeSpec, RangeSpecEntry
+from picongpu.pypicongpu.output.openpmd_plugin import FieldDump, RangeSpec, RangeSpecEntry
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
 from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFunctor
 from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
@@ -716,6 +716,19 @@ class TestOpenPMDRangeSpecInvariants:
         assert (
             RangeSpec(data=(RangeSpecEntry(data=1), RangeSpecEntry(), RangeSpecEntry(data=42))).model_dump() == "1,,42"
         )
+
+
+class TestFieldDumpInvariants:
+    @pytest.mark.parametrize("filtername", ["bad name", "with.dot", "1leading", "with-dash"])
+    def test_filtername_must_be_c_identifier(self, filtername):
+        with pytest.raises(ValidationError, match="C\\+\\+ identifier"):
+            FieldDump(name="E", filtername=filtername)
+
+    def test_filtername_none_allowed(self):
+        assert FieldDump(name="E", filtername=None).filtername is None
+
+    def test_filtername_valid(self):
+        assert FieldDump(name="E", filtername="myFilter2").filtername == "myFilter2"
 
 
 class TestEnergyHistogramInvariants:

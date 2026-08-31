@@ -345,6 +345,15 @@ deps_prepare_source_copy() {
     printf '%s' "$dest"
 }
 
+# Remove the out-of-tree cmake build dir for $1. A failed *configure* leaves
+# a CMakeCache.txt whose cached -D values would poison the next attempt (the
+# re-run does not re-pass every option); deleting it makes the retry start
+# from a clean slate. In-tree builds (libpng, fftw3, boost) need no such
+# cleanup because deps_prepare_source_copy re-copies src/ on every run.
+deps_clean_build_dir() {
+    rm -rf "$DEPS_KEY_DIR/build/$1"
+}
+
 # ---------------------------------------------------------------------------
 # idempotency guard, stamp, timing
 # ---------------------------------------------------------------------------
@@ -537,8 +546,11 @@ deps_install_c_blosc2() {
         -S "$src" -B "$build" \
         -DCMAKE_INSTALL_PREFIX="$target" \
         -DBUILD_TESTS=OFF \
+        -DBUILD_FUZZERS=OFF \
+        -DBUILD_BENCHMARKS=OFF \
+        -DBUILD_EXAMPLES=OFF \
         ${prefix_hint:+-DCMAKE_PREFIX_PATH="$prefix_hint"} \
-        ${DEPS_CMAKE_EXTRA_BLOSC2:-} || return 1
+        ${DEPS_CMAKE_EXTRA_BLOSC2:-} || { deps_clean_build_dir "$key"; return 1; }
     deps_build "$key" cmake --build "$build" -j "$DEPS_JOBS" || return 1
     deps_build "$key" cmake --install "$build" || return 1
     deps_stamp "$key" "$target"
@@ -604,7 +616,7 @@ deps_install_pngwriter() {
         -DCMAKE_INSTALL_PREFIX="$target" \
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         ${prefix_hint:+-DCMAKE_PREFIX_PATH="$prefix_hint"} \
-        ${DEPS_CMAKE_EXTRA_PNGWRITER:-} || return 1
+        ${DEPS_CMAKE_EXTRA_PNGWRITER:-} || { deps_clean_build_dir "$key"; return 1; }
     deps_build "$key" cmake --build "$build" -j "$DEPS_JOBS" || return 1
     deps_build "$key" cmake --install "$build" || return 1
     deps_stamp "$key" "$target"
@@ -635,7 +647,7 @@ deps_install_hdf5() {
         ${DEPS_MPI_C:+-DCMAKE_C_COMPILER="$DEPS_MPI_C"} \
         ${DEPS_MPI_CXX:+-DCMAKE_CXX_COMPILER="$DEPS_MPI_CXX"} \
         ${DEPS_CMAKE_PREFIX_HINT:+-DCMAKE_PREFIX_PATH="$DEPS_CMAKE_PREFIX_HINT"} \
-        ${DEPS_CMAKE_EXTRA_HDF5:-} || return 1
+        ${DEPS_CMAKE_EXTRA_HDF5:-} || { deps_clean_build_dir "$key"; return 1; }
     deps_build "$key" cmake --build "$build" -j "$DEPS_JOBS" || return 1
     deps_build "$key" cmake --install "$build" || return 1
     deps_stamp "$key" "$target"
@@ -683,7 +695,7 @@ deps_install_adios2() {
         -DADIOS2_USE_HDF5=ON \
         "${DEPS_MPI_FLAGS[@]}" \
         ${hdf5_hint:+-DCMAKE_PREFIX_PATH="$hdf5_hint"} \
-        ${DEPS_CMAKE_EXTRA_ADIOS2:-} || return 1
+        ${DEPS_CMAKE_EXTRA_ADIOS2:-} || { deps_clean_build_dir "$key"; return 1; }
     deps_build "$key" cmake --build "$build" -j "$DEPS_JOBS" || return 1
     deps_build "$key" cmake --install "$build" || return 1
     deps_stamp "$key" "$target"
@@ -739,8 +751,17 @@ deps_install_openpmd() {
         hints="${hints:+$hints:}$DEPS_CMAKE_PREFIX_HINT"
     fi
 
-    deps_build "$key" cmake \
-        -S "$src" -B "$build" \
+    # Export the same *_ROOT vars that current.env hands to the consumer:
+    # our HDF5 build's config file re-runs find_package(MPI) internally,
+    # which fails under openPMD's reduced MPI component set (CXX only,
+    # MPI_CXX_SKIP_MPICXX); without HDF5_ROOT, CMake's FindHDF5 falls back
+    # to its module-mode search, which misses a parallel build on recent
+    # CMake (verified: CMake 4.3). With HDF5_ROOT the config lookup is
+    # deterministic.
+    deps_build "$key" env \
+        ${hdf5_target:+HDF5_ROOT="$hdf5_target"} \
+        ${adios2_target:+ADIOS2_ROOT="$adios2_target"} \
+        cmake -S "$src" -B "$build" \
         -DCMAKE_INSTALL_PREFIX="$target" \
         -DopenPMD_USE_HDF5="$use_hdf5" \
         -DopenPMD_USE_ADIOS2="$use_adios2" \
@@ -748,7 +769,7 @@ deps_install_openpmd() {
         -DBUILD_TESTING=OFF \
         "${DEPS_MPI_FLAGS[@]}" \
         ${hints:+-DCMAKE_PREFIX_PATH="$hints"} \
-        ${DEPS_CMAKE_EXTRA_OPENPMD:-} || return 1
+        ${DEPS_CMAKE_EXTRA_OPENPMD:-} || { deps_clean_build_dir "$key"; return 1; }
     deps_build "$key" cmake --build "$build" -j "$DEPS_JOBS" || return 1
     deps_build "$key" cmake --install "$build" || return 1
     deps_stamp "$key" "$target"

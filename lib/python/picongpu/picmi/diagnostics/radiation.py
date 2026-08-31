@@ -5,7 +5,9 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from pydantic import ConfigDict, field_validator
+import warnings
+
+from pydantic import ConfigDict, field_validator, model_validator
 
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
@@ -33,7 +35,24 @@ class Radiation(RadiationPluginConfig):
     @field_validator("species", mode="before")
     @classmethod
     def _validate_species(cls, value):
-        return [value] if isinstance(value, (Species, FilteredSpecies)) else value
+        if isinstance(value, (Species, FilteredSpecies)):
+            return [value]
+        if isinstance(value, (list, tuple)):
+            return value
+        raise ValueError(f"species must be a Species or FilteredSpecies (or a list thereof), got {value!r}")
+
+    @model_validator(mode="after")
+    def _validate_gamma_filter_threshold(self):
+        # The C++ gamma filter only acts on species carrying the radiationMask
+        # attribute, which __init__ registers for plain species only. Without a
+        # plain species the threshold would be silently ignored, so reject it.
+        if self.gamma_filter_threshold is not None and all(isinstance(s, FilteredSpecies) for s in self.species):
+            raise ValueError(
+                "gamma_filter_threshold has no effect when all species are filtered, because "
+                "filtered species are selected by their own particle filter; "
+                "express the gamma cut inside your ParticleFilter instead"
+            )
+        return self
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -45,6 +64,13 @@ class Radiation(RadiationPluginConfig):
                 # and therefore do not need the hardcoded gamma mask.
                 requirements.append(RadiationMask())
             species.register_requirements(requirements)
+        if self.gamma_filter_threshold is not None and any(isinstance(s, FilteredSpecies) for s in self.species):
+            # mixed species list: the threshold applies to the plain species,
+            # but is ignored for the filtered ones; say so instead of dropping it silently
+            warnings.warn(
+                "gamma_filter_threshold applies only to plain species; "
+                "filtered species are selected by their own particle filter"
+            )
 
     def get_as_pypicongpu(self, time_step_size, num_steps):
         return RadiationPlugin(

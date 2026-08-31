@@ -172,9 +172,7 @@ def test_laptop_flow_discovers_rc_file_next_to_picmi_script(tmp_path):
         "sim.write_input_file('setup')\n"
     )
     env = {key: value for key, value in os.environ.items() if key != "PIC_RC"}
-    result = subprocess.run(
-        [sys.executable, "sim.py"], cwd=tmp_path, env=env, capture_output=True, text=True
-    )
+    result = subprocess.run([sys.executable, "sim.py"], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     # the EFP preset was applied through CWD discovery:
     assert (tmp_path / "setup" / "etc" / "picongpu" / EFP_PRESET / "gh200_efp.tpl").is_file()

@@ -130,7 +130,11 @@ ReadFiles(".dat", direction="/tmp").setDirection("/tmp")
 `CMAKEFlagReader.getAllSetups` (cmakeFlagReader.py:98) opened files without
 closing them. Under the repo's pytest regime (`filterwarnings = ["error"]`
 in `lib/python/pyproject.toml:88`) the resulting `ResourceWarning` fails any
-test exercising the parsers -- this is why the framework has zero tests.
+test exercising the parsers -- one of the reasons the framework has zero
+tests (the global config state, L3, and the missing fixtures are at least
+equally plausible). Both file-handle fixes have regression tests:
+`TestParamReader` for the paramReader side, `TestCMAKEFlagReader` for the
+cmakeFlagReader side (added in the rework, review m2).
 
 **B6 (additional, found & fixed) -- `DataReader.getValue` could not read the
 file format its own `allParamsinFile` defines.** `allParamsinFile` treats
@@ -214,8 +218,10 @@ fixed branch). Also fixed: the header is now split on whitespace
 - Zero automated tests, zero asserts; "pass" = one 20 % deviation check per
   case, reported via log file + exit code.
 - 6 real defects on the core computation/reader path (4 pre-existing named
-  + 2 found during this audit), all fixed on this branch with regression
-  tests; 7 documented latent/environmental defects.
+  + 2 found during this audit), all fixed on this branch, each with a
+  direct regression test (B5: `TestParamReader` for the paramReader handle,
+  `TestCMAKEFlagReader` for the cmakeFlagReader handle, the latter added in
+  the rework per review m2); 7 documented latent/environmental defects.
 - Untouched functionally since 2024-02 while the rest of the Python package
   was rewritten in 2025; the data source it parses (`fields_energy.dat`) is
   no longer produced by this checkout (L5), and the KHI input set produces

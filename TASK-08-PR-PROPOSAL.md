@@ -1,10 +1,10 @@
-# PR proposal — task 08: tighten the ruff rule set to `select = ["ALL"]`
+# PR proposal -- task 08: tighten the ruff rule set to `select = ["ALL"]`
 
-Branch: `task-08-ruff-all` (31 code commits, steps 0–30, on `dev` =
+Branch: `task-08-ruff-all` (31 code commits, steps 0-30, on `dev` =
 b4e4ca5b2, plus this artifact; the review-response rework commits are
 listed in TASK-08-RESPONSE.md)
-Footprint: 240 files, +2280 / −2066 (code only; this artifact adds one
-file) — 239 files are auto-fixes + small manual fixes; the substantive
+Footprint: 240 files, +2280 / -2066 (code only; this artifact adds one
+file) -- 239 files are auto-fixes + small manual fixes; the substantive
 decisions are all in `ruff.toml`.
 
 ## What this PR does
@@ -13,8 +13,8 @@ PIConGPU previously had **no ruff configuration at all**: pre-commit ran
 `ruff` with `--fix --ignore E721` and `ruff-format --line-length 120`, i.e.
 only the default rule set (E4/E7/E9/F). This PR introduces a repo-root
 `ruff.toml` as the single source of truth and tightens the rule set in
-31 incremental commits (steps 0–30: config foundation, then one commit
-per rule batch, each independently green) up to `select = ["ALL"]` —
+31 incremental commits (steps 0-30: config foundation, then one commit
+per rule batch, each independently green) up to `select = ["ALL"]` --
 the complete stable ruff rule set.
 
 Every exception (global `ignore`, `per-file-ignores`, `# noqa`) carries a
@@ -27,7 +27,7 @@ already covers).
 
 ## Suggested PR structure
 
-The 31 commits (steps 0–30) map 1:1 to the spec's incremental steps and
+The 31 commits (steps 0-30) map 1:1 to the spec's incremental steps and
 can be merged as one PR or squashed per batch. Suggested PR description
 per batch is in each commit message; the full exception list lives in
 `ruff.toml` comments.
@@ -55,17 +55,17 @@ per batch is in each commit message; the full exception list lives in
 | 16 | 282d9218d | PIE | |
 | 17 | a875d350f | PT (pytest-style) | TestCase-based tests: PT009/011/012/027 ignored with justification |
 | 18 | aff3090ed | RUF | 89 auto + 11 manual |
-| 19 | 89d26a20a | S (bandit) | 36 S101 `assert`→`AssertionError` (18 library, 16 extra scripts, 2 docs-example); S110 try-except-pass restructure; per-file-ignores for test/example/tool trees |
-| 20 | 000e3e8b3 | T20 (print) | 4 debug prints → `logging.debug`; console-output tools per-file-ignored |
+| 19 | 89d26a20a | S (bandit) | 36 S101 `assert`->`AssertionError` (18 library, 16 extra scripts, 2 docs-example); S110 try-except-pass restructure; per-file-ignores for test/example/tool trees |
+| 20 | 000e3e8b3 | T20 (print) | 4 debug prints -> `logging.debug`; console-output tools per-file-ignored |
 | 21 | 32b4ea31d | ARG | 60 unused args renamed to `_`-prefixed; 5 API-contract params noqa'd |
 | 22 | 61e3d320c | PLC | `X as X` re-export idiom preserved (radiation.py, collision.py); `.values()`/`.items()`; PLC0415 per-file-ignores |
 | 23 | b99f28e44 | ERA (eradicate) | dead commented-out code removed / kept where intentional |
 | 24 | 0b0c4a374 | INP | script/test trees are not packages by design |
-| 25 | d19722678 | PD (pandas-vet) | `.values` → `.to_numpy()`, `inplace` → rebinding |
+| 25 | d19722678 | PD (pandas-vet) | `.values` -> `.to_numpy()`, `inplace` -> rebinding |
 | 26 | 7c876c898 | LOG | module-level `logger = logging.getLogger(__name__)` in 9 files |
 | 27 | d1e122e59 | PLW | see "real bugs found" below |
-| 28 | 072b7adf9 | PLE | 10× `return super().__init__(...)` → `super().__init__(...)` in `__init__` |
-| 29 | 5dcb10860 | NPY/EXE/PGH/DTZ/PYI/SLOT/YTT | `np.NaN`→`np.nan`; legacy `np.random.*` → `default_rng()`; `namedtuple` → `typing.NamedTuple`; `__slots__ = ()`; version-info tuple comparison; FLYonPIC `#! @detail` doc markers per-file-ignored |
+| 28 | 072b7adf9 | PLE | 10× `return super().__init__(...)` -> `super().__init__(...)` in `__init__` |
+| 29 | 5dcb10860 | NPY/EXE/PGH/DTZ/PYI/SLOT/YTT | `np.NaN`->`np.nan`; legacy `np.random.*` -> `default_rng()`; `namedtuple` -> `typing.NamedTuple`; `__slots__ = ()`; version-info tuple comparison; FLYonPIC `#! @detail` doc markers per-file-ignored |
 | 30 | 40915ba40 | **select = ["ALL"]** | RSE102 + ICN001 fixed; justified family ignores added; SLF001/DTZ005 per-file-ignores; exception-minimisation pass |
 
 ## Decisions on the ALL step
@@ -103,7 +103,7 @@ per batch is in each commit message; the full exception list lives in
 
 ## Real bugs found by the linter (call-outs)
 
-1. **`particle_functor.py` — `NotImplementedError()` without `raise`**
+1. **`particle_functor.py` -- `NotImplementedError()` without `raise`**
    (PLW0133): the `Particle.get` stub assigned nothing and returned `None`;
    calling it silently "worked" instead of raising. Now `raise
    NotImplementedError(...)`.
@@ -113,7 +113,7 @@ per batch is in each commit message; the full exception list lives in
    `try` and `False` from the `except`; the broad `except Exception`
    is kept deliberately because the operands may be incomparable.
 3. **S101 in library, extra-script, and docs-example code** (batch 19):
-   36 `assert`s (18/16/2) converted to `raise AssertionError(...)` —
+   36 `assert`s (18/16/2) converted to `raise AssertionError(...)` --
    *intentionally* changes `python -O` behaviour
    (assertions are now kept). This is the desired direction (PIConGPU
    library code should not drop checks in optimized mode) but is a
@@ -125,12 +125,12 @@ per batch is in each commit message; the full exception list lives in
 
 ## Verification (per step and final)
 
-- `ruff check .` → 0 violations (ruff 0.12.10, matching the pinned
+- `ruff check .` -> 0 violations (ruff 0.12.10, matching the pinned
   pre-commit rev)
-- `ruff format --check .` → 0 diffs (291 files)
-- `pre-commit run --all-files` → all hooks passed
-- `cd lib/python/test/picongpu && python -m pytest quick/` →
-  **174 passed, 2 xfailed, 1 xpassed** — identical to the pre-PR baseline,
+- `ruff format --check .` -> 0 diffs (291 files)
+- `pre-commit run --all-files` -> all hooks passed
+- `cd lib/python/test/picongpu && python -m pytest quick/` ->
+  **174 passed, 2 xfailed, 1 xpassed** -- identical to the pre-PR baseline,
   i.e. no rule fix changed test-observable behaviour.
 
 ## Integration notes
@@ -144,7 +144,7 @@ per batch is in each commit message; the full exception list lives in
   so any new violations introduced by the other branches are resolved
   there rather than in this PR.
 - **Task 03** (jupyter pre-commit hooks) also edits
-  `.pre-commit-config.yaml`; suggested merge order is 03 → 08. The
+  `.pre-commit-config.yaml`; suggested merge order is 03 -> 08. The
   `types_or: [python, pyi, jupyter]` hooks are kept; the notebook linting
   is covered by this config (two example `.ipynb` files are linted, and the
   `pretty format json` hook is happy with the notebook edits).

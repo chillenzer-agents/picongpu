@@ -219,10 +219,11 @@ known-first-party = ["picongpu"]
 # (exit 42) instead of breaking at module import time (PLC0415).
 "lib/python/test/testsuite/_manager.py" = ["PLC0415"]
 # These picmi modules are re-export hubs: the self-aliasing imports
-# (`X as X`) are the explicit re-export idiom — they mark the pypicongpu
+# (`X as X`) are the explicit re-export idiom. They mark the pypicongpu
 # types as intentionally re-exported into the picmi public namespace and
-# exempt the (in-file unused) names from F401. PLC0414's fix is semantically
-# safe, but would drop that re-export marker and re-trigger F401.
+# exempt the (in-file unused) names from F401. PLC0414's fix is
+# semantically safe, but would drop that re-export marker and re-trigger
+# F401.
 "lib/python/picongpu/picmi/diagnostics/radiation.py" = ["PLC0414"]
 "lib/python/picongpu/picmi/interaction/collision.py" = ["PLC0414"]
 # Template for new testsuite cases: the commented-out imports are an

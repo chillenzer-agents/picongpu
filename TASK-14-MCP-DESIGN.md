@@ -172,23 +172,34 @@ taxonomy) so both sides can evolve independently.
 - `kind` is `event` (simclient -> room), `command` (MCP server ->
   simclient), or `ack` (reply, linked via `in_reply_to` and the Matrix
   `m.relates_to` relation).
-- `seq` is a per-simulation monotonic counter (gap detection).
+- `seq` is a monotonic counter per `(sim, sender_role)` (gap detection).
+  There are two senders per simulation (simclient + MCP server), so the
+  counter must be per-sender; independent per-sim counters would produce
+  spurious gaps and cross-sender `(sim, seq, type)` collisions in the
+  merged stream.
 - `sig` = HMAC-SHA256 over the canonical JSON of
   `{version, sim, kind, type, seq, ts, payload}`, keyed with a
   per-simulation secret shared between simclient and MCP server at setup
   time (section 6.4). This lets the room members (humans) read everything
   while only the two RCP parties can forge messages.
 - Matrix events are not ordered/atomic: at-least-once delivery is
-  assumed; receivers must deduplicate on `(sim, seq, type)`.
+  assumed; receivers must deduplicate on `(sim, sender_role, seq, type)`
+  (the envelope already carries `sender_role`). Both clients backfill
+  the room timeline on (re)connect rather than relying on live delivery
+  only.
 
 ### 2.2 Simulation id
 
-`sim_id` is a short stable identifier, e.g. the first 6 hex characters of
+`sim_id` is a short stable identifier, e.g. the first 8 hex characters of
 the SHA-256 of the absolute `setup_dir` path, or, if available, derived
 from the RO-Crate `name`/`@id` (the setup directory is an RO-Crate, see
-7.2). The simclient announces it in a `simulation.registered` event and
-in the room name/alias/topic (3.2). The MCP server keeps a local registry
-mapping `sim_id -> {room_id, setup_dir, run_dir, job_id, last_event}`.
+7.2). 8 hex chars (32 bits) keeps the birthday-collision probability
+negligible at the scale of a few thousand registered sims (a 6-hex /
+24-bit id does not); the server must still verify uniqueness against the
+local registry before reuse. The simclient announces it in a
+`simulation.registered` event and in the room name/alias/topic (3.2).
+The MCP server keeps a local registry mapping
+`sim_id -> {room_id, setup_dir, run_dir, job_id, last_event}`.
 
 ### 2.3 Event taxonomy
 
@@ -204,7 +215,7 @@ Every event carries the envelope of 2.1. Sources are traceable:
 | `simulation.job_running`       | SLURM state becomes RUNNING           | simclient polls `scontrol show job <id>` |
 | `simulation.step_finished`     | timestep N finished                   | parse job `stdout` progress line, see below |
 | `simulation.checkpoint_requested` | a checkpoint was triggered (signal) | TaskSignal.hpp:49,130 |
-| `simulation.checkpoint_written` | checkpoint file set complete          | TaskSignal.hpp:133 + openPMD dir in simOutput |
+| `simulation.checkpoint_written` | checkpoint file set complete          | openPMD dir appears in simOutput (dir watch); the write is `Checkpointing.hpp:148` (`dump`). `TaskSignal.hpp:133` (`addCheckpoint`) is only registration/scheduling, not completion |
 | `simulation.stopping`          | stop signal received                  | TaskSignal.hpp:139 |
 | `simulation.job_finished`      | SLURM state DONE, exit code 0         | `scontrol show job <id>`; stdout "full simulation time" (SimulationHelper.cpp:58-63) |
 | `simulation.job_failed`        | SLURM state FAILED / non-zero rc      | `scontrol`; workflow rc via observer hook |
@@ -395,9 +406,11 @@ Room naming: alias `#sim-<sim_id>:<domain>`, name "PIConGPU <sim_id>
 
 The MCP server is a standard MCP server (tools capability, stdio
 transport for local LLM hosts) built on the official Python SDK:
-`mcp` package, `MCPServer` + `@mcp.tool()` [A1][A2]. Tools return
-text plus `structuredContent` where stable schemas exist; execution
-failures use `isError: true` per the spec [A1].
+`mcp` package: `MCPServer` (`mcp/server/mcpserver/server.py:153`) with
+tools registered via the `server.tool()` instance decorator
+(`mcp/server/mcpserver/server.py:654`) [A1][A2]. Tools return text plus
+`structuredContent` where stable schemas exist; execution failures use
+`isError: true` per the spec [A1].
 
 ### 4.1 Tool list
 
@@ -466,7 +479,8 @@ The Matrix room can be noisy (progress lines every 5 %); the MCP server
 condenses:
 
 1. Filter by `sim_id` tag (and, defensively, by room membership).
-2. Deduplicate on `(sim, seq, type)` (2.1); drop redacted events.
+2. Deduplicate on `(sim, sender_role, seq, type)` (2.1); drop redacted
+   events.
 3. Progress condensation: for `simulation.step_finished` events keep the
    latest per sim and optionally one per N percent (default: latest +
    every 25 %); collapse consecutive identical `query_status` results.
@@ -793,8 +807,10 @@ External (accessed 2026-08-29):
   https://modelcontextprotocol.io/llms.txt (2025-06-18, 2025-11-25,
   2026-07-28).
 - [A2] MCP Python SDK (`mcp` 2.1.1 on PyPI, 2026-08-25):
-  https://github.com/modelcontextprotocol/python-sdk (MCPServer,
-  @mcp.tool, stdio/Streamable HTTP/SSE, Python 3.10+).
+  https://github.com/modelcontextprotocol/python-sdk (MCPServer at
+  mcp/server/mcpserver/server.py:153; tools registered with the
+  `server.tool()` instance decorator at server.py:654; stdio/Streamable
+  HTTP/SSE transports; Python 3.10+).
 - [A3] matrix-nio 0.26.0 (PyPI, 2026-07-23, Python >=3.10):
   https://github.com/matrix-nio/matrix-nio (AsyncClient; `login`
   async_client.py:1100, `register` :1026, `room_send` :1724,

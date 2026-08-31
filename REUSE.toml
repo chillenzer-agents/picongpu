@@ -101,3 +101,113 @@ path = "thirdParty/cuda_memtest/cmake/FindNVML.cmake"
 precedence = "override"
 "SPDX-FileCopyrightText" = "2008-2014 NVIDIA Corporation, Jiri Kraus"
 "SPDX-License-Identifier" = "MIT"
+
+# ---------------------------------------------------------------------------
+# Own-tree media/data assets (no license headers). CC-BY-4.0 for docs/ per
+# LICENSE.md; GPL-3.0-or-later for source-tree artifacts.
+# ---------------------------------------------------------------------------
+
+[[annotations]]
+path = "docs/*.odg"
+"SPDX-FileCopyrightText" = "2017 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/BorisPusher/*.tex"
+"SPDX-FileCopyrightText" = "2017 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/images/**"
+"SPDX-FileCopyrightText" = "2017 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/logo/**"
+"SPDX-FileCopyrightText" = "2017 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/models/media/*.png"
+"SPDX-FileCopyrightText" = "2020 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/models/media/*.svg"
+"SPDX-FileCopyrightText" = "2020 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/models/smilei_beam_relaxation_inputs.zip"
+"SPDX-FileCopyrightText" = "2022 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/models/smilei_thermalization_inputs.zip"
+"SPDX-FileCopyrightText" = "2022 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/pypicongpu/img/*.plantuml"
+"SPDX-FileCopyrightText" = "2022 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/pypicongpu/img/*.png"
+"SPDX-FileCopyrightText" = "2022 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/usage/media/*.png"
+"SPDX-FileCopyrightText" = "2024 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/usage/plugins/media/transition_foil_position.svg"
+"SPDX-FileCopyrightText" = "2024 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/usage/plugins/openPMD_extended_config.json"
+"SPDX-FileCopyrightText" = "2021 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/usage/plugins/openPMD_restart_config.json"
+"SPDX-FileCopyrightText" = "2021 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "lib/python/picongpu/extra/input/*.ipynb"
+"SPDX-FileCopyrightText" = "2023-2024 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "libraryDependencies.png"
+"SPDX-FileCopyrightText" = "2015 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "share/picongpu/examples/AtomicPhysics/validation/referenceData/mean_reference.data"
+"SPDX-FileCopyrightText" = "2024 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "share/picongpu/examples/AtomicPhysics/validation/referenceData/stdDev_reference.data"
+"SPDX-FileCopyrightText" = "2024 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "share/picongpu/examples/LaserWakefield/lib/python/snakemake/dag.png"
+"SPDX-FileCopyrightText" = "2023 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "share/picongpu/examples/LaserWakefield/lib/python/snakemake/params.csv"
+"SPDX-FileCopyrightText" = "2023 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = ".zenodo.json"
+"SPDX-FileCopyrightText" = "2018 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"

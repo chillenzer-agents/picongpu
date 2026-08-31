@@ -30,15 +30,17 @@ corrected for correctness (noted below).
   behavior unchanged). New test
   `test_input_change_invalidates_completed_stages` proves the new input is
   visible in the final artifacts (not silently skipped).
-- **m1 - accepted, with an environment note** (`470dcfce2`). ASCII-normalized
-  `TASK-09-FINDINGS.md` (all em dashes to hyphens, same treatment as
-  `TASK-05-PR-PROPOSAL.md`) and corrected section 12 (12 tests, final
-  numbers, hook claim phrased as what is actually true). Note: the "pre-commit
-  is failing" claim was true at the reviewed code tip `7e6e67bd8` (no
-  `TASK-*.md` exclusion existed there), but the review commit `fd539988e`
-  itself added the `^TASK-.*\.md$` exclusion, so at the review tip
-  `pre-commit run --all-files` already exits 0. The normalization was applied
-  anyway, so the claim holds under either hook config.
+- **m1 - accepted, with an environment note** (`470dcfce2`, plus
+  `2f5da778b`). ASCII-normalized `TASK-09-FINDINGS.md` (all em dashes to
+  hyphens, same treatment as `TASK-05-PR-PROPOSAL.md`) and corrected section
+  12 (12 tests, final numbers, hook claim phrased as what is actually true);
+  `2f5da778b` also normalizes one pre-existing em dash in
+  `partial_workflow.rst` so every file this branch touched is ASCII. Note:
+  the "pre-commit is failing" claim was true at the reviewed code tip
+  `7e6e67bd8` (no `TASK-*.md` exclusion existed there), but the review commit
+  `fd539988e` itself added the `^TASK-.*\.md$` exclusion, so at the review
+  tip `pre-commit run --all-files` already exits 0. The normalization was
+  applied anyway, so the claim holds under either hook config.
 - **m2 - accepted** (`304da40b6`). New
   `test_default_plan_matches_workflow_template` loads the real
   `templates/workflow/workflow.cwl` (YAML) and asserts all invariants from the

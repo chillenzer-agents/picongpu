@@ -278,9 +278,22 @@ an `ack` (`accepted` / `rejected` + reason).
 | `hello {message}`  | submit a trivial job `sbatch --wrap="echo '<message>' <sim_id>"`, capture output, ack with job id + output (M1) | simclient (new, in picongpu-mcp) |
 | `query_status`     | `scontrol show job <id>` + last progress event; ack with `{slurm_state, step, percent, walltime}` | simclient (new) |
 | `request_checkpoint` | `scancel --signal=USR1 --batch <jobid>` - checkpoint at next step boundary, run continues | simclient sends the signal; PIConGPU core handles it: signal.cpp:63, TaskSignal.hpp:49-133, Checkpointing.hpp (addCheckpoint). Requires the checkpoint plugin to be enabled [signals.rst:10; picmi/diagnostics/checkpoint.py:18-33] |
-| `cancel`           | graceful: `scancel --signal=USR2 --batch <jobid>` (finish step, exit normally [signals.rst:23]); hard: `scancel <jobid>` (SIGTERM -> stop [signal.cpp:66]) | simclient sends; core: signal.cpp:64-66, TaskSignal.hpp:139 |
+| `cancel`           | graceful: `scancel --signal=USR2 --batch <jobid>` (stop at the next step boundary, exit normally [signal.cpp:64; signals.rst:23]); hard: `scancel --signal=KILL <jobid>` (SIGKILL, no clean shutdown). A plain `scancel <jobid>` is NOT "hard" under the standard templates - see "Cancel semantics" below | simclient sends; core: signal.cpp:59-66, TaskSignal.hpp:139; wrapper: handleSlurmSignals.sh:46 |
 | `pause`            | none - OPEN (8.2)                                | needs a new core mechanism (see below) |
 | `resume`           | only if `pause` exists                            | same |
+
+Cancel semantics (why a plain `scancel` is not "hard"): the standard
+system templates run the app through the signal wrapper
+[etc/picongpu/hemera-hzdr/gpu.tpl:112, fwkt_v100.tpl:114,
+defq.tpl:104], which traps SIGTERM and forwards USR2 to the app
+[handleSlurmSignals.sh:46]. So a plain `scancel <jobid>` (SIGTERM to the
+batch script) delivers USR2 -> stop at the next step boundary and exit
+normally [signal.cpp:64] - identical to the "graceful" mode. The app's
+own SIGTERM handler [signal.cpp:66] is only reachable for a job that is
+not wrapped by `handleSlurmSignals.sh`. The only untrappable hard kill
+is `scancel --signal=KILL <jobid>` (SIGKILL); because it skips clean
+shutdown it must carry an explicit warning: in-flight openPMD/checkpoint
+writes may be left incomplete and the job is recorded as CANCELLED.
 
 Pause analysis (flagged as open): PIConGPU has no pause signal. The
 handled set is HUP/INT/QUIT/ABRT/TERM (stop), USR1 (checkpoint), USR2
@@ -670,8 +683,9 @@ M1/M2, to be replaced by the hook.
   `simulation.submitted` carries a real SLURM job id and `scontrol`
   polling is meaningful.
 - M3 - control. `query_status`, `request_checkpoint` (USR1), `cancel`
-  (USR2/TERM). `pause`/`resume` remain OPEN (8.2) and are not in M3.
-  Requires sims configured with the checkpoint plugin [signals.rst:10].
+  (graceful USR2 / hard SIGKILL, 2.4). `pause`/`resume` remain OPEN (8.2)
+  and are not in M3. Requires sims configured with the checkpoint plugin
+  [signals.rst:10].
 - M4 - data channel. `analyze_output` (openPMD/RO-Crate metadata,
   section 5); optional `run_analysis_cell` via Jupyter remote kernel
   (fallback).

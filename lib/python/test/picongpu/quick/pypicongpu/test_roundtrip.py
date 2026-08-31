@@ -214,5 +214,10 @@ _MODELS = [
 def test_model_roundtrip(name):
     model = _build(name)
     dumped = model.model_dump(mode="json")
-    restored = type(model)(**dumped)
+    # model_validate is the canonical "this dict is valid model input" check
+    # (the same call task 07 makes). The dump also carries computed-field
+    # keys (e.g. modenumber, species_name) that are not init fields; pydantic
+    # discards them via its default extra='ignore', which is intended - the
+    # guarantee covers the declared fields.
+    restored = type(model).model_validate(dumped)
     assert restored.model_dump(mode="json") == dumped, f"{name} does not round-trip through model_dump(mode='json')"

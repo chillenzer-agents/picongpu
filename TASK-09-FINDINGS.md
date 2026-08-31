@@ -335,13 +335,22 @@ installed into the generated setup dir:
    `invalidated` (stale, outside the range).
 7. `test_flags_after_generation_are_rejected` — flags after generation raise
    a clear `ValueError`; the state is left intact.
-8. **Stability test** `test_stability_future_workflow` — a fake "future"
-   workflow where the `submit` stage gains an extra `upload` step chained
-   into `submit` via `StepOutputRef`: the public API (stage names, ranges,
+8. **Stability test** `test_stability_future_workflow` — a "future"
+   workflow simulated as a mutated scratch `workflow.cwl` (a step id renamed,
+   an extra `upload` step inserted ahead of `submit` inside the submit stage)
+   with a correspondingly updated plan: the public API (stage names, ranges,
    state file) works unchanged; the in-stage wiring is verified (the upload
    output reaches the final `tbg`); the state file contains no step names.
    **Result: passed** — the adapter absorbs a step inserted inside an
    existing stage without any API change.
+9. **Plan/template sync** `test_default_plan_matches_workflow_template` —
+   loads the real `templates/workflow/workflow.cwl` and asserts that every
+   plan step covers exactly one workflow step (same file), with the same
+   input names and sources (workflow inputs, stage artifacts, in-stage step
+   outputs), and that every workflow step output is recorded by the plan.
+   The per-step path never reads `workflow.cwl`, so this turns "keep the
+   adapter in sync with the templates" into a CI-enforced invariant (drift
+   would otherwise silently diverge full and partial runs).
 
 Results (venv `task-09`):
 

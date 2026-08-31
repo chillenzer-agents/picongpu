@@ -1,8 +1,8 @@
 # TASK 12 -- Findings: general, portable installation of compiled build dependencies
 
-Status: **draft for iteration** (exploratory task)
+Status: **draft for iteration** (exploratory task), reworked 2026-08-31
 Branch: `task-12-deps-autoinstall` - Base: `dev` @ b4e4ca5b2
-Date: 2026-08-29
+Date: 2026-08-29 (rework: 2026-08-31, see `TASK-12-RESPONSE.md`)
 
 ## TL;DR
 
@@ -75,7 +75,11 @@ build -> install into `$<NAME>_ROOT`; parallel `-j 16`.
 | missing steps | -- | -- | **no libpng, no HDF5, no FFTW** (modules provide) |
 
 **Drift/bugs found during the diff** (evidence that unmanaged copies
-deteriorate -- the case for a single source of truth):
+deteriorate -- the case for a single source of truth). All five were
+addressed in the rework (2026-08-31): the three profile bugs are fixed in
+the profiles themselves, the literal-string guards disappeared with the
+old scripts, and the shared script applies the PNGwriter CMake-policy
+workaround for every cluster:
 
 - rosi: `HDF5_VERSION=2.0.0` in the profile (`#1.14.6` commented) -> the
   script would `wget` a non-existent `hdf5_2.0.0` tag -> broken.
@@ -181,8 +185,13 @@ etc/picongpu/{rosi-hzdr,delta-ncsa,perlmutter-nersc}/dependencies_autoinstall.sh
 lib/python/picongpu/dependencies.py            # [dependencies] config -> DEPS_* env
 lib/python/picongpu/pypicongpu/runner.py       # opt-in wiring into build/prepare/submit scripts
 lib/python/picongpu/templates/workflow/steps/install_dependencies.cwl  # DRAFT CWL step (not wired)
-lib/python/test/picongpu/quick/test_dependencies.py                       # 11 tests
-docs/source/install/dependencies.rst, CHANGELOG.md
+lib/python/test/picongpu/quick/test_dependencies.py                       # 16 tests
+CHANGELOG.md
+NOTE: docs/source/install/dependencies.rst and docs/source/install/profiles
+PRE-EXIST on base (commit ccb2df042) as symlinks to repo-root INSTALL.rst
+and etc/picongpu respectively; the dependency-install section therefore
+lives in INSTALL.rst and appears on the live install page via the symlink
+(the "Automatic Installation of Dependencies" section).
 ```
 
 Design decisions:
@@ -251,9 +260,61 @@ All found via the same hints PIConGPU honours (`CMAKE_PREFIX_PATH`,
 the MPI wrappers on PATH (openPMD's `COMPONENTS MPI` re-detects MPI) --
 exactly as on clusters where the profile loads the MPI module.
 
-**Extrapolation for the full stack:** + Boost (b2, ~5-10 min) + ADIOS2
-(~5-10 min) ~ 10-30 min cold, as assumed by the task; warm runs remain
-~0.2 s.
+### 5.1 Full-stack proof (rework, 2026-08-31)
+
+The default invocation (no `--only`) -- the path that was broken at review
+time (C1) -- now builds the entire stack end-to-end on the same container
+(16 cores, GCC 16.2.1, OpenMPI 5.0.9, CMake 4.3.0), sources pre-seeded in
+the shared cache:
+
+| dependency | version | cold time |
+|---|---|---|
+| boost | 1.87.0 | 117 s |
+| c-blosc2 | 2.22.0 | 26 s |
+| libpng | 1.6.34 | 7 s |
+| pngwriter | 0.7.0 | 4 s |
+| hdf5 (parallel, MPI) | 1.14.6 | 66 s |
+| adios2 (MPI + HDF5) | 2.11.0 | 134 s |
+| openpmd-api (HDF5 + ADIOS2 + MPI) | 0.17.1 | 48 s |
+| fftw3 | 3.3.10 | 28 s |
+| **total** | | **~ 430 s (~ 7 min)** |
+
+Two real defects were found and fixed by this proof run, neither reachable
+by the old subset test:
+
+- **c-blosc2 builds its benchmarks/examples/fuzzers by default** (and the
+  examples link `blosc_testing`, which does not exist when
+  `BUILD_TESTS=OFF`) -- the default run failed after the core library was
+  built. The provider now passes
+  `-DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXAMPLES=OFF`
+  (PIConGPU consumes only the library).
+- **openPMD cannot find a source-built parallel HDF5 on recent CMake
+  (4.3)**: openPMD requests only the CXX MPI component
+  (`MPI_CXX_SKIP_MPICXX`), so the `find_package(MPI REQUIRED)` inside our
+  HDF5 build's `hdf5-config.cmake` fails, and FindHDF5's module-mode
+  fallback misses the parallel build. The openPMD provider now exports
+  `HDF5_ROOT`/`ADIOS2_ROOT` (the same variables `current.env` hands to
+  the consumer) for its configure step; a shell test asserts this.
+
+A second run of the completed prefix is a full cache hit: **0.179 s**,
+8 x "already installed (cache hit, skipping)".
+
+The scratch CMake project of Sec. 5 was extended with the remaining
+find_package calls (Boost 1.74 CONFIG program_options, Blosc2, ADIOS2) and
+re-run against this prefix's `current.env` only -- all found, and openPMD
+now reports **HDF5=TRUE, ADIOS2=TRUE**:
+
+```
+-- Found Boost: 1.87.0 (.../boost-1.87.0/lib/cmake/Boost-1.87.0)
+-- Found Blosc2: 2.22.0 (.../c-blosc2-2.22.0/lib64/cmake/Blosc2)
+-- Found ADIOS2: 2.11.0 (.../adios2-2.11.0/lib64/cmake/adios2) [C CXX MPI]
+-- Found PNGwriter: .../pngwriter-0.7.0/lib/cmake/PNGwriter
+-- Found openPMD: .../openpmd-api-0.17.1/lib64/cmake/openPMD (HDF5=TRUE, ADIOS2=TRUE)
+-- Found FFTW3: 3.3.10 (.../fftw3-3.3.10/lib)
+```
+
+(The Sec. 5 "10-30 min" extrapolation for the full stack was therefore
+conservative: measured ~7 min on 16 cores, dominated by ADIOS2.)
 
 ## 6. Cache-keying design
 
@@ -265,14 +326,33 @@ exactly as on clusters where the profile loads the MPI module.
   (verified) -> the parallel and non-parallel stacks never mix.
 - **Layout:** shared `sources/` (fetch-once, key-independent) +
   `<key>/{src,build,logs,<name>-<version>,fingerprint.txt,picongpu-deps.env}`
-  + stable `current.env` pointer (Sec. 4).
+  + stable `current.env` pointer (Sec. 4). Git sources are cached
+  **tag-keyed** (`sources/git/<name>-<tag>`) so a `DEPS_<NAME>_VERSION`
+  override always fetches the requested tag, never a stale checkout of
+  another version. Tarball sources are pinned by sha256
+  (`DEPS_SHA256` table; a mismatch is a hard error and the cache entry is
+  removed for re-fetch) and validated with `tar -tzf` before use, so an
+  interrupted download can never be mistaken for a cache hit.
 - **Guards:** per-dep `.picongpu-deps.stamp` (key, dep, date, version,
   compiler); existing dir with matching stamp -> skip; existing dir with
-  *foreign* stamp -> warn + skip (`DEPS_FORCE=1` to rebuild); existing
-  dir without stamp (legacy per-cluster install) -> skip; empty dir
-  (failed previous run) -> rebuild in place.
-- **Failure semantics:** a failed build leaves no stamp and the script
-  exits non-zero (aborts the workflow step before `pic-build`).
+  *foreign* stamp -> warn + skip (`DEPS_FORCE=1` to rebuild); existing dir
+  without stamp (legacy per-cluster install) -> skip; empty dir
+  (failed previous run) -> rebuild in place. A build in flight writes a
+  `.picongpu-deps.inprogress` marker first; `deps_stamp` removes it on
+  success. An interrupted/failed run therefore leaves a dir that is
+  *retried* on the next run, never mistaken for installed.
+- **Failure semantics:** a failed build leaves no stamp, records
+  `FAILED` in the summary, and the script exits non-zero (aborts the
+  workflow step before `pic-build`). A failed cmake *configure* also
+  deletes the out-of-tree build dir so the cached `-D` values of the
+  failed configure cannot poison the retry (verified: poisoned
+  `CMAKE_C_COMPILER` configure -> retry from clean slate -> success).
+- **Env file (managed mode):** written whenever **any** dependency was
+  installed in managed mode, as the **union** of the profile's own
+  `*_ROOT` hints and the managed prefixes; the old "only when all eight
+  roots are unset" condition silently dropped mixed-profile installs
+  (rosi/delta/perlmutter are all mixed). A `current.env` whose key differs
+  from the new one is warned about before being re-pointed.
 
 ## 7. Open items for the requester
 
@@ -281,9 +361,12 @@ exactly as on clusters where the profile loads the MPI module.
    locally. Per-cluster `DEPS_CMAKE_EXTRA_*` values (e.g. the
    `-DMPI_mpi_gnu_123_LIBRARY` flag) need confirmation against each
    cluster's current MPI.
-2. **Fix the profile drift found in Sec. 1.2** (rosi `HDF5_VERSION=2.0.0`,
-   delta `FFTW_VERSION` typo, `FFTW_ROOT` vs `FFTW3_ROOT`) -- done as a
-   follow-up so the wrappers behave exactly like the old scripts.
+2. **Fix the profile drift found in Sec. 1.2** (rosi/delta
+   `HDF5_VERSION=2.0.0`, delta `FFTW_VERSION` typo, `FFTW_ROOT` vs
+   `FFTW3_ROOT`) -- **DONE in the rework (2026-08-31)**: profiles now say
+   `HDF5_VERSION=1.14.6`, the delta typo is fixed, and `FFTW3_ROOT` is the
+   canonical export (kept `FFTW_ROOT` as an alias for the old scripts'
+   CPATH/LD_LIBRARY_PATH lines).
 3. **Decision:** keep the per-cluster wrappers (chosen) vs. delete them
    once all presets are migrated to `[dependencies]` in
    `picongpurc.toml`.

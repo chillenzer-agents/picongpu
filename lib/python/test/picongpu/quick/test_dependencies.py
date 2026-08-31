@@ -197,3 +197,34 @@ def test_provider_loop_records_failure_and_stops(tmp_path):
     assert "c-blosc2: FAILED after" in result.stdout
     assert "SHOULD-NOT-REACH-LIBPNG" not in result.stderr
     assert not list(tmp_path.rglob(".picongpu-deps.stamp"))
+
+
+def test_openpmd_configure_is_pointed_at_built_targets(tmp_path):
+    # openpmd's CMake must be given HDF5_ROOT/ADIOS2_ROOT (the same vars
+    # current.env exports to the consumer) when the hdf5/adios2 targets
+    # exist: our HDF5 build's config file re-runs find_package(MPI)
+    # internally, which fails under openPMD's reduced MPI component set
+    # (CXX only, MPI_CXX_SKIP_MPICXX), and without HDF5_ROOT the
+    # FindHDF5 module-mode fallback misses the parallel build on recent
+    # CMake (verified: CMake 4.3).
+    code = r"""
+        set -euo pipefail
+        source "$1"
+        DEPS_KEY="key1"
+        DEPS_INSTALL_ROOT="$2"
+        DEPS_KEY_DIR="$2/key1"
+        DEPS_SOURCE_CACHE="$2/sources"
+        DEPS_JOBS=1
+        mkdir -p "$DEPS_KEY_DIR/logs" "$DEPS_KEY_DIR/hdf5-1.14.6" "$DEPS_KEY_DIR/adios2-2.11.0"
+        deps_fetch_git() { :; }
+        deps_prepare_source_copy() { printf '%s' "$2"; }
+        deps_mpi_cmake_flags() { DEPS_MPI_FLAGS=(); }
+        deps_build() { printf '%s\n' "$*" >> "$DEPS_KEY_DIR/deps_build.log"; }
+        deps_guard() { :; }
+        deps_stamp() { :; }
+        deps_install_openpmd
+        grep -q "HDF5_ROOT=$DEPS_KEY_DIR/hdf5-1.14.6" "$DEPS_KEY_DIR/deps_build.log"
+        grep -q "ADIOS2_ROOT=$DEPS_KEY_DIR/adios2-2.11.0" "$DEPS_KEY_DIR/deps_build.log"
+    """
+    result = subprocess.run(["bash", "-c", code, "bash", str(DEPS_LIB), str(tmp_path)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr

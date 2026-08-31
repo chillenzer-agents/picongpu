@@ -7,6 +7,7 @@ Unreleased
 **Features:**
 - PICMI:
     - radiation plugin: accept `FilteredSpecies` in PICMI (Python side; C++ dispatch is a follow-up)
+    - radiation plugin: reject `gamma_filter_threshold` if it would have no effect (all species filtered) and warn for a mixed species list
 
 0.8.0
 -----

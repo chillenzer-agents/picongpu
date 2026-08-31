@@ -24,7 +24,7 @@ from picongpu.pypicongpu.units import SI
 from .customuserinput import CustomUserInput
 from .field_solver import AnySolver
 from .grid import Grid3D
-from .laser import AnyLaser
+from .laser import AnyLaser, PlaneWaveLaser, TWTSLaser
 from .movingwindow import MovingWindow
 from .output import AnyPlugin, OpenPMDPlugin
 from .rendering import RenderedObject
@@ -131,8 +131,30 @@ class Simulation(RenderedObject, BaseModel):
         # PIConGPU happily simulates a laser pulse that extends beyond the end
         # of the run (the pulse is simply truncated), but it is usually a
         # sign of inconsistent parameters.
+        #
+        # This is a heuristic that models the temporal extent of
+        # _BaseLaser-style pulses (Gaussian / dispersive) as
+        # pulse_duration_si * pulse_init. It is type-specific:
+        #   - TWTSLaser's extent is its on/off window, approximated by
+        #     windowEnd * delta_t_si (an inactive window keeps the laser on
+        #     for the whole run, so nothing is truncated);
+        #   - PlaneWaveLaser is a continuous wave, so it is never truncated;
+        #   - FromOpenPMDPulseLaser carries its extent in the input file,
+        #     which is not known here.
         run_time = self.delta_t_si * self.time_steps
         for laser in self.laser or []:
+            if isinstance(laser, TWTSLaser):
+                pulse_end = laser.windowEnd * self.delta_t_si
+                if pulse_end > run_time:
+                    warnings.warn(
+                        f"TWTSLaser window end (windowEnd * delta_t_si = {pulse_end} s) "
+                        f"exceeds the simulation time {run_time} s (delta_t_si * time_steps). "
+                        "The laser will be truncated at the end of the run."
+                    )
+                continue
+            if isinstance(laser, PlaneWaveLaser):
+                # continuous wave: present for the whole run, never truncated
+                continue
             pulse_length = getattr(laser, "pulse_duration_si", None)
             pulse_length = getattr(laser, "pulse_init", 1.0) * pulse_length if pulse_length is not None else None
             if pulse_length is not None and pulse_length > run_time:

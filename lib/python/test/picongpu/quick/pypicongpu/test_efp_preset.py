@@ -32,6 +32,26 @@ def test_efp_preset_resolves_unambiguously():
     assert RCParams(preset="jupiter-jsc/gh200_picongpu").preset_dir == "jupiter-jsc"
 
 
+JUPITER_TPL = "etc/picongpu/jupiter-jsc/gh200.tpl"
+
+
+def test_pre_existing_jupiter_preset_selections_still_resolve():
+    # Regression test: the "efp-jupiter-jsc/" preset path contains the
+    # pre-existing "jupiter-jsc" preset name, so with a plain substring
+    # matcher every short selection of the pre-existing preset would raise
+    # a "ambiguous" ValueError. They must keep resolving to jupiter-jsc:
+    assert RCParams(preset="jupiter-jsc").preset_dir == "jupiter-jsc"
+    assert RCParams(preset="jupiter-jsc")["tbg_tpl_file"] == JUPITER_TPL
+    assert RCParams(preset="jupiter")["tbg_tpl_file"] == JUPITER_TPL
+    assert RCParams(preset="jup")["tbg_tpl_file"] == JUPITER_TPL
+    # ... while the EFP preset resolves for its own names:
+    assert RCParams(preset=EFP_PRESET)["tbg_tpl_file"] == EFP_TPL
+    assert RCParams(preset="efp")["tbg_tpl_file"] == EFP_TPL
+    # and genuinely ambiguous selections still raise:
+    with raises(ValueError):
+        RCParams(preset="jsc")
+
+
 def test_efp_preset_submission_defaults():
     rc = RCParams(preset=EFP_PRESET)
     assert rc["tbg_submit"] == "sbatch"

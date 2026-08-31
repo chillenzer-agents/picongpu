@@ -161,12 +161,36 @@ def get_available_presets() -> list[str]:
 
 
 def _preset_path(preset) -> Path:
-    # The `or` enables the following feature:
-    # `preset = "bash" is first matched against `bash/` and uniquely determines `bash/bash_picongpu.profile.example`
-    # without the first option in the `or` it would be ambiguous because `bash-devServer-hzdr/...` would match as well.
-    candidates = list(filter(lambda p: f"{preset}/" in str(p), get_available_presets())) or list(
-        filter(lambda p: preset in str(p), get_available_presets())
+    presets = get_available_presets()
+    # Legacy behaviour, kept for every selection it already made unique:
+    # first match "<preset>/" in the preset path, else "<preset>" anywhere in
+    # it. This is why `preset = "bash"` is not confused with
+    # `bash-devServer-hzdr/...`.
+    candidates = list(filter(lambda p: f"{preset}/" in str(p), presets)) or list(
+        filter(lambda p: preset in str(p), presets)
     )
+    if len(candidates) != 1:
+        # Ambiguous (or no match). Break the tie with the most specific tier
+        # that yields a unique result:
+        # 1. the exact preset path, e.g. `preset = "bash/bash_picongpu.profile.example"`,
+        # 2. a full preset directory, e.g. `preset = "jupiter-jsc"` matches
+        #    `jupiter-jsc/...` but not `efp-jupiter-jsc/...`,
+        # 3. a path prefix, e.g. `preset = "jupiter"` or `preset = "jupiter-jsc/gh200"`,
+        # 4. a queue/file prefix, e.g. `preset = "gh200"` matches
+        #    `jupiter-jsc/gh200_picongpu.profile.example`.
+        # A bare substring occurrence is deliberately not a tie-breaker, so a
+        # fragment happening to sit inside several names (e.g. "ef" in
+        # "defq_picongpu" and "efp_...") stays ambiguous.
+        for match in (
+            lambda p: p == preset,
+            lambda p: p.startswith(f"{preset}/"),
+            lambda p: p.startswith(preset),
+            lambda p: any(segment.startswith(preset) for segment in p.split("/")),
+        ):
+            specific = list(filter(match, candidates))
+            if len(specific) == 1:
+                candidates = specific
+                break
     if len(candidates) > 1:
         raise ValueError(f"The given {preset=} is ambiguous ({candidates=}). Please be more specific!")
     if len(candidates) == 0:

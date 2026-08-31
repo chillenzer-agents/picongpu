@@ -117,6 +117,10 @@ workflow.cwl:107-149]:
 3. `submit_step` - invoke the submit command (e.g. `sbatch`) and capture
    its output into `submission_information.txt` (for SLURM this is
    "Submitted batch job <id>") [runner.py:336-343, steps/submit.cwl:43-48].
+   The submit command is the workflow input `run_submit_system`, whose
+   default is `"bash"` [workflow.cwl:62-66] - i.e. by default the batch
+   script runs locally on the submission node, not on the cluster. A
+   real SLURM submission requires `run_submit_system: "sbatch"` (4.1).
 4. `organize_output_step` - copy input, `tbg`, `submission_information.txt`
    and `link_results.sh` into the run directory
    [workflow.cwl:140-149, scripts/organize_output.sh:13-15].
@@ -399,16 +403,40 @@ failures use `isError: true` per the spec [A1].
 
 Notes:
 
-- `submit_simulation` takes a PICMI Python script (path or inline code):
-  the server executes it in a controlled subprocess, obtains the
-  `picmi.Simulation`, then drives `write_input_file`/`generate`
-  [picmi/simulation.py:339-350] and, if `run_async`, `picongpu_run`
-  [picmi/simulation.py:494-501] in a background task. Build/run flags map
-  to the existing CWL inputs `build_*`/`run_*` [workflow.cwl:18-81,
-  runner.py:355-393]; SLURM specifics (partition, nodes, gres) come from
-  the system `N.cfg` template [N.cfg.mustache:50-66] and can be pinned
-  via `overwrite_vars` [workflow.cwl:72-76] - no new submission
-  machinery is needed.
+- `submit_simulation` takes a PICMI Python script (a path, or inline
+  code that the server first writes to a temp file). The server never
+  imports or executes the script in its own process. It launches a
+  checked-in wrapper script in a disposable subprocess (a fresh Python
+  interpreter) that (1) runs the PICMI script to build the
+  `picmi.Simulation`, (2) calls `sim.picongpu_run(setup_dir=...,
+  run_dir=..., **flags)` exactly once [picmi/simulation.py:497-501] -
+  that is `generate()` + `run()` in a single call - and (3) prints one
+  JSON line `{sim_id, setup_dir, run_dir, job_id, status}`. The server
+  only consumes that JSON; it never holds a live `picmi.Simulation`
+  object (a Python object cannot cross the subprocess boundary). It must
+  never call `write_input_file` before `picongpu_run`: `picongpu_run`
+  re-invokes `generate()` [picmi/simulation.py:500] and `generate()`
+  asserts the setup directory does not already exist
+  [pypicongpu/runner.py:408-411], so the "drive `write_input_file`, then
+  `picongpu_run`" flow of the previous revision crashes on a
+  `AssertionError`. Build/run flags map to the existing CWL inputs
+  `build_*`/`run_*` [workflow.cwl:18-81, runner.py:355-393]; SLURM
+  specifics (partition, nodes, gres) come from the system `N.cfg`
+  template [N.cfg.mustache:50-66] and can be pinned via `overwrite_vars`
+  [workflow.cwl:72-76] - no new submission machinery is needed.
+  - Submit system: the workflow input `run_submit_system` defaults to
+    `"bash"` [workflow.cwl:62-66], which executes the rendered batch
+    script locally on the submission node (a bash PID lands in
+    `submission_information.txt`; no SLURM job is created). That is also
+    the Python-side default (`tbg_submit` via `TBGFlags.submit_system`
+    [runner.py:141-145]). For a real cluster submission,
+    `submit_simulation` must pass `submit_system: "sbatch"` (it flows
+    through `picongpu_run(**flags)` -> `generate(**flags)` ->
+    `TBGFlags` [runner.py:434-437]); for a non-SLURM submit system the
+    server rejects in M1/M2, or emits `simulation.submitted_locally`
+    instead of `simulation.submitted` if that is explicitly requested.
+  - The PICMI script is arbitrary code that runs on the submission
+    node; see 6.5 (LLM code execution).
 - `sim_id` is assigned by the server at `generate()` time (2.2) and
   returned immediately, before submission.
 - `analyze_output` is metadata-level only (4.2, section 5): RO-Crate
@@ -530,6 +558,23 @@ declared via MCP tool annotations where the spec/SDK supports them
   `rejected_by_policy`.
 - Replay/loss: `seq` counters + `in_reply_to` command ids (2.5).
 
+### 6.5 LLM code execution (PICMI scripts)
+
+`submit_simulation` executes LLM-supplied PICMI Python code. This is the
+largest blast-radius surface in the design and is handled explicitly:
+
+- The code runs in a disposable subprocess (a fresh Python interpreter)
+  on the submission node, owned by the MCP server, not in the server's
+  own process. The server only consumes the wrapper's single JSON result
+  line (4.1); it never imports or `exec`s the script.
+- Tier: `submit_simulation` is in the confirm tier (6.2) - a human
+  approves the invocation before the subprocess is spawned.
+- The subprocess environment is scrubbed of credentials (6.1): no Matrix
+  tokens, no RCP secrets, no cluster secrets. It inherits only the
+  user's existing submission-node session (SLURM, etc.).
+- The subprocess is killed on timeout; a non-zero wrapper exit or
+  malformed JSON is surfaced to the LLM as `isError: true` (4.1).
+
 --------------------------------------------------------------------
 
 ## 7. Integration points in the codebase
@@ -620,6 +665,10 @@ M1/M2, to be replaced by the hook.
   job RUNNING detection, `simulation.step_finished` from stdout
   progress polling on the shared FS, `results.ready`. Tools:
   `list_simulations`, `get_status`, `get_events`, `get_logs`.
+  `submit_simulation` must pass `run_submit_system: "sbatch"` (the
+  workflow default is `"bash"` / local, 1.4/4.1) so that
+  `simulation.submitted` carries a real SLURM job id and `scontrol`
+  polling is meaningful.
 - M3 - control. `query_status`, `request_checkpoint` (USR1), `cancel`
   (USR2/TERM). `pause`/`resume` remain OPEN (8.2) and are not in M3.
   Requires sims configured with the checkpoint plugin [signals.rst:10].

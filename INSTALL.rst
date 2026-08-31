@@ -313,6 +313,12 @@ the script:
    :language: markdown
    :caption: etc/picongpu/dependencies/README.md
 
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   profiles/dependencies/README
+
 The old per-cluster ``dependencies_autoinstall.sh`` scripts (rosi-hzdr,
 delta-ncsa, perlmutter-nersc) are thin wrappers around this shared
 installer; per-cluster overrides remain possible via ``DEPS_*``

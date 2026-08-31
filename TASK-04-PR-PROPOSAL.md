@@ -1,4 +1,4 @@
-# PR Proposal — Task 04
+# PR Proposal - Task 04
 
 ## Title
 
@@ -16,7 +16,7 @@ list), mirroring the pattern already used by `EnergyHistogram`, `PhaseSpace`,
   `_validate_species` wraps a single `Species` or `FilteredSpecies` into a list.
 - `Radiation.__init__` registers `MomentumPrev1()` for every species (for a
   `FilteredSpecies`, on the wrapped plain species) and `RadiationMask()` **only**
-  for plain `Species` when `gamma_filter_threshold is not None` — never for
+  for plain `Species` when `gamma_filter_threshold is not None` - never for
   filtered species, which select particles via their own particle filter.
 - `Radiation.get_as_pypicongpu()` converts plain species via
   `get_as_pypicongpu()` and `FilteredSpecies` via `get_as_pypicongpu(mode="Filter")`.
@@ -46,15 +46,15 @@ functors/filters in PICMI for radiation is the Python half of that feature.
 
 ### Changes
 
-- `lib/python/picongpu/picmi/diagnostics/radiation.py` — species type,
+- `lib/python/picongpu/picmi/diagnostics/radiation.py` - species type,
   validation (actionable error, `gamma_filter_threshold` no-op check),
   attribute registration, `get_as_pypicongpu` conversion.
-- `lib/python/picongpu/pypicongpu/output/radiation.py` —
+- `lib/python/picongpu/pypicongpu/output/radiation.py` -
   `RadiationPlugin.species` accepts `FilteredSpecies`.
-- `lib/python/picongpu/picmi/simulation.py` — one-line comment in
+- `lib/python/picongpu/picmi/simulation.py` - one-line comment in
   `_collect_particle_filters()` noting that the list-aware `UnpackChain`
   traversal picks up filters of species lists (e.g. `Radiation`).
-- `lib/python/test/picongpu/quick/picmi/diagnostics/test_radiation.py` — new
+- `lib/python/test/picongpu/quick/picmi/diagnostics/test_radiation.py` - new
   quick tests (19): acceptance of `Species`/`FilteredSpecies`/lists;
   `ValidationError` on wrong types (with an actionable message for a bare
   species name); `MomentumPrev1`/`RadiationMask` registration rules;
@@ -68,7 +68,7 @@ functors/filters in PICMI for radiation is the Python half of that feature.
   `speciesDefinition.param`; and a characterization test pinning the
   known-wrong `--<species>_<filter>_radiation.*` block in the rendered
   `N.cfg` (wrong prefix, no correct prefix, no `.filter` line) until task 15.
-- `CHANGELOG.md` — short entry under `Unreleased`.
+- `CHANGELOG.md` - short entry under `Unreleased`.
 
 ### Python-side readiness / scope
 
@@ -88,7 +88,7 @@ separately (follow-up task 15) and is intentionally **not** included here:
 ### Verification
 
 - Quick test gate: `cd lib/python/test/picongpu && python -m pytest quick/ -q`
-  → `193 passed, 2 xfailed, 1 xpassed` (baseline was `174 passed, 2 xfailed,
+  -> `193 passed, 2 xfailed, 1 xpassed` (baseline was `174 passed, 2 xfailed,
   1 xpassed`; the 19 additional passes are the new radiation tests).
 - Rendered-output regression: for simulations **without** radiation filters
   (radiation diagnostic on a plain species, with and without

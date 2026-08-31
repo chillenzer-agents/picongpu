@@ -68,18 +68,38 @@ Resuming after a failure
 
 The progress of a run is persisted in ``<run_dir>/.workflow_state.json``.
 Stages that finished successfully are recorded there (keyed by stage name,
-never by workflow step name), together with the locations of their artifacts.
-When ``picongpu_run()`` is called again, completed stages are skipped and the
-run continues with the first incomplete stage — a run that failed (or was
-stopped) can be resumed without redoing the successful stages:
+never by workflow step name), together with the locations of their
+artifacts. When ``picongpu_run()`` is called again, completed stages are
+skipped and the run continues with the first incomplete stage.
+
+Stage-level resume applies to runs started with an explicit stage range
+(``up_to``/``from_``): the stages are executed one at a time and each is
+recorded as soon as it finishes, so after a failure only the failed stage
+and the stages after it are re-run:
 
 .. code-block:: python
 
-   # first attempt: failed inside 'submit'
-   sim.picongpu_run()
+   # first attempt: failed inside 'submit' ('build' and 'prepare' succeeded)
+   sim.picongpu_run(up_to=Stage.submit)
 
    # after fixing the problem: only 'submit' and 'collect' are re-run
    sim.picongpu_run()
+
+A failed *default* run (no stage arguments) works differently: it executes
+the complete workflow in a single cwltool invocation and records the stage
+state only after the whole workflow has succeeded. A failed default run
+therefore leaves no stage state behind; calling ``picongpu_run()`` again
+resumes at *job* granularity through the cwltool job cache: jobs whose
+inputs are byte-identical to the first attempt are skipped, and any changed
+input re-runs the workflow from that point on. (Recording per-stage progress
+during the single-invocation default run would change the historical
+"default = one workflow invocation" behavior and is a possible improvement
+for a later iteration.)
+
+Changed inputs are detected: each stage records a digest of the workflow
+inputs it was run with (see below), so an edit of ``workflow/input.yaml``
+after a completed run re-runs the affected stages (and the stages that
+depend on them) instead of silently skipping them.
 
 Semantics
 ---------

@@ -386,6 +386,23 @@ def test_step_file_renamed_raises_workflow_stage_error(runner):
         runner.run_range(up_to=Stage.build)
 
 
+def test_unknown_state_version_is_ignored(runner):
+    # a state file with an unknown version must not be trusted: it is
+    # treated as empty, the stage is re-run, and the state is re-recorded
+    # with the supported version (had the foreign state been trusted, the
+    # stage would have been skipped and the file would still say version 99)
+    runner.run_range(up_to=Stage.build)
+    state = json.loads(runner.workflow_state_path.read_text())
+    state["version"] = 99
+    runner.workflow_state_path.write_text(json.dumps(state))
+
+    runner.run_range(up_to=Stage.build)
+
+    state = json.loads(runner.workflow_state_path.read_text())
+    assert state["version"] == 1
+    assert state["stages"][Stage.build.value]["status"] == "completed"
+
+
 def test_force_stage_invalidates_dependents(runner):
     runner.run_range()
     state = load_state(runner)

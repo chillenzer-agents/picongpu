@@ -206,7 +206,11 @@ Rules:
   invalidated and re-run. This is how an edit of `input.yaml` after a
   completed run is detected (without it, the run would silently skip every
   stage and reuse stale artifacts).
-- Unreadable/foreign state files are logged and treated as empty.
+- Unreadable/foreign state files are logged and treated as empty. A state
+  file whose `version` is not 1 (the only version this runner writes and
+  reads) is likewise logged and ignored: it is treated as empty, so the next
+  run re-records it (the check makes the `version` field a migration hook for
+  future format changes instead of a dead field).
 - The file is safe to delete (fresh start); `Runner.reset_workflow_state()`
   does it programmatically.
 
@@ -384,7 +388,8 @@ Results (venv `task-09`):
 ## 15. Risks / known limitations
 
 - The stage vocabulary is a **new public commitment**; renaming a stage
-  later breaks the state file (mitigation: state `version` field + the
+  later breaks the state file (mitigation: the state `version` field is
+  checked on load -- unknown versions are ignored, cf. section 6 -- plus the
   "membership may grow, meaning is stable" contract documented in the
   `Stage` docstring).
 - Per-step outdirs named `step-N`: if a stage's steps are renumbered, stale

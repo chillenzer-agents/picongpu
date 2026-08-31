@@ -12,7 +12,7 @@ Partial Workflow Execution (Stages)
 
 Running a PIConGPU simulation with the Python package drives a small
 `CWL <https://www.commonwl.org/>`_ workflow (``workflow.cwl``) that performs
-several actions in a row. These actions are exposed to users as **stages** —
+several actions in a row. These actions are exposed to users as **stages** -
 coarse-grained, stable milestones of a simulation run:
 
 =========  =====================================================

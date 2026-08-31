@@ -35,9 +35,12 @@ Ground rules used throughout:
 | 7 | P1 | collision model declared in both layers; the dynamic-log/screening invariant lived only in picmi | done | `1b3aa0fe3` |
 | 8 | P1 | ionization bridging: `ionization_current` silently dropped, `ThomasFermi` conversion broken | done | `39e42fa90` |
 | 9 | P1 | simulation-level defaults & compile/runtime split | **verified aligned — no code change needed** (see below) | — |
+| 10 | P1(opt) | synchrotron parameter alignment (C++ computed `minEnergy = hbar/dt` default vs Python `None` + template fallback) | open — deferred (optional trivial mirror, after the core items; see "Next PRs") | — |
+| 11 | P1(opt) | radiation plugin defaults (trivial mirrors: `radiationGamma = 5.0`, `NyquistFactor`, `listLocation`) | open — deferred (optional trivial mirror, after the core items; see "Next PRs") | — |
 
-The two remaining optional items of the original plan were not started (time
-box); candidates are listed under "Next PRs".
+The two remaining optional items of the original plan (10: synchrotron
+parameters, 11: radiation plugin defaults) were not started (time box); they
+are tracked as `open` in the table above and listed under "Next PRs".
 
 ## Item details
 
@@ -105,8 +108,12 @@ fixed base values) and computed `mass_ratio`/`charge_ratio` fields on
 directly, exactly like the C++ default file.
 
 Rendered impact: **intentional text change, numerically identical** — e.g.
-electron `9.109…e-31 / sim.si.getBaseMass()` → `1.0`; proton mass ratio
-→ `1836.15267…`, charge ratio → `-1.0`. Same IEEE double C++ computed.
+electron mass ratio `9.109…e-31 / sim.si.getBaseMass()` →
+`0.99999999999656941` (the particle-package CODATA electron mass differs from
+the rounded C++ base by ~3.4e-12, so the rendered literal is not exactly
+`1.0`); electron charge ratio → `1.0` (particle charge and the C++ base
+charge are both negative); proton mass ratio → `1836.15267…`. For identical
+input values this is the same IEEE double C++ computes.
 All other rendered files byte-identical.
 
 ### 5. Density-ratio semantics (P1) — done
@@ -173,9 +180,10 @@ because the plain-mode `field_serializer`s of `Collision.species_pairs` and
 `Collision.functor` change the serialised shape while the fallback
 `model_json_schema(mode="serialization")` does not. Reproduced at the task
 base commit (`b6374eafd`) — i.e. picmi collision setups could not be rendered
-at all before or after this item. The same family affects any model whose
-plain-mode field serializer changes the shape (e.g. `Simulation.customuserinput`
-when non-empty, `Binning.openPMDBackendConfig`). Verified for item 7 that the
+at all before or after this item. Only the collision setup actually fails in
+this family: `Simulation.customuserinput` (non-empty) and
+`Binning.openPMDBackendConfig` (set) were checked and render fine at the base
+commit and at this branch, so they are not affected. Verified for item 7 that the
 pypicongpu `CollisionalPhysicsSetup` `model_dump(mode="json")` is
 byte-identical before/after.
 
@@ -274,9 +282,10 @@ the C++ interface. The main couplings:
    the fallback schema generation with the actual serialised shapes (or
    provide the pre-generated schemas in `share/picongpu/pypicongpu/schema/`,
    the mechanism already exists in `renderedobject.py`).
-2. **Same schema/serializer mismatch family** for `Simulation.customuserinput`
-   (non-empty) and `Binning.openPMDBackendConfig` (set): not exercised by any
-   quick test, so latent.
+2. **Not affected (checked):** `Simulation.customuserinput` (non-empty) and
+   `Binning.openPMDBackendConfig` (set) were initially suspected of the same
+   schema/serializer mismatch family, but both render fine at the base commit
+   and at this branch (verified); only the collision setup of bug #1 fails.
 3. **Dead field**: `MODEL_NAME` on the picmi ionization models is declared
    but never read anywhere (the C++ name comes from the pypicongpu
    `ionizer_picongpu_name` defaults). Candidate for removal in a cleanup PR
@@ -288,7 +297,7 @@ the C++ interface. The main couplings:
 ## Next PRs (suggested order)
 
 1. Fix the render-context schema check for shape-changing serializers
-   (pre-existing bug #1/#2 above); add a quick test that renders a
+   (pre-existing bug #1 above); add a quick test that renders a
    collision setup end-to-end (this would have caught it).
 2. Expose the remaining C++ `value_identifier`s (the species attribute
    defaults in `speciesAttributes.param`) as pypicongpu defaults where
@@ -298,6 +307,11 @@ the C++ interface. The main couplings:
    in `species.py`.
 4. Cleanup: remove the dead `MODEL_NAME` fields on the picmi ionization
    models (public API change, hence a separate PR).
+5. Item 10 (optional, deferred): align the synchrotron parameter
+   names/types/defaults with `synchrotron.param` (Python side).
+6. Item 11 (optional, deferred): mirror the radiation plugin defaults
+   (`gamma_filter_threshold` -> `radiationGamma = 5.0`, `nyquist_factor` ->
+   `NyquistFactor`, `list_location` -> `listLocation`).
 
 ## Test gate
 

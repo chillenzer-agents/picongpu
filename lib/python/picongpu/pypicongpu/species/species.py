@@ -244,34 +244,6 @@ class Species(RenderedObject, BaseModel):
             )
         return self
 
-    def check(self) -> None:
-        """
-        sanity-check self, if ok pass silently
-
-        Ensure that:
-
-        - species has valid name
-        - constants have unique types
-
-        Note: the name, position/momentum and attribute-uniqueness invariants
-        are enforced at construction time by the field/model validators; this
-        method is kept for explicit re-checks of the remaining invariants.
-        """
-
-        # name c++ compatible (enforced by the field validator at construction)
-        if not re.fullmatch(r"^[A-Za-z0-9_]+$", self.name):
-            raise ValueError("species names must be c++ compatible ([A-Za-z0-9_]+)")
-
-        # each constant type can only be used once
-        const_types = list(map(type, self.constants))
-        non_unique_constants = set([c for c in const_types if const_types.count(c) > 1])
-        if 0 != len(non_unique_constants):
-            raise ValueError(
-                "constant names must be unique per species, offending: {}".format(
-                    ", ".join(map(str, non_unique_constants))
-                )
-            )
-
     @field_validator("constants", mode="before")
     @classmethod
     def constants_context(cls, value):

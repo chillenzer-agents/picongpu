@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 from enum import Enum
-from operator import attrgetter, itemgetter
+from operator import attrgetter
 from typing import Annotated, Callable, Literal
 
 from pydantic import (
@@ -18,7 +18,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from sympy import Expr, Symbol, srepr, sympify
+from sympy import Expr, Symbol, srepr, sqrt, sympify
 from sympy.vector import CoordSys3D, Vector
 
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
@@ -152,34 +152,26 @@ _OBSERVER_INDEX = Symbol("index")
 
 def serialise_index_to_direction(value) -> dict[str, str]:
     # Evaluate the direction mapping at the canonical symbol and serialise the
-    # three component expressions (lossless, via sympy's srepr).
+    # three component expressions (lossless, via sympy's srepr). Components
+    # are canonicalised through sympify first, because srepr of a python
+    # scalar (e.g. 0 -> "0") differs from srepr of its sympy counterpart
+    # (Integer(0) -> "Integer(0)"), which the normalising validator produces.
     # A dict (rather than a list) is used so that the value is also accepted
     # by the rendering context checker (lists may only contain dicts).
-    return {key: srepr(component) for key, component in zip("xyz", value(_OBSERVER_INDEX))}
+    return {key: srepr(sympify(component)) for key, component in zip("xyz", value(_OBSERVER_INDEX))}
 
 
 def deserialise_index_to_direction(value):
     # Rebuild the direction mapping from the serialised form (a dict of three
     # sympy expression strings, keyed x/y/z), so that model_dump(mode="json")
-    # output can be validated again (round-trip safety). Plain numbers are
-    # turned back into python ints/floats so that re-serialisation (srepr) is
-    # stable.
+    # output can be validated again (round-trip safety). Components stay
+    # sympy objects (srepr is a faithful round-trip), so that re-serialising
+    # yields the identical srepr strings.
     if isinstance(value, dict) and set(value) == {"x", "y", "z"}:
-        components = []
-        for key in "xyz":
-            expr = sympify(value[key])
-            if expr.is_Integer:
-                components.append(int(expr))
-            elif expr.is_Float:
-                components.append(float(expr))
-            else:
-                components.append(expr)
+        components = [sympify(value[key]) for key in "xyz"]
 
         def direction(arg):
-            return tuple(
-                component.subs(_OBSERVER_INDEX, arg) if isinstance(component, Expr) else component
-                for component in components
-            )
+            return tuple(component.subs(_OBSERVER_INDEX, arg) for component in components)
 
         return direction
     return value
@@ -211,14 +203,22 @@ class RadiationObserverConfiguration(BaseModel):
     @classmethod
     def _validate_index_to_direction(cls, value):
         index = Symbol("index")
-        vec = _make_vector(value(index))
+        components = [sympify(component) for component in value(index)]
+        vec = _make_vector(components)
         if vec.magnitude().equals(1):
             return value
         if vec.magnitude().equals(0):
             raise ValueError(f"The index_to_direction expression must be normalisable. You gave: {vec=} with norm 0.")
-        return lambda arg: tuple(
-            map(itemgetter(2), sorted(vec.normalize().subs(index, arg).components.items(), key=itemgetter(1)))
-        )
+        # normalise component-wise; the normalised Vector cannot be
+        # re-extracted by sorting its components dict, because neither the
+        # basis terms nor the symbolic coefficients are orderable in sympy
+        magnitude_sq = sum(component**2 for component in components)
+
+        def direction(arg):
+            magnitude = sqrt(magnitude_sq.subs(index, arg))
+            return tuple(component.subs(index, arg) / magnitude for component in components)
+
+        return direction
 
     @computed_field
     def component_expressions(self) -> dict[str, str]:

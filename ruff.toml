@@ -55,10 +55,10 @@ ignore = [
     # pydocstyle: the docstrings follow a mix of conventions (the
     # "This file is part of PIConGPU" module headers, Google-style
     # sections, and the project's @param/@detail style) and are also
-    # consumed by Sphinx; normalising ~4,600 docstrings to a single
-    # pydocstyle convention is a separate documentation project.
+    # consumed by Sphinx; normalising the ~3,800 pydocstyle violations
+    # is a separate documentation project.
     "D",
-    # flake8-annotations: ~3,500 missing type annotations would be a
+    # flake8-annotations: ~2,500 missing type annotations would be a
     # separate typing project; the public API boundaries are guarded at
     # runtime with typeguard instead.
     "ANN",
@@ -74,8 +74,8 @@ ignore = [
     # docs recommend ignoring it when using ruff format).
     "COM812",
     # flake8-use-pathlib: the scripts, tools, and plugin code use
-    # os.path consistently; migrating ~120 call sites to pathlib is a
-    # separate modernisation.
+    # os.path consistently; migrating the ~110 call sites to pathlib is
+    # a separate modernisation.
     "PTH",
     # flake8-boolean-trap: boolean flags in the public API mirror the
     # C++ parameters (prePlasma, ...); restructuring them (keyword-only,

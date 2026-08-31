@@ -135,18 +135,21 @@ def _cpp_identifier(name: str) -> bool:
 
 
 class TestPusherShapeTranslation(TestCase):
-    """the picmi->pypicongpu pusher/shape bridge must not drift from the C++ names"""
+    """the picmi->pypicongpu pusher/shape bridge must not drift from the C++
+    names (identifier-ness only: the existence of the matching C++ struct is
+    not checked here, see the `Pusher.Axel` note in `species.py`)"""
 
-    def test_pusher_members_match_cpp_struct_names(self):
+    def test_pusher_members_are_cpp_identifiers(self):
         # the pypicongpu Pusher values render into particles::pusher::<value>,
-        # so every value must be a valid C++ identifier
+        # so every value must be a valid C++ identifier (identifier-ness only,
+        # the C++ struct itself is not checked)
         for pusher in Pusher:
             assert _cpp_identifier(pusher.value), f"pusher value {pusher.value!r} is not a C++ identifier"
 
-    def test_particle_shape_members_match_cpp_struct_names(self):
+    def test_particle_shape_members_are_cpp_identifiers(self):
+        # identifier-ness only, the C++ struct itself is not checked
         for shape in Shape:
             assert _cpp_identifier(shape.value), f"shape value {shape.value!r} is not a C++ identifier"
-
 
 class TestSpeciesRequirementResolution(TestCase):
     def test_deduplicate_attributes(self):

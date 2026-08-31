@@ -206,6 +206,9 @@ def _build(name: str):
         return LogFrequencies(omega_min=1e14, omega_max=1e17)
     if name == "RadiationObserverConfiguration":
         return RadiationObserverConfiguration(index_to_direction=lambda _: [1, 0, 0], N_observer=1)
+    if name == "RadiationObserverConfiguration_nonunit":
+        # a non-unit direction exercises the validator's normalising branch
+        return RadiationObserverConfiguration(index_to_direction=lambda i: (i, 1, 0), N_observer=1)
     if name == "RadiationConfiguration":
         return RadiationConfiguration(frequencies=LogFrequencies(omega_min=1e14, omega_max=1e17))
     if name == "RadiationPluginConfig":
@@ -443,6 +446,7 @@ _MODELS = [
     "LinearFrequencies",
     "LogFrequencies",
     "RadiationObserverConfiguration",
+    "RadiationObserverConfiguration_nonunit",
     "RadiationConfiguration",
     "RadiationPluginConfig",
     "RadiationPlugin",
@@ -676,3 +680,18 @@ def test_collision_functor_malformed_dict_raises_value_error():
     # must fail with a validation-style error, not a raw KeyError
     with pytest.raises(ValueError, match="data.coulomb_log"):
         Collision(species_pairs=[(_ELECTRON, _ELECTRON)], functor={"type_constlog": True, "data": {}})
+
+
+def test_radiation_observer_nonunit_direction_roundtrips():
+    # a direction whose magnitude is not symbolically 1 goes through the
+    # validator's normalising branch; the reconstructed mapping must still be
+    # unit-length and point along the original direction
+    model = RadiationObserverConfiguration(index_to_direction=lambda i: (i, 1, 0), N_observer=8)
+    dumped = model.model_dump(mode="json")
+    restored = RadiationObserverConfiguration.model_validate(dumped)
+    assert restored.model_dump(mode="json") == dumped
+    for k in (3, 7):
+        x, y, z = restored.index_to_direction(k)
+        assert x**2 + y**2 + z**2 == 1
+        assert x / y == k
+        assert z == 0

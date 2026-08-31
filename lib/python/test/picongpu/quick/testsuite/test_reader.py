@@ -83,8 +83,7 @@ class TestCMAKEFlagReader:
 
     def _make_reader(self, tmp_path):
         (tmp_path / "cmakeFlags").write_text(
-            'flags[0]="-DPIC_GAMMA=1.021;-DPIC_DENSITY=1.0e25"\n'
-            'flags[1]="-DPIC_GAMMA=1.0;-DPIC_DENSITY=2.0e25"\n'
+            'flags[0]="-DPIC_GAMMA=1.021;-DPIC_DENSITY=1.0e25"\nflags[1]="-DPIC_GAMMA=1.0;-DPIC_DENSITY=2.0e25"\n'
         )
         (tmp_path / "cmakeFlagsSetup").write_text("selected setup:0\n")
         return cmakeFlagReader.CMAKEFlagReader(direction=str(tmp_path))

@@ -6,8 +6,10 @@ License: GPLv3+
 """
 
 import json
+import os
 import re
 import subprocess
+import sys
 from copy import deepcopy
 
 from moosetash import MissingVariable
@@ -148,3 +150,32 @@ def test_efp_preset_generate_copies_preset_and_drives_flags(efp_rc_params):
     inputs = json.loads(runner.workflow_input_path.read_text())
     assert inputs["run_submit_system"] == "sbatch"
     assert inputs["run_template_file"] == EFP_TPL
+
+
+def test_laptop_flow_discovers_rc_file_next_to_picmi_script(tmp_path):
+    # The documented primary laptop route: a picongpurc.toml next to the
+    # PICMI script must actually select the preset (review finding M1: with
+    # a dotfile-only CWD glob this silently produced a setup without the
+    # EFP preset).
+    (tmp_path / "picongpurc.toml").write_text(
+        f'preset = "{EFP_PRESET}"\n'
+        'author = "EFP Test"\n'
+        'email = "efp-test@example.com"\n'
+        f'pic_src_path = "{core.path()}"\n'
+        f'pic_libs = "{tmp_path}"\n'
+    )
+    (tmp_path / "sim.py").write_text(
+        "from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation\n"
+        "sim = Simulation(time_step_size=1, max_steps=1, solver=ElectromagneticSolver(method='Yee', grid="
+        "Cartesian3DGrid(number_of_cells=[16] * 3, lower_bound=[0] * 3, upper_bound=[16] * 3, "
+        "lower_boundary_conditions=['periodic'] * 3, upper_boundary_conditions=['periodic'] * 3)))\n"
+        "sim.write_input_file('setup')\n"
+    )
+    env = {key: value for key, value in os.environ.items() if key != "PIC_RC"}
+    result = subprocess.run(
+        [sys.executable, "sim.py"], cwd=tmp_path, env=env, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    # the EFP preset was applied through CWD discovery:
+    assert (tmp_path / "setup" / "etc" / "picongpu" / EFP_PRESET / "gh200_efp.tpl").is_file()
+    assert EFP_TPL in (tmp_path / "setup" / "workflow" / "scripts" / "picongpu.profile").read_text()

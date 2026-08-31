@@ -290,10 +290,12 @@ class FromOpenPMDPulseLaser(BaseModel):
     propagationAxisOpenPMD: str
     """Propagation axis name in the OpenPMD file.
     C++ name: propagationAxisOpenPMD (incidentField.param)."""
-    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
+    huygens_surface_positions: Annotated[
+        list[list[int]], BeforeValidator(deserialise_huygens), PlainSerializer(_get_huygens_surface_serialized)
+    ]
     """Position in cells of the Huygens surface relative to start/
-       edge(negative numbers) of the total domain, [cells];
-       a 3x2 list: per axis (positive edge, negative edge)."""
+        edge(negative numbers) of the total domain, [cells];
+        a 3x2 list: per axis (positive edge, negative edge)."""
 
 
 class TWTSLaser(_BaseLaser):
@@ -355,10 +357,6 @@ class TWTSLaser(_BaseLaser):
     """Switching duration by half a Blackman-Nuttall window in number of time steps,
     [dimensionless time-step number]; must be >= 0 (0 deactivates the window).
     C++ name: windowLength (incidentField.param)."""
-    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
-    """Position in cells of the Huygens surface relative to start/
-       edge(negative numbers) of the total domain, [cells];
-       a 3x2 list: per axis (positive edge, negative edge)."""
 
     @model_validator(mode="after")
     def _check_window(self):

@@ -299,7 +299,18 @@ def set_workflow_input(runner, key, value):
 def test_full_run_default_and_state(runner, sim):
     # Default (no arguments) runs the whole pipeline; progress is recorded
     # in the stage-keyed state file.
-    sim.picongpu_run()
+    artifacts = runner.run_range()
+
+    # the default full run returns the recorded artifacts of the last stage
+    # (the same shape as the per-step path), not the raw workflow outputs
+    assert set(artifacts) == {
+        "input_directory",
+        "tbg_directory",
+        "submission_information",
+        "link_results_script",
+    }
+    for artifact in artifacts.values():
+        assert set(artifact) == {"class", "location"}
 
     run_dir = runner.run_dir
     assert (run_dir / "input" / "bin" / "picongpu").read_text() == "built-default\n"
@@ -325,7 +336,8 @@ def test_second_run_skips_completed(runner, sim):
     sim.picongpu_run()
     first = load_state(runner)
 
-    sim.picongpu_run()
+    # an up-to-date re-run executes no stage at all and returns None
+    assert runner.run_range() is None
 
     second = load_state(runner)
     assert first == second, "a second run must not redo (or even rewrite) completed stages"

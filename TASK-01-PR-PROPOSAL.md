@@ -147,7 +147,7 @@ docs: render python_package snippets from CI-tested scripts
 | Rendered HTML | `defining_simulation.html` | no `BEGIN-`/`END-` marker lines rendered |
 | pre-commit | `pre-commit run --all-files` | all hooks **Passed** (re-verified at the rework tip) |
 | CI job dry-run (original entry) | profile-check block executed locally (generate 16^3 setup with `bash` preset, source profile) | `PIC_BACKEND=omp2b:native`, `PICSRC=<source tree>` - OK. **Superseded by the re-run below:** this run used a hand-corrected variant of the profile-check block, not the committed job text |
-| CI job dry-run (re-run, rework) | `share/ci/docs_snippets_dryrun.sh` - the job's `script:` entries as YAML-parsed (exactly what the GitLab runner executes) run verbatim with the task venv; stubbed only: `pypicongpu.sh` (micromamba env setup), `apt`, the `pic-build`/`pic-configure`/`tbg` `--help` smoke checks | **all 16 job steps passed** (~3.5 min, 2026-08-31): snippet suite `25 passed in 19.60s`; `profile check OK: PIC_BACKEND=omp2b:native PICSRC=<source tree>`; doxygen + `sphinx-build`: `build succeeded` (283 warnings, **0** in `python_package/`, **0** include failures); both grep gates passed |
+| CI job dry-run (re-run, rework) | `share/ci/docs_snippets_dryrun.sh` - the job's `script:` entries as YAML-parsed (exactly what the GitLab runner executes) run verbatim with the task venv; stubbed only: `pypicongpu.sh` (micromamba env setup), `apt`, the `pic-build`/`pic-configure`/`tbg` `--help` smoke checks | **all 16 job steps passed** at the rework tip (~3.5 min, 2026-08-31): snippet suite `25 passed in 21.51s`; `profile check OK: PIC_BACKEND=omp2b:native PICSRC=<source tree>`; doxygen + `sphinx-build`: `build succeeded` (413 warnings in this run's environment - the absolute count is environment/state-dependent: 381 originally, 283 in an intermediate re-run, 413 at the final tip; **0** in `python_package/`, **0** include failures in all runs); both grep gates passed |
 | `.gitlab-ci.yml` | YAML parse of the new job | OK (note: the YAML block-scalar de-indent is what places the old inline heredoc's `PY` terminator at column 0; the rework moved the check to a checked-in script anyway, for testability outside GitLab) |
 
 ## Key decisions
@@ -196,8 +196,8 @@ docs: render python_package snippets from CI-tested scripts
   job structure are stable - task 02 should build on them, not rework them.
 - `share/ci/docs_snippets_profile_check.sh` / `docs_snippets_dryrun.sh`
   (new in rework)  -  profile check + local dry-run harness for the job.
-- (`docs/source/conf.py` is no longer touched: the rework removed the
-  no-op `exclude_patterns` entry, so the file is identical to the base.)
+- `docs/source/conf.py` (rework only corrects the `exclude_patterns`
+  comment; the entry itself is required, see n1).
 
 ## Rework (post-review, 2026-08-31)
 
@@ -214,7 +214,11 @@ the per-finding disposition):
 - m1: execution wording corrected (`test_snippets.py`, `snippets/README.md`).
 - m2: emulation constants single-sourced in `run_snippet.py`; the optimizer
   test is documented as a mechanics test against the synthetic landscape.
-- n1: no-op `exclude_patterns` entry removed from `conf.py`.
+- n1: the `exclude_patterns` entry is kept (the review's "no-op" claim
+  overlooked that `myst_parser` also collects `.md` files, and
+  `snippets/README.md` is one; without the entry the build gains a
+  "document isn't included in any toctree" warning - verified by build);
+  the misleading comment is corrected.
 - n2: python snippet shebangs unified on `#!/usr/bin/env python`; WIP-`@dev`
   pin noted above.
 

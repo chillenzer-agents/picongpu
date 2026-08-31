@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from picongpu.pypicongpu.field_solver import YeeSolver
 from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
-from picongpu.pypicongpu.laser import FromOpenPMDPulseLaser, GaussianLaser, TWTSLaser
+from picongpu.pypicongpu.laser import FromOpenPMDPulseLaser, GaussianLaser, PlaneWaveLaser, TWTSLaser
 from picongpu.pypicongpu.movingwindow import MovingWindow
 from picongpu.pypicongpu.output.checkpoint import Checkpoint
 from picongpu.pypicongpu.collisions import Collision, CollisionNumericsConfig, ConstLogCollision, DynamicLogCollision
@@ -148,6 +148,38 @@ class TestSimulationInvariants:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             make_sim(laser=[make_laser(duration=1e-15)], time_steps=100)
+
+    def test_twts_window_exceeding_run_warns(self):
+        # TWTSLaser extent is its on/off window (windowEnd, in steps)
+        laser = make_twts_laser(windowStart=0.0, windowEnd=1000.0, windowLength=10.0)
+        with pytest.warns(UserWarning, match="exceeds the simulation time"):
+            make_sim(laser=[laser], time_steps=10)
+
+    def test_twts_window_within_run_does_not_warn(self):
+        laser = make_twts_laser(windowStart=10.0, windowEnd=50.0, windowLength=10.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            make_sim(laser=[laser], time_steps=100)
+
+    def test_plane_wave_does_not_warn(self):
+        # a continuous wave is present for the whole run by definition; the
+        # Gaussian-pulse heuristic must not fire for it
+        laser = PlaneWaveLaser(
+            propagation_direction=(0.0, 1.0, 0.0),
+            polarization_direction=(0.0, 0.0, 1.0),
+            polarization_type="Linear",
+            wavelength=0.8e-6,
+            duration=1.0,
+            focal_position=(0.5, 0.5, 0.5),
+            phi0=0.0,
+            E0=1e10,
+            pulse_init=1.0,
+            huygens_surface_positions=[[1, -1], [1, -1], [1, -1]],
+            laser_nofocus_constant_si=1.0,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            make_sim(laser=[laser], time_steps=10)
 
 
 class TestWalltimeInvariants:

@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 import enum
+import warnings
 from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, PlainSerializer, model_validator
@@ -133,6 +134,12 @@ class Grid3D(BaseModel, RenderedObject):
 
     Units policy: cell sizes in meter, cell counts and super cell sizes in
     cells (dimensionless).
+
+    The super-cell/GPU divisibility of the grid is a soft (technical)
+    invariant: PIConGPU does not reject such grids but rounds the local
+    domain up to a full super cell at runtime (the C++ DomainAdjuster,
+    include/picongpu/simulation/control/DomainAdjuster.hpp) and runs the
+    adjusted grid, so the model only warns about them.
     """
 
     # accept both the field names (as produced by model_dump) and the aliases
@@ -169,11 +176,20 @@ class Grid3D(BaseModel, RenderedObject):
     super_cell_size: Annotated[Vec3_int, AfterValidator(lambda x: all_gt(x, 0))]
     """size of the super cell in x, y and z direction as 3-integer tuple, [cells]; must be >= 1.
     C++ name: SuperCellSize (memory.param).
-    The cells per device in each direction must be a multiple of the super cell size."""
+    The cells per device in each direction should be a multiple of the super cell
+    size; PIConGPU otherwise rounds the local domain up at runtime, so a
+    violation is a warning, not an error."""
 
     @model_validator(mode="after")
     def check(self) -> Self:
-        """cross-field invariants between cell_cnt, gpu_cnt, grid_dist and super_cell_size"""
+        """cross-field invariants between cell_cnt, gpu_cnt, grid_dist and super_cell_size
+
+        The per-axis cell-count sum is a hard error. The super-cell/GPU
+        divisibility is a soft (technical) invariant, hence a warning: the C++
+        DomainAdjuster (include/picongpu/simulation/control/DomainAdjuster.hpp)
+        rounds the local domain up to a full super cell, prints the adjusted
+        size, and continues, so such grids are still runnable by PIConGPU.
+        """
         if self.grid_dist is not None:
             for axis, message in enumerate(
                 (
@@ -184,25 +200,29 @@ class Grid3D(BaseModel, RenderedObject):
             ):
                 if sum(self.grid_dist[axis]) != self.cell_cnt[axis]:
                     raise ValueError(message)
-            # each device's chunk must be a multiple of the super cell size
+            # each device's chunk should be a multiple of the super cell size
             for axis in range(3):
                 for chunk in self.grid_dist[axis]:
                     if chunk % self.super_cell_size[axis] != 0:
-                        raise ValueError(
-                            f"grid distribution in {'xyz'[axis]} direction must be a multiple of the super cell size. "
-                            f"You gave chunk {chunk} and super_cell_size {self.super_cell_size[axis]}."
+                        warnings.warn(
+                            f"grid distribution in {'xyz'[axis]} direction is not a multiple of the super cell size: "
+                            f"chunk {chunk} with super_cell_size {self.super_cell_size[axis]}. "
+                            "PIConGPU will round the local domain up to a full super cell at runtime "
+                            "(DomainAdjuster) and run the adjusted grid."
                         )
         else:
             # without an explicit distribution the grid is split evenly over the GPUs,
-            # so each device's share must be a multiple of the super cell size
+            # so each device's share should be a multiple of the super cell size
             for axis in range(3):
                 cells = self.cell_cnt[axis]
                 n_gpus = self.gpu_cnt[axis]
                 super_cell = self.super_cell_size[axis]
                 if (cells // n_gpus // super_cell) * n_gpus * super_cell != cells:
-                    raise ValueError(
+                    warnings.warn(
                         f"GPU- and/or super-cell-distribution in {'xyz'[axis]} direction does not match grid size: "
                         f"cell_cnt {cells} is not evenly divisible by "
-                        f"gpu_cnt {n_gpus} * super_cell_size {super_cell}."
+                        f"gpu_cnt {n_gpus} * super_cell_size {super_cell}. "
+                        "PIConGPU will round the local domain up to a full super cell at runtime "
+                        "(DomainAdjuster) and run the adjusted grid."
                     )
         return self

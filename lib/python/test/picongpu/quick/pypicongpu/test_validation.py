@@ -209,22 +209,30 @@ class TestGridInvariants:
         with pytest.raises(ValidationError, match="sum of grid_dists"):
             make_grid(n_gpus=(2, 1, 1), grid_dist=([10, 16], [16], [16]))
 
-    def test_grid_dist_not_multiple_of_super_cell_raises(self):
-        with pytest.raises(ValidationError, match="multiple of the super cell size"):
+    def test_grid_dist_not_multiple_of_super_cell_warns(self):
+        # technical invariant: PIConGPU rounds the local domain up to a full
+        # super cell at runtime (DomainAdjuster), so this is a warning
+        with pytest.warns(UserWarning, match="multiple of the super cell size"):
             make_grid(super_cell_size=(3, 2, 2), grid_dist=([8, 8], [16], [16]))
 
-    def test_super_cell_does_not_divide_grid_raises(self):
-        # 16 cells in x cannot be split into a multiple of 3 super cells
-        with pytest.raises(ValidationError, match="does not match grid size"):
+    def test_super_cell_does_not_divide_grid_warns(self):
+        # 16 cells in x cannot be split into a multiple of 3 super cells;
+        # PIConGPU adjusts the domain at runtime, so this is a warning
+        with pytest.warns(UserWarning, match="does not match grid size"):
             make_grid(super_cell_size=(3, 2, 2))
 
-    def test_gpu_cnt_does_not_divide_grid_raises(self):
-        with pytest.raises(ValidationError, match="does not match grid size"):
+    def test_gpu_cnt_does_not_divide_grid_warns(self):
+        with pytest.warns(UserWarning, match="does not match grid size"):
             make_grid(n_gpus=(3, 1, 1))
 
     def test_valid_grid(self):
         grid = make_grid()
         assert grid.cell_cnt == (16, 16, 16)
+
+    def test_valid_grid_does_not_warn(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            make_grid()
 
 
 def make_species(name="electron", constants=(), attributes=None, **overrides):

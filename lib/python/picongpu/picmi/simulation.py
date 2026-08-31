@@ -474,9 +474,11 @@ class Simulation(picmistandard.PICMI_Simulation):
           stages even if they are recorded as completed; stages that depend
           on them are invalidated as well
 
-        Progress is stored in ``<run_dir>/.workflow_state.json``, so a run
-        that failed or was stopped can be resumed without redoing the
-        successful stages.
+        Progress is stored in ``<run_dir>/.workflow_state.json``: a run
+        started with an explicit stage range that failed or was stopped can
+        be resumed without redoing the successful stages; a failed default
+        (no-argument) run leaves no stage state and resumes at job
+        granularity via the cwltool job cache (byte-identical inputs only).
         """
         runner = self.picongpu_get_runner(setup_dir=setup_dir, run_dir=run_dir)
         if not runner.workflow_input_path.exists():

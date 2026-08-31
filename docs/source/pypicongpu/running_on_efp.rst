@@ -74,8 +74,9 @@ The target user flow: you have a ``picongpurc.toml`` and a PICMI input
 script on your laptop; running the script prepares everything that the EFP
 Workflows need.
 
-1. **Select the EFP preset in ``picongpurc.toml``** (next to your PICMI
-   script, or in ``$XDG_CONFIG_HOME/picongpu/picongpurc.toml``):
+1. **Select the EFP preset in ``picongpurc.toml``** (in the directory you
+   run the PICMI script from — typically next to the script — or in
+   ``$XDG_CONFIG_HOME/picongpu/picongpurc.toml``):
 
    .. code-block:: toml
 
@@ -108,19 +109,17 @@ Workflows need.
 
    .. code-block:: bash
 
-      cd setup
-      tbg -c etc/picongpu/N.cfg -t etc/picongpu/efp-jupiter-jsc/gh200_efp.tpl $SCRATCH/efp-run
+       cd setup
+       tbg -c etc/picongpu/N.cfg -t etc/picongpu/efp-jupiter-jsc/gh200_efp.tpl $SCRATCH/efp-run
 
-   (After sourcing the profile, ``tbg -c etc/picongpu/N.cfg $SCRATCH/efp-run``
-   uses the preset defaults.)
-    This creates ``$SCRATCH/efp-run/tbg/submit.start`` (the rendered job
-    script) and ``$SCRATCH/efp-run/input/`` (``bin/``, ``etc/``, ...).
-    Per-run overrides (queue, account, wall time, ...) work as usual
-    through ``tbg -o``, e.g.
-    ``tbg -c etc/picongpu/N.cfg -o "TBG_queue=debug TBG_wallTime=01:00:00"
-    $SCRATCH/efp-run``;
-    the overwritable variables are the ``.TBG_*`` computation lines of the
-    template.
+   This creates ``$SCRATCH/efp-run/tbg/submit.start`` (the rendered job
+   script) and ``$SCRATCH/efp-run/input/`` (``bin/``, ``etc/``, ...).
+   Per-run overrides (queue, account, wall time, ...) work as usual
+   through ``tbg -o``, e.g.
+   ``tbg -c etc/picongpu/N.cfg -o "TBG_queue=debug TBG_wallTime=01:00:00"
+   $SCRATCH/efp-run``;
+   the overwritable variables are the ``.TBG_*`` computation lines of the
+   template.
 5. **Ship the environment profile with the input dataset**:
 
    .. code-block:: bash
@@ -204,6 +203,12 @@ Configurability
   that the CWL workflow currently declares that input as a string, so the
   list form is rejected by cwltool — a pre-existing issue independent of
   the EFP flow, which uses ``tbg`` directly.)
+- **The CWL runner (``picongpu_run()``) is not the EFP submission path.**
+  With the EFP preset, ``run_submit_system`` defaults to the profile's
+  ``TBG_SUBMIT=sbatch``, so the CWL flow would submit locally via
+  ``sbatch`` — it stays for local/SLURM execution. For EFP, use the job
+  script path above (steps 4-6) and upload the rendered script and the
+  ``input/`` directory through the portal.
 
 Pending verification (requires EFP access)
 -------------------------------------------

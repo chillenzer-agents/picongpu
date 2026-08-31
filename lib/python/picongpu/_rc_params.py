@@ -653,13 +653,30 @@ def search_in_user_config():
     return None
 
 
+def _search_rc_file_in_parents(start_path):
+    """Find picongpurc.toml (or a dot-prefixed variant) in start_path or its parents.
+
+    The plain name matches the canonical file used by the XDG config and
+    PIC_RC lookups, so a picongpurc.toml next to the PICMI script is
+    discovered just like a .picongpurc.toml would be.
+    """
+    start_path = Path(start_path).absolute()
+    for directory in [start_path, *start_path.parents]:
+        for pattern in ("picongpurc.toml", "[.]*picongpurc.toml"):
+            try:
+                return next(directory.glob(pattern))
+            except StopIteration:
+                pass
+    return None
+
+
 _DEFAULT_PICONGPURC_PATH = None
 
 
 def generate_default_rc_params():
     picongpurc_path = (
         search_in_environment_variables()
-        or search_for_in_parents("[.]*picongpurc.toml", Path())
+        or _search_rc_file_in_parents(Path())
         or search_in_user_config()
         or _DEFAULT_PICONGPURC_PATH
     )

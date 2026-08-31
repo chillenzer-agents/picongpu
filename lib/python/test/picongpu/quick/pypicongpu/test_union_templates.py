@@ -64,9 +64,9 @@ _UNION_TEMPLATE_ANCHORS = {
         LeheSolver: ("include/picongpu/param/fieldSolver.param.mustache", "{{{solver.name}}}"),
     },
     AnyLayout: {
-        Random: ("include/picongpu/param/particle.param.mustache", "{{#layout.type_random}}"),
-        Quiet: ("include/picongpu/param/particle.param.mustache", "{{#layout.type_quiet}}"),
-        OnePosition: ("include/picongpu/param/particle.param.mustache", "{{#layout.type_one_position}}"),
+        Random: ("include/picongpu/param/particle.param.mustache", "{{#start_position.type_random}}"),
+        Quiet: ("include/picongpu/param/particle.param.mustache", "{{#start_position.type_quiet}}"),
+        OnePosition: ("include/picongpu/param/particle.param.mustache", "{{#start_position.type_one_position}}"),
     },
     AnyOperation: {
         CreateDensity: ("include/picongpu/param/speciesInitialization.param.mustache", "{{#type_createdensity}}"),

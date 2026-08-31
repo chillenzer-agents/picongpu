@@ -125,7 +125,14 @@ class Collision(BaseModel):
         # again (round-trip safety)
         if isinstance(value, dict):
             if value.get("type_constlog"):
-                return ConstLogCollision(coulomb_log=value["data"]["coulomb_log"])
+                data = value.get("data")
+                coulomb_log = data.get("coulomb_log") if isinstance(data, dict) else None
+                if coulomb_log is None:
+                    raise ValueError(
+                        "A constant-log collision functor requires data.coulomb_log. You gave: "
+                        f"{value=}."
+                    )
+                return ConstLogCollision(coulomb_log=coulomb_log)
             if value.get("type_dynamiclog"):
                 return DynamicLogCollision()
         return value

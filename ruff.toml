@@ -26,11 +26,6 @@ target-version = "py311"
 # corresponding code change.
 select = ["ALL"]
 ignore = [
-    # lib/python/picongpu/pypicongpu/rendering/renderer.py deliberately
-    # compares *exact* types (type(x) is dict) rather than using
-    # isinstance(), see the "note on typechecks" in that file; E721 would
-    # force isinstance() and change behaviour.
-    "E721",
     # "Too many ..." (returns, branches, arguments, statements) and
     # cyclomatic complexity: the functions in this codebase carry many
     # simulation/physics parameters and cases, mirroring the C++ API and
@@ -189,6 +184,9 @@ known-first-party = ["picongpu"]
 # deliberate multi-index reshape; melt/pivot_table are not equivalent (PD010,
 # PD013).
 "lib/python/test/picongpu/end_to_end/test_diagnostics.py" = ["A002", "ERA001", "PD010", "PD013"]
+# The test helper asserts exact type equality of two model instances;
+# isinstance() would also accept subclasses and weaken the check (E721).
+"lib/python/test/picongpu/quick/picmi/test_copy_attributes.py" = ["E721"]
 "share/ci/n_wise_generator.py" = ["A002"]
 "src/tools/bin/printField.py" = ["A001"]
 
@@ -248,5 +246,8 @@ known-first-party = ["picongpu"]
 # The template `_date` is a human-readable local timestamp for display;
 # forcing UTC would change what the user sees (DTZ005). The other two
 # local-timestamp sites (widget axis label, temp-directory name) are
-# covered by the per-file entries above.
-"lib/python/picongpu/pypicongpu/rendering/renderer.py" = ["DTZ005"]
+# covered by the per-file entries above. The two `type()` comparisons
+# are deliberate *exact* type checks (see the "note on typechecks" in
+# that file); isinstance() would accept subclasses and change behaviour
+# (E721).
+"lib/python/picongpu/pypicongpu/rendering/renderer.py" = ["DTZ005", "E721"]

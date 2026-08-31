@@ -24,25 +24,25 @@ docs: render python_package snippets from CI-tested scripts
 >
 > ### What changed
 >
- > - **New snippet system** (`docs/source/python_package/snippets/`):
- >   - 10 Python snippets + 15 bash snippets, one file per documented snippet.
- >   - `run_snippet.py`: execution harness; `--no-run` replaces the build/submit
- >     step of `simulation.run()` with a no-op (and emulates the
- >     `EnergyHistogram` output where a snippet reads results), so CI never
- >     compiles or submits jobs. The emulated landscape (Gaussian peak at
- >     4.6e-5 m focal position, sigma 1e-6 m, 1000 electrons; scan focals
- >     4.4/4.6/4.8e-5 m) is defined once as constants in `run_snippet.py` and
- >     imported by the test.
- >   - `test_snippets.py`: pytest suite that executes every Python snippet in an
- >     isolated environment (fresh cwd, isolated `HOME`, `PIC_RC` pointing at a
- >     non-existent file) and asserts exit code 0 plus per-snippet expected
- >     artifacts (files, file content, stdout/stderr). Bash snippets are
- >     syntax-checked with `bash -n`; in CI, one bash flow (setup generation +
- >     profile sourcing, as `legacy_workflow.sh` performs it) is additionally
- >     executed for real, no other bash snippet is executed.
- >   - Whole-file includes by default; semantic `BEGIN-<NAME>`/`END-<NAME>`
- >     markers only where one tested file feeds several doc sections
- >     (`lwfa_example.py`, `multiple_simulations.py`).
+> - **New snippet system** (`docs/source/python_package/snippets/`):
+>   - 10 Python snippets + 15 bash snippets, one file per documented snippet.
+>   - `run_snippet.py`: execution harness; `--no-run` replaces the build/submit
+>     step of `simulation.run()` with a no-op (and emulates the
+>     `EnergyHistogram` output where a snippet reads results), so CI never
+>     compiles or submits jobs. The emulated landscape (Gaussian peak at
+>     4.6e-5 m focal position, sigma 1e-6 m, 1000 electrons; scan focals
+>     4.4/4.6/4.8e-5 m) is defined once as constants in `run_snippet.py` and
+>     imported by the test.
+>   - `test_snippets.py`: pytest suite that executes every Python snippet in an
+>     isolated environment (fresh cwd, isolated `HOME`, `PIC_RC` pointing at a
+>     non-existent file) and asserts exit code 0 plus per-snippet expected
+>     artifacts (files, file content, stdout/stderr). Bash snippets are
+>     syntax-checked with `bash -n`; in CI, one bash flow (setup generation +
+>     profile sourcing, as `legacy_workflow.sh` performs it) is additionally
+>     executed for real, no other bash snippet is executed.
+>   - Whole-file includes by default; semantic `BEGIN-<NAME>`/`END-<NAME>`
+>     markers only where one tested file feeds several doc sections
+>     (`lwfa_example.py`, `multiple_simulations.py`).
 > - **Doc rewrites** (`foundations/{configuring_environment,defining_simulation,running_simulation}.rst`):
 >   all inline code blocks replaced by `literalinclude` of the tested scripts;
 >   non-executable excerpts (TOML values, search-order lists, one-liners) stay inline.
@@ -85,55 +85,55 @@ docs: render python_package snippets from CI-tested scripts
 >      quick tests, which are covered by the pypicongpu jobs);
 >   2. installs `docs/requirements.txt` and `doxygen`;
 >   3. smoke-checks `pic-build`/`pic-configure`/`tbg --help`;
- >   4. runs the snippet test suite;
- >   5. runs `share/ci/docs_snippets_profile_check.sh`: generates a minimal
- >      input set with the `bash` preset, unsets `PICSRC` (which
- >      `pypicongpu.sh` exports first), sources the generated
- >      `workflow/scripts/picongpu.profile` and checks `PIC_BACKEND`/`PICSRC`
- >      (mirroring `legacy_workflow.sh`  -  no compilation);
+>   4. runs the snippet test suite;
+>   5. runs `share/ci/docs_snippets_profile_check.sh`: generates a minimal
+>      input set with the `bash` preset, unsets `PICSRC` (which
+>      `pypicongpu.sh` exports first), sources the generated
+>      `workflow/scripts/picongpu.profile` and checks `PIC_BACKEND`/`PICSRC`
+>      (mirroring `legacy_workflow.sh`  -  no compilation);
 >   6. builds the docs (`doxygen` + `sphinx-build -b html`) and **explicitly
 >      fails** on "Include file ... not found" (a missing snippet file is only
 >      a Sphinx warning otherwise) and on a failed build.
 >
- > ### Verification (local, branch tip)
- >
- > - snippet suite: `25 passed` (10 python executions, 4 of them `--no-run`
- >   generation checks + 15 bash `bash -n`)
- > - package gate: `pytest lib/python/test/picongpu/quick/ -q` ->
- >   `174 passed, 2 xfailed, 1 xpassed` (unchanged vs. base)
- > - docs: clean `sphinx-build -b html` succeeds, **0 warnings in
- >   `python_package/`**, no snippet-inclusion failures, no marker lines
- >   rendered into the HTML
- > - CI job dry-run: `share/ci/docs_snippets_dryrun.sh` runs the job's
- >   `script:` entries (as YAML-parsed, i.e. exactly what the GitLab runner
- >   executes) against the local checkout, stubbing only the container
- >   environment (`pypicongpu.sh` micromamba setup, `apt`, the
- >   `pic-build`/`pic-configure`/`tbg` `--help` smoke checks); all steps
- >   pass, incl. doxygen + sphinx-build (see verification log below)
- > - `pre-commit run --all-files`: all hooks pass
- >
- > ### Notes / follow-ups
- >
- > - The PyPIConGPU JSON round-trip limitation is a package issue, not a docs
- >   issue; it should get its own tracking (see also task 06/07 in the
- >   documentation plan).
- > - The optimization snippet needs a system-specific wait for the submitted
- >   job in real use; this is documented in the text (the package does not
- >   provide it). Its test is a **mechanics test**: the optimizer runs against
- >   the synthetic, harness-defined landscape of `run_snippet.py` (the
- >   compile-free CI decision rules out a real scan); it verifies the scan
- >   loop, the `minimize` call and the result parsing.
- > - **WIP `@dev` pin:** all PEP 723 metadata blocks pin
- >   `picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python`,
- >   while the docs describe the post-PR-5639 interface, which is not on
- >   `dev` yet. Direct `uv run` of the snippets (or `uv run`-style execution
- >   in general) therefore breaks until 5639 lands; this is inherent to the
- >   docs lineage (this branch feeds PR 5731) and a conscious decision -
- >   re-pin or drop the metadata blocks when 5639 is merged.
- > - The 381 pre-existing Sphinx warnings elsewhere in the docs are out of
- >   scope.
- > - Task 02 ("expand documentation") builds on top of this branch: new
- >   pages should follow the same convention (snippet file + literalinclude).
+> ### Verification (local, branch tip)
+>
+> - snippet suite: `25 passed` (10 python executions, 4 of them `--no-run`
+>   generation checks + 15 bash `bash -n`)
+> - package gate: `pytest lib/python/test/picongpu/quick/ -q` ->
+>   `174 passed, 2 xfailed, 1 xpassed` (unchanged vs. base)
+> - docs: clean `sphinx-build -b html` succeeds, **0 warnings in
+>   `python_package/`**, no snippet-inclusion failures, no marker lines
+>   rendered into the HTML
+> - CI job dry-run: `share/ci/docs_snippets_dryrun.sh` runs the job's
+>   `script:` entries (as YAML-parsed, i.e. exactly what the GitLab runner
+>   executes) against the local checkout, stubbing only the container
+>   environment (`pypicongpu.sh` micromamba setup, `apt`, the
+>   `pic-build`/`pic-configure`/`tbg` `--help` smoke checks); all steps
+>   pass, incl. doxygen + sphinx-build (see verification log below)
+> - `pre-commit run --all-files`: all hooks pass
+>
+> ### Notes / follow-ups
+>
+> - The PyPIConGPU JSON round-trip limitation is a package issue, not a docs
+>   issue; it should get its own tracking (see also task 06/07 in the
+>   documentation plan).
+> - The optimization snippet needs a system-specific wait for the submitted
+>   job in real use; this is documented in the text (the package does not
+>   provide it). Its test is a **mechanics test**: the optimizer runs against
+>   the synthetic, harness-defined landscape of `run_snippet.py` (the
+>   compile-free CI decision rules out a real scan); it verifies the scan
+>   loop, the `minimize` call and the result parsing.
+> - **WIP `@dev` pin:** all PEP 723 metadata blocks pin
+>   `picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python`,
+>   while the docs describe the post-PR-5639 interface, which is not on
+>   `dev` yet. Direct `uv run` of the snippets (or `uv run`-style execution
+>   in general) therefore breaks until 5639 lands; this is inherent to the
+>   docs lineage (this branch feeds PR 5731) and a conscious decision -
+>   re-pin or drop the metadata blocks when 5639 is merged.
+> - The 381 pre-existing Sphinx warnings elsewhere in the docs are out of
+>   scope.
+> - Task 02 ("expand documentation") builds on top of this branch: new
+>   pages should follow the same convention (snippet file + literalinclude).
 
 ---
 

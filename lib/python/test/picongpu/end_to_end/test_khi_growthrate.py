@@ -60,10 +60,13 @@ def _openpmd_read_roundtrip(tmp_path_factory):
         )
 
 
-def _write_synthetic_series(path, gamma=1.6, density_si=1.0e25, n_cells=16, steps=(0, 5, 10, 15, 20, 25)):
+def _write_synthetic_series(
+    path, gamma=1.6, density_si=1.0e25, n_cells=16, steps=(0, 5, 10, 15, 20, 25), rate_factor=1.0
+):
     """
-    Writes an openPMD series whose Bx field grows exponentially with the
-    analytic esKHI rate, so the validated growth rate must recover it.
+    Writes an openPMD series whose Bx field grows exponentially with
+    rate_factor times the analytic esKHI rate, so the validated growth
+    rate must recover it.
     """
     omega_pe = ts_physics.plasmafrequence(density=density_si, gamma=gamma, relativistic=True)
     dt = 0.1 / omega_pe
@@ -73,7 +76,7 @@ def _write_synthetic_series(path, gamma=1.6, density_si=1.0e25, n_cells=16, step
         iteration = series.iterations[step]
         iteration.time = step * dt
         iteration.dt = dt
-        amplitude = np.exp(eskhi_growthrate_theory(gamma) * step * dt * omega_pe)
+        amplitude = np.exp(rate_factor * eskhi_growthrate_theory(gamma) * step * dt * omega_pe)
         cells = (amplitude * (1.0 + 1e-3 * np.arange(n_cells))).astype(np.float64)
         component = iteration.meshes["B"]["x"]
         component.reset_dataset(opmd.Dataset(np.dtype(np.float64), [n_cells]))
@@ -103,6 +106,20 @@ class TestSyntheticSeries:
 
         assert result["result"] is True
         assert abs(result["difference_in_percentage"]) < 1.0
+
+    def test_validation_fails_below_theory(self, tmp_path, _openpmd_read_roundtrip):
+        # negative case: a field growing at half the analytic rate is
+        # ~50 % off theory and must fail the 20 % acceptance, guarding the
+        # verdict/acceptance wiring (not just the rate recovery)
+        gamma = 1.6
+        density_si = 1.0e25
+        path = tmp_path / "khi.h5"
+        _write_synthetic_series(path, gamma=gamma, density_si=density_si, rate_factor=0.5)
+
+        result = validate_eskhi_growthrate(path, gamma=gamma, density_si=density_si)
+
+        assert result["result"] is False
+        assert result["difference_in_percentage"] == pytest.approx(50.0, abs=1.0)
 
     def test_bx_amplitude_and_times(self, tmp_path, _openpmd_read_roundtrip):
         gamma = 1.6

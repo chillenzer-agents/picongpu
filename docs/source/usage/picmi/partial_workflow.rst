@@ -106,12 +106,21 @@ The workflow state file
 -----------------------
 
 ``<run_dir>/.workflow_state.json`` records, for each stage, its status
-(``running``, ``completed``, ``failed``, ``invalidated``), a timestamp, and
-the locations of its artifacts (as CWL file objects). It is safe to delete:
-the next run then starts from scratch. Use
-``Runner.reset_workflow_state()`` for the same effect from Python.
+(``running``, ``completed``, ``failed``, ``invalidated``), a timestamp, a
+digest of the workflow inputs the stage was run with, and the locations of
+its artifacts (as CWL file objects). It is safe to delete: the next run then
+starts from scratch. Use ``Runner.reset_workflow_state()`` for the same
+effect from Python.
+
+The input digest is what detects edits to ``workflow/input.yaml`` between
+runs: a completed stage whose inputs changed is marked as stale (together
+with the stages that depend on it) and re-run, instead of being silently
+skipped with its stale artifacts.
 
 .. note::
 
    The state file complements, and does not replace, the cwltool job cache
-   (``<run_dir>/.cwl_cache``), which is kept as an internal optimization.
+   (``<run_dir>/.cwl_cache``), which the default single-invocation run uses
+   as an internal optimization. Per-step (stage-range) runs do not consult
+   the job cache: the stage state is their skip mechanism, and every
+   invoked step executes freshly.

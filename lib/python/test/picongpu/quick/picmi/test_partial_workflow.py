@@ -408,6 +408,33 @@ def test_flags_after_generation_are_rejected(runner, sim):
     assert load_state(runner) == state_before
 
 
+def test_input_change_invalidates_completed_stages(runner):
+    # editing workflow/input.yaml after a completed run must not be a silent
+    # no-op: the stage whose inputs changed (and the stages that depend on it)
+    # is re-run, while stages with unchanged inputs are still skipped.
+    runner.run_range()
+    state = load_state(runner)
+    build_digest = state["stages"][Stage.build.value]["inputs_digest"]
+    assert build_digest
+    prepare_updated_at = state["stages"][Stage.prepare.value]["updated_at"]
+
+    # the user edits a workflow input that only the build stage consumes
+    set_workflow_input(runner, "build_cmake", "v2")
+    runner.run_range()
+
+    state = load_state(runner)
+    for stage in Stage:
+        assert state["stages"][stage.value]["status"] == "completed"
+    assert state["stages"][Stage.build.value]["inputs_digest"] != build_digest
+    # prepare was not affected by the input change and was skipped
+    assert state["stages"][Stage.prepare.value]["updated_at"] == prepare_updated_at
+    # the stale build and its dependents (submit, collect) were re-run, so
+    # the new input is visible in the final artifacts (not silently skipped)
+    run_dir = runner.run_dir
+    assert (run_dir / "input" / "bin" / "picongpu").read_text() == "built-v2\n"
+    assert (run_dir / "tbg" / "bin_from_build").read_text() == "built-v2\n"
+
+
 def future_stage_plan():
     """A "future" plan where the submit stage gained an extra (upload) step."""
     plan = DEFAULT_STAGE_PLAN.model_copy(deep=True)

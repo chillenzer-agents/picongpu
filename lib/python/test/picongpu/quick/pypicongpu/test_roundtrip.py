@@ -669,3 +669,10 @@ def test_collision_setup_roundtrips_and_renders_identically():
         Runner(sim=restored_sim, setup_dir=setup2, run_dir=Path(tmp) / "run2").generate()
         _assert_same_tree(setup / "include", setup2 / "include")
         _assert_same_tree(setup / "etc", setup2 / "etc")
+
+
+def test_collision_functor_malformed_dict_raises_value_error():
+    # a malformed serialised functor (type_constlog without data.coulomb_log)
+    # must fail with a validation-style error, not a raw KeyError
+    with pytest.raises(ValueError, match="data.coulomb_log"):
+        Collision(species_pairs=[(_ELECTRON, _ELECTRON)], functor={"type_constlog": True, "data": {}})

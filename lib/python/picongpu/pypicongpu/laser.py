@@ -106,18 +106,18 @@ class _BaseLaser(BaseModel):
     """laser polarization (Linear or Circular)"""
     wave_length_si: Annotated[float, Field(alias="wavelength", gt=0.0), SI("m")]
     """wave length, [m]; must be > 0.
-    C++ name: lambda_SI (incidentField.param)."""
+    C++ name: WAVE_LENGTH_SI (incidentField.param)."""
     pulse_duration_si: Annotated[float, Field(alias="duration", gt=0.0), SI("s")]
     """pulse duration, [s] (1 sigma of a standard gaussian for the intensity (E^2)); must be > 0.
-    C++ name: pulselength_SI (incidentField.param)."""
+    C++ name: PULSE_DURATION_SI (incidentField.param)."""
     focus_pos_si: Annotated[tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)] = (
         Field(alias="focal_position")
     )
     """focus position vector, [m].
-    C++ name: focus_SI (incidentField.param)."""
+    C++ name: focus_position[] / FOCUS_POSITION_{X,Y,Z}_SI (incidentField.param)."""
     phase: Annotated[float, Field(alias="phi0"), SI("rad")]
     """initial phase phi0, [rad]; periodic in 2*pi.
-    C++ name: PHI (incidentField.param)."""
+    C++ name: LASER_PHASE (incidentField.param)."""
     E0_si: Annotated[float, Field(alias="E0", gt=0.0), SI("V/m")]
     """peak electric field amplitude, [V/m]; must be > 0 (an E0 of 0 would
     switch the laser off, which is expressed by omitting the laser).
@@ -270,7 +270,7 @@ class FromOpenPMDPulseLaser(BaseModel):
     """direction of polarization, [dimensionless] (normalized vector)"""
     file_path: Annotated[str, Field(min_length=1)]
     """File path to the OpenPMD file containing the pulse data, [path]; must not be empty.
-    C++ name: file (incidentField.param)."""
+    C++ name: filename (incidentField.param)."""
     iteration: Annotated[int, Field(ge=0)]
     """Iteration in the OpenPMD file to use, [dimensionless count]; must be >= 0
     (rendered as a uint32_t).
@@ -280,10 +280,10 @@ class FromOpenPMDPulseLaser(BaseModel):
     C++ name: datasetEName (incidentField.param)."""
     datatype: str
     """Data type of the pulse data (openPMD type name).
-    C++ name: datatype (incidentField.param)."""
+    C++ name: dataType (incidentField.param)."""
     time_offset_si: Annotated[float, SI("s")]
     """Time offset in seconds to apply to the pulse data, [s].
-    C++ name: timeOffset (incidentField.param)."""
+    C++ name: TIME_DELAY_SI (incidentField.param)."""
     polarisationAxisOpenPMD: str
     """Polarization axis name in the OpenPMD file.
     C++ name: polarisationAxisOpenPMD (incidentField.param)."""
@@ -323,14 +323,15 @@ class TWTSLaser(_BaseLaser):
        propagation direction with respect to the y-axis.
        C++ name: PHI (incidentField.param)."""
     laserIncidenceAnglePositive: bool
-    """Is the laser incidence angle positive?, [dimensionless flag].
-    C++ name: phiPositive (incidentField.param)."""
+    """Is the laser incidence angle positive?, [dimensionless flag];
+    selects the rendered ZMin/ZMax profile section in incidentField.param
+    (the C++ side's phiPositive flag)."""
     polarizationAngle: Annotated[float, SI("rad")]
     """Linear laser polarization direction,
-       parameterized as a rotation angle, [rad]
-       of the x-direction around the mean
-       laser phase propagation direction.
-       C++ name: POLARIZATION_ANGLE (incidentField.param)."""
+        parameterized as a rotation angle, [rad]
+        of the x-direction around the mean
+        laser phase propagation direction.
+        C++ name: Polarization (incidentField.param)."""
     beta0: Annotated[float, Field(ge=-1.0, le=1.0)]
     """speed of the TWTS laser overlap (focal region) normalized to the vacuum
     speed of light, [dimensionless]; must satisfy |beta0| <= 1 (the default
@@ -338,11 +339,11 @@ class TWTSLaser(_BaseLaser):
     C++ name: BETA_0 (incidentField.param)."""
     time_offset_si: Annotated[float, SI("s")]
     """time offset to apply to the pulse, [s].
-    C++ name: tdelay_user_SI (incidentField.param)."""
+    C++ name: TDELAY (incidentField.param; used as tdelay_user_SI in the TWTS profile)."""
     focus_lateral_offset_si: Annotated[float, SI("m")]
     """Offset from the middle of the simulation domain
-       to the laser focus in z-direction, [m].
-       C++ name: focus_lateral_offset (incidentField.param)."""
+        to the laser focus in z-direction, [m].
+        C++ name: FOCUS_Z_OFFSET_SI (incidentField.param)."""
     windowStart: Annotated[float, Field(ge=0.0)]
     """First time step number at which the laser starts to be gradually switched on
     using a Blackman-Nuttall window, [dimensionless time-step number]; must be >= 0.

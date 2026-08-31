@@ -9,6 +9,9 @@ doc: |
   picongpu-deps.sh (etc/picongpu/dependencies/). The install is
   idempotent: a warm cache makes this step a no-op.
 
+  The install script is staged into the work directory and executed with
+  `bash`, so the input File does not need the executable bit.
+
   The resulting prefix is handed to the build step either by sourcing
   <prefix>/current.env in the generated build.sh (what the runner does
   today when [dependencies].enabled = true) or, in a future iteration,
@@ -25,13 +28,15 @@ requirements:
       - envName: PICONGPU_RUNNING_AS_CWL
         envValue: "1"
 
-baseCommand: ./install.sh
+baseCommand: bash
 
 inputs:
   script:
     type: File
     label: "Install script"
     doc: "Shell script that runs picongpu-deps.sh with the configured DEPS_* variables"
+    inputBinding:
+      position: 1
   jobs:
     type: int?
     label: "Number of parallel jobs"
@@ -47,4 +52,4 @@ outputs:
     outputBinding:
       glob: "deps"
     label: "Installed dependency prefixes"
-    doc: "Only meaningful when the install root is inside the work directory (see doc)."
+    doc: "Only non-empty when the install script sets DEPS_INSTALL_ROOT=./deps (inside the work directory); the default install root lives outside the work directory, in which case this output is empty."

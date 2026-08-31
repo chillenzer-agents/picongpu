@@ -318,8 +318,14 @@ class Runner(BaseModel):
         (build and run) scripts source the resulting environment.
         """
         deps = DependenciesConfig.from_rc_params(rc_params)
-        if not deps.active:
+        if not deps.enabled:
             return []
+        if not deps.active:
+            # enabled, but the provider is not wired into the generated
+            # scripts yet: say so instead of being a silent no-op
+            return [
+                f"echo \"[picongpu-deps] WARNING: [dependencies].provider = '{deps.provider}' is not wired into the generated scripts yet; no dependencies are installed or loaded\"",
+            ]
         install_root = Path(deps.prefix) if deps.prefix else self.setup_dir / "deps"
         if env_only:
             return deps.env_commands(install_root)

@@ -24,9 +24,12 @@ docstrings -> constrained types -> validators -> tests:
    exceeding the run is a **warning** (technical); new shared `SI("unit")`
    metadata tag in `pypicongpu/units.py`.
 2. `grid.py` - `cell_cnt`/`super_cell_size`/`gpu_cnt` > 0, cell size > 0;
-   cross-field: grid distribution chunks are multiples of the super cell size
-   and `cell_cnt` is evenly divisible by `gpu_cnt * super_cell_size`
-   (previous `assert`s converted to `ValueError`).
+   cross-field: the per-axis sum of `grid_dist` must equal `cell_cnt` (hard
+   error, as the previous `assert`s). The super-cell/GPU divisibility of the
+   grid is a soft (technical) invariant and only a **warning**: PIConGPU's
+   C++ `DomainAdjuster` rounds the local domain up to a full super cell at
+   runtime and runs the adjusted grid, so such (previously runnable)
+   configurations are not rejected.
 3. `species/**` (33 files) - mass/charge/density/synchrotron/element/
    ground-state-constant constraints; C++-identifier species name check moved
    from dead `check()` code into a `field_validator`; position + momentum
@@ -69,27 +72,34 @@ docstrings -> constrained types -> validators -> tests:
 - The invariants are captured in pydantic's native, machine-understandable
   form (`Field`/`Annotated` metadata, `SI` unit tags) so introspection and
   schema generation carry them - a requester requirement.
-- Round-trip safety: every validator is satisfiable from
-  `model_dump(mode="json")` output, which task 07 (serialization) builds on.
+- Round-trip safety: every field-preserving model (including all five laser
+  types) re-validates its own `model_dump(mode="json")` output, which task
+  07 (serialization) builds on.
 
 ### Changes
 
-- `lib/python/picongpu/pypicongpu/**` - 45 model files refined
+- `lib/python/picongpu/pypicongpu/**` - 53 module files refined
   (simulation, grid, laser, walltime, movingwindow, collisions, all
   `species/**`, all `output/**`, all `particle_functor/**`, runner,
   ionization groups), plus the new shared `units.py` `SI` tag.
 - `lib/python/picongpu/picmi/diagnostics/**` - docstring corrections and
   field docstrings for the diagnostic mirror models.
 - `lib/python/test/picongpu/quick/pypicongpu/test_validation.py` - new
-  (131 tests): one or more `pytest.raises(ValidationError)` negative tests
-  per new invariant, plus positive construction tests.
+  (138 test functions, 179 collected tests): one or more
+  `pytest.raises(ValidationError)` negative tests per new invariant, plus
+  positive construction tests and `pytest.warns` tests for the soft
+  (technical) invariants.
 - `lib/python/test/picongpu/quick/pypicongpu/test_docstrings.py` - new
   (94 parametrized AST-based tests): every `BaseModel` subclass in
   `pypicongpu` has a class docstring and every public annotated field a
   docstring (the pydantic house idiom).
-- `lib/python/test/picongpu/quick/pypicongpu/test_roundtrip.py` - new (20
-  tests): representative models survive
-  `Model(**m.model_dump(mode="json"))` with an identical re-dump.
+- `lib/python/test/picongpu/quick/pypicongpu/test_roundtrip.py` - new
+  (24 tests): every field-preserving model, including all five laser types,
+  survives `model_validate(m.model_dump(mode="json"))` with an identical
+  re-dump.
+- `lib/python/test/picongpu/quick/pypicongpu/test_union_templates.py` - new
+  (25 tests): every member of the public type unions has a rendering
+  template fragment (union exhaustiveness).
 - `CHANGELOG.md` - `Unreleased` entry ("stricter input validation").
 
 ### Key decisions and deliberate deviations
@@ -104,12 +114,20 @@ docstrings -> constrained types -> validators -> tests:
   through the conversion, and the test config uses `filterwarnings = error`
   - so it is enforced neither as an error nor as a warning (documented in
   the model).
-- **Warnings are used sparingly**: the suite runs with `filterwarnings =
-  error`, so a validator `warnings.warn` would fail any test that triggers
-  it. The single remaining warning (laser pulse longer than the run) is on a
-  path no test triggers; everything else is a hard error (physical) or a
-  documented non-enforcement (technical where tests exercise the "invalid"
-  shape).
+- **Warnings for soft (technical) invariants** (per the confirmed decision:
+  hard error for physical, warning for technical). Two invariants are
+  warnings, both via a controlled `warnings.warn` inside a `model_validator`
+  (never a side-channel) and both covered by `pytest.warns` tests:
+  - the grid super-cell/GPU divisibility - the C++ `DomainAdjuster` rounds
+    the local domain up to a full super cell at runtime and runs the
+    adjusted grid, so such configurations are still runnable;
+  - a laser extending beyond the end of the run - a `_BaseLaser`-style
+    pulse via `pulse_duration_si * pulse_init`, the TWTSLaser window via
+    `windowEnd * delta_t_si`; a `PlaneWaveLaser` is a continuous wave and is
+    never truncated, so it is not checked.
+  The suite runs with `filterwarnings = error`, so these warnings are only
+  triggered inside `pytest.warns`/`catch_warnings` contexts; everything
+  else is a hard error (physical) or a documented non-enforcement.
 - **Checkpoint file prefixes `min_length=1`**: an explicitly set empty
   prefix would be silently dropped by the mustache rendering (falsy
   section), hiding a typo - rejected at the model level instead.
@@ -133,21 +151,28 @@ docstrings -> constrained types -> validators -> tests:
 ### Verification
 
 - Quick test gate: `cd lib/python/test/picongpu && python -m pytest quick/ -q`
-  -> **`473 passed, 2 xfailed, 1 xpassed`** (baseline at branch start:
-  `190 passed, 2 xfailed, 1 xpassed`; the +283 are the new validation,
-  docstring, and round-trip tests). The xfail/xpass sets are unchanged.
-- Docstring completeness: 94 models / 372 public fields, **0 violations**
+  -> **`515 passed, 2 xfailed, 1 xpassed`** (rebased baseline at branch
+  start: `476 passed, 2 xfailed, 1 xpassed`; the +39 are the rework tests:
+  the grid/laser warning tests, the all-laser round-trip tests, the
+  union-exhaustiveness tests, and the `FieldDump`/laser-type tests). The
+  xfail/xpass sets are unchanged. (Before the rebase onto the reworked
+  task-04 branch the gate was `473/2/1` over the `190/2/1` baseline, +283
+  new tests.)
+- Docstring completeness: 94 models / 325 public fields, **0 violations**
   (audit baseline: 231 violations), now enforced permanently by the 94
   AST-based quick tests.
-- Rendered-output regression (hard constraint): a battery of 10
-  representative setups (basic, binning, collisions, ionization, laser,
-  moving window, openPMD, profiles, radiation, synchrotron) renders
-  **byte-identical** `.param`/`.cfg`/rendering-context files before and after
-  every pass (functor-uuid suffixes normalised before diffing).
-- Round-trip: 20 representative models (incl. `Simulation`-building blocks
-  `Grid3D`, `GaussianLaser`, `Species`, `TimeStepSpec`, diagnostics,
-  collisions, layouts, momentum operations) satisfy
-  `Model(**m.model_dump(mode="json"))` with an identical re-dump.
+- Rendered-output regression (hard constraint): a battery of representative
+  setups (basic, binning, collisions, ionization, laser, moving window,
+  openPMD, profiles, radiation, synchrotron) renders **byte-identical**
+  `.param`/`.cfg`/rendering-context files before and after every pass
+  (functor-uuid suffixes normalised before diffing). Re-verified after the
+  rework: all five laser types' rendering contexts and a full
+  laser + species + diagnostics setup render byte-identically to the
+  pre-rework tip.
+- Round-trip: 24 field-preserving models (incl. all five laser types,
+  `Simulation`-building blocks `Grid3D`/`Species`/`TimeStepSpec`,
+  diagnostics, collisions, layouts, momentum operations) satisfy
+  `model_validate(m.model_dump(mode="json"))` with an identical re-dump.
 - Pre-commit: `pre-commit run --all-files` green (ruff, ruff-format,
   gersemi, pyproject-fmt, ...).
 

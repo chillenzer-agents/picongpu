@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 import json
+import shutil
 from pathlib import Path
 
 from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Stage, Simulation
@@ -15,6 +16,7 @@ from picongpu.pypicongpu.runner import (
     StageStepSpec,
     StepOutputRef,
     WorkflowPrerequisiteError,
+    WorkflowStageError,
 )
 from pytest import fixture, raises
 
@@ -372,6 +374,16 @@ def test_missing_prerequisite_is_an_error(runner):
 
     with raises(ValueError, match="after up_to"):
         runner.run_range(from_=Stage.collect, up_to=Stage.build)
+
+
+def test_step_file_renamed_raises_workflow_stage_error(runner):
+    # a missing (renamed) step file is a cwltool load/validation failure; the
+    # documented error contract is WorkflowStageError, not a raw cwltool exception
+    steps_dir = runner.workflow_dir_path / "steps"
+    shutil.move(str(steps_dir / "build.cwl"), str(steps_dir / "compile.cwl"))
+
+    with raises(WorkflowStageError, match="loading/running CWL step"):
+        runner.run_range(up_to=Stage.build)
 
 
 def test_force_stage_invalidates_dependents(runner):

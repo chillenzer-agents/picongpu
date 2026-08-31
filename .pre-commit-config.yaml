@@ -74,8 +74,12 @@ repos:
         # - CHANGELOG.md: Contains author names that might include special characters for correct spelling.
         # - .zenodo.json: Contains author names that might include special characters for correct spelling.
         # - unit_dimension.py: Contains theta as the symbol for temperature.
+        # - TASK-NN-*.md: per-task review/PR artifact documentation containing
+        #   unicode (arrows, dashes, greek); the review document in particular
+        #   is committed by the review team and must not be modified by the
+        #   task author. Source code stays ASCII-checked.
         exclude_types: [rst]
-        exclude: CHANGELOG.md|.zenodo.json|lib/python/picongpu/picmi/particle_functor/unit_dimension.py
+        exclude: CHANGELOG.md|.zenodo.json|lib/python/picongpu/picmi/particle_functor/unit_dimension.py|^TASK-[0-9]{2}-.+\.md$
   - repo: https://github.com/BlankSpruce/gersemi
     rev: 0.22.1
     hooks:

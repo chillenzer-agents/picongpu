@@ -32,6 +32,8 @@ import pytest
 from sympy import Symbol
 
 from picongpu import picmi
+from picongpu.picmi.interaction import Collision as PicmiCollision
+from picongpu.picmi.interaction import CollisionalPhysicsSetup as PicmiCollisionalPhysicsSetup
 from picongpu.pypicongpu.runner import Runner
 from picongpu.pypicongpu.simulation import Simulation
 from picongpu.pypicongpu.collisions import (
@@ -599,3 +601,68 @@ def test_runner_roundtrips_from_runner_metadata():
     restored = Runner.model_validate(runner_json)
     assert isinstance(restored, Runner)
     assert isinstance(restored.sim, Simulation)
+
+
+def _collision_sim():
+    # a representative simulation whose collisional physics carries a real
+    # (constant-log) collision, built through the picmi interaction API
+    grid = picmi.Cartesian3DGrid(
+        number_of_cells=[16, 16, 16],
+        lower_bound=[0, 0, 0],
+        upper_bound=[1e-5, 1e-5, 1e-5],
+        lower_boundary_conditions=["periodic", "periodic", "periodic"],
+        upper_boundary_conditions=["periodic", "periodic", "periodic"],
+    )
+    solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+    sim = picmi.Simulation(time_step_size=1e-15, max_steps=100, solver=solver)
+
+    profile = picmi.UniformDistribution(density=42, rms_velocity=[1e5, 0, 0], directed_velocity=[1e5, 0, 0])
+    electron = picmi.Species(name="electron", mass=9.109e-31, charge=-1.602e-19, initial_distribution=profile)
+    hydrogen = picmi.Species(name="hydrogen", mass=1.67e-27, charge=1.602e-19, initial_distribution=profile)
+    sim.add_species(electron, picmi.PseudoRandomLayout(n_macroparticles_per_cell=4))
+    sim.add_species(hydrogen, picmi.PseudoRandomLayout(n_macroparticles_per_cell=2))
+
+    sim.picongpu_interaction = [
+        PicmiCollisionalPhysicsSetup(
+            collisions=[
+                PicmiCollision(species_pairs=[(electron, hydrogen)], functor=picmi.ConstLogCollision(coulomb_log=12.0))
+            ]
+        )
+    ]
+    return sim
+
+
+def _assert_same_tree(a: Path, b: Path):
+    files_a = {p.relative_to(a) for p in a.rglob("*") if p.is_file()}
+    files_b = {p.relative_to(b) for p in b.rglob("*") if p.is_file()}
+    assert files_a == files_b, f"file sets differ between {a} and {b}: {files_a ^ files_b}"
+    for rel in files_a:
+        assert (a / rel).read_bytes() == (b / rel).read_bytes(), f"rendered file differs: {rel}"
+
+
+def test_collision_setup_roundtrips_and_renders_identically():
+    # end-to-end collision regression: a setup containing a real collision must
+    # generate at all (the rendering-context schema check used to reject the
+    # serialised species_pairs shape before any artifact was written), both
+    # metadata JSONs must reload into re-serialising-identical instances, and a
+    # regeneration from the reconstructed simulation must render a
+    # byte-identical include/ + etc/ tree
+    sim = _collision_sim()
+    with tempfile.TemporaryDirectory() as tmp:
+        setup = Path(tmp) / "setup"
+        sim.write_input_file(setup)
+        context = json.loads((setup / "metadata" / "pypicongpu_rendering_context.json").read_text())
+        runner_json = json.loads((setup / "metadata" / "pypicongpu_runner.json").read_text())
+
+        restored_sim = Simulation.model_validate(context)
+        assert restored_sim.model_dump(mode="json") == context
+
+        restored_runner = Runner.model_validate(runner_json)
+        assert isinstance(restored_runner, Runner)
+        assert isinstance(restored_runner.sim, Simulation)
+        assert restored_runner.model_dump(mode="json") == runner_json
+
+        setup2 = Path(tmp) / "setup2"
+        Runner(sim=restored_sim, setup_dir=setup2, run_dir=Path(tmp) / "run2").generate()
+        _assert_same_tree(setup / "include", setup2 / "include")
+        _assert_same_tree(setup / "etc", setup2 / "etc")

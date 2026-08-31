@@ -1,10 +1,12 @@
 # Task 02 — PR proposal: expand the PICMI (Python package) documentation
 
-**Status:** ready for review
-**Branch:** `task-02-docs-expand` (12 commits on top of `6d9f158ab`)
-**Base branch:** `picmi-docs` (after task 01's snippet system has landed; the
-branch was built on the current tip of the PR work, which already contains the
-tested-snippet system)
+**Status:** reworked per `TASK-02-REVIEW.md` (see `TASK-02-RESPONSE.md`)
+**Branch:** `task-02-docs-expand` (11 rework commits on top of the review
+commit `873180e6f`)
+**Base branch:** `picmi-docs` via the reworked task-01 branch
+(`7b086af5d` — reworked state of the tested-snippet system: checked-in
+`share/ci/docs_snippets_profile_check.sh` dry-run harness, single-sourced
+emulation constants, unified shebangs)
 **Target:** PR against `picmi-docs`, per the clarified branching workflow
 (requester 2026-08-29). Fork remote: `origin` = `chillenzer/picongpu`.
 
@@ -49,21 +51,34 @@ beginner pages.
 | 11 | `90a7f204b` | Re-evaluation fix: `picongpu_n_gpus` is a **grid** parameter taking a list (bare int is rejected by typeguard); corrected in `defining_simulation` |
 | 12 | `8bd557950` | **API page in sync**: `api/index.rst` now generated via `automodule:: picongpu.picmi` (added `sphinx.ext.autodoc` to `conf.py`) |
 
-Diff: 38 files changed, ~2756 insertions, 35 deletions — all under
-`docs/source/python_package/` except the one-line `conf.py` extension add.
+(The review rework commits on top of `873180e6f` are listed in
+`TASK-02-RESPONSE.md`.)
 
-### Verification (all green)
+Diff at the rework tip vs. the rebased base (`7b086af5d`): 45 files changed,
+3105 insertions(+), 37 deletions(-) — under `docs/source/python_package/`,
+`docs/` build config, the one-line `conf.py` extension add and the
+docstring-only `picmi/diagnostics/phase_space.py` correction (C1).
+
+### Verification (all green at the rework tip)
 
 - **Sphinx** (fresh build of `docs/`): exit 0, `build succeeded`; **zero
   warnings from `python_package/`**, no "Include file ... not found".
   (398 total build warnings are pre-existing and live in other doc trees.)
-- **Snippet suite** (`docs/source/python_package/snippets`, task-01 system):
-  **42 passed** (25 at baseline) — every new snippet actually runs; bash
+- **Snippet suite** (`docs/source/python_package/snippets`, reworked task-01
+  system): **43 passed** (42 at the rebased base; +1 new bash snippet
+  `verification/quick_suite.sh`) — every new snippet actually runs; bash
   snippets pass `bash -n`.
 - **Package tests**: `lib/python/test/picongpu quick/` →
-  `174 passed, 2 xfailed, 1 xpassed` (baseline match; the SHACL
-  stderr noise is pre-existing).
-- **pre-commit** `--all-files`: all passed.
+  `174 passed, 2 xfailed, 1 xpassed, 3499 subtests passed` (baseline match;
+  the SHACL stderr noise is pre-existing).
+- **pre-commit** `--all-files`: all 21 hooks passed.
+- **Dry-run harness** (`share/ci/docs_snippets_profile_check.sh`, the
+  reworked task-01 CI check): `profile check OK`.
+- **Canonical docs environment** (fresh Python 3.11 venv with only
+  `docs/requirements.txt` + `pip install ../lib/python`, as
+  `.readthedocs.yaml` / the documented local build now do): build succeeds
+  with zero `python_package/` warnings and the API reference page renders
+  the class members (M1 verification).
 
 ### Known limitations / follow-ups (flag for the PR description)
 
@@ -88,8 +103,12 @@ Diff: 38 files changed, ~2756 insertions, 35 deletions — all under
 3. **autoapi is broken in this environment** ("Unable to read file" for all
    `pypicongpu` sources; the pre-existing toctree ref
    `pypicongpu/autoapi/...` already warned before this PR). The API page now
-   uses plain `autodoc` on the public `picongpu.picmi` package instead, which
-   is stable and renders.
+   uses plain `autodoc` on the public `picongpu.picmi` package instead.
+   `autodoc` requires the package to be importable in the build env, so the
+   canonical docs environments install it from the checkout being documented
+   (`.readthedocs.yaml` path install; documented `pip install ../lib/python`
+   step in `dev/sphinx.rst` and `picongpu-docs-env.yml`) — verified to render
+   the class members in a fresh `docs/requirements.txt`-only environment.
 4. **10 pre-existing RST warnings** now surface from malformed docstrings in
    `lib/python/picongpu/picmi/` (GaussianLaser, DispersivePulseLaser,
    TWTSLaser, AnalyticDistribution, UniformDistribution) via autodoc. They

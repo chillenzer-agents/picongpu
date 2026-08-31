@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2013 PIConGPU contributors
+# SPDX-License-Identifier: CC-BY-SA-3.0
 #
 # Thanks to potong@stackoverflow
 # snipped licensed as CC BY-SA 3.0

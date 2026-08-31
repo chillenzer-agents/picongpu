@@ -601,6 +601,9 @@ def test_runner_roundtrips_from_runner_metadata():
     restored = Runner.model_validate(runner_json)
     assert isinstance(restored, Runner)
     assert isinstance(restored.sim, Simulation)
+    # the re-serialisation contract: the reconstructed runner must dump
+    # identically to the on-disk metadata (same as the Simulation counterpart)
+    assert restored.model_dump(mode="json") == runner_json
 
 
 def _collision_sim():

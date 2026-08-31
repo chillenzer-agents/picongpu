@@ -14,6 +14,7 @@ from .phase_space import PhaseSpace
 from .radiation import RadiationConfiguration, RadiationPlugin, RadiationObserverConfiguration
 from .timestepspec import TimeStepSpec
 
+# every union member must have a rendering template fragment (see test_union_templates.py)
 AnyPlugin = Binning | Checkpoint | EnergyHistogram | MacroParticleCount | OpenPMDPlugin | PhaseSpace | RadiationPlugin
 
 __all__ = [

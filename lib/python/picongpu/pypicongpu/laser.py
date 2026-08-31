@@ -369,4 +369,5 @@ class TWTSLaser(_BaseLaser):
         return self
 
 
+# every union member must have a rendering template fragment (see test_union_templates.py)
 AnyLaser = DispersivePulseLaser | FromOpenPMDPulseLaser | GaussianLaser | PlaneWaveLaser | TWTSLaser

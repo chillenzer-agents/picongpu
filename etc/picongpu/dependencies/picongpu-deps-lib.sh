@@ -120,6 +120,29 @@ declare -A DEPS_DIRNAME=(
     [fftw3]="fftw3"
 )
 
+# key -> install function. Function names are always underscored; the keys
+# keep their human form (e.g. "c-blosc2"), so the mapping must be explicit:
+# "deps_install_$key" can never be formed for a key containing a dash.
+declare -A DEPS_FN=(
+    [boost]="deps_install_boost"
+    [c-blosc2]="deps_install_c_blosc2"
+    [libpng]="deps_install_libpng"
+    [pngwriter]="deps_install_pngwriter"
+    [hdf5]="deps_install_hdf5"
+    [adios2]="deps_install_adios2"
+    [openpmd]="deps_install_openpmd"
+    [fftw3]="deps_install_fftw3"
+)
+
+# pinned sha256 of the default-version tarballs (corruption/MITM defence for
+# the shared source cache). Version overrides that are not listed here still
+# get a completeness check (deps_tarball_intact) before caching.
+declare -A DEPS_SHA256=(
+    [boost_1_87_0.tar.gz]="f55c340aa49763b1925ccf02b2e83f35fdcf634c9d5164a2acb87540173c741d"
+    [libpng-1.6.34.tar.gz]="574623a4901a9969080ab4a2df9437026c8a87150dfd5c235e28c94b212964a7"
+    [fftw-3.3.10.tar.gz]="56c932549852cddcfafdab3820b0200c7742675be92179e59e6215b340e26467"
+)
+
 deps_dep_requested() {
     local key=$1
     local wanted
@@ -215,40 +238,94 @@ deps_compute_key() {
 
 deps_require_online() {
     if [ "${DEPS_OFFLINE:-0}" -eq 1 ]; then
-        deps_die "DEPS_OFFLINE=1 but the source is not in $DEPS_SOURCE_CACHE yet. Run once with network access (login node) first, or copy the source cache."
+        deps_warn "DEPS_OFFLINE=1 but the source is not in $DEPS_SOURCE_CACHE yet. Run once with network access (login node) first, or copy the source cache."
+        return 1
     fi
+}
+
+deps_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 "$1" | cut -d' ' -f1
+    fi
+}
+
+# a .tar.gz is "intact" if it lists its contents; this is the cheap
+# completeness check for downloads whose version has no pinned checksum
+deps_tarball_intact() {
+    tar -tzf "$1" >/dev/null 2>&1
 }
 
 deps_fetch_tarball() {
     local url=$1
     local name=$2
     local dest="$DEPS_SOURCE_CACHE/$name"
-    if [ -f "$dest" ]; then
+    if [ -f "$dest" ] && deps_tarball_intact "$dest"; then
         deps_log "source cache hit: $name"
         return 0
     fi
-    deps_require_online
+    if [ -f "$dest" ]; then
+        deps_warn "$name: cached copy is not a readable tarball; removing and refetching"
+        rm -f "$dest"
+    fi
+    deps_require_online || return 1
     deps_log "fetching $url -> $dest"
+    local rc=0
     if command -v curl >/dev/null 2>&1; then
-        curl -fL --retry 3 --connect-timeout 30 -o "$dest.part" "$url"
+        curl -fL --retry 3 --connect-timeout 30 -o "$dest.part" "$url" || rc=$?
     else
-        wget -O "$dest.part" "$url"
+        wget -O "$dest.part" "$url" || rc=$?
+    fi
+    if [ "$rc" -ne 0 ]; then
+        rm -f "$dest.part"
+        deps_warn "$name: download failed (rc=$rc); no partial file kept in $DEPS_SOURCE_CACHE"
+        return 1
+    fi
+    local want="${DEPS_SHA256[$name]:-}"
+    if [ -n "$want" ]; then
+        local got
+        got=$(deps_sha256 "$dest.part")
+        if [ "$got" != "$want" ]; then
+            rm -f "$dest.part"
+            deps_warn "$name: checksum mismatch (want $want, got $got); removing the file"
+            return 1
+        fi
+    fi
+    if ! deps_tarball_intact "$dest.part"; then
+        rm -f "$dest.part"
+        deps_warn "$name: downloaded file is not a readable tarball; removing it"
+        return 1
     fi
     mv "$dest.part" "$dest"
+}
+
+# git source cache, keyed by name AND tag: a version override must not
+# silently reuse a checkout of a different tag
+deps_git_cache_dir() {
+    # $1 name, $2 tag
+    printf '%s' "$DEPS_SOURCE_CACHE/git/$1-$2"
 }
 
 deps_fetch_git() {
     local url=$1
     local tag=$2
     local name=$3
-    local dir="$DEPS_SOURCE_CACHE/git/$name"
+    local dir
+    dir=$(deps_git_cache_dir "$name" "$tag")
     if [ -d "$dir/.git" ]; then
-        deps_log "source cache hit: git:$name"
+        deps_log "source cache hit: git:$name-$tag"
         return 0
     fi
-    deps_require_online
+    deps_require_online || return 1
     deps_log "cloning $url ($tag) -> $dir"
-    git clone --depth 1 --branch "$tag" "$url" "$dir"
+    local rc=0
+    git clone --depth 1 --branch "$tag" "$url" "$dir" || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        rm -rf "$dir"
+        deps_warn "$name: git clone of $tag failed (rc=$rc); removing the partial clone"
+        return 1
+    fi
 }
 
 # create a working copy of a source in the toolchain-keyed build area;
@@ -292,6 +369,10 @@ deps_guard() {
             fi
             deps_warn "$key: $target exists but was built for a different toolchain (key $stamp_key, current $DEPS_KEY). Skipping; set DEPS_FORCE=1 to rebuild."
             return 1
+        elif [ -f "$target/.picongpu-deps.inprogress" ]; then
+            deps_log "$key: previous build in $target was interrupted (no stamp); rebuilding in place"
+            rm -f "$target/.picongpu-deps.inprogress"
+            return 0
         fi
         deps_log "$key: pre-existing installation at $target (no stamp; e.g. from an old per-cluster script), skipping; set DEPS_FORCE=1 to rebuild."
         return 1
@@ -301,6 +382,10 @@ deps_guard() {
         rm -rf "$target"
     fi
     mkdir -p "$target"
+    # marks the target as being built by this tool; removed by deps_stamp on
+    # success. A failed run therefore never leaves a target that looks
+    # "installed" and is always retried on the next run.
+    touch "$target/.picongpu-deps.inprogress"
     return 0
 }
 
@@ -314,9 +399,13 @@ deps_stamp() {
         printf 'version=%s\n' "$(deps_resolve_version "$key")"
         printf 'cxx=%s\n' "$("$DEPS_CXX" --version 2>/dev/null | head -n1 || echo unknown)"
     } >"$target/.picongpu-deps.stamp"
+    rm -f "$target/.picongpu-deps.inprogress"
 }
 
-# run a build command, logging into the cache and measuring the time
+# run a build command, logging into the cache and measuring the time.
+# Returns the command's rc (non-zero on failure) so the caller can record
+# the failure and abort the remaining dependencies; a failed build must
+# never be stamped as installed.
 deps_build() {
     local key=$1
     shift
@@ -324,12 +413,17 @@ deps_build() {
     deps_log "$key: building (log: $log)"
     local rc=0
     if [ "${DEPS_QUIET:-0}" -eq 1 ]; then
-        "$@" >>"$log" 2>&1 || rc=$?
+        "$@" >>"$log" 2>&1
+        rc=$?
     else
-        "$@" 2>&1 | tee "$log" || rc=${PIPESTATUS[0]}
+        # PIPESTATUS must be read immediately after the pipeline; a trailing
+        # "|| rc=..." would only fire if tee itself failed
+        "$@" 2>&1 | tee "$log"
+        rc=${PIPESTATUS[0]}
     fi
     if [ $rc -ne 0 ]; then
-        deps_die "$key: build step failed (rc=$rc), see $log"
+        deps_warn "$key: build step failed (rc=$rc), see $log"
+        return "$rc"
     fi
 }
 
@@ -386,6 +480,20 @@ deps_mpi_cmake_flags() {
 # per-dependency install functions
 # ---------------------------------------------------------------------------
 
+deps_boost_build() {
+    # $1 source dir, $2 install target; run through deps_build so the
+    # exit status is checked, logged and honours DEPS_QUIET
+    local src=$1
+    local target=$2
+    cd "$src" || return 1
+    ./bootstrap.sh \
+        --with-libraries="$DEPS_BOOST_LIBRARIES" \
+        --prefix="$target" \
+        CC="$DEPS_CC" CXX="$DEPS_CXX" || return 1
+    ./b2 cxxflags="-std=$DEPS_CXXSTD" -j "$DEPS_JOBS" || return 1
+    ./b2 install
+}
+
 deps_install_boost() {
     local key=boost
     local version
@@ -397,22 +505,14 @@ deps_install_boost() {
 
     local underscored
     underscored=${version//./_}
-    deps_fetch_tarball "https://archives.boost.io/release/$version/source/boost_${underscored}.tar.gz" "boost_${underscored}.tar.gz"
+    deps_fetch_tarball "https://archives.boost.io/release/$version/source/boost_${underscored}.tar.gz" "boost_${underscored}.tar.gz" || return 1
     local src="$DEPS_KEY_DIR/src/boost_${underscored}"
     if [ ! -d "$src" ]; then
         mkdir -p "$DEPS_KEY_DIR/src"
-        tar -xzf "$DEPS_SOURCE_CACHE/boost_${underscored}.tar.gz" -C "$DEPS_KEY_DIR/src"
+        tar -xzf "$DEPS_SOURCE_CACHE/boost_${underscored}.tar.gz" -C "$DEPS_KEY_DIR/src" || return 1
     fi
 
-    (
-        cd "$src"
-        ./bootstrap.sh \
-            --with-libraries="$DEPS_BOOST_LIBRARIES" \
-            --prefix="$target" \
-            CC="$DEPS_CC" CXX="$DEPS_CXX"
-        ./b2 cxxflags="-std=$DEPS_CXXSTD" -j "$DEPS_JOBS"
-        ./b2 install
-    )
+    deps_build "$key" deps_boost_build "$src" "$target" || return 1
     deps_stamp "$key" "$target"
     deps_record "$key" 0 $((SECONDS - t0))
 }
@@ -426,17 +526,18 @@ deps_install_c_blosc2() {
     deps_guard "$key" "$target" || return 0
     local t0=$SECONDS
 
-    deps_fetch_git "https://github.com/Blosc/c-blosc2.git" "v$version" "$key"
+    deps_fetch_git "https://github.com/Blosc/c-blosc2.git" "v$version" "$key" || return 1
     local src
-    src=$(deps_prepare_source_copy "$key" "$DEPS_SOURCE_CACHE/git/$key")
+    src=$(deps_prepare_source_copy "$key" "$(deps_git_cache_dir "$key" "v$version")")
 
     local build="$DEPS_KEY_DIR/build/$key"
     mkdir -p "$build"
+    local prefix_hint="${DEPS_CMAKE_PREFIX_HINT:-}"
     deps_build "$key" cmake \
         -S "$src" -B "$build" \
         -DCMAKE_INSTALL_PREFIX="$target" \
         -DBUILD_TESTS=OFF \
-        ${DEPS_CMAKE_PREFIX_HINT:+-DCMAKE_PREFIX_PATH="$DEPS_CMAKE_PREFIX_HINT"} \
+        ${prefix_hint:+-DCMAKE_PREFIX_PATH="$prefix_hint"} \
         ${DEPS_CMAKE_EXTRA_BLOSC2:-} || return 1
     deps_build "$key" cmake --build "$build" -j "$DEPS_JOBS" || return 1
     deps_build "$key" cmake --install "$build" || return 1
@@ -453,14 +554,17 @@ deps_install_libpng() {
     deps_guard "$key" "$target" || return 0
     local t0=$SECONDS
 
-    deps_fetch_tarball "https://download.sourceforge.net/libpng/libpng-$version.tar.gz" "libpng-$version.tar.gz"
+    deps_fetch_tarball "https://download.sourceforge.net/libpng/libpng-$version.tar.gz" "libpng-$version.tar.gz" || return 1
     local src="$DEPS_KEY_DIR/src/libpng-$version"
     if [ ! -d "$src" ]; then
         mkdir -p "$DEPS_KEY_DIR/src"
-        tar -xzf "$DEPS_SOURCE_CACHE/libpng-$version.tar.gz" -C "$DEPS_KEY_DIR/src"
+        tar -xzf "$DEPS_SOURCE_CACHE/libpng-$version.tar.gz" -C "$DEPS_KEY_DIR/src" || return 1
     fi
 
-    deps_build "$key" bash -c "cd '$src' && ./configure --prefix='$target' --enable-shared --enable-static && make -j '$DEPS_JOBS' && make install" || return 1
+    # path passed via environment (not string interpolation) so a prefix
+    # containing a quote cannot break the command
+    DEPS_SRC="$src" DEPS_TARGET="$target" DEPS_NJOBS="$DEPS_JOBS" \
+        deps_build "$key" bash -c 'cd "$DEPS_SRC" && ./configure --prefix="$DEPS_TARGET" --enable-shared --enable-static && make -j "$DEPS_NJOBS" && make install' || return 1
     deps_stamp "$key" "$target"
     deps_record "$key" 0 $((SECONDS - t0))
 }
@@ -474,9 +578,9 @@ deps_install_pngwriter() {
     deps_guard "$key" "$target" || return 0
     local t0=$SECONDS
 
-    deps_fetch_git "https://github.com/pngwriter/pngwriter.git" "$version" "$key"
+    deps_fetch_git "https://github.com/pngwriter/pngwriter.git" "$version" "$key" || return 1
     local src
-    src=$(deps_prepare_source_copy "$key" "$DEPS_SOURCE_CACHE/git/$key")
+    src=$(deps_prepare_source_copy "$key" "$(deps_git_cache_dir "$key" "$version")")
 
     local build="$DEPS_KEY_DIR/build/$key"
     mkdir -p "$build"
@@ -487,6 +591,9 @@ deps_install_pngwriter() {
         prefix_hint="$libpng_target"
     elif [ -n "${LIBPNG_ROOT:-}" ] && [ -d "${LIBPNG_ROOT}" ]; then
         prefix_hint="$LIBPNG_ROOT"
+    fi
+    if [ -n "${DEPS_CMAKE_PREFIX_HINT:-}" ]; then
+        prefix_hint="${prefix_hint:+$prefix_hint:}$DEPS_CMAKE_PREFIX_HINT"
     fi
 
     # PNGwriter 0.7.0 declares cmake_minimum_required(VERSION 2.8.12),
@@ -513,15 +620,12 @@ deps_install_hdf5() {
     deps_guard "$key" "$target" || return 0
     local t0=$SECONDS
 
-    deps_fetch_git "https://github.com/HDFGroup/hdf5.git" "hdf5_$version" "$key"
+    deps_fetch_git "https://github.com/HDFGroup/hdf5.git" "hdf5_$version" "$key" || return 1
     local src
-    src=$(deps_prepare_source_copy "$key" "$DEPS_SOURCE_CACHE/git/$key")
+    src=$(deps_prepare_source_copy "$key" "$(deps_git_cache_dir "$key" "hdf5_$version")")
 
     local build="$DEPS_KEY_DIR/build/$key"
     mkdir -p "$build"
-    local mpi_flags=()
-    deps_mpi_cmake_flags
-    mpi_flags=("${DEPS_MPI_FLAGS[@]}")
 
     deps_build "$key" cmake \
         -S "$src" -B "$build" \
@@ -530,6 +634,7 @@ deps_install_hdf5() {
         -DHDF5_ENABLE_FORTRAN=OFF \
         ${DEPS_MPI_C:+-DCMAKE_C_COMPILER="$DEPS_MPI_C"} \
         ${DEPS_MPI_CXX:+-DCMAKE_CXX_COMPILER="$DEPS_MPI_CXX"} \
+        ${DEPS_CMAKE_PREFIX_HINT:+-DCMAKE_PREFIX_PATH="$DEPS_CMAKE_PREFIX_HINT"} \
         ${DEPS_CMAKE_EXTRA_HDF5:-} || return 1
     deps_build "$key" cmake --build "$build" -j "$DEPS_JOBS" || return 1
     deps_build "$key" cmake --install "$build" || return 1
@@ -546,9 +651,9 @@ deps_install_adios2() {
     deps_guard "$key" "$target" || return 0
     local t0=$SECONDS
 
-    deps_fetch_git "https://github.com/ornladios/ADIOS2.git" "v$version" "$key"
+    deps_fetch_git "https://github.com/ornladios/ADIOS2.git" "v$version" "$key" || return 1
     local src
-    src=$(deps_prepare_source_copy "$key" "$DEPS_SOURCE_CACHE/git/$key")
+    src=$(deps_prepare_source_copy "$key" "$(deps_git_cache_dir "$key" "v$version")")
     # perlmutter needed this patch for MPICH client/server builds
     if [ "${DEPS_ADIOS2_PATCH_CLIENT_SERVER:-0}" -eq 1 ]; then
         sed -i 's|if (ADIOS2_HAVE_MPI_CLIENT_SERVER)|if (TRUE)|' "$src/cmake/DetectOptions.cmake"
@@ -563,6 +668,9 @@ deps_install_adios2() {
     hdf5_target=$(deps_target hdf5 "$(deps_resolve_version hdf5)")
     if [ -d "$hdf5_target" ]; then
         hdf5_hint="$hdf5_target"
+    fi
+    if [ -n "${DEPS_CMAKE_PREFIX_HINT:-}" ]; then
+        hdf5_hint="${hdf5_hint:+$hdf5_hint:}$DEPS_CMAKE_PREFIX_HINT"
     fi
 
     deps_build "$key" cmake \
@@ -591,9 +699,9 @@ deps_install_openpmd() {
     deps_guard "$key" "$target" || return 0
     local t0=$SECONDS
 
-    deps_fetch_git "https://github.com/openPMD/openPMD-api.git" "$version" "$key"
+    deps_fetch_git "https://github.com/openPMD/openPMD-api.git" "$version" "$key" || return 1
     local src
-    src=$(deps_prepare_source_copy "$key" "$DEPS_SOURCE_CACHE/git/$key")
+    src=$(deps_prepare_source_copy "$key" "$(deps_git_cache_dir "$key" "$version")")
 
     local build="$DEPS_KEY_DIR/build/$key"
     mkdir -p "$build"
@@ -621,8 +729,15 @@ deps_install_openpmd() {
     local hdf5_target adios2_target
     hdf5_target=$(deps_target hdf5 "$(deps_resolve_version hdf5)")
     adios2_target=$(deps_target adios2 "$(deps_resolve_version adios2)")
-    [ -d "$hdf5_target" ] && hints="$hdf5_target"
-    [ -d "$adios2_target" ] && hints="${hints:+$hints:}$adios2_target"
+    if [ -d "$hdf5_target" ]; then
+        hints="$hdf5_target"
+    fi
+    if [ -d "$adios2_target" ]; then
+        hints="${hints:+$hints:}$adios2_target"
+    fi
+    if [ -n "${DEPS_CMAKE_PREFIX_HINT:-}" ]; then
+        hints="${hints:+$hints:}$DEPS_CMAKE_PREFIX_HINT"
+    fi
 
     deps_build "$key" cmake \
         -S "$src" -B "$build" \
@@ -649,16 +764,53 @@ deps_install_fftw3() {
     deps_guard "$key" "$target" || return 0
     local t0=$SECONDS
 
-    deps_fetch_tarball "https://www.fftw.org/fftw-$version.tar.gz" "fftw-$version.tar.gz"
+    deps_fetch_tarball "https://www.fftw.org/fftw-$version.tar.gz" "fftw-$version.tar.gz" || return 1
     local src="$DEPS_KEY_DIR/src/fftw-$version"
     if [ ! -d "$src" ]; then
         mkdir -p "$DEPS_KEY_DIR/src"
-        tar -xzf "$DEPS_SOURCE_CACHE/fftw-$version.tar.gz" -C "$DEPS_KEY_DIR/src"
+        tar -xzf "$DEPS_SOURCE_CACHE/fftw-$version.tar.gz" -C "$DEPS_KEY_DIR/src" || return 1
     fi
 
-    deps_build "$key" bash -c "cd '$src' && ./configure --prefix='$target' ${DEPS_FFTW_CONFIGURE_EXTRA:-} && make -j '$DEPS_JOBS' && make install" || return 1
+    # path passed via environment (not string interpolation) so a prefix
+    # containing a quote cannot break the command
+    DEPS_SRC="$src" DEPS_TARGET="$target" DEPS_NJOBS="$DEPS_JOBS" \
+        DEPS_FFTW_EXTRA="${DEPS_FFTW_CONFIGURE_EXTRA:-}" \
+        deps_build "$key" bash -c 'cd "$DEPS_SRC" && ./configure --prefix="$DEPS_TARGET" $DEPS_FFTW_EXTRA && make -j "$DEPS_NJOBS" && make install' || return 1
     deps_stamp "$key" "$target"
     deps_record "$key" 0 $((SECONDS - t0))
+}
+
+# human-readable source for --list / documentation
+deps_source_desc() {
+    local key=$1
+    local version
+    version=$(deps_resolve_version "$key")
+    case $key in
+    boost)
+        printf 'tarball: archives.boost.io/release/%s/source/boost_%s.tar.gz' "$version" "${version//./_}"
+        ;;
+    c-blosc2)
+        printf 'git: github.com/Blosc/c-blosc2 @ v%s' "$version"
+        ;;
+    libpng)
+        printf 'tarball: download.sourceforge.net/libpng/libpng-%s.tar.gz' "$version"
+        ;;
+    pngwriter)
+        printf 'git: github.com/pngwriter/pngwriter @ %s' "$version"
+        ;;
+    hdf5)
+        printf 'git: github.com/HDFGroup/hdf5 @ hdf5_%s' "$version"
+        ;;
+    adios2)
+        printf 'git: github.com/ornladios/ADIOS2 @ v%s' "$version"
+        ;;
+    openpmd)
+        printf 'git: github.com/openPMD/openPMD-api @ %s' "$version"
+        ;;
+    fftw3)
+        printf 'tarball: www.fftw.org/fftw-%s.tar.gz' "$version"
+        ;;
+    esac
 }
 
 # ---------------------------------------------------------------------------
@@ -694,6 +846,10 @@ deps_write_env_file() {
     local key version target root_var
     for key in "${DEPS_KEYS[@]}"; do
         version=$(deps_resolve_version "$key")
+        # cluster mode -> the profile's *_ROOT; managed mode -> the
+        # toolchain-keyed prefix. The env file is the union of both, so
+        # managed-mode installs stay visible even when the profile exports
+        # some (but not all) *_ROOT variables (the mixed cluster case).
         target=$(deps_target "$key" "$version")
         [ -d "$target" ] || continue
         root_var="${DEPS_ROOT_VAR[$key]}"
@@ -716,9 +872,19 @@ deps_write_env_file() {
         esac
     done
     printf '%s\n' "${DEPS_ENV_LINES[@]}" >"$env_file"
-    # stable pointer so build/run scripts do not need to know the key
-    cp "$env_file" "$DEPS_INSTALL_ROOT/current.env"
-    deps_log "wrote $env_file (and $DEPS_INSTALL_ROOT/current.env)"
+    # stable pointer so build/run scripts do not need to know the key;
+    # warn when it is re-pointed at a different toolchain (last-writer-wins
+    # is visible, not silent)
+    local current="$DEPS_INSTALL_ROOT/current.env"
+    if [ -f "$current" ]; then
+        local old_key
+        old_key=$(grep '^# toolchain key:' "$current" | head -n1 | cut -d' ' -f4 || true)
+        if [ -n "$old_key" ] && [ "$old_key" != "$DEPS_KEY" ]; then
+            deps_warn "$current now points at toolchain key $DEPS_KEY (it held $old_key); all consumers of current.env switch to this toolchain's prefixes"
+        fi
+    fi
+    cp "$env_file" "$current"
+    deps_log "wrote $env_file (and $current)"
 }
 
 # ---------------------------------------------------------------------------
@@ -728,14 +894,22 @@ deps_write_env_file() {
 deps_provider_source() {
     local rc=0
     local done_count=0
-    local key
+    local key fn t0
     for key in "${DEPS_KEYS[@]}"; do
         deps_dep_requested "$key" || continue
-        local fn="deps_install_$key"
+        fn="${DEPS_FN[$key]:-}"
+        if [ -z "$fn" ] || [ "$(type -t "$fn" 2>/dev/null)" != "function" ]; then
+            deps_record "$key" 1 0
+            deps_warn "$key: internal error, no install function registered (DEPS_FN[$key]='$fn'); aborting"
+            rc=1
+            break
+        fi
+        t0=$SECONDS
         if "$fn"; then
             done_count=$((done_count + 1))
         else
-            deps_warn "$key: build failed; aborting remaining dependencies"
+            deps_record "$key" 1 $((SECONDS - t0))
+            deps_warn "$key: build failed (see $DEPS_KEY_DIR/logs/$key.log); aborting remaining dependencies"
             rc=1
             break
         fi
@@ -748,11 +922,11 @@ deps_provider_source() {
     if [ "$rc" -ne 0 ]; then
         return "$rc"
     fi
-    # in managed mode (no *_ROOT in the environment) we must hand the
-    # resulting prefixes to the build via an environment file
-    if [ -z "${BOOST_ROOT:-}${OPENPMD_ROOT:-}${PNGwriter_ROOT:-}${FFTW3_ROOT:-}${HDF5_ROOT:-}${ADIOS2_ROOT:-}${BLOSC_ROOT:-}${LIBPNG_ROOT:-}" ]; then
-        deps_write_env_file
-    fi
+    # hand the resulting prefixes to the build via an environment file:
+    # the union of the profile's cluster-mode *_ROOT hints and the
+    # managed-mode prefixes, so managed installs are visible even in
+    # mixed profiles (which export some but not all *_ROOT variables)
+    deps_write_env_file
 }
 
 deps_provider_modules() {
@@ -829,4 +1003,6 @@ deps_write_summary() {
         fi
     done
     deps_log "------------------------------------------"
+    # clear so the EXIT-trap call in the main script does not print twice
+    DEPS_SUMMARY=()
 }

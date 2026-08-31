@@ -60,6 +60,16 @@ repos:
         # TODO: Adjust the script to take filenames, so that we can pass the
         # filenames and speed things up before commits.
         stages: [manual, pre-push]
+      # 'reuse lint' checks the whole tree (~1 s), so it is light enough to run
+      # before every commit. The 'manual' stage makes the pull-request-validation
+      # CI job (pre-commit run --all-files --hook-stage manual) enforce REUSE
+      # compliance. The 'reuse' CLI is pinned in requirements_pre-commit.txt.
+      - id: reuse-lint
+        name: REUSE compliance (reuse lint)
+        entry: reuse lint
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push, manual]
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
     rev: v0.12.10

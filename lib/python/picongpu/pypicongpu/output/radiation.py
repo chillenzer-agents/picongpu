@@ -147,7 +147,11 @@ def _make_vector(coefficients, basis_vectors=CoordSys3D("e")):
 
 # Fixed symbol used for the (de)serialisation of index_to_direction, so that
 # the serialised form is canonical (stable symbol name) and round-trips.
-_OBSERVER_INDEX = Symbol("index")
+# The name is mangled so that it cannot collide with a user-provided direction
+# mapping that legitimately uses its own symbol named "index" (sympy interns
+# symbols by name and assumptions, so a user "index" would be the very same
+# object and get silently re-bound during deserialisation).
+_OBSERVER_INDEX = Symbol("pypicongpu_observer_index")
 
 
 def serialise_index_to_direction(value) -> dict[str, str]:
@@ -202,8 +206,10 @@ class RadiationObserverConfiguration(BaseModel):
     @field_validator("index_to_direction", mode="after")
     @classmethod
     def _validate_index_to_direction(cls, value):
-        index = Symbol("index")
-        components = [sympify(component) for component in value(index)]
+        # the mapping is evaluated at the canonical placeholder, so that a
+        # user direction that legitimately uses its own symbol named "index"
+        # is not conflated with the observer index (n1)
+        components = [sympify(component) for component in value(_OBSERVER_INDEX)]
         vec = _make_vector(components)
         if vec.magnitude().equals(1):
             return value
@@ -215,8 +221,8 @@ class RadiationObserverConfiguration(BaseModel):
         magnitude_sq = sum(component**2 for component in components)
 
         def direction(arg):
-            magnitude = sqrt(magnitude_sq.subs(index, arg))
-            return tuple(component.subs(index, arg) / magnitude for component in components)
+            magnitude = sqrt(magnitude_sq.subs(_OBSERVER_INDEX, arg))
+            return tuple(component.subs(_OBSERVER_INDEX, arg) / magnitude for component in components)
 
         return direction
 

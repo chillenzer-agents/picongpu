@@ -682,6 +682,20 @@ def test_collision_functor_malformed_dict_raises_value_error():
         Collision(species_pairs=[(_ELECTRON, _ELECTRON)], functor={"type_constlog": True, "data": {}})
 
 
+def test_radiation_observer_user_index_symbol_not_conflated():
+    # a user direction that uses its own symbol named "index" as a constant
+    # must not be conflated with the observer index: the canonical
+    # serialisation placeholder is mangled, so the user constant survives
+    # the round-trip as a free symbol (n1)
+    tilt = Symbol("index")
+    model = RadiationObserverConfiguration(index_to_direction=lambda i: (tilt + i, 1, 0), N_observer=4)
+    dumped = model.model_dump(mode="json")
+    restored = RadiationObserverConfiguration.model_validate(dumped)
+    assert restored.model_dump(mode="json") == dumped
+    x, y, z = restored.index_to_direction(0)
+    assert x.free_symbols == {tilt}, f"user constant lost in round-trip: {x}"
+
+
 def test_radiation_observer_nonunit_direction_roundtrips():
     # a direction whose magnitude is not symbolically 1 goes through the
     # validator's normalising branch; the reconstructed mapping must still be

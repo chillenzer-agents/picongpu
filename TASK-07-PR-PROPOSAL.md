@@ -179,39 +179,61 @@ pydantic-native, symmetric mechanisms (annotated
 ### Verification
 
 - Quick test gate: `cd lib/python/test/picongpu && python -m pytest quick/
-  -q` -> **`534 passed, 2 xfailed, 1 xpassed, 3503 subtests passed`**
-  (baseline at branch start: `473 passed, 2 xfailed, 1 xpassed`; the +61 are
-  the new round-trip and reconstruction tests). The xfail/xpass sets are
-  unchanged.
-- Round-trip corpus: 79 representative models (all solvers, all 5 lasers,
+  -q` -> **`577 passed, 2 xfailed, 1 xpassed, 3512 subtests passed`** (the
+  +5 over the review tip's `572 passed` are the rework's regression tests:
+  the collision end-to-end setup, the malformed collision functor, the
+  non-unit radiation-direction corpus entry + test, and the user-`index`
+  symbol test). The xfail/xpass sets are unchanged.
+- Round-trip corpus: 80 representative models (all solvers, all 5 lasers,
   openPMD config/plugin/range, binning, all 7 ionization models, ground-state
-  bundle, radiation observer/plugin, collisions, elements incl. `#14N`
-  isotope, synchrotron, species operations, layouts, functors, custom user
-  input) satisfy `model_validate(model_dump(mode="json"))` with an identical
-  re-dump and the same concrete type.
+  bundle, radiation observer/plugin incl. a non-unit observer direction,
+  collisions, elements incl. `#14N` isotope, synchrotron, species operations,
+  layouts, functors, custom user input) satisfy
+  `model_validate(model_dump(mode="json"))` with an identical re-dump and the
+  same concrete type.
 - End-to-end reconstruction: a representative simulation's
   `write_input_file` output is read back - `Simulation.model_validate` on
   `pypicongpu_rendering_context.json` re-dumps identically, and
   `Runner.model_validate` on `pypicongpu_runner.json` yields a `Runner`
   whose `sim` is a `Simulation`.
-- Rendered-output regression (hard constraint): a battery of 10
-  representative setups (basic, binning, collisions, ionization, laser,
-  moving window, openPMD, profiles, radiation, synchrotron) rendered against
-  the task-06 base commit and this branch produces **byte-identical**
-  `.param`/`.cfg` files; the metadata JSONs differ only by the added
-  reconstruction fields (`type_yee`, `index_to_direction`,
-  `typename_suffix`, `openpmd_name`, openPMD `sources`/`config`). A second,
-  independent single-setup diff (explorer simulation) confirms the same.
+- Rendered-output regression (hard constraint): a battery of 11
+  representative setups (basic, laser, moving window, ionization, profiles,
+  openPMD, radiation, synchrotron, unfiltered binning, filtered binning, and
+  a real collision setup carrying a `ConstLogCollision`) was rendered by both
+  the task-06 base commit and this branch, and the rendered `include/`+`etc/`
+  trees were compared with `diff -r`:
+  - **9 setups render byte-identical** (basic, laser, moving window,
+    ionization, profiles, openPMD, radiation, synchrotron, unfiltered
+    binning). Their metadata JSONs differ only by the added reconstruction
+    fields (`type_yee`, `index_to_direction`, `typename_suffix`,
+    `openpmd_name`, openPMD `sources`/`config`) plus environment-specific
+    paths.
+  - **Filtered binning differs only in the functor typename hash.** The base
+    rendered a fresh random `uuid4` per generation (non-deterministic, and
+    not even consistent across files within a single render), while this
+    branch renders a stable per-instance `typename_suffix`. The generate ->
+    reload -> regenerate round-trip is byte-identical, since the suffix
+    round-trips through the metadata JSON.
+  - **The collision setup is new to this branch.** It contains a real
+    collision and generates here (the reload -> regenerate round-trip is
+    byte-identical, and `collision.param` renders `coulombLog` and
+    `Pair<...>`). The base cannot generate it at all (`_serialize_functor`
+    called the non-existent `ConstLogCollision.get_rendering_context`), so it
+    is a branch-only improvement rather than a base<->branch comparison.
 - Pre-commit: `pre-commit run` on all changed files green (ruff, ruff-format,
   gersemi, pyproject-fmt, ...).
 
 ### Notes for follow-up tasks
 
 - **Task 13** (pypicongpu <-> C++ alignment) can rely on the full round-trip
-  guarantee: every model's `model_dump(mode="json")` is valid input to
-  `model_validate` and re-serialises identically, including the previously
-  excluded/lossy models (`OpenPMDPlugin`, `Element`, ionization models, the
-  radiation observer direction mapping).
+  guarantee: for every model in the tested corpus, `model_dump(mode="json")`
+  is valid input to `model_validate` and re-serialises identically, including
+  the previously excluded/lossy models (`OpenPMDPlugin`, `Element`,
+  ionization models, the radiation observer direction mapping - including
+  non-unit directions). Two generation-level exceptions that previously broke
+  the guarantee are fixed in this branch and covered by committed regression
+  tests: collision setups failing the rendering-context schema check, and
+  non-unit radiation observer directions crashing `model_dump`.
 - The picmi-side `IonizationCurrent` interface (a different class from the
   pypicongpu one) was left untouched: it has no subclasses and its dump
   round-trips trivially.

@@ -49,11 +49,19 @@ def bx_amplitude_per_iteration(series):
 
 def times_omega_pe(series, density_si, gamma):
     """
-    The iteration times in units of 1/omega_pe: the openPMD time (SI)
-    scaled with the relativistic plasma frequency of the flow.
+    The iteration times in units of 1/omega_pe: the openPMD time
+    (time * timeUnitSI, SI) scaled with the relativistic plasma frequency
+    of the flow. PIConGPU writes timeUnitSI = 1.0; the factor is applied
+    anyway so the check stays correct for other unit conventions
+    (openpmd-api reports the standard default 1.0 when the attribute is
+    absent).
     """
     keys = sorted(series.iterations, key=int)
-    time_si = np.asarray([float(series.iterations[key].time) for key in keys])
+    time_si = []
+    for key in keys:
+        iteration = series.iterations[key]
+        time_si.append(float(iteration.time) * float(iteration.time_unit_SI))
+    time_si = np.asarray(time_si)
     omega_pe = physics.plasmafrequence(density=density_si, gamma=gamma, relativistic=True)
     return time_si * omega_pe
 

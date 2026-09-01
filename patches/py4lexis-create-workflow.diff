@@ -1,0 +1,84 @@
+diff --git a/src/py4lexis/core/workflows/airflow.py b/src/py4lexis/core/workflows/airflow.py
+index bd12b3a..3049f52 100644
+--- a/src/py4lexis/core/workflows/airflow.py
++++ b/src/py4lexis/core/workflows/airflow.py
+@@ -309,10 +309,77 @@ class Airflow(object):
+             print(f"\nContent: {content}\n")
+
+         return content_out
+-
+
+     @handle_class_exceptions()
+-    def get_workflow_states(self,
++    def create_workflow(self,
++                        workflow_definition: str | dict,
++                        project: str | None = None) -> dict:
++        """
++            Create a new workflow (DAG) from a LEXIS Workflow Definition (LWD).
++
++            Py4Lexis can list/info/execute/check-state *existing* workflows, but
++            (as of this version) cannot *create* one from an LWD. This method adds
++            that capability by POSTing the LWD to the LEXIS Airflow extension API.
++
++            NOTE: the exact lexis-extension endpoint + payload shape must be
++            confirmed against the live EFP OpenAPI
++            (https://api.lexis.tech/airflow/api/lexis/openapi). The path below is
++            a best-effort default and can be overridden via the
++            PY4LEXIS_CREATE_WORKFLOW_PATH env var.
++
++            Parameters
++            ----------
++            workflow_definition : str | dict
++                The LWD, either as a YAML document (str) or a parsed dict.
++            project : str | None
++                Optional project short name override (defaults to the LWD's).
++
++            Returns
++            -------
++            dict
++                The API response (typically contains the new dag_id / workflow id).
++        """
++
++        if not self._suppress_print:
++            print("Creating a new workflow (DAG) from a LEXIS Workflow Definition...")
++
++        import os as _os
++        import yaml as _yaml
++
++        if isinstance(workflow_definition, dict):
++            lwd: dict = dict(workflow_definition)
++        else:
++            lwd = _yaml.safe_load(workflow_definition)
++        if project is not None:
++            lwd["project_shortname"] = project
++
++        # The lexis extension lives under the airflow api base (e.g.
++        # .../airflow/api/lexis/...), not the plain .../airflow/api/v1 base.
++        path: str = _os.getenv("PY4LEXIS_CREATE_WORKFLOW_PATH", "/lexis/workflows")
++        base: str = self.__session.api_air
++        if base.rstrip("/").endswith("/v1"):
++            base = base.rstrip("/")[: -len("/v1")]
++        url: str = f"{base}{path}"
++
++        content: dict = self.__session.make_request(
++            method="post",
++            url=url,
++            headers=self.__session.get_air_headers(),
++            json_data=lwd,
++            verify=False,
++            to_json=True,
++        )
++
++        if not self._suppress_print:
++            print("Workflow (DAG) successfully created...")
++
++        if self._print_content:
++            print(f"\nContent: {content}\n")
++
++        return content
++
++    @handle_class_exceptions()
++    def get_workflow_states(self,
+                             workflow_id: str,
+                             content_as_pandas: bool=False,
+                             records_limit: int | None=None) -> list[dict] | DataFrame:

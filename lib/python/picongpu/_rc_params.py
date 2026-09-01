@@ -282,7 +282,14 @@ def _path_to_str(value):
 
 
 _RETAINED_CONTENT = {"dirty_reset_policy": "raise", "missing_variable_policy": "raise"}
-_DEFAULT_CONTENT = _RETAINED_CONTENT | {"required_information": tuple(), "pic_src_path": core.path()}
+_DEFAULT_CONTENT = _RETAINED_CONTENT | {
+    "required_information": tuple(),
+    "pic_src_path": core.path(),
+    # Workflow backend used by the runner: "cwl" (default, cwltool pipeline on
+    # the laptop) or "lexis" (emit a LEXIS Workflow Definition and submit via
+    # Py4Lexis to the EFP). See pypicongpu/lexis_workflow.py.
+    "workflow_backend": "cwl",
+}
 
 
 def _read_picongpurc(path):

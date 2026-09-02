@@ -8,9 +8,6 @@ License: GPLv3+
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
-
-from picongpu.pypicongpu.units import SI
-
 from .plasmaramp import AllPlasmaRamps, None_
 
 
@@ -28,13 +25,13 @@ class Foil(BaseModel):
     type_foil: Literal[True] = True
     """discriminator for the AnyDensityProfile union."""
 
-    density_si: Annotated[float, Field(gt=0.0), SI("m^-3")]
+    density_si: Annotated[float, Field(gt=0.0)]
     """particle number density at the foil plateau, [m^-3]; must be > 0."""
 
-    y_value_front_foil_si: Annotated[float, Field(ge=0.0), SI("m")]
+    y_value_front_foil_si: Annotated[float, Field(ge=0.0)]
     """position of the front of the foil plateau, [m]; must be >= 0."""
 
-    thickness_foil_si: Annotated[float, Field(ge=0.0), SI("m")]
+    thickness_foil_si: Annotated[float, Field(ge=0.0)]
     """thickness of the foil plateau, [m]; must be >= 0."""
 
     pre_foil_plasmaRamp: AllPlasmaRamps = None_()

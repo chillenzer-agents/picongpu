@@ -19,8 +19,6 @@ from pydantic import (
     model_validator,
 )
 
-from picongpu.pypicongpu.units import SI
-
 
 class PolarizationType(Enum):
     """represents a polarization of a laser (for PIConGPU)"""
@@ -104,10 +102,10 @@ class _BaseLaser(BaseModel):
     """direction of polarization, [dimensionless] (normalized vector)"""
     polarization_type: PolarizationType
     """laser polarization (Linear or Circular)"""
-    wave_length_si: Annotated[float, Field(alias="wavelength", gt=0.0), SI("m")]
+    wave_length_si: Annotated[float, Field(alias="wavelength", gt=0.0)]
     """wave length, [m]; must be > 0.
     C++ name: WAVE_LENGTH_SI (incidentField.param)."""
-    pulse_duration_si: Annotated[float, Field(alias="duration", gt=0.0), SI("s")]
+    pulse_duration_si: Annotated[float, Field(alias="duration", gt=0.0)]
     """pulse duration, [s] (1 sigma of a standard gaussian for the intensity (E^2)); must be > 0.
     C++ name: PULSE_DURATION_SI (incidentField.param)."""
     focus_pos_si: Annotated[tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)] = (
@@ -115,10 +113,10 @@ class _BaseLaser(BaseModel):
     )
     """focus position vector, [m].
     C++ name: focus_position[] / FOCUS_POSITION_{X,Y,Z}_SI (incidentField.param)."""
-    phase: Annotated[float, Field(alias="phi0"), SI("rad")]
+    phase: Annotated[float, Field(alias="phi0")]
     """initial phase phi0, [rad]; periodic in 2*pi.
     C++ name: LASER_PHASE (incidentField.param)."""
-    E0_si: Annotated[float, Field(alias="E0", gt=0.0), SI("V/m")]
+    E0_si: Annotated[float, Field(alias="E0", gt=0.0)]
     """peak electric field amplitude, [V/m]; must be > 0 (an E0 of 0 would
     switch the laser off, which is expressed by omitting the laser).
     C++ name: AMPLITUDE_SI (incidentField.param)."""
@@ -168,7 +166,7 @@ class GaussianLaser(_BaseLaser):
     type_gaussian: Literal[True] = True
     """discriminator for the AnyLaser union."""
 
-    waist_si: Annotated[float, Field(alias="waist", gt=0.0), SI("m")]
+    waist_si: Annotated[float, Field(alias="waist", gt=0.0)]
     """beam waist, [m]; must be > 0.
     C++ name: W0_SI (incidentField.param)."""
     laguerre_modes: Annotated[list[_Component], BeforeValidator(validate_component_vector)] = Field(min_length=1)
@@ -225,22 +223,22 @@ class DispersivePulseLaser(_BaseLaser):
     type_dispersive: Literal[True] = True
     """discriminator for the AnyLaser union."""
 
-    waist_si: Annotated[float, Field(alias="waist", gt=0.0), SI("m")]
+    waist_si: Annotated[float, Field(alias="waist", gt=0.0)]
     """beam waist, [m]; must be > 0.
     C++ name: W0_SI (incidentField.param)."""
     spectral_support: Annotated[float, Field(gt=0.0)]
     """width of the spectral support for the discrete Fourier transform,
     [dimensionless]; must be > 0."""
-    sd_si: Annotated[float, SI("m*s")]
+    sd_si: float
     """spatial dispersion in focus, [m*s].
     C++ name: SD_SI (incidentField.param)."""
-    ad_si: Annotated[float, SI("rad*s")]
+    ad_si: float
     """angular dispersion in focus, [rad*s].
     C++ name: AD_SI (incidentField.param)."""
-    gdd_si: Annotated[float, SI("s^2")]
+    gdd_si: float
     """group velocity dispersion in focus, [s^2].
     C++ name: GDD_SI (incidentField.param)."""
-    tod_si: Annotated[float, SI("s^3")]
+    tod_si: float
     """third order dispersion in focus, [s^3].
     C++ name: TOD_SI (incidentField.param)."""
 
@@ -281,7 +279,7 @@ class FromOpenPMDPulseLaser(BaseModel):
     datatype: str
     """Data type of the pulse data (openPMD type name).
     C++ name: dataType (incidentField.param)."""
-    time_offset_si: Annotated[float, SI("s")]
+    time_offset_si: float
     """Time offset in seconds to apply to the pulse data, [s].
     C++ name: TIME_DELAY_SI (incidentField.param)."""
     polarisationAxisOpenPMD: str
@@ -315,10 +313,10 @@ class TWTSLaser(_BaseLaser):
     type_twts: Literal[True] = True
     """discriminator for the AnyLaser union."""
 
-    waist_si: Annotated[float, Field(alias="waist", gt=0.0), SI("m")]
+    waist_si: Annotated[float, Field(alias="waist", gt=0.0)]
     """beam waist, [m]; must be > 0.
     C++ name: W0_SI (incidentField.param)."""
-    laserIncidenceAngle: Annotated[float, SI("rad")]
+    laserIncidenceAngle: float
     """Laser incident angle, [rad] denoting the mean laser phase
        propagation direction with respect to the y-axis.
        C++ name: PHI (incidentField.param)."""
@@ -326,7 +324,7 @@ class TWTSLaser(_BaseLaser):
     """Is the laser incidence angle positive?, [dimensionless flag];
     selects the rendered ZMin/ZMax profile section in incidentField.param
     (the C++ side's phiPositive flag)."""
-    polarizationAngle: Annotated[float, SI("rad")]
+    polarizationAngle: float
     """Linear laser polarization direction,
         parameterized as a rotation angle, [rad]
         of the x-direction around the mean
@@ -337,10 +335,10 @@ class TWTSLaser(_BaseLaser):
     speed of light, [dimensionless]; must satisfy |beta0| <= 1 (the default
     1.0 = overlap propagates with c).
     C++ name: BETA_0 (incidentField.param)."""
-    time_offset_si: Annotated[float, SI("s")]
+    time_offset_si: float
     """time offset to apply to the pulse, [s].
     C++ name: TDELAY (incidentField.param; used as tdelay_user_SI in the TWTS profile)."""
-    focus_lateral_offset_si: Annotated[float, SI("m")]
+    focus_lateral_offset_si: float
     """Offset from the middle of the simulation domain
         to the laser focus in z-direction, [m].
         C++ name: FOCUS_Z_OFFSET_SI (incidentField.param)."""

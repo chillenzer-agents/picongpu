@@ -11,7 +11,6 @@ from typing import Annotated
 from pydantic import BaseModel, PlainSerializer, field_validator
 
 from .rendering import RenderedObject
-from .units import SI
 
 
 def serialise_timedelta(value):
@@ -35,7 +34,7 @@ class Walltime(RenderedObject, BaseModel):
     Units policy: the walltime is a duration, serialized as HH:MM:SS.
     """
 
-    walltime: Annotated[timedelta, PlainSerializer(serialise_timedelta), SI("s")]
+    walltime: Annotated[timedelta, PlainSerializer(serialise_timedelta)]
     """time after which the cluster scheduler will stop the simulation, [s]; must be > 0."""
 
     @field_validator("walltime", mode="after")

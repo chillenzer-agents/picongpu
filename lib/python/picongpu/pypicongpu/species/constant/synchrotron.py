@@ -8,9 +8,6 @@ License: GPLv3+
 from typing import Annotated, Any
 
 from pydantic import BaseModel, Field, model_validator
-
-from picongpu.pypicongpu.units import SI
-
 from picongpu.pypicongpu.species.constant.constant import Constant
 
 
@@ -98,7 +95,7 @@ class SynchrotronParams(BaseModel):
     C++ name: ElectronRecoil.
     """
 
-    min_energy: Annotated[float | None, Field(gt=0.0), SI("J")] = None
+    min_energy: Annotated[float | None, Field(gt=0.0)] = None
     """
     Energy high-pass filter: accept only photons with energy higher than this
     value, [J]; must be > 0 when set (default: hbar/dt is used).

@@ -17,29 +17,9 @@ from picongpu.picmi.species import Species
 
 
 class ParticleDump(BaseModel):
-    """
-    a dump of all particles of a (filtered) species into the openPMD output.
-
-    Parameters
-    ----------
-    species: Species or FilteredSpecies
-        The species (or filtered species) whose particles are dumped.
-
-    period: TimeStepSpec, optional
-        The time steps at which the dump is written (default: every step).
-
-    options: OpenPMDConfig, optional
-        The openPMD backend configuration (default: file prefix "simData").
-    """
-
     species: Species | FilteredSpecies
-    """the species (or filtered species) whose particles are dumped"""
-
     period: TimeStepSpec = TimeStepSpec[:]("steps")
-    """the time steps at which the dump is written, [time-step number]"""
-
     options: BackendConfig = OpenPMDConfig(file="simData")
-    """the openPMD backend configuration (file prefix, infix, extension, ...)"""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

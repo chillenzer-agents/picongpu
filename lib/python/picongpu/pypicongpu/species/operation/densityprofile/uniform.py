@@ -9,8 +9,6 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from picongpu.pypicongpu.units import SI
-
 
 class Uniform(BaseModel):
     """
@@ -28,5 +26,5 @@ class Uniform(BaseModel):
     type_uniform: Literal[True] = True
     """discriminator for the AnyDensityProfile union (renders the homogenous profile)."""
 
-    density_si: Annotated[float, Field(gt=0.0), SI("m^-3")]
+    density_si: Annotated[float, Field(gt=0.0)]
     """number density at every point in space, [m^-3]; must be > 0."""

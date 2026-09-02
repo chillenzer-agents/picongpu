@@ -5,7 +5,6 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-import re
 from typing import Annotated, Literal
 from uuid import uuid4 as uuid
 
@@ -17,6 +16,7 @@ from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.rendering.renderedobject import RenderedObject
 from picongpu.pypicongpu.util import alt
+from picongpu.pypicongpu.validation import validate_cpp_identifier
 
 
 def by_bracket(attribute):
@@ -147,7 +147,8 @@ class ParticleFunctor(RenderedObject, BaseModel):
 
     The functor is the combination of a preamble (local variable
     declarations) and a return expression, both in the C++ scope of the
-    functor lambda.
+    functor's callable body (a lambda, a member function, or a standalone
+    function depending on the rendering context).
 
     Units policy: the unit dimension of the return value is given by
     `unit_dimension` (SI base unit exponents).
@@ -206,7 +207,5 @@ class ParticleFunctor(RenderedObject, BaseModel):
     @classmethod
     def _validate_name(cls, name):
         # The name renders into the C++ alias `using {name} = ...` and the
-        # struct `{name}_{uuid}`, so it must be a valid C++ identifier.
-        if not re.fullmatch(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
-            raise ValueError("functor names must be c++ identifiers ([A-Za-z_][A-Za-z0-9_]*)")
-        return name
+        # struct `{name}_{uuid}`.
+        return validate_cpp_identifier(name, field="functor name")

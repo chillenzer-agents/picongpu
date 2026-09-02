@@ -56,9 +56,9 @@ class Checkpoint(BaseModel):
     """the checkpoint step to restart from, [time-step number]; must be >= 0
     (C++: --checkpoint.restart.step)"""
 
-    restartDirectory: Annotated[str, Field(min_length=1)] | None = None
+    restartDirectory: Path | None = None
     """directory inside simOutput containing the checkpoints to restart from
-    (C++: --checkpoint.restart.directory); must not be empty"""
+    (C++: --checkpoint.restart.directory)"""
 
     restartFile: Annotated[str, Field(min_length=1)] | None = None
     """fileset prefix of the checkpoints to restart from

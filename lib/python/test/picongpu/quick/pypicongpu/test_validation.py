@@ -24,7 +24,6 @@ from picongpu.pypicongpu.collisions import (
 from picongpu.pypicongpu.movingwindow import MovingWindow
 from picongpu.pypicongpu.output.checkpoint import Checkpoint
 from picongpu.pypicongpu.output.binning import BinSpec, Binning, BinningAxis
-from picongpu.pypicongpu.output.checkpoint import Checkpoint
 from picongpu.pypicongpu.output.openpmd_plugin import FieldDump, RangeSpec, RangeSpecEntry
 from picongpu.pypicongpu.output.radiation import (
     FrequenciesFromList,
@@ -42,10 +41,7 @@ from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.species.constant import (
     Charge,
     DensityRatio,
-    ElementProperties,
     Mass,
-    SPECIES_CONSTANTS,
-    SpeciesConstants,
 )
 from picongpu.pypicongpu.species.constant.synchrotron import (
     FirstSynchrotronFunctionParams,
@@ -56,11 +52,8 @@ from picongpu.pypicongpu.species.operation.densityprofile import Uniform
 from picongpu.pypicongpu.species.operation.densityprofile.cylinder import Cylinder
 from picongpu.pypicongpu.species.operation.densityprofile.gaussian import Gaussian
 from picongpu.pypicongpu.species.operation.densityprofile.plasmaramp import Exponential
-from picongpu.pypicongpu.species.species import Species
-from picongpu.pypicongpu.species.attribute import BoundElectrons, Momentum, Position, Weighting
+from picongpu.pypicongpu.species.attribute import Momentum, Position, Weighting
 from picongpu.pypicongpu.species.operation.createdensity import CreateDensity
-from picongpu.pypicongpu.species.operation.setchargestate import SetChargeState
-from picongpu.pypicongpu.species.util import Element
 from picongpu.pypicongpu.species.operation.layout import OnePosition, Quiet, Random
 from picongpu.pypicongpu.species.operation.momentum import Drift, Temperature
 from picongpu.pypicongpu.walltime import Walltime
@@ -103,6 +96,7 @@ def test_time_steps_must_be_non_negative(time_steps):
 def test_typical_ppc_must_be_positive(typical_ppc):
     with pytest.raises(ValidationError):
         make_sim(typical_ppc=typical_ppc)
+
 
 class TestCreateDensityInvariants:
     def test_created_and_derived_species(self):
@@ -149,6 +143,7 @@ class TestMomentumInvariants:
     def test_drift_direction_must_be_unit_vector(self):
         with pytest.raises(ValidationError, match="unit vector"):
             Drift(direction_normalized=(2.0, 0.0, 0.0), gamma=1.0)
+
 
 def test_laser_exceeding_run_warns():
     with pytest.warns(UserWarning, match="exceeds the simulation time"):
@@ -327,22 +322,16 @@ def test_species_name_must_be_cpp_identifier(name):
 
 
 def test_position_attribute_mandatory():
-    from picongpu.pypicongpu.species.attribute import Momentum, Weighting
-
     with pytest.raises(ValidationError, match="position attribute"):
         make_species(attributes=[Weighting(), Momentum()])
 
 
 def test_momentum_attribute_mandatory():
-    from picongpu.pypicongpu.species.attribute import Position, Weighting
-
     with pytest.raises(ValidationError, match="momentum attribute"):
         make_species(attributes=[Position(), Weighting()])
 
 
 def test_duplicate_attribute_rejected():
-    from picongpu.pypicongpu.species.attribute import Momentum, Position, Weighting
-
     with pytest.raises(ValidationError, match="unique"):
         make_species(attributes=[Position(), Weighting(), Momentum(), Weighting()])
 
@@ -451,6 +440,7 @@ def test_gaussian_center_ordering():
                 vacuum_cells_front=0,
                 density_si=density_si,
             )
+
 
 def test_cylinder_radius_too_small_for_ramp():
     with pytest.raises(ValidationError, match="reduced radius"):

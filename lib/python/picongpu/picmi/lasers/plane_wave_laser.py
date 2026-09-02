@@ -156,4 +156,3 @@ class PlaneWaveLaser(BaseModel, BaseLaser):
         # constant (wavefront-uncurved) polarization, component-first like GaussianLaser
         shape = np.broadcast_shapes(np.shape(x), np.shape(y), np.shape(z))
         return np.reshape(self.polarization_direction, (-1,) + (1,) * len(shape)) * np.ones((3,) + tuple(shape))
-

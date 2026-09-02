@@ -5,6 +5,17 @@ Branch: `task-09-partial-workflow` (base: `task-05-cwl-cache-ref-purge` @ `33d89
 Status: **draft implementation + design note** (exploratory task convention:
 iterate on, not PR-perfect).
 
+> **Rework (2026-09-02), base moved to task-05 @ `971db962a`.** The base
+> branch was reworked to task-05's step-isolation model: the submit step runs
+> in isolation (resolves `TBG_dstPath`/`--chdir` to its own job-cache workdir)
+> and the `organize_output` step strips the `.cwl_cache` references, so the
+> `destination_path` workflow/submit input was **removed**. Consequently every
+> `destination_path` / submit-step pre-staging reference below (e.g. section 4,
+> section 5 "Composition with task 05", the staging-order caveat) describes the
+> prior base state and is superseded: per-stage outputs are now located by the
+> per-stage outdir + recorded artifacts, not by a stable destination input. See
+> `TASK-09-RESPONSE.md` (rework section) and the PR #13 comment.
+
 ## 1. What was delivered
 
 - `pypicongpu/runner.py`: a stable `Stage` vocabulary, a stage->CWL-step

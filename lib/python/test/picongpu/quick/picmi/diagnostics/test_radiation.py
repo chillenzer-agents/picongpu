@@ -5,6 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import re
 import tempfile
 from functools import partial
 from pathlib import Path
@@ -17,6 +18,7 @@ from pydantic import ValidationError
 from picongpu import picmi
 from picongpu.picmi import FilteredSpecies, ParticleFilter
 from picongpu.picmi.diagnostics import Radiation, TimeStepSpec
+from picongpu.picmi.particle_functor.rng_arg import RNGArg
 from picongpu.pypicongpu.output.radiation import RadiationObserverConfiguration
 from picongpu.pypicongpu.particle_functor import (
     FilteredSpecies as PyPIConGPUFilteredSpecies,
@@ -105,9 +107,9 @@ class TestRadiationSpecies(TestCase):
             Radiation(species="electron", period=TimeStepSpec[:], observer=make_observer())
 
     def test_rejects_gamma_filter_threshold_without_plain_species(self):
-        # the C++ gamma filter only acts on species carrying the radiationMask
-        # attribute, which is never registered for filtered species; with no
-        # plain species the threshold would be silently ignored
+        # the C++ gamma filter only acts on plain species (filtered species are
+        # masked by their own particle filter); with no plain species the
+        # threshold would be silently ignored
         with pytest.raises(ValidationError, match="gamma_filter_threshold has no effect"):
             Radiation(
                 species=[
@@ -121,7 +123,11 @@ class TestRadiationSpecies(TestCase):
 
 
 class TestRadiationRequirements(TestCase):
-    """MomentumPrev1 is required for every species, RadiationMask only for plain species with a gamma filter."""
+    """
+    MomentumPrev1 is required for every species; RadiationMask is required for
+    filtered species and for plain species with a gamma filter, because the
+    C++ filter only runs on species carrying the radiationMask attribute.
+    """
 
     def test_momentum_prev_1_registered_for_plain_species(self):
         species = make_species()
@@ -143,9 +149,15 @@ class TestRadiationRequirements(TestCase):
         Radiation(species=species, period=TimeStepSpec[:], observer=make_observer())
         assert not has_requirement(species, RadiationMask)
 
-    def test_radiation_mask_never_registered_for_filtered_species(self):
-        # only observable in the mixed case: an all-filtered list with a gamma
-        # filter is rejected, and there the threshold would be a silent no-op
+    def test_radiation_mask_registered_for_filtered_species(self):
+        # the C++ filter sets the mask from the particle filter's expression,
+        # so the filtered species needs the radiationMask attribute to be
+        # written and read
+        filtered_species = make_filtered_species(make_species())
+        Radiation(species=filtered_species, period=TimeStepSpec[:], observer=make_observer())
+        assert has_requirement(filtered_species.species, RadiationMask)
+
+    def test_radiation_mask_registered_for_every_species_in_mixed_list(self):
         species = make_species()
         filtered_species = make_filtered_species(make_species("proton"))
         with pytest.warns(UserWarning, match="gamma_filter_threshold applies only to plain species"):
@@ -156,7 +168,7 @@ class TestRadiationRequirements(TestCase):
                 gamma_filter_threshold=10.0,
             )
         assert has_requirement(species, RadiationMask)
-        assert not has_requirement(filtered_species.species, RadiationMask)
+        assert has_requirement(filtered_species.species, RadiationMask)
 
 
 class TestRadiationTranslation(TestCase):
@@ -221,9 +233,27 @@ class TestRadiationRendering(TestCase):
         assert "using AllParticleFilters = MakeSeq_t<" in rendered.particle_filters
         assert "rangeFilter," in rendered.particle_filters
         # the wrapped species is the one added to the simulation, so the
-        # requirement registered by the diagnostic must be rendered
+        # requirements registered by the diagnostic must be rendered
         assert "momentumPrev1" in rendered.species_definition
-        assert "radiationMask" not in rendered.species_definition
+        assert "radiationMask" in rendered.species_definition
+
+    def test_generated_setup_renders_mask_functor_for_filtered_species(self):
+        rendered = self._render(filtered=True)
+        # the filter expression is inlined into a mask functor that writes the
+        # radiationMask attribute, instead of the hardcoded gamma filter
+        assert "struct electron_rangeFilterMaskFunctor" in rendered.radiation_param
+        assert "DataSpace< simDim > const & particleOffsetToTotalOrigin," in rendered.radiation_param
+        assert "particle[picongpu::radiationMask_] = xt_cell_cell >= 0 && xt_cell_cell < 8;" in rendered.radiation_param
+        # the hardcoded gamma filter must not be emitted or referenced for
+        # filtered species (the doc comment still mentions the name)
+        assert "struct GammaFilterFunctor" not in rendered.radiation_param
+        assert "Free<GammaFilterFunctor>" not in rendered.radiation_param
+        # the mask manipulator is selected per species via a template
+        # specialization keyed on the species type
+        assert "struct RadiationParticleFilterFor<species_electron>" in rendered.radiation_param
+        assert "manipulators::unary::FreeTotalCellOffset<" in rendered.radiation_param
+        assert "electron_rangeFilterMaskFunctor" in rendered.radiation_param
+        assert "struct RadiationParticleFilter" in rendered.radiation_param
 
     def test_generated_setup_renders_unfiltered_radiation_without_particle_filters(self):
         rendered = self._render()
@@ -240,8 +270,41 @@ class TestRadiationRendering(TestCase):
         assert "momentumPrev1" in rendered.species_definition
         assert "radiationMask" in rendered.species_definition
         assert "static constexpr float_X radiationGamma = 5.0;" in rendered.radiation_param
+        # a plain species with a gamma filter is specialized to the gamma mask
+        assert "struct RadiationParticleFilterFor<species_electron>" in rendered.radiation_param
+        assert "generic::Free<GammaFilterFunctor>" in rendered.radiation_param
         # a plain species uses the prefix the C++ plugin actually registers
         assert "--electron_radiation.period" in rendered.n_cfg
+
+    def test_generated_setup_renders_no_mask_functor_for_plain_species_without_gamma_filter(self):
+        rendered = self._render()
+        # no mask is written at all: no gamma filter struct, no per-species
+        # mask functor, and no specialization (the primary template with its
+        # static_assert is always emitted, but never instantiated)
+        assert "struct GammaFilterFunctor" not in rendered.radiation_param
+        assert re.search(r"struct \w*MaskFunctor", rendered.radiation_param) is None
+        assert "struct RadiationParticleFilterFor<" not in rendered.radiation_param
+        assert "particle[picongpu::radiationMask_]" not in rendered.radiation_param
+
+    def test_generated_setup_renders_rng_mask_functor_for_filtered_species(self):
+        def keep_half(particle, rng: RNGArg):
+            return rng.get("uniform") > 0.5
+
+        sim, electrons = make_sim()
+        filtered_species = FilteredSpecies(
+            species=electrons, functor=ParticleFilter(name="keepHalf", functor=keep_half)
+        )
+        sim.add_diagnostic(Radiation(species=filtered_species, period=TimeStepSpec[2:4:2], observer=make_observer()))
+        with tempfile.TemporaryDirectory() as parent:
+            # the runner requires the setup directory to not exist yet
+            setup_dir = Path(parent) / "setup"
+            sim.write_input_file(setup_dir)
+            radiation_param = (setup_dir / "include/picongpu/param/radiation.param").read_text()
+        assert "struct electron_keepHalfMaskFunctor" in radiation_param
+        assert "using RNGType = typename std::remove_cvref_t<decltype(rng.m_rng)>;" in radiation_param
+        assert "particle[picongpu::radiationMask_] = random0 > 0.5;" in radiation_param
+        assert "manipulators::generic::FreeRng<" in radiation_param
+        assert "pmacc::random::distributions::Uniform< float_X >" in radiation_param
 
     def test_n_cfg_radiation_block_is_known_wrong_until_task_15(self):
         # KNOWN BROKEN STATE, deferred to task 15: the radiation block of

@@ -319,7 +319,6 @@ DEFAULT_STAGE_PLAN = StagePlan(
                         "etc_directory": "run_etc_directory",
                         "tbg_link": StageArtifactRef(stage=Stage.prepare, artifact="tbg_directory"),
                         "submit_system": "run_submit_system",
-                        "destination_path": "destination_path",
                     },
                     outputs={
                         "submission_information": "submission_information",

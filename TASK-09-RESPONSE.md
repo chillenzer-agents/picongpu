@@ -84,3 +84,53 @@ corrected for correctness (noted below).
   tests, no regressions.
 - `pre-commit run --all-files` (worktree root, venv pre-commit) -> exit 0,
   all 21 hooks passed (run after all rework commits; this file is ASCII).
+
+## Rework (2026-09-02): consistency with the reworked base (task-05)
+
+The base branch `task-05-cwl-cache-ref-purge` was reworked (`971db962a`,
+"Reorganize CWL cache fix around step isolation"). The old "stable
+`destination_path`" design was dropped in favor of CWL step isolation: the
+submit step runs in its own per-step job-cache workdir (resolving
+`TBG_dstPath`/`--chdir` to `$(pwd -P)`) and the `organize_output` step strips
+the `.cwl_cache` references from every generated file except `link_results.sh`.
+`destination_path` was removed from `submit.cwl`, `workflow.cwl` and the
+`runner.py` plumbing.
+
+This branch was therefore rebased onto `971db962a`. The rebase was clean:
+task-09's changes are additive (the `Stage`/`StagePlan`/state machinery) in
+regions task-05 did not touch, so `generate_submission_command` /
+`generate_workflow_input` and the CWL templates simply take task-05's
+isolation form. No conflict resolution was needed.
+
+**`destination_path` decision: removed (not kept).** It is a leftover mirroring
+task-05's now-removed stable-destination input, not a distinct partial-execution
+capability. The "resume where a prior stage left off" behavior the feature
+needs is already provided without it:
+- each stage's outputs land in a deterministic outdir (`_stage_outdir`:
+  `run_dir/.stage_outputs/<stage>/step-N`, or `run_dir` for the final stage);
+- those artifacts are recorded in `.workflow_state.json` as reduced CWL objects
+  and re-staged as inputs of later stages via `StageArtifactRef`;
+- the `organize_output` (collect) step makes the final `run_dir` self-contained
+  by stripping the cache references, exactly as in the full run.
+
+So a separate `destination_path` is redundant under the isolation model, and
+keeping it would contradict task-05.
+
+**Interface/test changes (all mechanical, feature preserved):**
+- `DEFAULT_STAGE_PLAN` (submit step): dropped the `destination_path` input so
+  the plan again mirrors `workflow.cwl` exactly (`test_default_plan_matches_workflow_template`).
+- `generate_submission_command` / `generate_workflow_input`: now task-05's
+  isolation form (no stable-destination plumbing); `test_workflow.py` is
+  task-05's, asserting the submit step runs in isolation with no
+  `destination_path`.
+- `test_partial_workflow.py`: `ECHO_SUBMIT_CWL` and `future_stage_plan()`
+  dropped the `destination_path` input.
+- The per-step `submit` still runs inside a `.cwl_cache` job dir, and `collect`
+  strips the references, so partial runs behave like the full run.
+
+**Gates (re-run after the rebase):**
+- `cd lib/python && python -m pytest test/picongpu/quick/ -q` ->
+  **190 passed, 2 xfailed, 1 xpassed** (3499 subtests), exit 0.
+- `pre-commit run --all-files` -> exit 0 (all hooks passed; this file and the
+  `TASK-09-*.md` artifacts are ASCII, since task-05's rework dropped the
+  `^TASK-.*\.md$` require-ascii exclusion and task-09 keeps its artifacts).

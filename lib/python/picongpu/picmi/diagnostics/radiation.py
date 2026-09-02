@@ -43,9 +43,9 @@ class Radiation(RadiationPluginConfig):
 
     @model_validator(mode="after")
     def _validate_gamma_filter_threshold(self):
-        # The C++ gamma filter only acts on species carrying the radiationMask
-        # attribute, which __init__ registers for plain species only. Without a
-        # plain species the threshold would be silently ignored, so reject it.
+        # The gamma filter is only rendered for plain species; filtered species
+        # are masked by their own particle filter. Without a plain species the
+        # threshold would be silently ignored, so reject it.
         if self.gamma_filter_threshold is not None and all(isinstance(s, FilteredSpecies) for s in self.species):
             raise ValueError(
                 "gamma_filter_threshold has no effect when all species are filtered, because "
@@ -59,9 +59,13 @@ class Radiation(RadiationPluginConfig):
         for s in self.species:
             species = s.species if isinstance(s, FilteredSpecies) else s
             requirements = [MomentumPrev1()]
-            if isinstance(s, Species) and self.gamma_filter_threshold is not None:
-                # Filtered species are selected by their own particle filter
-                # and therefore do not need the hardcoded gamma mask.
+            # The C++ filter (plugins::radiation::executeParticleFilter) only runs
+            # on species that carry the radiationMask attribute, and a mask
+            # functor is rendered for exactly those species:
+            # - a filtered species, whose mask is set by its ParticleFunctor
+            # - a plain species with a gamma filter threshold
+            # Register the attribute so the mask is actually written and read.
+            if isinstance(s, FilteredSpecies) or (isinstance(s, Species) and self.gamma_filter_threshold is not None):
                 requirements.append(RadiationMask())
             species.register_requirements(requirements)
         if self.gamma_filter_threshold is not None and any(isinstance(s, FilteredSpecies) for s in self.species):

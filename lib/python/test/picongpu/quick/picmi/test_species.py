@@ -151,6 +151,7 @@ class TestPusherShapeTranslation(TestCase):
         for shape in Shape:
             assert _cpp_identifier(shape.value), f"shape value {shape.value!r} is not a C++ identifier"
 
+
 class TestSpeciesRequirementResolution(TestCase):
     def test_deduplicate_attributes(self):
         species = Species(name="dummy")

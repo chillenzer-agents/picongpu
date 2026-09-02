@@ -24,6 +24,8 @@ class SpeciesConstants(BaseModel):
     user-configurable per simulation. The defaults here mirror the C++
     constants exactly (2022 CODATA, physicalConstants.param); the species
     mass/charge ratios (see Mass/Charge) are relative to them.
+
+    Units policy: base_mass_si in SI (kg); base_charge_si in SI (C).
     """
 
     base_mass_si: Annotated[float, Field(gt=0.0)] = 9.1093837139e-31

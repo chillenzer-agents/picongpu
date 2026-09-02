@@ -8,8 +8,6 @@ License: GPLv3+
 from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
-from picongpu.pypicongpu.units import SI
-
 
 def neq_0(value):
     if value == 0:
@@ -40,21 +38,21 @@ class Gaussian(BaseModel):
     type_gaussian: Literal[True] = True
     """discriminator for the AnyDensityProfile union."""
 
-    gas_center_front: Annotated[float, Field(ge=0.0, alias="center_front"), SI("m")]
+    gas_center_front: Annotated[float, Field(ge=0.0, alias="center_front")]
     """position of the front edge of the constant middle of the density profile, [m]; must be >= 0.
     C++ name: gasCenterFront."""
 
-    gas_center_rear: Annotated[float, Field(ge=0.0, alias="center_rear"), SI("m")]
+    gas_center_rear: Annotated[float, Field(ge=0.0, alias="center_rear")]
     """position of the rear edge of the constant middle of the density profile, [m]; must be >= 0 and
     >= gas_center_front.
     C++ name: gasCenterRear."""
 
-    gas_sigma_front: Annotated[float, AfterValidator(neq_0), Field(alias="sigma_front"), SI("m")]
+    gas_sigma_front: Annotated[float, AfterValidator(neq_0), Field(alias="sigma_front")]
     """distance from gasCenterFront until the gas density decreases to its 1/e-th part, [m]; must be != 0
     (the sign is irrelevant, the profile uses abs()).
     C++ name: gasSigmaFront."""
 
-    gas_sigma_rear: Annotated[float, AfterValidator(neq_0), Field(alias="sigma_rear"), SI("m")]
+    gas_sigma_rear: Annotated[float, AfterValidator(neq_0), Field(alias="sigma_rear")]
     """distance from gasCenterRear until the gas density decreases to its 1/e-th part, [m]; must be != 0
     (the sign is irrelevant, the profile uses abs()).
     C++ name: gasSigmaRear."""
@@ -72,7 +70,7 @@ class Gaussian(BaseModel):
     """number of vacuum cells in front of foil for laser init, [cells]; must be >= 0.
     C++ name: vacuumFront."""
 
-    density_si: Annotated[float, Field(gt=0.0, alias="density"), SI("m^-3")]
+    density_si: Annotated[float, Field(gt=0.0, alias="density")]
     """particle number density at the plateau, [m^-3]; must be > 0.
     C++ name: densityFactor (density.param), the dimensionless factor rendered as
     density_si / SI::BASE_DENSITY_SI (normalized to the base density)."""

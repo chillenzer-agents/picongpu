@@ -17,7 +17,6 @@ from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
 from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.species import Species
-from picongpu.pypicongpu.units import SI
 
 
 class LinearFrequencies(BaseModel):
@@ -33,10 +32,10 @@ class LinearFrequencies(BaseModel):
     N_omega: Annotated[int, Field(ge=1)] = 2048
     """number of frequency points, [dimensionless]; must be >= 1"""
 
-    omega_min: Annotated[float, Field(ge=0.0), SI("1/s")] = 0.0
+    omega_min: Annotated[float, Field(ge=0.0)] = 0.0
     """lowest angular frequency of the scale, [1/s]; must be >= 0 and < omega_max"""
 
-    omega_max: Annotated[float, Field(gt=0.0), SI("1/s")] = 1.06e16
+    omega_max: Annotated[float, Field(gt=0.0)] = 1.06e16
     """highest angular frequency of the scale, [1/s]; must be > 0 and > omega_min"""
 
     type_linear_frequencies: Literal[True] = True
@@ -65,11 +64,11 @@ class LogFrequencies(BaseModel):
     N_omega: Annotated[int, Field(ge=1)] = 2048
     """number of frequency points, [dimensionless]; must be >= 1"""
 
-    omega_min: Annotated[float, Field(gt=0.0), SI("1/s")] = 1.0e14
+    omega_min: Annotated[float, Field(gt=0.0)] = 1.0e14
     """lowest angular frequency of the scale, [1/s]; must be > 0 (logarithm is
     undefined for non-positive frequencies) and < omega_max"""
 
-    omega_max: Annotated[float, Field(gt=0.0), SI("1/s")] = 1.0e17
+    omega_max: Annotated[float, Field(gt=0.0)] = 1.0e17
     """highest angular frequency of the scale, [1/s]; must be > 0 and > omega_min"""
 
     type_log_frequencies: Literal[True] = True

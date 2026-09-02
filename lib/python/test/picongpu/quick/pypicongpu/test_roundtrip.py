@@ -23,72 +23,28 @@ import pytest
 
 from picongpu.pypicongpu.collisions import CollisionNumericsConfig, ConstLogCollision
 from picongpu.pypicongpu.field_solver import YeeSolver
-from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
-from picongpu.pypicongpu.laser import (
-    DispersivePulseLaser,
-    FromOpenPMDPulseLaser,
-    GaussianLaser,
-    PlaneWaveLaser,
-    TWTSLaser,
-)
+from picongpu.pypicongpu.laser import DispersivePulseLaser
 from picongpu.pypicongpu.movingwindow import MovingWindow
-from picongpu.pypicongpu.output.checkpoint import Checkpoint
-from picongpu.pypicongpu.output.energy_histogram import EnergyHistogram
-from picongpu.pypicongpu.output.phase_space import PhaseSpace
-from picongpu.pypicongpu.output.radiation import LinearFrequencies, RadiationConfiguration
 from picongpu.pypicongpu.output.timestepspec import Spec, TimeStepSpec
-from picongpu.pypicongpu.species.attribute import Momentum, Position, Weighting
-from picongpu.pypicongpu.species.constant import Charge, Mass
-from picongpu.pypicongpu.species.operation.layout import OnePosition, Quiet, Random
-from picongpu.pypicongpu.species.operation.momentum import Drift, Temperature
-from picongpu.pypicongpu.species.species import Species
+from picongpu.pypicongpu.species.operation.momentum import Temperature
 from picongpu.pypicongpu.walltime import Walltime
 
-
-def _make_species():
-    return Species(
-        name="electron",
-        constants=[Mass(mass_si=9.109e-31), Charge(charge_si=-1.602e-19)],
-        attributes=[Position(), Weighting(), Momentum()],
-    )
-
-
-def _make_grid():
-    return Grid3D(
-        cell_size_si=(1e-6, 1e-6, 1e-6),
-        cell_cnt=(16, 16, 16),
-        boundary_condition=(BoundaryCondition.PERIODIC,) * 3,
-        n_gpus=(1, 1, 1),
-        super_cell_size=(2, 2, 2),
-    )
-
-
-def _base_laser_kwargs():
-    return dict(
-        propagation_direction=(0.0, 1.0, 0.0),
-        polarization_direction=(0.0, 0.0, 1.0),
-        polarization_type="Linear",
-        wavelength=0.8e-6,
-        duration=1e-15,
-        focal_position=(0.5, 0.5, 0.5),
-        phi0=0.0,
-        E0=1e10,
-        pulse_init=1.0,
-        huygens_surface_positions=[[1, -1], [1, -1], [1, -1]],
-    )
-
-
-def _make_laser():
-    return GaussianLaser(**(_base_laser_kwargs() | dict(waist=1e-5, laguerre_modes=[1.0], laguerre_phases=[0.0])))
-
-
-def _spec(**kwargs):
-    return Spec(**kwargs)
+from .model_factories import (
+    base_laser_kwargs,
+    make_energy_histogram,
+    make_from_openpmd_laser,
+    make_grid,
+    make_laser,
+    make_phase_space,
+    make_plane_wave_laser,
+    make_species,
+    make_twts_laser,
+)
 
 
 def _build(name: str):
     if name == "Grid3D":
-        return _make_grid()
+        return make_grid()
     if name == "Walltime":
         return Walltime(walltime=timedelta(hours=1))
     if name == "MovingWindow":
@@ -96,87 +52,59 @@ def _build(name: str):
     if name == "YeeSolver":
         return YeeSolver()
     if name == "GaussianLaser":
-        return _make_laser()
+        return make_laser()
     if name == "PlaneWaveLaser":
-        return PlaneWaveLaser(**(_base_laser_kwargs() | dict(laser_nofocus_constant_si=1.0)))
+        return make_plane_wave_laser()
     if name == "DispersivePulseLaser":
         return DispersivePulseLaser(
             **(
-                _base_laser_kwargs()
+                base_laser_kwargs()
                 | dict(waist=1e-5, spectral_support=2.0, sd_si=0.0, ad_si=0.0, gdd_si=0.0, tod_si=0.0)
             )
         )
     if name == "TWTSLaser":
-        return TWTSLaser(
-            **(
-                _base_laser_kwargs()
-                | dict(
-                    waist=1e-5,
-                    laserIncidenceAngle=1.0,
-                    laserIncidenceAnglePositive=True,
-                    polarizationAngle=0.0,
-                    beta0=1.0,
-                    time_offset_si=0.0,
-                    focus_lateral_offset_si=0.0,
-                    windowStart=0.0,
-                    windowEnd=0.0,
-                    windowLength=0.0,
-                )
-            )
-        )
+        return make_twts_laser()
     if name == "FromOpenPMDPulseLaser":
-        return FromOpenPMDPulseLaser(
-            **dict(
-                propagation_direction=(0.0, 1.0, 0.0),
-                polarization_direction=(0.0, 0.0, 1.0),
-                file_path="pulse.h5",
-                iteration=0,
-                dataset_name="E",
-                datatype="float",
-                time_offset_si=0.0,
-                polarisationAxisOpenPMD="x",
-                propagationAxisOpenPMD="y",
-                huygens_surface_positions=[[1, -1], [1, -1], [1, -1]],
-            )
-        )
+        return make_from_openpmd_laser()
     if name == "TimeStepSpec":
-        return TimeStepSpec([_spec(start=0, stop=-1, step=10)])
+        return TimeStepSpec([Spec(start=0, stop=-1, step=10)])
     if name == "Checkpoint":
-        return Checkpoint(period=TimeStepSpec([_spec(start=0, stop=-1, step=10)]))
+        from picongpu.pypicongpu.output.checkpoint import Checkpoint
+
+        return Checkpoint(period=TimeStepSpec([Spec(start=0, stop=-1, step=10)]))
     if name == "LinearFrequencies":
+        from picongpu.pypicongpu.output.radiation import LinearFrequencies
+
         return LinearFrequencies()
     if name == "RadiationConfiguration":
+        from picongpu.pypicongpu.output.radiation import RadiationConfiguration
+
         return RadiationConfiguration()
     if name == "PhaseSpace":
-        return PhaseSpace(
-            species=_make_species(),
-            period=TimeStepSpec([_spec(start=0, stop=-1, step=1)]),
-            spatial_coordinate="x",
-            momentum_coordinate="px",
-            min_momentum=-1.0,
-            max_momentum=1.0,
-        )
+        return make_phase_space()
     if name == "EnergyHistogram":
-        return EnergyHistogram(
-            species=_make_species(),
-            period=TimeStepSpec([_spec(start=0, stop=-1, step=1)]),
-            bin_count=16,
-            min_energy=0.0,
-            max_energy=100.0,
-        )
+        return make_energy_histogram()
     if name == "ConstLogCollision":
         return ConstLogCollision(coulomb_log=12.0)
     if name == "CollisionNumericsConfig":
         return CollisionNumericsConfig(precision=64, cell_list_chunk_size=128)
     if name == "Species":
-        return _make_species()
+        return make_species()
     if name == "OnePosition":
+        from picongpu.pypicongpu.species.operation.layout import OnePosition
+
         return OnePosition(ppc=2, in_cell_offset=(0.5, 0.5, 0.5))
     if name == "Quiet":
+        from picongpu.pypicongpu.species.operation.layout import Quiet
+
         return Quiet(ppc=8, n_points=(2, 2, 2))
     if name == "Random":
+        from picongpu.pypicongpu.species.operation.layout import Random
+
         return Random(ppc=4)
     if name == "Drift":
+        from picongpu.pypicongpu.species.operation.momentum import Drift
+
         return Drift.from_velocity((1e5, 0.0, 0.0))
     if name == "Temperature_kev":
         return Temperature(temperature_kev=1e4)
@@ -217,10 +145,5 @@ _MODELS = [
 def test_model_roundtrip(name):
     model = _build(name)
     dumped = model.model_dump(mode="json")
-    # model_validate is the canonical "this dict is valid model input" check
-    # (the same call task 07 makes). The dump also carries computed-field
-    # keys (e.g. modenumber, species_name) that are not init fields; pydantic
-    # discards them via its default extra='ignore', which is intended - the
-    # guarantee covers the declared fields.
     restored = type(model).model_validate(dumped)
     assert restored.model_dump(mode="json") == dumped, f"{name} does not round-trip through model_dump(mode='json')"

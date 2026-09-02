@@ -5,11 +5,11 @@ Authors: Hannes Troepgen, Brian Edward Marre
 License: GPLv3+
 """
 
-import re
 from pydantic import BaseModel, computed_field, field_validator, model_validator
 from enum import Enum
 
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant
+from picongpu.pypicongpu.validation import validate_cpp_identifier
 
 from ..rendering import RenderedObject
 from .attribute import Attribute, BoundElectrons, Momentum, Position, Weighting
@@ -193,20 +193,9 @@ class Species(RenderedObject, BaseModel):
     @field_validator("name")
     @classmethod
     def _validate_name(cls, name: str) -> str:
-        # name c++ compatible
-        # quick excursion to re.[match, fullmatch, search]:
-        # - re.search: match *anywhere* in the string
-        # - re.match: match *full* string, but ignore trailing newline (WTF?)
-        #   -> "abc\n" would be accepted (despite "$" at the end)
-        # - re.fullmatch: match *actually* full string
-        #   -> "abc\n" is rejected
-        # The name renders into the C++ typedef `species_<name>` and the
-        # PMACC_CSTRING particle name, so it must be a valid C++ identifier.
-        # (The "species_" prefix makes even a leading digit acceptable, hence
-        # the [A-Za-z0-9_]+ pattern.)
-        if not re.fullmatch(r"^[A-Za-z0-9_]+$", name):
-            raise ValueError("species names must be c++ compatible ([A-Za-z0-9_]+)")
-        return name
+        # The name renders into the C++ typedef `species_<name>`; the
+        # "species_" prefix makes even a leading digit acceptable.
+        return validate_cpp_identifier(name, field="species name", prefix="species_")
 
     @field_validator("attributes", mode="before")
     @classmethod

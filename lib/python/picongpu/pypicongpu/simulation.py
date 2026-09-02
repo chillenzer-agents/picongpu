@@ -19,7 +19,6 @@ from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFuncto
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
 from picongpu.pypicongpu.species.operation import AnyOperation
 from picongpu.pypicongpu.species.species import Species
-from picongpu.pypicongpu.units import SI
 
 from .customuserinput import CustomUserInput
 from .field_solver import AnySolver
@@ -47,11 +46,11 @@ class Simulation(RenderedObject, BaseModel):
     To run a Simulation object pass it to the Runner (for details see there).
     """
 
-    base_density: Annotated[float, Field(gt=0.0), SI("m^-3")]
+    base_density: Annotated[float, Field(gt=0.0)]
     """reference number density for normalising density profiles, [m^-3]; must be > 0.
     C++ name: SI::BASE_DENSITY_SI (simulation.param)."""
 
-    delta_t_si: Annotated[float, Field(gt=0.0), SI("s")]
+    delta_t_si: Annotated[float, Field(gt=0.0)]
     """width of a single timestep, [s]; must be > 0.
     C++ name: SI::DELTA_T_SI (simulation.param)."""
 

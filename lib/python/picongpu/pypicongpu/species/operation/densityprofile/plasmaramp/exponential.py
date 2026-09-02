@@ -8,8 +8,6 @@ License: GPLv3+
 from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
-from picongpu.pypicongpu.units import SI
-
 
 class Exponential(BaseModel):
     """exponential plasma ramp, either up or down
@@ -22,10 +20,10 @@ class Exponential(BaseModel):
     type_exponential: Literal[True] = True
     """discriminator for the AllPlasmaRamps union."""
 
-    PlasmaLength: Annotated[float, Field(gt=0.0), SI("m")]
+    PlasmaLength: Annotated[float, Field(gt=0.0)]
     """scale length of the exponential pre-plasma ramp, [m]; must be > 0.
     C++ name: PlasmaLength."""
 
-    PlasmaCutoff: Annotated[float, Field(ge=0.0), SI("m")]
+    PlasmaCutoff: Annotated[float, Field(ge=0.0)]
     """cutoff of the exponential pre-plasma ramp, [m]; must be >= 0.
     C++ name: PlasmaCutoff."""

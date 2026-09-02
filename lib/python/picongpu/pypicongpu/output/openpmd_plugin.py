@@ -5,7 +5,6 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-import re
 from functools import reduce
 from hashlib import sha256
 from os import PathLike
@@ -28,6 +27,7 @@ from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
 from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFunctor
 from picongpu.pypicongpu.species.species import Species
+from picongpu.pypicongpu.validation import validate_cpp_identifier
 from picongpu.pypicongpu.util import unique
 
 NATIVE_FIELDS = ["E", "B", "J"]
@@ -180,11 +180,9 @@ class FieldDump(BaseModel):
     @field_validator("filtername")
     @classmethod
     def _validate_filtername(cls, value):
-        # The name renders verbatim into `picongpu::particles::filter::{name}`,
-        # so it must be a valid C++ identifier (same rule as the functor name
-        # it is derived from).
-        if value is not None and not re.fullmatch(r"^[A-Za-z_][A-Za-z0-9_]*$", value):
-            raise ValueError(f"filtername must be a valid C++ identifier. You gave {value!r}.")
+        # The name renders verbatim into `picongpu::particles::filter::{name}`.
+        if value is not None:
+            return validate_cpp_identifier(value, field="filtername")
         return value
 
     def get_rendering_context(self) -> dict:

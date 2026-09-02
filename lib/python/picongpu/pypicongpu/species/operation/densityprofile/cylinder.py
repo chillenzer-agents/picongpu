@@ -9,9 +9,6 @@ from math import sqrt
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field, model_validator
-
-from picongpu.pypicongpu.units import SI
-
 from .plasmaramp import AllPlasmaRamps, None_
 
 
@@ -58,15 +55,13 @@ class Cylinder(BaseModel):
     type_cylinder: Literal[True] = True
     """discriminator for the AnyDensityProfile union."""
 
-    density_si: Annotated[float, Field(gt=0.0), SI("m^-3")]
+    density_si: Annotated[float, Field(gt=0.0)]
     """particle number density at at the foil plateau, [m^-3]; must be > 0."""
 
-    center_position_si: Annotated[
-        tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector), SI("m")
-    ]
+    center_position_si: Annotated[tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)]
     """center of the cylinder [x, y, z], [m]"""
 
-    radius_si: Annotated[float, Field(ge=0.0), SI("m")]
+    radius_si: Annotated[float, Field(ge=0.0)]
     """cylinder radius, [m]; must be >= 0 and > sqrt(2)*pre_plasma_length when a
     pre-plasma ramp is used (so that the reduced radius stays non-negative)."""
 

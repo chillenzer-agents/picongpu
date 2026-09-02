@@ -13,7 +13,6 @@ from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Fie
 from typing_extensions import Self
 
 from .rendering import RenderedObject
-from .units import SI
 
 
 class BoundaryCondition(enum.Enum):
@@ -147,7 +146,7 @@ class Grid3D(BaseModel, RenderedObject):
     # validated again (round-trip safety)
     model_config = ConfigDict(populate_by_name=True)
 
-    cell_size: Annotated[Vec3_float, AfterValidator(lambda x: all_gt(x, 0)), SI("m")] = Field(alias="cell_size_si")
+    cell_size: Annotated[Vec3_float, AfterValidator(lambda x: all_gt(x, 0))] = Field(alias="cell_size_si")
     """width of an individual cell in each direction, [m]; must be > 0 in every direction.
     C++ name: SI::CELL_{WIDTH,HEIGHT,DEPTH}_SI (simulation.param)."""
 

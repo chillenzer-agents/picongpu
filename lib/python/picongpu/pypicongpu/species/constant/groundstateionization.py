@@ -36,17 +36,17 @@ class GroundStateIonization(Constant):
             ionization_model.check()
 
         # check that no ionization model group is represented more than once
-        groups = IonizationModelGroups().get_by_group().keys()
-
-        type_already_present = {}
-        for group in groups:
-            type_already_present[group] = False
-
         by_model = IonizationModelGroups().get_by_model()
+        group_members: dict[str, list[str]] = {}
         for ionization_model in self.ionization_model_list:
-            group: str = by_model[type(ionization_model)]
-            if type_already_present[group]:
-                raise ValueError(f"ionization model group already represented: {group}")
-            else:
-                type_already_present[group] = True
+            group = by_model[type(ionization_model)]
+            group_members.setdefault(group, []).append(type(ionization_model).__name__)
+
+        conflicts = {g: names for g, names in group_members.items() if len(names) > 1}
+        if conflicts:
+            details = "; ".join(f"group {g!r}: {' and '.join(names)}" for g, names in conflicts.items())
+            raise ValueError(
+                f"Multiple ionization models from the same group are not allowed: {details}. "
+                f"Remove all but one model per group."
+            )
         return self

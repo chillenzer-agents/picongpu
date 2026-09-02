@@ -34,7 +34,10 @@ from picongpu.pypicongpu.output.radiation import (
     RadiationObserverConfiguration,
 )
 from picongpu.pypicongpu.output.timestepspec import Spec, TimeStepSpec
+from sympy import Symbol
+
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
+from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFunctor
 from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.species.constant import (
     Charge,
@@ -844,7 +847,7 @@ class TestCollisionInvariants:
 class TestParticleFunctorInvariants:
     @pytest.mark.parametrize("name", ["with space", "with-dot", "1leading", "with\nnewline", ""])
     def test_name_must_be_c_identifier(self, name):
-        with pytest.raises(ValidationError, match="c\\+\\+ identifiers"):
+        with pytest.raises(ValidationError, match="valid C\\+\\+ identifier"):
             make_binning_functor(name=name)
 
     def test_valid_functor(self):
@@ -859,6 +862,7 @@ class TestParticleFunctorInvariants:
             functor_preamble=[],
             return_type="float_X",
         )
+        assert functor.unit_dimension is not None
 
 
 def test_binning_requires_axes_and_species():

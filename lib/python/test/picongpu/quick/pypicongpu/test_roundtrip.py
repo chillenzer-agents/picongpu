@@ -274,7 +274,7 @@ def _build(name: str):
     if name == "BinningAxis":
         return BinningAxis(
             name="x",
-            bin_spec=BinSpec(kind="Linear", start=0, stop=10, nsteps=10),
+            bin_spec_raw=BinSpec(kind="Linear", start=0, stop=10, nsteps=10),
             functor=_FUNCTOR,
             use_overflow_bins=True,
         )
@@ -285,7 +285,7 @@ def _build(name: str):
             axes=[
                 BinningAxis(
                     name="x",
-                    bin_spec=BinSpec(kind="Linear", start=0, stop=10, nsteps=10),
+                    bin_spec_raw=BinSpec(kind="Linear", start=0, stop=10, nsteps=10),
                     functor=_FUNCTOR,
                     use_overflow_bins=True,
                 )

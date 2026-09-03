@@ -5,13 +5,13 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
+import numpy as np
+
 from picongpu.picmi.copy_attributes import converts_to
 from picongpu.pypicongpu.species.operation.densityprofile.gaussian import Gaussian
+
 from ...pypicongpu import util
-
 from .Distribution import Distribution
-
-import numpy as np
 
 
 @converts_to(

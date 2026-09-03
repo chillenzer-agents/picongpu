@@ -5,10 +5,12 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from unittest import TestCase
 import inspect
+from unittest import TestCase
+
 import pytest
-from picongpu.picmi.copy_attributes import copy_attributes, converts_to, default_converts_to
+
+from picongpu.picmi.copy_attributes import converts_to, copy_attributes, default_converts_to
 
 CLASS_NAME = "TmpClass"
 ARBITRARY_VALUE = 42

@@ -5,9 +5,12 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from typing import Annotated, Callable
-from pydantic import BaseModel, ValidationError
+from collections.abc import Callable
+from typing import Annotated
 from unittest import TestCase
+
+from pydantic import BaseModel, ValidationError
+
 from picongpu.pypicongpu.util import (
     UnsupportedFeatureError,
     decorating_class,

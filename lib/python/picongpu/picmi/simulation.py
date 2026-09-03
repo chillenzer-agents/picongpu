@@ -10,15 +10,15 @@ import contextlib
 import datetime
 import logging
 import math
+from collections.abc import Iterable
 from functools import reduce
 from itertools import chain, groupby
 from os import PathLike
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Annotated, Literal
 
 import picmistandard
-from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, PrivateAttr, model_validator
 from sympy import Symbol
 
 from picongpu import pypicongpu, templates
@@ -27,7 +27,7 @@ from picongpu.picmi.diagnostics.field_dump import NativeFieldDump, _FieldDump
 from picongpu.picmi.diagnostics.particle_dump import ParticleDump
 from picongpu.picmi.diagnostics.phase_space import PhaseSpace
 from picongpu.picmi.distribution.AnalyticDistribution import AnalyticDistribution
-from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid, AnyGrid
+from picongpu.picmi.grid import AnyGrid, Cartesian2DGrid, Cartesian3DGrid
 from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
 from picongpu.picmi.layout import AnyLayout
@@ -127,7 +127,8 @@ def _validate_collisional_physics_setup(interactions):
     if "setup" in types:
         if "collision" in types:
             raise ValueError(
-                f"If you give a CollisionalPhysicsSetup, you have to subsume all collisions under it. You gave: {types['collision']=} and {types['setup']=}."
+                f"If you give a CollisionalPhysicsSetup, you have to subsume all collisions under it. "
+                f"You gave: {types['collision']=} and {types['setup']=}."
             )
         if len(list(types["setup"])) > 1:
             raise ValueError(f"Please, only provide at most one CollisionalPhysicsSetup. You gave {types['setup']=}.")
@@ -167,9 +168,11 @@ class Simulation(picmistandard.PICMI_Simulation):
     picongpu_interaction: Annotated[list[Interaction], BeforeValidator(_validate_collisional_physics_setup)] = Field(
         default_factory=list
     )
-    """Interaction instance containing all particle interactions of the simulation, set to None to have no interactions"""
+    """
+    Interaction instance containing all particle interactions of the simulation, set to None to have no interactions
+    """
 
-    def _validate_typical_ppc(value: int | None) -> int | None:
+    def _validate_typical_ppc(value: int | None) -> int | None:  # noqa: N805
         if value is not None and value <= 0:
             raise ValueError(f"Typical ppc should be > 0, not {value=}.")
         return value
@@ -193,8 +196,9 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     in multiples of the simulation window size
 
-    @attention if moving window is active, one gpu in y direction is reserved for initializing new spaces,
-        thereby reducing the simulation window size accordingrelative spot at which to start moving the simulation window
+        @attention if moving window is active, one gpu in y direction is reserved for initializing new spaces,
+        thereby reducing the simulation window size accordingrelative spot at which to start moving the simulation
+        window
     """
 
     picongpu_moving_window_stop_iteration: int | None = Field(default=None)
@@ -314,16 +318,15 @@ class Simulation(picmistandard.PICMI_Simulation):
             if delta_t_from_cfl != self.time_step_size:
                 raise ValueError(
                     "time step size (delta t) does not match CFL "
-                    "(Courant-Friedrichs-Lewy) parameter! delta_t: {}; "
-                    "expected from CFL: {}".format(self.time_step_size, delta_t_from_cfl)
+                    f"(Courant-Friedrichs-Lewy) parameter! delta_t: {self.time_step_size}; "
+                    f"expected from CFL: {delta_t_from_cfl}"
                 )
-        else:
-            if self.time_step_size is not None:
-                # calculate cfl
-                self.solver.cfl = _cfl_from_delta_t(self.time_step_size)
-            elif self.solver.cfl is not None:
-                # calculate delta_t
-                self.time_step_size = _delta_t_from_cfl(self.solver.cfl)
+        elif self.time_step_size is not None:
+            # calculate cfl
+            self.solver.cfl = _cfl_from_delta_t(self.time_step_size)
+        elif self.solver.cfl is not None:
+            # calculate delta_t
+            self.time_step_size = _delta_t_from_cfl(self.solver.cfl)
 
             # if neither delta_t nor cfl are given simply silently pass
             # (might change in the future)
@@ -351,14 +354,15 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     def add_interaction(self, interaction) -> None:  # noqa: ARG002 -- parameter name follows the PICMI standard signature
         pypicongpu.util.unsupported(
-            "PICMI standard interactions are not supported by PIConGPU, use the picongpu specific Interaction object instead"
+            "PICMI standard interactions are not supported by PIConGPU, "
+            "use the picongpu specific Interaction object instead"
         )
 
     # @todo add refactor once restarts are supported by the Runner, Brian Marre, 2024
     def step(self, nsteps: int = 1, **flags):
         if nsteps != self.max_steps:
             raise ValueError(
-                "PIConGPU does not support stepwise running. Invoke step() with max_steps (={})".format(self.max_steps)
+                f"PIConGPU does not support stepwise running. Invoke step() with max_steps (={self.max_steps})"
             )
         self.picongpu_run(**flags)
 
@@ -470,7 +474,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         ]
         if len(synchrotron_params) > 2:
             raise ValueError(
-                f"You have configured the Synchrotron extension multiple times with different arguments. This is not allowed! You gave {synchrotron_params[:-1]=}."
+                f"You have configured the Synchrotron extension multiple times with different arguments. "
+                f"This is not allowed! You gave {synchrotron_params[:-1]=}."
             )
         # We need to make sure that bare collisions are merged into a setup,
         # no matter if the interactions were assembled at construction time or later.

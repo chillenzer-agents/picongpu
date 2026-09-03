@@ -127,7 +127,7 @@ def position_binning_for(species, timestep):
     kwargs = {
         "axes": [
             BinningAxis(
-                functor=BinningFunctor(name="dummy", functor=lambda x: 0, return_type=float),
+                functor=BinningFunctor(name="dummy", functor=lambda _x: 0, return_type=float),
                 bin_spec=BinSpec(kind="linear", start=-0.5, stop=0.5, nsteps=1),
             )
         ],

@@ -84,9 +84,8 @@ def all_gt(iterable, m):
 def all_ge(iterable, m):
     if all(correct := [x >= m for x in iterable]):
         return iterable
-    else:
-        message = f"{iterable=} contains values < {m=} while all should be greater than or equal to m. Valid are the following: {correct=}."
-        raise ValueError(message)
+    message = f"{iterable=} contains values < {m=} while all should be greater than or equal to m. Valid are the following: {correct=}."
+    raise ValueError(message)
 
 
 def grid_dist_validate(grid_dist):

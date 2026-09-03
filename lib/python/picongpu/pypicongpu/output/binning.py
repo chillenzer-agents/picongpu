@@ -85,9 +85,10 @@ class BinningAxis(RenderedObject, BaseModel):
     """name of the axis, rendered as the C++ variable axis_{name}, so it must
     be a valid C++ identifier ([A-Za-z0-9_]+)"""
 
-    bin_spec_raw: BinSpec = Field(exclude=True)
+    bin_spec_raw: BinSpec
     """the binning specification as given by the user (pre unit-translation);
-    the translated ``bin_spec`` is exposed as a computed field"""
+    the translated ``bin_spec`` is exposed as a computed field. Kept in the
+    serialised form so the model is reconstructable (round-trip safety)."""
 
     axis_functor: ParticleFunctor = Field(alias="functor")
     """the particle functor computing the axis value"""

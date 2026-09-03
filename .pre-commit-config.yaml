@@ -38,12 +38,13 @@ repos:
       - id: forbid-tabs
         types_or: [file]
         exclude_types: [rst, tex, tsv]
-        # Canonical license texts (e.g. CC-BY-4.0) use tabs for line wrapping.
-        exclude: ^LICENSES/
+        # Canonical license texts (e.g. CC-BY-4.0) use tabs for line
+        # wrapping; make recipes require a leading tab.
+        exclude: ^LICENSES/|(^|/)Makefile$
       - id: remove-tabs
         types_or: [file]
         exclude_types: [rst, tex, tsv]
-        exclude: ^LICENSES/
+        exclude: ^LICENSES/|(^|/)Makefile$
       - id: forbid-crlf
       - id: remove-crlf
   - repo: local

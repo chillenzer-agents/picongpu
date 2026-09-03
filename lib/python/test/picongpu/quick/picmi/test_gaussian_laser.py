@@ -5,16 +5,17 @@ Authors: Hannes Troepgen, Brian Edward Marre, Alexander Debus, Richard Pausch
 License: GPLv3+
 """
 
-from math import sqrt
-from unittest import TestCase
-
 import os
 import re
 import tempfile
+from math import sqrt
+from unittest import TestCase
+
 import pytest
-from picongpu import picmi
 from pydantic import ValidationError
 from scipy.constants import c
+
+from picongpu import picmi
 
 
 def _pulse_duration(duration_picmi_si):
@@ -74,7 +75,10 @@ class TestPicmiGaussianLaser(TestCase):
         )
 
     def test_duration_converted_to_pulse_duration(self):
-        """picmi `duration` is the PICMI-standard 1/e field width, pypicongpu expects PULSE_DURATION = duration / 2 (#5739)"""
+        """
+        picmi `duration` is the PICMI-standard 1/e field width, pypicongpu expects PULSE_DURATION = duration / 2
+        (#5739)
+        """
         duration_picmi_si = 30e-15
         picmi_laser = picmi.GaussianLaser(
             wavelength=800e-9,

@@ -68,8 +68,6 @@ class IonizationModel(BaseModel):
                 if value is not None:
                     hash_value += hash(value)
             except TypeError:
-                print(self)
-                print(type(self))
                 raise
         return hash_value
 

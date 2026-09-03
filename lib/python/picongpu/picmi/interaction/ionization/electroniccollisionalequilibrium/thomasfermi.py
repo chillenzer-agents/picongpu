@@ -5,8 +5,8 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
-from ..groundstateionizationmodel import GroundStateIonizationModel
 from ..... import pypicongpu
+from ..groundstateionizationmodel import GroundStateIonizationModel
 
 
 class ThomasFermi(GroundStateIonizationModel):

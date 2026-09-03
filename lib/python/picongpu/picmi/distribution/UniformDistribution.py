@@ -5,10 +5,9 @@ Authors: Hannes Troepgen, Brian Edward Marre
 License: GPLv3+
 """
 
-from ...pypicongpu import species
-from ...pypicongpu import util
-
 import picmistandard
+
+from ...pypicongpu import species, util
 
 """
 note on rms_velocity:

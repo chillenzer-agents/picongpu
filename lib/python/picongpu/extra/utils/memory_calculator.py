@@ -11,8 +11,7 @@ License: GPLv3+
 """
 
 import numpy as np
-import numpy.typing as nptype
-
+import numpy.typing as npt
 import pydantic
 from pydantic import ConfigDict
 
@@ -40,16 +39,16 @@ class MemoryCalculator(pydantic.BaseModel):
     particle_shape_order: int = 2
 
     # pml border size, in cells, see ``fieldAbsorber.param``:``NUM_CELLS``
-    pml_border_size: nptype.NDArray = np.array(((12, 12), (12, 12), (12, 12)))
+    pml_border_size: npt.NDArray = np.array(((12, 12), (12, 12), (12, 12)))
 
     # precision used by PIConGPU, see ``precision.param``
     precision: int = 32
 
     # size of super cell in cells, see ``memory.param``
-    super_cell_size: nptype.NDArray = np.array((8, 8, 4))
+    super_cell_size: npt.NDArray = np.array((8, 8, 4))
 
     # in super cells, see ``memory.param``
-    guard_size: nptype.NDArray = np.array((1, 1, 1))
+    guard_size: npt.NDArray = np.array((1, 1, 1))
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -106,7 +105,7 @@ class MemoryCalculator(pydantic.BaseModel):
             "totalCellIdx": simulation_dimension * size_uint32,
         }
 
-    def _check_cell_extent(self, cell_extent: nptype.NDArray):
+    def _check_cell_extent(self, cell_extent: npt.NDArray):
         """check cell extent is consistent with configuration"""
         if (cell_extent).ndim != 1:
             raise ValueError("cell_extent must be 1D array")
@@ -153,9 +152,7 @@ class MemoryCalculator(pydantic.BaseModel):
         if not (np.all(self.super_cell_size > 0)):
             raise ValueError("super_cell_size must be > 0 in all dimensions")
 
-    def memory_required_by_cell_fields(
-        self, cell_extent: nptype.NDArray, number_of_temporary_field_slots: int = 1
-    ) -> int:
+    def memory_required_by_cell_fields(self, cell_extent: npt.NDArray, number_of_temporary_field_slots: int = 1) -> int:
         """
         Memory required for cell fields on a specific device(GPU/CPU/...)
 
@@ -195,7 +192,7 @@ class MemoryCalculator(pydantic.BaseModel):
 
     def memory_required_by_super_cell_fields(
         self,
-        super_cell_extent: nptype.NDArray,
+        super_cell_extent: npt.NDArray,
         number_atomic_states_by_atomic_physics_ion_species: list[int],
         number_electron_histogram_bins: int,
         ipd_active: bool = True,
@@ -279,7 +276,7 @@ class MemoryCalculator(pydantic.BaseModel):
 
     def memory_required_by_particles_of_species(
         self,
-        particle_filled_cells: nptype.NDArray,
+        particle_filled_cells: npt.NDArray,
         particles_per_cell: int,
         species_attribute_list: list[str],
         custom_attributes_size_dict: dict[str, int] | None = None,
@@ -336,7 +333,7 @@ class MemoryCalculator(pydantic.BaseModel):
         return int(np.ceil(number_particle_cells * mem_per_particle * particles_per_cell))
 
     def memory_required_by_random_number_generator(
-        self, cell_extent: nptype.NDArray, generator_method: str = "XorMin"
+        self, cell_extent: npt.NDArray, generator_method: str = "XorMin"
     ) -> int:
         """
         Memory reserved for the random number generator state on device per device.

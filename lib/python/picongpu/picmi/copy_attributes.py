@@ -6,8 +6,8 @@ License: GPLv3+
 """
 
 import inspect
+from collections.abc import Callable
 from itertools import chain
-from typing import Callable
 
 from pydantic import BaseModel, ValidationError
 

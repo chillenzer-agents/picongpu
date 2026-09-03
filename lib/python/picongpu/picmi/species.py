@@ -36,7 +36,6 @@ from .. import pypicongpu
 from ..pypicongpu.species.util.element import Element
 from .predefinedparticletypeproperties import PredefinedParticleTypeProperties
 
-
 # Accepted particle-shape terms: the PICMI-standard names plus PIConGPU-only
 # extensions, which (following the PICMI "other:" extension convention) are
 # prefixed with "other:".
@@ -158,19 +157,21 @@ class Species(PICMI_Species):
     @model_validator(mode="after")
     def check(self):
         if self.particle_type is None:
-            assert self.charge_state is None, (
-                f"Species {self.name} specified initial charge state via charge_state without also specifying particle "
-                "type, must either set particle_type explicitly or only use charge instead"
-            )
-            assert self.picongpu_fixed_charge is False, (
-                f"Species {self.name} specified fixed charge without also specifying particle_type"
-            )
+            if self.charge_state is not None:
+                raise ValueError(
+                    f"Species {self.name} specified initial charge state via charge_state without also specifying "
+                    "particle type, must either set particle_type explicitly or only use charge instead"
+                )
+            if self.picongpu_fixed_charge:
+                raise ValueError(f"Species {self.name} specified fixed charge without also specifying particle_type")
         # Returns None if it is not an element, so is False-y in those cases, and True-y otherwise:
         elif not self.picongpu_element:
-            assert self.charge_state is None, "charge_state may only be set for ions"
-            assert self.picongpu_fixed_charge is False, (
-                f"Species {self.name} configured with fixed charge state but particle_type indicates non ion"
-            )
+            if self.charge_state is not None:
+                raise ValueError("charge_state may only be set for ions")
+            if self.picongpu_fixed_charge:
+                raise ValueError(
+                    f"Species {self.name} configured with fixed charge state but particle_type indicates non ion"
+                )
         return self
 
     @computed_field
@@ -202,7 +203,7 @@ class Species(PICMI_Species):
     def _pusher(self) -> Pusher:
         return _lookup("pusher method", _PUSHER_BY_NAME, self.method or "Boris")
 
-    def get_as_pypicongpu(self, *args, **kwargs):
+    def get_as_pypicongpu(self, *args, **kwargs):  # noqa: ARG002 -- pypicongpu translation protocol signature
         return PyPIConGPUSpecies(
             name=self.name,
             **self._evaluate_species_requirements(),

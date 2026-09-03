@@ -5,8 +5,9 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from pydantic import ValidationError
 from unittest import TestCase
+
+from pydantic import ValidationError
 
 from picongpu.pypicongpu.species.attribute.momentum import Momentum
 from picongpu.pypicongpu.species.attribute.position import Position

@@ -5,7 +5,9 @@ Authors: Hannes Troepgen, Brian Edward Marre, Richard Pausch, Julian Lenz
 License: GPLv3+
 """
 
-from typing import Annotated, Sequence
+from collections.abc import Sequence
+from typing import Annotated
+
 import picmistandard
 from pydantic import AfterValidator, BeforeValidator, Field, computed_field, model_validator
 

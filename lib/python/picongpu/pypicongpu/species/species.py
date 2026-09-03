@@ -6,8 +6,9 @@ License: GPLv3+
 """
 
 import re
-from pydantic import BaseModel, computed_field, field_validator
 from enum import Enum
+
+from pydantic import BaseModel, computed_field, field_validator
 
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant
 

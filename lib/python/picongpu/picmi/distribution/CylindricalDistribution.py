@@ -5,13 +5,12 @@ Authors: Brian Edward Marre, Pawel Ordyna
 License: GPLv3+
 """
 
-from ...pypicongpu import species
-from ...pypicongpu import util
+import math
+
 import numpy as np
 
+from ...pypicongpu import species, util
 from .Distribution import Distribution
-
-import math
 
 
 class CylindricalDistribution(Distribution):

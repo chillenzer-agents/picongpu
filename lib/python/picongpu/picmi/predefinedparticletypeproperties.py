@@ -5,15 +5,18 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
-import collections
-import particle
 from types import MappingProxyType
+from typing import NamedTuple
 
+import particle
 from pydantic import BaseModel
-
 from scipy import constants as consts
 
-PropertyTuple: collections.namedtuple = collections.namedtuple("_PropertyTuple", ["mass", "charge"])
+
+class PropertyTuple(NamedTuple):
+    mass: float | None
+    charge: float | None
+
 
 _PARTICLE_TYPE_TO_PDGID: MappingProxyType = MappingProxyType(
     {
@@ -67,14 +70,14 @@ class PredefinedParticleTypeProperties(BaseModel):
         @returns None if particle_type is unknown, units: (kg, C)
         """
 
-        if particle_type in _PARTICLE_TYPE_TO_PDGID.keys():
+        if particle_type in _PARTICLE_TYPE_TO_PDGID:
             data = particle.Particle.from_pdgid(_PARTICLE_TYPE_TO_PDGID[particle_type])
             propertyTuple = PropertyTuple(
                 mass=data.mass * 1e6 * consts.elementary_charge / consts.speed_of_light**2,
                 charge=data.charge * consts.elementary_charge,
             )
 
-        elif particle_type in _DIRECT_DEFINITIONS.keys():
+        elif particle_type in _DIRECT_DEFINITIONS:
             propertyTuple = _DIRECT_DEFINITIONS[particle_type]
 
         else:

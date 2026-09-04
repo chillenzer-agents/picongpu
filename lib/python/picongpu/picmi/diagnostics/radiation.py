@@ -5,9 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-import warnings
-
-from pydantic import ConfigDict, field_validator, model_validator
+from pydantic import ConfigDict, field_validator
 
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
@@ -41,40 +39,21 @@ class Radiation(RadiationPluginConfig):
             return value
         raise ValueError(f"species must be a Species or FilteredSpecies (or a list thereof), got {value!r}")
 
-    @model_validator(mode="after")
-    def _validate_gamma_filter_threshold(self):
-        # The gamma filter is only rendered for plain species; filtered species
-        # are masked by their own particle filter. Without a plain species the
-        # threshold would be silently ignored, so reject it.
-        if self.gamma_filter_threshold is not None and all(isinstance(s, FilteredSpecies) for s in self.species):
-            raise ValueError(
-                "gamma_filter_threshold has no effect when all species are filtered, because "
-                "filtered species are selected by their own particle filter; "
-                "express the gamma cut inside your ParticleFilter instead"
-            )
-        return self
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for s in self.species:
             species = s.species if isinstance(s, FilteredSpecies) else s
             requirements = [MomentumPrev1()]
-            # The C++ filter (plugins::radiation::executeParticleFilter) only runs
-            # on species that carry the radiationMask attribute, and a mask
-            # functor is rendered for exactly those species:
-            # - a filtered species, whose mask is set by its ParticleFunctor
-            # - a plain species with a gamma filter threshold
-            # Register the attribute so the mask is actually written and read.
-            if isinstance(s, FilteredSpecies) or (isinstance(s, Species) and self.gamma_filter_threshold is not None):
+            # The C++ filter (plugins::radiation::executeParticleFilter) only
+            # runs on species that carry the radiationMask attribute, and a mask
+            # functor is rendered for exactly those species: a filtered species,
+            # whose mask is set by its particle filter. A plain species has no
+            # mask, so all of its particles contribute unfiltered. Register the
+            # attribute for filtered species so the mask is actually written and
+            # read.
+            if isinstance(s, FilteredSpecies):
                 requirements.append(RadiationMask())
             species.register_requirements(requirements)
-        if self.gamma_filter_threshold is not None and any(isinstance(s, FilteredSpecies) for s in self.species):
-            # mixed species list: the threshold applies to the plain species,
-            # but is ignored for the filtered ones; say so instead of dropping it silently
-            warnings.warn(
-                "gamma_filter_threshold applies only to plain species; "
-                "filtered species are selected by their own particle filter"
-            )
 
     def get_as_pypicongpu(self, time_step_size, num_steps):
         return RadiationPlugin(

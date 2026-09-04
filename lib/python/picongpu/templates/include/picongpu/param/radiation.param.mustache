@@ -37,13 +37,10 @@
 #define PIC_VERBOSE_RADIATION {{#output}}{{#type_radiation}}{{{config.radiation.verbose_level}}}{{/type_radiation}}{{/output}}
 
 #include "picongpu/defines.hpp"
-#include "picongpu/algorithms/Gamma.def"
-#include "picongpu/param/particleFilters.param"
-#include "picongpu/param/species.param"
-#include "picongpu/param/speciesDefinition.param"
 #include "picongpu/particles/manipulators/manipulators.hpp"
 #include "picongpu/plugins/radiation/VectorTypes.hpp"
-#include "picongpu/traits/attribute/GetMass.hpp"
+
+#include <type_traits>
 
 namespace picongpu
 {
@@ -190,8 +187,6 @@ namespace picongpu
              * a mask functor is rendered that writes the filter's decision
              * into the particle's `radiationMask` attribute:
              *
-             * - plain species are masked by their relativistic Lorentz factor
-             *   gamma (see `GammaFilterFunctor`)
              * - species wrapped in a PICMI particle filter are masked by the
              *   expression of that filter (see the
              *   `<species>_<filter>MaskFunctor` structs below)
@@ -199,26 +194,6 @@ namespace picongpu
              * `RadiationParticleFilter` selects the matching mask manipulator
              * for a given species.
              */
-            {{#gamma_filter_threshold}}
-            /** select particles with a relativistic Lorentz factor gamma
-             * above a threshold
-             */
-            struct GammaFilterFunctor
-            {
-                /** Gamma value above which the radiation is calculated */
-                static constexpr float_X radiationGamma = {{{gamma_filter_threshold}}};
-
-                template<typename T_Particle>
-                HDINLINE void operator()(T_Particle& particle)
-                {
-                    if(picongpu::gamma<float_X>(
-                           particle[picongpu::momentum_],
-                           picongpu::traits::attribute::getMass(particle[picongpu::weighting_], particle))
-                        >= radiationGamma)
-                        particle[picongpu::radiationMask_] = true;
-                }
-            };
-            {{/gamma_filter_threshold}}
 
             {{#species}}
             {{#type_filtered}}
@@ -264,19 +239,18 @@ namespace picongpu
                 /** select the mask manipulator for a species
                  *
                  * One full specialization is emitted per species wrapped in a
-                 * PICMI particle filter, and for every plain species when a
-                 * `gamma_filter_threshold` is set. The primary template is
-                 * therefore only instantiated for a misconfigured species
-                 * (a `radiationMask` attribute without a matching filter).
+                 * PICMI particle filter. The primary template is therefore only
+                 * instantiated for a misconfigured species (a `radiationMask`
+                 * attribute without a matching filter).
                  */
                 template<typename T_Species>
                 struct RadiationParticleFilterFor
                 {
                     static_assert(
-                        false,
+                        !std::is_same_v<T_Species, T_Species>,
                         "radiation: the species carries the radiationMask attribute but no "
-                        "particle filter is defined for it; set a gamma filter threshold or "
-                        "wrap the species in a PICMI particle filter");
+                        "particle filter is defined for it; wrap the species in a PICMI "
+                        "particle filter");
                 };
 
             {{#species}}
@@ -307,26 +281,13 @@ namespace picongpu
 
             {{/type_filtered}}
             {{/species}}
-            {{#gamma_filter_threshold}}
-            {{#species}}
-            {{^type_filtered}}
-                template<>
-                struct RadiationParticleFilterFor<{{{typename}}}>
-                {
-                    using type = picongpu::particles::manipulators::generic::Free<GammaFilterFunctor>;
-                };
-
-            {{/type_filtered}}
-            {{/species}}
-            {{/gamma_filter_threshold}}
             } // namespace detail
 
             /** filter to (de)select particles for the radiation calculation
              *
              * to activate the filter:
              *   - add the attribute `radiationMask` to the particle species
-             *     (PIConGPU does this automatically for filtered species and
-             *     for plain species with a `gamma_filter_threshold`)
+             *     (PyPIConGPU does this automatically for filtered species)
              */
             struct RadiationParticleFilter
             {

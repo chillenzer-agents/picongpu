@@ -133,8 +133,8 @@ class RadiationConfiguration(BaseModel):
 class RadiationPluginConfig(BaseModel):
     """Top-level radiation plugin configuration.
 
-    Combines radiation settings, observer settings, gamma filtering,
-    and window function configuration into a single coherent model.
+    Combines radiation settings, observer settings, and window function
+    configuration into a single coherent model.
     """
 
     radiation: RadiationConfiguration = Field(
@@ -143,11 +143,6 @@ class RadiationPluginConfig(BaseModel):
     )
 
     observer: RadiationObserverConfiguration = Field(description="Observer configuration for virtual detectors")
-
-    gamma_filter_threshold: float | None = Field(
-        None,
-        description="Minimum gamma value for particles to be included in radiation calculation",
-    )
 
     window_function: WindowFunctionConfiguration = Field(
         WindowFunctionConfiguration.NONE,

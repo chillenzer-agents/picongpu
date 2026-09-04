@@ -1,13 +1,6 @@
 Changelog
 =========
 
-Unreleased
-----------
-
-**Features:**
-- PICMI:
-    - round-trip fidelity: the `pypicongpu` models now accept their own `model_dump(mode="json")` output again via `model_validate` and re-serialise it identically, so a `Runner`/`Simulation` can be fully reconstructed from the metadata JSONs written during `generate()`. Models whose serialisation was lossy gained symmetric (de)serialisation (field solvers, all lasers, the openPMD plugin, binning, chemical elements incl. isotopes, ground-state ionization models, collisions, the radiation observer direction mapping, particle functors, and species operations). Rendered C++ output is byte-identical for valid inputs; the metadata JSONs only gain the fields required for lossless reconstruction.
-
 0.8.0
 -----
 

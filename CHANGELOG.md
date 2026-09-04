@@ -1,20 +1,6 @@
 Changelog
 =========
 
-0.9.0
------
-
-**Date:** TBD
-
-**Features:**
-- tools:
-    - add a LEXIS Workflow Definition (LWD) backend (`workflow_backend = "lexis"`) that emits `workflow.lwd.yaml` instead of the CWL workflow, a `Py4Lexis` submission driver (`pypicongpu.lexis_submit`), and `patches/py4lexis-create-workflow.diff` (adding the missing workflow-creation step) for running PIConGPU on the EuroHPC Federation Platform (EFP)
-    - add a draft EFP/LEXIS job-script preset (`efp-jupiter-jsc`) as a fallback that renders a self-contained job script via TBG
-
-**Documentation:**
-- tools:
-    - add a "Running on the EuroHPC Federation Platform (EFP)" page (LWD + Py4Lexis primary, job-script fallback) and a profile entry for the EFP JUPITER preset
-
 0.8.0
 -----
 

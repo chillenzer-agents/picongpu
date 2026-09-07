@@ -422,3 +422,128 @@ def test_dispersive_pulse_laser_duration_converted_to_pulse_duration():
     )
     pypic_laser = picmi_laser.get_as_pypicongpu()
     assert abs(pypic_laser.pulse_duration_si - _pulse_duration(duration_picmi_si)) < 1e-24
+
+
+def _minimal_gaussian_laser(**kwargs):
+    params = {
+        "wavelength": 1,
+        "waist": 2,
+        "duration": 3,
+        "focal_position": [0, 0, 0],
+        "centroid_position": [0, -1, 0],
+        "propagation_direction": [0, 1, 0],
+        "polarization_direction": [1, 0, 0],
+        "E0": 1,
+    }
+    params.update(kwargs)
+    return picmi.GaussianLaser(**params)
+
+
+def _minimal_sim(number_of_cells):
+    grid = picmi.Cartesian3DGrid(
+        number_of_cells=number_of_cells,
+        lower_bound=[0, 0, 0],
+        upper_bound=[0.1, 0.1, 0.1],
+        lower_boundary_conditions=["open", "open", "periodic"],
+        upper_boundary_conditions=["open", "open", "periodic"],
+    )
+    solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+    return picmi.Simulation(time_step_size=1e-15, max_steps=2, solver=solver)
+
+
+def test_huygens_surface_positions_accepts_valid_defaults():
+    assert _minimal_gaussian_laser().get_as_pypicongpu().huygens_surface_positions == [[16, -16], [16, -16], [16, -16]]
+    assert _minimal_gaussian_laser(
+        picongpu_huygens_surface_positions=[[1, -1], [1, -1], [1, -1]]
+    ).get_as_pypicongpu().huygens_surface_positions == [[1, -1], [1, -1], [1, -1]]
+
+
+def test_huygens_surface_positions_accepts_positive_max():
+    laser = _minimal_gaussian_laser(picongpu_huygens_surface_positions=[[16, 96], [16, -16], [16, -16]])
+    # complete absolute positions only valid against a grid, but must not fail structurally
+    assert laser.get_as_pypicongpu().huygens_surface_positions == [[16, 96], [16, -16], [16, -16]]
+
+
+@pytest.mark.parametrize(
+    "positions",
+    [
+        [[0, -1], [1, -1], [1, -1]],
+        [[-1, -1], [1, -1], [1, -1]],
+        [[1, 0], [1, -1], [1, -1]],
+        [[1, 1], [1, -1], [1, -1]],
+        [[1, -1], [1, -1]],
+        [[1, -1], ["a", -1], [1, -1]],
+        [[1.5, -1], [1, -1], [1, -1]],
+    ],
+)
+def test_huygens_surface_positions_invalid_at_construction(positions):
+    with pytest.raises(ValueError, match="[Hh]uygens"):
+        _minimal_gaussian_laser(picongpu_huygens_surface_positions=positions)
+
+
+def test_huygens_surface_positions_invalid_for_all_laser_types():
+    invalid = [[0, -1], [1, -1], [1, -1]]
+    with pytest.raises(ValueError, match="[Hh]uygens"):
+        picmi.PlaneWaveLaser(
+            wavelength=1,
+            duration=3,
+            propagation_direction=[0, 1, 0],
+            polarization_direction=[0, 0, 1],
+            centroid_position=[0, -1, 0],
+            E0=1,
+            picongpu_huygens_surface_positions=invalid,
+        )
+    with pytest.raises(ValueError, match="[Hh]uygens"):
+        picmi.TWTSLaser(
+            wavelength=1,
+            waist=2,
+            duration=3,
+            laserIncidenceAngle=0.0,
+            polarizationAngle=0.0,
+            focal_position=[0, 0, 0],
+            centroid_position=[0, -1, 0],
+            E0=1,
+            picongpu_huygens_surface_positions=invalid,
+        )
+    with pytest.raises(ValueError, match="[Hh]uygens"):
+        picmi.FromOpenPMDPulseLaser(
+            file_path="pulse.h5",
+            iteration=0,
+            dataset_name="pulse",
+            datatype="float64",
+            time_offset_si=0.0,
+            polarisationAxisOpenPMD="z",
+            propagationAxisOpenPMD="y",
+            propagation_direction=[0, 1, 0],
+            polarization_direction=[0, 0, 1],
+            picongpu_huygens_surface_positions=invalid,
+        )
+
+
+def test_huygens_surface_positions_insufficient_dimension():
+    # y extends over only 24 cells, so [[16, -16], ...] cannot fit
+    sim = _minimal_sim([128, 24, 128])
+    sim.add_laser(_minimal_gaussian_laser(), None)
+    with pytest.raises(ValueError, match="[Hh]uygens"):
+        sim.get_as_pypicongpu()
+
+
+def test_huygens_surface_positions_too_small_grid():
+    sim = _minimal_sim([16, 16, 16])
+    sim.add_laser(_minimal_gaussian_laser(), None)
+    with pytest.raises(ValueError, match="[Hh]uygens"):
+        sim.get_as_pypicongpu()
+
+
+def test_huygens_surface_positions_fit_into_grid():
+    sim = _minimal_sim([128, 512, 256])
+    sim.add_laser(_minimal_gaussian_laser(), None)
+    assert sim.get_as_pypicongpu().model_dump() != {}
+
+
+def test_huygens_surface_positions_all_lasers_must_match():
+    sim = _minimal_sim([128, 512, 256])
+    sim.add_laser(_minimal_gaussian_laser(), None)
+    sim.add_laser(_minimal_gaussian_laser(picongpu_huygens_surface_positions=[[1, -1], [1, -1], [1, -1]]), None)
+    with pytest.raises(ValueError, match="[Hh]uygens"):
+        sim.get_as_pypicongpu()

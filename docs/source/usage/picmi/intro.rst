@@ -212,6 +212,32 @@ Parameters/Methods prefixed with ``picongpu_`` are PIConGPU-exclusive.
     :class:`picongpu.picmi.PseudoRandomLayout` is therefore a
     force-independent discriminator.
 
+    .. warning::
+
+      The ``seed`` is a **grouping discriminator only**. It is never forwarded
+      to the C++ random number generator: for a *single* random layout it has no
+      runtime effect at all (a layout with ``seed`` renders byte-identically to
+      one without; positions are neither reproducible from the ``seed`` nor
+      disjoint from those of other species -- all random draws come from the same
+      externally-seeded device RNG stream). It only matters across species: two
+      equal-``ppc`` random layouts with different seeds are *not* merged, i.e.
+      the involved species are initialised independently.
+
+  **Migration note.** PIConGPU used to initialise two or more species
+  *collectively* (identical in-cell positions, e.g. charge-neutral electron/ion
+  setups) whenever they shared the same ``initial_distribution`` *and* the
+  same ``layout`` -- an implicit heuristic. With this release species are
+  initialised **independently by default**, so previously-colocated random-layout
+  species now draw their own random in-cell positions (no longer automatically
+  charge-neutral). PIConGPU issues a ``UserWarning`` when it detects species for
+  which the old implicit merging would have applied; to keep the previous
+  (collective, charge-neutral) behaviour, wrap those species in a
+  :class:`picongpu.picmi.MultiSpecies`. Collective initialisation (including the
+  fix for same-density/differing-momentum species, which keeps positions
+  charge-neutral) is **exclusively available through an explicit
+  ``MultiSpecies``** -- plain species are never grouped, no matter how similar
+  their distributions look.
+
 
 Ionization:
 ^^^^^^^^^^^

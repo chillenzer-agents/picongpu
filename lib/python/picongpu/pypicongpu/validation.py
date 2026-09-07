@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 
-def validate_huygens_surface_positions(huygens_surface_positions, cell_cnt=None):
+def validate_huygens_surface_positions(huygens_surface_positions, cell_cnt=None, moving_window_enabled=False):
     """
     Check that the Huygens surface positions of an incident-field laser are well-formed.
 
@@ -18,11 +18,17 @@ def validate_huygens_surface_positions(huygens_surface_positions, cell_cnt=None)
     arithmetic.
 
     With ``cell_cnt`` (the global number of cells per axis) given, this also checks
-    that both surfaces lie inside the global domain and do not overlap ("insufficient
-    dimension"). Without it, only the structural checks are performed.
+    that both surfaces lie inside the global domain and that the bounded volume is
+    non-degenerate, i.e. spans at least 2 cells (mirroring the C++ ``checkPositioning``
+    in ``Solver.hpp``). For moving-window simulations the YMax side is exempt from the
+    inside-the-domain requirement, matching the C++ ``skipMaxCheck``.
+
+    Without ``cell_cnt``, only the structural checks are performed.
 
     :param huygens_surface_positions: 3-element list of ``[min, max]`` integer pairs
     :param cell_cnt: optional 3-element tuple of ints, the global cell counts per axis
+    :param moving_window_enabled: whether a moving window is active; if so the YMax
+        (axis 1, max side) surface may be located outside the initially simulated volume
     :raise ValueError: if any of the checks fail
     :return: ``huygens_surface_positions`` unchanged
     """
@@ -59,13 +65,15 @@ def validate_huygens_surface_positions(huygens_surface_positions, cell_cnt=None)
                 f"You gave: {minimum=}."
             )
 
-        # a non-negative max is expressed as an absolute coordinate and hence must
-        # already be larger than the corresponding min position
+        # a non-negative max is expressed as an absolute coordinate and hence must already be far
+        # enough away from the corresponding min position to yield a non-degenerate volume with a
+        # span of at least 2 cells (as required for a Fittable volume by the C++ checkPositioning)
         absolute_max = maximum if maximum >= 0 else None
-        if absolute_max is not None and absolute_max <= minimum:
+        if absolute_max is not None and absolute_max <= minimum + 1:
             raise ValueError(
                 f"The Huygens surface max position for axis {axis} is given as an absolute coordinate "
-                "and must lie inside the domain beyond the min position. "
+                "and must lie inside the domain beyond the min position, spanning at least 2 cells "
+                "(a span of 1 would make the Huygens surface degenerate/crossing). "
                 f"You gave: {minimum=} and {absolute_max=}."
             )
 
@@ -77,12 +85,23 @@ def validate_huygens_surface_positions(huygens_surface_positions, cell_cnt=None)
                     f"which has {size} cells in that axis. You gave: {minimum=}."
                 )
             max_coordinate = (size + maximum) if maximum < 0 else maximum
-            if max_coordinate >= size or max_coordinate <= minimum:
+            # For moving-window simulations, the YMax surface may be located outside the initially
+            # simulated volume (mirrors the C++ skipMaxCheck in Solver.hpp::checkPositioning)
+            max_outside_allowed = (axis == 1) and moving_window_enabled
+            if not max_outside_allowed and max_coordinate >= size:
                 raise ValueError(
-                    f"The Huygens surface for axis {axis} does not fit inside the global domain, "
-                    f"which has {size} cells in that axis: the surfaces must be inside the domain "
-                    "and must not overlap (insufficient dimension). "
-                    f"You gave: {minimum=} and {maximum=}."
+                    f"The Huygens surface max position for axis {axis} lies outside the global domain, "
+                    f"which has {size} cells in that axis. You gave: {minimum=} and {maximum=} "
+                    f"(absolute max position {max_coordinate})."
+                )
+            # C++ requires the volume bounded by the Huygens surface to be non-zero, i.e. its span
+            # (distance between the min and max surfaces) must be at least 2 cells (Solver.hpp, checkPositioning)
+            if max_coordinate < minimum + 2:
+                raise ValueError(
+                    f"The Huygens surface for axis {axis} does not fit into the global domain, "
+                    f"which has {size} cells in that axis, with a non-degenerate span of at least 2 cells "
+                    "(insufficient dimension; a span of 1 would make the surfaces cross). "
+                    f"You gave: {minimum=} and {maximum=} (absolute max position {max_coordinate})."
                 )
 
     return huygens_surface_positions

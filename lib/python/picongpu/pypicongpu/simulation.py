@@ -138,7 +138,11 @@ class Simulation(RenderedObject, BaseModel):
                     f"You gave {first_positions=} for the first laser and {ll.huygens_surface_positions=} "
                     "for another one."
                 )
-            validate_huygens_surface_positions(ll.huygens_surface_positions, cell_cnt=self.grid.cell_cnt)
+            validate_huygens_surface_positions(
+                ll.huygens_surface_positions,
+                cell_cnt=self.grid.cell_cnt,
+                moving_window_enabled=self.moving_window is not None,
+            )
         return self
 
     def spread_directory_information(self, setup_dir):

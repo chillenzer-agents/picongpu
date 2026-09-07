@@ -100,7 +100,13 @@ class BuiltinFieldSolver(BaseModel):
 
 
 class DerivedFieldSolver(BaseModel):
-    """One compile-time particle-to-grid operation for one species and filter."""
+    """One compile-time particle-to-grid operation for one species and filter.
+
+    `attribute_type`, `filter_type` and `species` are consumed by the
+    `fileOutput.param.mustache` template. `attribute_typename` is kept as
+    identification metadata (indexed by the serialized `sources` output); it is
+    not read by any template.
+    """
 
     species: str
     attribute_type: str
@@ -111,11 +117,6 @@ class DerivedFieldSolver(BaseModel):
     @property
     def filter_type(self) -> str:
         return f"picongpu::particles::filter::{self.filtername or 'All'}"
-
-    @computed_field
-    @property
-    def typename(self) -> str:
-        return "_".join((self.attribute_typename, self.species, self.filtername or "All"))
 
 
 class FieldDump(BaseModel):

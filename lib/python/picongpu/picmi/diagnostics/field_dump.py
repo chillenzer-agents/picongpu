@@ -5,6 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import logging
 from os import PathLike
 from pathlib import Path
 from typing import ClassVar, Literal
@@ -152,7 +153,35 @@ class NativeDerivedFieldDump(_BuiltinDerivedFieldDump):
 
 
 class AverageDerivedFieldDump(_BuiltinDerivedFieldDump):
-    """Dump the cell-wise average of a built-in PIConGPU derived field."""
+    """Dump the cell-wise average of a built-in PIConGPU derived field.
+
+    The average is the total weighted value divided by the number of particles,
+    i.e. the C++ ``AverageAttribute<T>`` operation. Averaging a scalar per-cell
+    or counting quantity such as ``Density`` / ``EnergyDensity`` therefore maps
+    to ``T / T`` (a value of ~1) and is semantically odd; a warning is issued
+    for those. Physically meaningful use is averaging per-particle quantities
+    (``WeightedVelocity``, ``Momentum``, ...).
+    """
 
     field: AverageableDerivedField
     _average: ClassVar[bool] = True
+
+    # C++-legal (`IsWeighted<...> == true_type`) but averaging reduces to T/T (~1).
+    _CONSTANT_AVERAGE_FIELDS = frozenset(
+        {"Density", "BoundElectronDensity", "ChargeDensity", "Counter", "EnergyDensity"}
+    )
+
+    @model_validator(mode="after")
+    def _warn_non_physical_average(self):
+        if self.field in self._CONSTANT_AVERAGE_FIELDS:
+            logging.warning(
+                "AverageDerivedFieldDump of %s maps to C++ AverageAttribute<%s> = %s/%s (value ~1); "
+                "averaging scalar per-cell/counting quantities is not physically meaningful. "
+                "Use AverageableDerivedField on a per-particle quantity "
+                "(WeightedVelocity, Momentum, ...) for a meaningful average.",
+                self.field,
+                self.field,
+                self.field,
+                self.field,
+            )
+        return self

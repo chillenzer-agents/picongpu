@@ -18,6 +18,8 @@ from pydantic import (
     model_validator,
 )
 
+from .validation import validate_huygens_surface_positions
+
 
 class PolarizationType(Enum):
     """represents a polarization of a laser (for PIConGPU)"""
@@ -93,6 +95,11 @@ class _BaseLaser(BaseModel):
     huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
     """Position in cells of the Huygens surface relative to start/
        edge(negative numbers) of the total domain"""
+
+    @model_validator(mode="after")
+    def check_huygens_surface_positions(self):
+        validate_huygens_surface_positions(self.huygens_surface_positions)
+        return self
 
     def _get_common_serialized_fields(self) -> dict:
         """Get all common serialized fields for lasers"""
@@ -206,6 +213,11 @@ class FromOpenPMDPulseLaser(BaseModel):
     """Position in cells of the Huygens surface relative to start/
        edge(negative numbers) of the total domain"""
 
+    @model_validator(mode="after")
+    def check_huygens_surface_positions(self):
+        validate_huygens_surface_positions(self.huygens_surface_positions)
+        return self
+
 
 class TWTSLaser(_BaseLaser):
     """
@@ -241,9 +253,6 @@ class TWTSLaser(_BaseLaser):
     """Final time step number [#] after gradually switching off the laser using a Blackman-Nuttall window"""
     windowLength: float
     """Denotes the respective switching duration by half a Blackman-Nuttall window in number of time steps unit [#]"""
-    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
-    """Position in cells of the Huygens surface relative to start/
-       edge(negative numbers) of the total domain"""
 
 
 AnyLaser = DispersivePulseLaser | FromOpenPMDPulseLaser | GaussianLaser | PlaneWaveLaser | TWTSLaser

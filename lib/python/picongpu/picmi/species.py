@@ -112,7 +112,11 @@ class Species(PICMI_Species):
     # positions via a common density operation. Kept as a private attribute so
     # that it neither leaks into equality/serialization of the species nor into
     # the rendered output; it survives deep-copies of a Simulation because all
-    # members point to the same MultiSpecies instance.
+    # members point to the same MultiSpecies instance. It does NOT survive a
+    # pydantic model_dump/model_validate round-trip (PrivateAttr is never
+    # serialized) -- the picmi layer has no such serialization surface today;
+    # the pypicongpu layer is the serialization surface and stores the merged
+    # result (created/derived split) explicitly.
     _multi_species: object | None = PrivateAttr(default=None)
 
     @field_validator("method")

@@ -17,6 +17,21 @@ from ..pypicongpu.species.operation.layout import Quiet, Random
 
 
 class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
+    """Random in-cell placement (pseudo-random).
+
+    .. warning::
+
+       The ``seed`` is a **grouping/across-species discriminator only**. It is
+       never forwarded to the C++ random number generator, so on the C++ level a
+       layout with ``seed=42`` renders byte-identically to one with ``seed=None``:
+       once a single ``PseudoRandomLayout`` is used, the ``seed`` neither makes
+       the in-cell positions reproducible from run to run nor separates the
+       random draws between independently-initialised species (both draw from the
+       same, externally-seeded device RNG stream). Its only effect is to make two
+       otherwise-equal random layouts *distinct* so that they are NOT merged into
+       one density operation (deliberately independent, non-neutral positions).
+    """
+
     n_macroparticles_per_cell: int = Field(gt=0)
     # PIConGPU can't handle the following separately:
     n_macroparticles: None = None

@@ -104,6 +104,15 @@ then
     exit 1
 fi
 
+# The SUFFIX is injected into sed replacement strings unescaped, so restrict it
+# to characters that cannot break the `s/.../.../` editor. This must be checked
+# *before* any file is modified.
+if [[ -n "$SUFFIX" && ! "$SUFFIX" =~ ^[A-Za-z0-9._-]+$ ]]
+then
+    echo "error: SUFFIX may only contain alphanumerics and '.', '_', '-' (got '$SUFFIX')." >&2
+    exit 1
+fi
+
 SUFFIX_STR=""
 if [[ -n "$SUFFIX" ]]
 then

@@ -15,7 +15,7 @@
 #   - the PICMI `uv` install instructions (PEP 723 pins) point to the main
 #     repository (not a fork)
 #   - `.zenodo.json` creators roughly match the committers of the release range
-#     (informational diff only, human must confirm)
+#     (informational diff only, names matched 'Last, First'; human must confirm)
 #   - finally, print the `gh release create --draft` command for the human to
 #     run (nothing is released by this script)
 #
@@ -70,7 +70,9 @@ if [[ -z "$REPO_DIR" ]]; then
 fi
 REPO_DIR=$(realpath "$REPO_DIR")
 
-if [[ ! -d "$REPO_DIR/.git" ]]; then
+# In a git worktree (and in submodules) `.git` is a file, not a directory, so
+# resolve the actual git dir instead of testing for a `.git` directory.
+if ! git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1; then
     echo "ERROR: $REPO_DIR is not a git repository." >&2
     exit 1
 fi
@@ -99,6 +101,13 @@ info() {
 
 indent() {
     awk '{ print "       " $0 }'
+}
+
+# Normalize git committer names ("First Last") to the `.zenodo.json` ordering
+# ("Last, First") so the comm-based diff below is meaningful. Single-word
+# identities (e.g. misconfigured `git user.name`) are left untouched.
+last_first() {
+    awk '{ if (NF > 1) { last = $NF; $NF = ""; sub(/ +$/, "", $0); print last ", " $0 } else { print } }'
 }
 
 echo "=================================================================="
@@ -247,11 +256,12 @@ elif ! command -v jq >/dev/null 2>&1; then
 elif [[ ! -f "$ZENODO_FILE" ]]; then
     warn "$ZENODO_FILE not found"
 else
-    committers=$(git -C "$REPO_DIR" log --use-mailmap --format='%an' "$PREVIOUS_TAG..HEAD" 2>/dev/null | sort -u)
-    creators=$(jq -r '.creators[].name' "$ZENODO_FILE" 2>/dev/null | sort -u)
+    committers=$(git -C "$REPO_DIR" log --use-mailmap --format='%an' "$PREVIOUS_TAG..HEAD" 2>/dev/null | last_first | sort -u || true)
+    creators=$(jq -r '.creators[].name' "$ZENODO_FILE" 2>/dev/null | sort -u || true)
     missing_in_zenodo=$(comm -23 <(echo "$committers") <(echo "$creators") || true)
     missing_among_committers=$(comm -13 <(echo "$committers") <(echo "$creators") || true)
     echo "  release range: $PREVIOUS_TAG..HEAD"
+    info "names are compared 'Last, First' (git committer names are normalized); aliases still need manual confirmation"
     if [[ -n "$missing_in_zenodo" ]]; then
         info "committers without a .zenodo.json creator entry (add them?):"
         echo "$missing_in_zenodo" | indent

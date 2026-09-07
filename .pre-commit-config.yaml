@@ -1,5 +1,8 @@
 minimum_pre_commit_version: 3.2.0 # necessitated by Lucas-C's hooks
 default_install_hook_types: [pre-commit, pre-push]
+# Explicit and independent of the pre-commit default (all stages); makes sure
+# hooks run on pre-commit and keep running on pre-push.
+default_stages: [pre-commit, pre-push]
 exclude: "thirdParty"
 repos:
   - repo: https://github.com/pre-commit/mirrors-clang-format

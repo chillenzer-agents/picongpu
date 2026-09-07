@@ -7,10 +7,10 @@ License: GPLv3+
 
 from .backend_config import BackendConfig as BackendConfig
 from .backend_config import OpenPMDConfig as OpenPMDConfig
-from .binning import BinSpec as BinSpec
 from .binning import Binning as Binning
 from .binning import BinningAxis as BinningAxis
 from .binning import BinningFunctor as BinningFunctor
+from .binning import BinSpec as BinSpec
 from .checkpoint import Checkpoint as Checkpoint
 from .energy_histogram import EnergyHistogram as EnergyHistogram
 from .field_dump import DerivedFieldDump as DerivedFieldDump

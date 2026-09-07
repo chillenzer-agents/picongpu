@@ -8,7 +8,7 @@ License: GPLv3+
 from pydantic import BaseModel, Field
 
 from ...pypicongpu import laser
-from ..copy_attributes import default_converts_to
+from .._copy_attributes import default_converts_to
 
 
 @default_converts_to(laser.FromOpenPMDPulseLaser)

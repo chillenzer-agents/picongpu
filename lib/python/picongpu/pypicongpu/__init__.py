@@ -2,7 +2,7 @@
 internal representation of params to generate PIConGPU input files
 """
 
-import sys
+import sys as _sys
 
 from . import collision as collision
 from . import customuserinput as customuserinput
@@ -25,4 +25,4 @@ from .output.phase_space import PhaseSpace as PhaseSpace
 from .runner import Runner as Runner
 from .simulation import Simulation as Simulation
 
-assert sys.version_info.major > 3 or sys.version_info.minor >= 9, "Python 3.9 is required for PIConGPU"
+assert _sys.version_info.major > 3 or _sys.version_info.minor >= 9, "Python 3.9 is required for PIConGPU"

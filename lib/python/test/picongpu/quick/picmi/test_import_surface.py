@@ -12,10 +12,10 @@ import picongpu.picmi as picmi_module
 from picongpu import picmi
 from picongpu.picmi import diagnostics, particle_functor
 from picongpu.picmi.diagnostics import BinningFunctor, RadiationObserverConfiguration
-from picongpu.picmi.particle_functor import ParticleFunctor, RNGArg, UnitDimension
 from picongpu.picmi.particle_functor import I as I_public
 from picongpu.picmi.particle_functor import L as L_public
 from picongpu.picmi.particle_functor import M as M_public
+from picongpu.picmi.particle_functor import ParticleFunctor, RNGArg, UnitDimension
 from picongpu.picmi.particle_functor import T as T_public
 from picongpu.picmi.particle_functor.unit_dimension import I as I_from_unit_dimension
 from picongpu.picmi.particle_functor.unit_dimension import L as L_from_unit_dimension
@@ -78,6 +78,8 @@ class TestStarImport(TestCase):
         "simulation",
         "solver",
         "species",
+        # required by the PICMI interface
+        "codename",
         # classes
         "Simulation",
         "ParticleFunctor",
@@ -128,6 +130,17 @@ class TestStarImport(TestCase):
         namespace = self._star_import()
         missing = self.EXPECTED_NAMES - set(namespace)
         self.assertEqual(missing, set())
+
+    def test_star_surface_is_exactly_the_expected_set(self):
+        """
+        pin the exact `from picongpu.picmi import *` surface so that both
+        removals (drift of documented names) and additions (leaked internals,
+        e.g. `sys`, `picmistandard`, or helper modules bound on the package by
+        transitive imports) are caught in CI.
+        """
+        namespace = self._star_import()
+        namespace.pop("__builtins__", None)
+        self.assertEqual(set(namespace), self.EXPECTED_NAMES)
 
     def test_star_import_reaches_promoted_names(self):
         namespace = self._star_import()

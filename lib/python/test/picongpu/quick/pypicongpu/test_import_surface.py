@@ -5,6 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import builtins
 from types import ModuleType
 from unittest import TestCase
 
@@ -34,3 +35,43 @@ class TestPyPIConGPUClassSurface(TestCase):
         from picongpu.pypicongpu.field_solver import AnySolver
 
         self.assertIs(pypicongpu.field_solver.AnySolver, AnySolver)
+
+
+class TestStarImport(TestCase):
+    """
+    pin the exact `from picongpu.pypicongpu import *` surface so that neither
+    drift of documented names nor leaked internals (e.g. `sys`) go unnoticed.
+    """
+
+    EXPECTED_NAMES = {
+        # explicit submodules
+        "collision",
+        "customuserinput",
+        "field_solver",
+        "grid",
+        "laser",
+        "movingwindow",
+        "output",
+        "particle_functor",
+        "rendering",
+        "runner",
+        "simulation",
+        "species",
+        "util",
+        "walltime",
+        # classes
+        "Checkpoint",
+        "EnergyHistogram",
+        "LeheSolver",
+        "MacroParticleCount",
+        "PhaseSpace",
+        "Runner",
+        "Simulation",
+        "YeeSolver",
+    }
+
+    def test_star_surface_is_exactly_the_expected_set(self):
+        namespace = {"__builtins__": builtins}
+        exec("from picongpu.pypicongpu import *", namespace)  # noqa: S102
+        namespace.pop("__builtins__", None)
+        self.assertEqual(set(namespace), self.EXPECTED_NAMES)

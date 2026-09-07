@@ -2,11 +2,12 @@
 PICMI for PIConGPU
 """
 
-import sys
+import sys as _sys
 
-import picmistandard
+import picmistandard as _picmistandard
 
-from . import constants, diagnostics as diagnostics
+from . import constants
+from . import diagnostics as diagnostics
 from .distribution import AnalyticDistribution as AnalyticDistribution
 from .distribution import CylindricalDistribution as CylindricalDistribution
 from .distribution import FoilDistribution as FoilDistribution
@@ -19,10 +20,12 @@ from .interaction import ConstLogCollision as ConstLogCollision
 from .interaction import DynamicLogCollision as DynamicLogCollision
 from .interaction import Interaction as Interaction
 from .interaction import Synchrotron as Synchrotron
-from .interaction.ionization.electroniccollisionalequilibrium import ThomasFermi as ThomasFermi
+from .interaction.ionization.electroniccollisionalequilibrium import (
+    ThomasFermi as ThomasFermi,
+)
 from .interaction.ionization.fieldionization import ADK as ADK
-from .interaction.ionization.fieldionization import ADKVariant as ADKVariant
 from .interaction.ionization.fieldionization import BSI as BSI
+from .interaction.ionization.fieldionization import ADKVariant as ADKVariant
 from .interaction.ionization.fieldionization import BSIExtension as BSIExtension
 from .interaction.ionization.fieldionization import Keldysh as Keldysh
 from .lasers import DispersivePulseLaser as DispersivePulseLaser
@@ -42,7 +45,7 @@ from .solver import BinomialSmoother as BinomialSmoother
 from .solver import ElectromagneticSolver as ElectromagneticSolver
 from .species import Species as Species
 
-assert sys.version_info.major > 3 or sys.version_info.minor >= 11, "Python 3.11 is required for PIConGPU PICMI"
+assert _sys.version_info.major > 3 or _sys.version_info.minor >= 11, "Python 3.11 is required for PIConGPU PICMI"
 
 
 codename = "picongpu"
@@ -51,5 +54,5 @@ name of this PICMI implementation
 required by PICMI interface
 """
 
-picmistandard.register_codename(codename)
-picmistandard.register_constants(constants)
+_picmistandard.register_codename(codename)
+_picmistandard.register_constants(constants)

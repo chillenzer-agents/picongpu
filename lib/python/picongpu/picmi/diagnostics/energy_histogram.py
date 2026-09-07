@@ -8,7 +8,7 @@ License: GPLv3+
 from pydantic import BaseModel, ConfigDict
 
 from picongpu.picmi import constants
-from picongpu.picmi.copy_attributes import default_converts_to
+from picongpu.picmi._copy_attributes import default_converts_to
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species

@@ -5,7 +5,7 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
-from picongpu.picmi.copy_attributes import converts_to
+from picongpu.picmi._copy_attributes import converts_to
 from picongpu.pypicongpu.species.operation.densityprofile.gaussian import Gaussian
 from ...pypicongpu import util
 

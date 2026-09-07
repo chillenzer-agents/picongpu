@@ -8,13 +8,12 @@ set -o pipefail
 export PATH=$CI_PROJECT_DIR/share/ci:$PATH
 export picongpu_DIR=$CI_PROJECT_DIR
 
-cd $picongpu_DIR
+# compute the CI control flags (ci_no_compile, ci_full_compile, ci_picongpu,
+# ci_pmacc, ci_no_python_compile, ci_label_no_compile, CI_NO_COMPILE) from the
+# last commit message and the `CI:no-compile` GitHub label
+source "${CI_PROJECT_DIR}/share/ci/ci_flags.sh"
 
-# 0 == false; 1 == true
-commit_no_compile=$(git log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*no-compile[[:blank:]]*$" && echo "1" || echo "0")
-commit_full_compile=$(git log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*full-compile[[:blank:]]*$" && echo "1" || echo "0")
-commit_picongpu_only=$(git log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*picongpu[[:blank:]]*$" && echo "1" || echo "0")
-commit_pmacc_only=$(git log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*pmacc[[:blank:]]*$" && echo "1" || echo "0")
+cd $picongpu_DIR
 
 cd $picongpu_DIR/share/picongpu/
 
@@ -27,13 +26,12 @@ echo "  - local: '/share/ci/compiler_hipcc.yml'"
 echo ""
 
 # handle CI actions
-has_label=$($CI_PROJECT_DIR/share/ci/pr_has_label.sh "CI:no-compile" && echo "0" || echo "1")
-if [ "$has_label" == "0" ] ; then
+if [ "$ci_label_no_compile" == "1" ] ; then
   echo "skip-compile:"
   echo "  script:"
   echo "    - echo \"CI label action - 'CI:no-compile' -> skip compile/runtime tests\""
   exit 0
-elif [ $commit_no_compile -eq 1 ]; then
+elif [ $ci_no_compile -eq 1 ]; then
   echo "skip-compile:"
   echo "  script:"
   echo "    - echo \"Commit CI control action - 'CI:no-compile' -> skip compile/runtime tests\""
@@ -46,7 +44,7 @@ if [ -n "$QUICK_CI_TESTS" ] ; then
   # For user PRs only run reduced set of tests.
   # If a PR is merged to the `dev` branch a non-reduced test will be executed.
   is_pr=$(echo "$CI_COMMIT_REF_NAME" | grep -q "^pr-" && echo 1 || echo 0)
-  if [ $is_pr -eq 1 ] && [ $commit_full_compile -ne 1 ] ; then
+  if [ $is_pr -eq 1 ] && [ $ci_full_compile -ne 1 ] ; then
       ADDITIONAL_GENERATOR_FLAGS="$ADDITIONAL_GENERATOR_FLAGS --quick"
   fi
 fi
@@ -55,35 +53,35 @@ add_empty_job=0
 
 folders=()
 if [ "$PIC_INPUTS" == "pmacc" ] ; then
-  if [ $commit_picongpu_only -ne 1 ] ; then
+  if [ $ci_picongpu -ne 1 ] ; then
     # create unit tests for PMacc
     echo "pmacc" | tr " " "\n" | n_wise_generator.py $@ --limit_boost_version $ADDITIONAL_GENERATOR_FLAGS
   else
     add_empty_job=1
   fi
 elif [ "$PIC_INPUTS" == "pmacc_header" ] ; then
-  if [ $commit_picongpu_only -ne 1 ] ; then
+  if [ $ci_picongpu -ne 1 ] ; then
     # create header validation test for PMacc
     echo "pmacc_header" | tr " " "\n" | n_wise_generator.py $@ --limit_boost_version $ADDITIONAL_GENERATOR_FLAGS
   else
     add_empty_job=1
   fi
 elif [ "$PIC_INPUTS" == "picongpu_header" ] ; then
-  if [ $commit_pmacc_only -ne 1 ] ; then
+  if [ $ci_pmacc -ne 1 ] ; then
     # create unit tests for PIConGPU
     echo "picongpu_header" | tr " " "\n" | n_wise_generator.py $@ --limit_boost_version $ADDITIONAL_GENERATOR_FLAGS
   else
     add_empty_job=1
   fi
 elif [ "$PIC_INPUTS" == "unit" ] ; then
-  if [ $commit_pmacc_only -ne 1 ] ; then
+  if [ $ci_pmacc -ne 1 ] ; then
     # create unit tests for PIConGPU
     echo "unit" | tr " " "\n" | n_wise_generator.py $@ --limit_boost_version $ADDITIONAL_GENERATOR_FLAGS
   else
     add_empty_job=1
   fi
 else
-  if [ $commit_pmacc_only -ne 1 ] ; then
+  if [ $ci_pmacc -ne 1 ] ; then
     # create input set test cases for PIConGPU
     for CASE in ${PIC_INPUTS}; do
       if [ "$CASE" == "examples" ] || [  "$CASE" == "tests"  ] || [  "$CASE" == "benchmarks"  ] ; then

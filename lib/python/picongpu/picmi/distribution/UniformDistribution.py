@@ -6,13 +6,12 @@ License: GPLv3+
 """
 
 from ...pypicongpu import species
-from ...pypicongpu import util
 
 import picmistandard
 
 """
 note on rms_velocity:
----------------------
+--------------------
 The rms_velocity is converted to a temperature in keV. This conversion requires the mass of the species to be known,
 which is not the case inside the picmi density distribution.
 
@@ -32,6 +31,16 @@ this method returns None.
 """
 
 
+def _as_bound(bound) -> tuple[float | None, float | None, float | None] | None:
+    """
+    Convert a PICMI bound (list of length 3, a ``None`` axis = unbounded) to
+    the pypicongpu 3-component tuple representation.
+    """
+    if bound is None or all(component is None for component in bound):
+        return None
+    return tuple(bound)
+
+
 class UniformDistribution(picmistandard.PICMI_UniformDistribution):
     """Uniform Particle Distribution as defined by PICMI"""
 
@@ -39,17 +48,12 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
         return tuple(self.rms_velocity)
 
     def get_as_pypicongpu(self, grid):
-        util.unsupported("fill in", self.fill_in)
-        util.unsupported("lower bound", self.lower_bound, [None, None, None])
-        util.unsupported("upper bound", self.upper_bound, [None, None, None])
-
-        profile = species.operation.densityprofile.Uniform(density_si=self.density)
-
-        # @todo respect bounding box, Brian Marre, 2023
-        # profile.lower_bound = tuple(map(
-        #   lambda x: -math.inf if x is None else x, self.lower_bound))
-        # profile.upper_bound = tuple(map(
-        #   lambda x: math.inf if x is None else x, self.upper_bound))
+        profile = species.operation.densityprofile.Uniform(
+            density_si=self.density,
+            lower_bound=_as_bound(self.lower_bound),
+            upper_bound=_as_bound(self.upper_bound),
+            fill_in=self.fill_in,
+        )
 
         return profile
 

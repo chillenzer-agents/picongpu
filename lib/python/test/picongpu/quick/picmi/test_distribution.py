@@ -7,6 +7,9 @@ License: GPLv3+
 
 from unittest import TestCase
 
+import os
+import tempfile
+
 import pytest
 from picongpu import picmi
 from picongpu.picmi.grid import Cartesian3DGrid
@@ -63,11 +66,84 @@ class TestPicmiUniformDistribution(TestCase, HelperTestPicmiBoundaries):
 
         assert pypic.density_si == 42.42
 
-    def test_lower_upper_bound_not_supported(self):
-        """the uniform profile has no bound support, so setting bounds must raise"""
-        uniform = picmi.UniformDistribution(density=42.42, lower_bound=[111, 222, 333], upper_bound=[444, 555, 666])
-        with pytest.raises(UnsupportedFeatureError, match="lower bound"):
-            uniform.get_as_pypicongpu(ARBITRARY_GRID)
+    def test_lower_upper_bound_fill_in(self):
+        """construction accepts sub-volume bounds + fill_in and carries them to pypicongpu"""
+        uniform = picmi.UniformDistribution(
+            density=42.42,
+            lower_bound=[1.0, 2.0, None],
+            upper_bound=[3.0, None, 5.0],
+            fill_in=True,
+        )
+        pypic = uniform.get_as_pypicongpu(ARBITRARY_GRID)
+        assert pypic.lower_bound == {"x": {"value": 1.0}, "y": {"value": 2.0}, "z": {"value": None}}
+        assert pypic.upper_bound == {"x": {"value": 3.0}, "y": {"value": None}, "z": {"value": 5.0}}
+        assert pypic.fill_in is True
+
+    def test_lower_upper_bound_fill_in_rendering_context(self):
+        """sub-volume bounds + fill_in appear in the rendering context"""
+        uniform = picmi.UniformDistribution(
+            density=42.42,
+            lower_bound=[1.0, None, None],
+            upper_bound=[None, 2.0, None],
+            fill_in=True,
+        )
+        pypic = uniform.get_as_pypicongpu(ARBITRARY_GRID)
+        context = pypic.model_dump(mode="json")
+        assert context["lower_bound"] == {"x": {"value": 1.0}, "y": {"value": None}, "z": {"value": None}}
+        assert context["upper_bound"] == {"x": {"value": None}, "y": {"value": 2.0}, "z": {"value": None}}
+        assert context["fill_in"] is True
+
+    def test_lower_upper_bound_fill_in_default_unbounded(self):
+        """bound/fill_in defaults map to an unbounded profile (no warnings, no errors)"""
+        uniform = picmi.UniformDistribution(density=42.42)
+        pypic = uniform.get_as_pypicongpu(ARBITRARY_GRID)
+        assert pypic.lower_bound is None
+        assert pypic.upper_bound is None
+        assert pypic.fill_in is None
+
+    def test_rendered_uniform_sub_volume(self):
+        """the requested sub-volume is rendered into the generated species definition (omitted when unbounded)"""
+        unbound_rendered = self._write_sim(picmi.UniformDistribution(density=42))
+        bound_rendered = self._write_sim(
+            picmi.UniformDistribution(
+                density=42,
+                lower_bound=[1.0, None, None],
+                upper_bound=[None, 2.0, 3.0],
+                fill_in=True,
+            )
+        )
+
+        # unbounded: no sub-volume is requested -> output unchanged
+        assert "requested lower bound of the sub-volume" not in unbound_rendered
+        assert "requested upper bound of the sub-volume" not in unbound_rendered
+        assert "requested to refill the sub-volume" not in unbound_rendered
+
+        # bounded: the requested sub-volume is rendered into the density profile
+        assert "requested lower bound of the sub-volume" in bound_rendered
+        assert "lower_bound = (1.0, None, None)" in bound_rendered
+        assert "requested upper bound of the sub-volume" in bound_rendered
+        assert "upper_bound = (None, 2.0, 3.0)" in bound_rendered
+        assert "requested to refill the sub-volume" in bound_rendered
+
+    def _write_sim(self, distribution) -> str:
+        """render a minimal simulation with the given distribution and return the density.param content"""
+        grid = Cartesian3DGrid(
+            lower_bound=[0, 0, 0],
+            upper_bound=[16, 16, 16],
+            number_of_cells=[16, 16, 16],
+            lower_boundary_conditions=["periodic", "periodic", "periodic"],
+            upper_boundary_conditions=["periodic", "periodic", "periodic"],
+        )
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        sim = picmi.Simulation(time_step_size=0.1, max_steps=1, solver=solver)
+        sim.add_species(
+            Species(name="electron", mass=1, initial_distribution=distribution),
+            picmi.PseudoRandomLayout(n_macroparticles_per_cell=1),
+        )
+        out_dir = os.path.join(tempfile.mkdtemp(), "out")
+        sim.write_input_file(out_dir)
+        with open(os.path.join(out_dir, "include", "picongpu", "param", "density.param")) as rendered_file:
+            return rendered_file.read()
 
     def test_density_zero(self):
         """density set to zero is not accepted"""

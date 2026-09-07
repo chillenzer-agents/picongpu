@@ -190,7 +190,29 @@ Parameters/Methods prefixed with ``picongpu_`` are PIConGPU-exclusive.
 
     If neither is set a warning is printed prompting for either of the options above.
 
-    
+  - **MultiSpecies**
+
+    Species are initialised **independently by default** (picmi-standard
+    semantics). To initialise several species *collectively* -- i.e. with
+    **identical in-cell positions** on the C++ level, as required for
+    charge-neutral setups -- group them in a
+    :class:`picongpu.picmi.MultiSpecies`.
+
+    All members of a ``MultiSpecies`` share one ``initial_distribution``. They
+    are placed with a single ``CreateDensity``; the remaining members are
+    derived (``ManipulateDerive<DensityWeighting>``), so all members occupy
+    exactly the same positions once. Each member's ``proportion`` maps to its
+    ``density_scale`` (i.e. its ``DensityRatio``) and is respected in the
+    weighting. Momentum/temperature differences between members do **not**
+    prevent collective initialisation (momentum is applied per species,
+    afterwards).
+
+    Members whose pseudo-random layouts differ in ``seed`` are deliberately
+    initialised **independently** (non-neutral on purpose) -- the ``seed`` of
+    :class:`picongpu.picmi.PseudoRandomLayout` is therefore a
+    force-independent discriminator.
+
+
 Ionization:
 ^^^^^^^^^^^
 The PIConGPU PICMI interface currently supports the configuration of ionization only through a picongpu specific PICMI extension, not the in the PICMI standard defined interface, due to the lack of standardization of ionization algorithm names in the PICMI standard.

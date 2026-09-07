@@ -202,20 +202,28 @@ class TestPicmiSimulation(TestCase):
             sim.get_as_pypicongpu()
 
     def test_operations_simple_density_translated(self):
-        """simple density operations are correctly derived"""
+        """simple density operations are correctly derived
+
+        Species are initialised independently by default (picmi-standard
+        semantics, Option B): only members of the same explicit MultiSpecies
+        share a density operation (collective initialisation), everything else
+        is split into individual operations.
+        """
         profile = picmi.UniformDistribution(density=42)
         other_profile = picmi.UniformDistribution(density=17)
         layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
         other_layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4)
 
-        self.sim.add_species(
-            picmi.Species(name="colocated1", mass=1, density_scale=4, initial_distribution=profile),
-            layout,
+        # explicitly coordinated group
+        multispecies = picmi.MultiSpecies(
+            particle_types=["electron", "H"],
+            names=["colocated1", "colocated2"],
+            proportions=[4, 2],
+            initial_distribution=profile,
         )
-        self.sim.add_species(
-            picmi.Species(name="colocated2", mass=2, density_scale=2, initial_distribution=profile),
-            layout,
-        )
+        self.sim.add_species(multispecies[0], layout)
+        self.sim.add_species(multispecies[1], layout)
+        # independent species that merely look the same w.r.t. profile/layout
         self.sim.add_species(
             picmi.Species(name="separate1", mass=3, initial_distribution=other_profile),
             layout,
@@ -250,10 +258,10 @@ class TestPicmiSimulation(TestCase):
 
             # ensure grouping:
             if "separate1" in species_names or "separate2" in species_names:
-                # one of the two lone species
+                # one of the two lone species (no MultiSpecies -> independent)
                 assert len(species_names) == 1
             else:
-                # the two colocated species
+                # the two colocated species (explicit MultiSpecies)
                 assert len(species_names) == 2
 
             # check profile
@@ -271,6 +279,183 @@ class TestPicmiSimulation(TestCase):
             else:
                 # used "other_layout"
                 assert op.layout.ppc == 4
+
+    def test_simple_density_independent_by_default(self):
+        """same distribution+layout no longer merges implicitly (Option B)"""
+        profile = picmi.UniformDistribution(density=42)
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
+        for name in ("electron_1", "electron_2"):
+            self.sim.add_species(
+                picmi.Species(name=name, particle_type="electron", initial_distribution=profile), layout
+            )
+
+        density_operations = list(
+            filter(
+                lambda op: isinstance(op, species.operation.SimpleDensity),
+                self.sim.get_as_pypicongpu().init_operations,
+            )
+        )
+        assert len(density_operations) == 2
+
+    def test_multispecies_members_and_density_ratio(self):
+        """MultiSpecies members share one distribution and map proportions to DensityRatio"""
+        profile = picmi.UniformDistribution(density=42)
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=8)
+        multispecies = picmi.MultiSpecies(
+            particle_types=["electron", "H"],
+            names=["electron", "proton"],
+            proportions=[1.0, 2.0],
+            initial_distribution=profile,
+        )
+        assert len(multispecies) == 2
+
+        for member, proportion in zip(multispecies, [1.0, 2.0], strict=True):
+            # plain picmi species sharing the distribution
+            assert isinstance(member, picmi.Species)
+            assert member.initial_distribution is profile
+            assert member.density_scale == proportion
+            # density_scale maps to DensityRatio on the pypicongpu level
+            assert member._evaluate_species_requirements()["constants"] and any(
+                ratio.ratio == proportion
+                for ratio in member._evaluate_species_requirements()["constants"]
+                if hasattr(ratio, "ratio")
+            )
+
+        # the whole MultiSpecies is placed on a single shared grid
+        for layout_member in multispecies.species_instances_list:
+            self.sim.add_species(layout_member, layout)
+
+        density_operations = list(
+            filter(
+                lambda op: isinstance(op, species.operation.SimpleDensity),
+                self.sim.get_as_pypicongpu().init_operations,
+            )
+        )
+        assert len(density_operations) == 1
+        op = density_operations[0]
+        # exactly one species is created ("placed"), the other one is derived
+        assert len(op.placed_species_copied) == 1
+        assert set(s.name for s in op.species) == {"electron", "proton"}
+
+    def test_multispecies_same_density_different_momentum_charge_neutral(self):
+        """#5762: same density, differing momentum -> grouped (charge-neutral)"""
+        # density distribution common to all members, different momenta per member
+        base_profile = picmi.UniformDistribution(density=42)
+        profile_cold = picmi.UniformDistribution(density=42, rms_velocity=[0.0, 0.0, 0.0])
+        profile_hot = picmi.UniformDistribution(density=42, rms_velocity=[1.0e6, 1.0e6, 1.0e6])
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4)
+        multispecies = picmi.MultiSpecies(
+            particle_types=["electron", "H"],
+            names=["colder", "hotter"],
+            proportions=[1.0, 1.0],
+            initial_distribution=base_profile,
+        )
+        # customize the momentum (rms_velocity) per member while keeping the density
+        multispecies[0].initial_distribution = profile_cold
+        multispecies[1].initial_distribution = profile_hot
+        for member in multispecies:
+            self.sim.add_species(member, layout)
+
+        pypic = self.sim.get_as_pypicongpu()
+        density_operations = list(
+            filter(
+                lambda op: isinstance(op, species.operation.SimpleDensity),
+                pypic.init_operations,
+            )
+        )
+        momentum_operations = list(
+            filter(
+                lambda op: isinstance(op, species.operation.SimpleMomentum),
+                pypic.init_operations,
+            )
+        )
+        # differing momentum must NOT prevent collective (charge-neutral) init:
+        # one density op placing both species on identical in-cell positions...
+        assert len(density_operations) == 1
+        assert len(density_operations[0].species) == 2
+        # ... while momentum is still applied individually per species
+        assert len(momentum_operations) == 2
+
+    def test_multispecies_different_seed_independent(self):
+        """same density + different random-layout seed -> independent (non-neutral on purpose)"""
+        profile = picmi.UniformDistribution(density=42)
+        layout_a = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4, seed=1)
+        layout_b = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4, seed=2)
+        multispecies = picmi.MultiSpecies(
+            particle_types=["electron", "H"],
+            names=["electron", "proton"],
+            proportions=[1.0, 1.0],
+            initial_distribution=profile,
+        )
+        self.sim.add_species(multispecies[0], layout_a)
+        self.sim.add_species(multispecies[1], layout_b)
+
+        density_operations = list(
+            filter(
+                lambda op: isinstance(op, species.operation.SimpleDensity),
+                self.sim.get_as_pypicongpu().init_operations,
+            )
+        )
+        # different seeds force independent initialisation
+        assert len(density_operations) == 2
+
+    def test_random_layout_seed_discriminator(self):
+        """the pseudo-random layout seed is a force-independent discriminator"""
+        profile = picmi.UniformDistribution(density=42)
+        seeded = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4, seed=42)
+        unseeded = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4)
+        # the seed is no longer swallowed on the picmi level
+        assert seeded.seed == 42
+        assert unseeded.seed is None
+        # ... and forwarded to the pypicongpu random layout
+        assert seeded.get_as_pypicongpu().seed == 42
+        # equal-ppc random layouts with different seeds compare unequal (not merged)
+        assert seeded.get_as_pypicongpu() != unseeded.get_as_pypicongpu()
+        assert (
+            seeded.get_as_pypicongpu()
+            == picmi.PseudoRandomLayout(n_macroparticles_per_cell=4, seed=42).get_as_pypicongpu()
+        )
+
+        # even inside a MultiSpecies different seeds prevent merging
+        multispecies = picmi.MultiSpecies(
+            particle_types=["electron", "H"],
+            names=["electron", "proton"],
+            proportions=[1.0, 1.0],
+            initial_distribution=profile,
+        )
+        self.sim.add_species(multispecies[0], seeded)
+        self.sim.add_species(multispecies[1], unseeded)
+        density_operations = list(
+            filter(
+                lambda op: isinstance(op, species.operation.SimpleDensity),
+                self.sim.get_as_pypicongpu().init_operations,
+            )
+        )
+        assert len(density_operations) == 2
+
+    def test_multispecies_grouping_survives_deepcopy(self):
+        """explicit MultiSpecies grouping survives a simulation round-trip (deepcopy)"""
+        profile = picmi.UniformDistribution(density=42)
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4)
+        multispecies = picmi.MultiSpecies(
+            particle_types=["electron", "H"],
+            names=["electron", "proton"],
+            proportions=[1.0, 1.0],
+            initial_distribution=profile,
+        )
+        for member in multispecies:
+            self.sim.add_species(member, layout)
+
+        sim_copy = copy.deepcopy(self.sim)
+        density_operations = list(
+            filter(
+                lambda op: isinstance(op, species.operation.SimpleDensity),
+                sim_copy.get_as_pypicongpu().init_operations,
+            )
+        )
+        # grouping must survive the copy, i.e. the two members still share one op
+        assert len(density_operations) == 1
+        assert len(density_operations[0].species) == 2
 
     def test_operation_not_placed_translated(self):
         """non-placed species are correctly translated"""

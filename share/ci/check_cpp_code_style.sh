@@ -66,6 +66,13 @@ fi
 #   mallocMC brackets                                                       #
 #   doxygen           : include (any), share (any)                          #
 # pmacc self-includes ("./pmacc/...") inside include/pmacc stay allowed.    #
+#                                                                           #
+# NOTE: pre-commit only hands us the files matching the `files:` regex in   #
+# .pre-commit-config.yaml (i.e. C++-flavoured extensions). Non-C++ files    #
+# (e.g. *.py, *.sh, Snakefile, *.md) under the four __global__ directories  #
+# are therefore deliberately NOT checked for `__global__` at commit time,   #
+# since it is a CUDA/C++-only keyword. Full-tree coverage (including such   #
+# files) stays available via directory mode / `pre-commit run --all-files`. #
 #############################################################################
 
 globalKeywordsFiles=()

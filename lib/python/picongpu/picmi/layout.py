@@ -20,11 +20,11 @@ class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
     n_macroparticles_per_cell: int = Field(gt=0)
     # PIConGPU can't handle the following separately:
     n_macroparticles: None = None
-    seed: None = None
+    seed: int | None = None
     grid: None = None
 
     def get_as_pypicongpu(self):
-        return Random(ppc=self.n_macroparticles_per_cell)
+        return Random(ppc=self.n_macroparticles_per_cell, seed=self.seed)
 
 
 class GriddedLayout(picmistandard.PICMI_GriddedLayout):

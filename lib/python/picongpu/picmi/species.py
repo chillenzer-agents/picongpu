@@ -105,6 +105,16 @@ class Species(PICMI_Species):
     # For now, we add them to all species. Refinements might be necessary in the future.
     _requirements: list[Any] = PrivateAttr(default_factory=lambda: [Position(), Weighting(), Momentum()])
 
+    # Explicit marker for collective (coordinated) initialisation:
+    # if this species is a member of a picmi.MultiSpecies it points to that
+    # MultiSpecies, otherwise None. Species are initialised independently by
+    # default; only members of the same MultiSpecies may share their in-cell
+    # positions via a common density operation. Kept as a private attribute so
+    # that it neither leaks into equality/serialization of the species nor into
+    # the rendered output; it survives deep-copies of a Simulation because all
+    # members point to the same MultiSpecies instance.
+    _multi_species: object | None = PrivateAttr(default=None)
+
     @field_validator("method")
     @classmethod
     def _validate_method(cls, value):

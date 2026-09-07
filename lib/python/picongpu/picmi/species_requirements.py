@@ -235,13 +235,33 @@ class SimpleDensityOperation(DelayedConstruction):
                 layout=kwargs["layout"].get_as_pypicongpu(),
             )
 
+        def _density_profile(op):
+            kwargs = op.metadata.kwargs
+            return kwargs["profile"].get_as_pypicongpu(kwargs["grid"])
+
         def try_update_with(self, other):
-            return (
-                isinstance(other, SimpleDensityOperation)
-                and other.metadata.kwargs["profile"] == self.metadata.kwargs["profile"]
-                and other.metadata.kwargs["layout"] == self.metadata.kwargs["layout"]
-                and (self.metadata.kwargs["species"].extend(other.metadata.kwargs["species"]) or True)
-            )
+            if not isinstance(other, SimpleDensityOperation):
+                return False
+            # picmi-standard semantics: species are initialised independently by
+            # default; collective (coordinated) initialisation is only requested
+            # explicitly by making the involved species members of the *same*
+            # MultiSpecies.
+            group_one = self.metadata.kwargs["species"][0]._multi_species
+            group_two = other.metadata.kwargs["species"][0]._multi_species
+            if group_one is None or group_one is not group_two:
+                return False
+            # Group by density only: momentum/temperature are applied per species
+            # afterwards (SimpleMomentum), so differing momenta must not prevent
+            # collective, charge-neutral initialisation.
+            if _density_profile(self) != _density_profile(other):
+                return False
+            # In-cell placement must agree. The (pseudo-random) layout seed is a
+            # force-independent discriminator: equal-ppc random layouts with
+            # different seeds are deliberately initialised independently.
+            if self.metadata.kwargs["layout"] != other.metadata.kwargs["layout"]:
+                return False
+            self.metadata.kwargs["species"].extend(other.metadata.kwargs["species"])
+            return True
 
         metadata = {
             "Type": SimpleDensity,

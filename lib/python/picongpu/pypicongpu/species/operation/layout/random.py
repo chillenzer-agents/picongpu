@@ -14,3 +14,10 @@ class Random(BaseModel):
     type_random: Literal[True] = True
     ppc: int = Field(gt=0)
     """particles per cell (random layout), >0"""
+
+    seed: int | None = Field(default=None)
+    """seed of the pseudo-random number generator
+
+    purely a discriminator: two equal-``ppc`` random layouts with different seeds
+    are considered distinct (and therefore not merged / initialised independently)
+    """

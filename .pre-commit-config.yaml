@@ -46,13 +46,9 @@ repos:
         entry: share/ci/check_cpp_code_style.sh
         language: system
         files: \.(cpp|def|h|cu|tpp|kernel|loader|unitless|hpp|param)$
-        pass_filenames: false
-        # This hook runs on all files which is why it feels a bit too heavy-weight
-        # for running before every commit. The CI currently runs manually, so it's
-        # still running there and can be run manually and pre-push on demand.
-        # TODO: Adjust the script to take filenames, so that we can pass the
-        # filenames and speed things up before commits.
-        stages: [manual, pre-push]
+        # The script consumes the list of changed files and only greps those, so
+        # running it before every commit is fast (a single batched grep per scope).
+        pass_filenames: true
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
     rev: v0.12.10

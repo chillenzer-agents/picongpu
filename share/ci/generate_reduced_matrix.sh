@@ -11,7 +11,13 @@ export picongpu_DIR=$CI_PROJECT_DIR
 # compute the CI control flags (ci_no_compile, ci_full_compile, ci_picongpu,
 # ci_pmacc, ci_no_python_compile, ci_label_no_compile, CI_NO_COMPILE) from the
 # last commit message and the `CI:no-compile` GitHub label
+# shellcheck source=./ci_flags.sh
 source "${CI_PROJECT_DIR}/share/ci/ci_flags.sh"
+
+# defensive defaults (shellcheck cannot follow the sourced file reliably, so
+# give it a local assignment; a conservative 0 also prevents acting on stale
+# values should the source above ever be skipped)
+: "${ci_label_no_compile:=0}" "${ci_no_compile:=0}" "${ci_full_compile:=0}" "${ci_picongpu:=0}" "${ci_pmacc:=0}"
 
 cd $picongpu_DIR
 

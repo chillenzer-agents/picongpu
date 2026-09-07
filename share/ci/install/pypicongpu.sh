@@ -132,14 +132,37 @@ if [ ! -z ${PYTHON_END_TO_END_TEST+x} ]; then
         echo "--- CMAKE_PREFIX_PATH ---"
         echo "${CMAKE_PREFIX_PATH}"
         echo ""
-        for run_dir in $(ls -d /tmp/pypicongpu-*run-* 2>/dev/null); do
-            echo "=== run dir: ${run_dir} ==="
-            if [ -f "${run_dir}/input/bin/picongpu" ]; then
-                echo "--- unresolved dynamic dependencies of the simulation binary ---"
-                ldd "${run_dir}/input/bin/picongpu" 2>&1 | grep "not found" || echo "(none)"
+        # The end-to-end tests place the build in the runner's setup dir and
+        # the simulation output in the run dir. The runner may create those
+        # under /tmp (the pypicongpu-<ts>-{setup,run}-* defaults) or, as the
+        # e2e tests do, under ${HOME}/data/NNNNNN/{setup,run}, so probe both.
+        # shellcheck disable=SC2206 # deliberate globbing to enumerate the dirs
+        setup_dirs=( /tmp/pypicongpu-*setup-* ${HOME}/data/*/setup )
+        for setup_dir in "${setup_dirs[@]}"; do
+            [ -d "${setup_dir}" ] || continue
+            echo "=== setup dir: ${setup_dir} ==="
+            binary=""
+            for candidate in "${setup_dir}"/input/bin/picongpu "${setup_dir}"/bin/picongpu; do
+                if [ -f "${candidate}" ]; then
+                    binary="${candidate}"
+                    break
+                fi
+            done
+            if [ -n "${binary}" ]; then
+                echo "--- unresolved dynamic dependencies of ${binary} ---"
+                ldd "${binary}" 2>&1 | grep "not found" || echo "(none)"
             else
-                echo "ERROR: simulation binary missing: ${run_dir}/input/bin/picongpu"
+                echo "ERROR: simulation binary missing under ${setup_dir}"
             fi
+            echo "--- top-level content of the setup dir ---"
+            ls -la "${setup_dir}"
+            echo ""
+        done
+        # shellcheck disable=SC2206 # deliberate globbing to enumerate the dirs
+        run_dirs=( /tmp/pypicongpu-*run-* ${HOME}/data/*/run )
+        for run_dir in "${run_dirs[@]}"; do
+            [ -d "${run_dir}" ] || continue
+            echo "=== run dir: ${run_dir} ==="
             if [ -f "${run_dir}/simOutput/output" ]; then
                 echo "--- simulation output (simOutput/output) ---"
                 cat "${run_dir}/simOutput/output"

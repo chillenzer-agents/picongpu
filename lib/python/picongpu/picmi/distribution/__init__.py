@@ -2,22 +2,13 @@
 PICMI for PIConGPU
 """
 
-from .UniformDistribution import UniformDistribution
-from .FoilDistribution import FoilDistribution
-from .Distribution import Distribution
-from .GaussianDistribution import GaussianDistribution
-from .CylindricalDistribution import CylindricalDistribution
-from .AnalyticDistribution import AnalyticDistribution
+from .AnalyticDistribution import AnalyticDistribution as AnalyticDistribution
+from .CylindricalDistribution import CylindricalDistribution as CylindricalDistribution
+from .Distribution import Distribution as Distribution
+from .FoilDistribution import FoilDistribution as FoilDistribution
+from .GaussianDistribution import GaussianDistribution as GaussianDistribution
+from .UniformDistribution import UniformDistribution as UniformDistribution
 
 AnyDistribution = (
     UniformDistribution | FoilDistribution | GaussianDistribution | CylindricalDistribution | AnalyticDistribution
 )
-
-__all__ = [
-    "UniformDistribution",
-    "FoilDistribution",
-    "Distribution",
-    "GaussianDistribution",
-    "AnalyticDistribution",
-    "CylindricalDistribution",
-]

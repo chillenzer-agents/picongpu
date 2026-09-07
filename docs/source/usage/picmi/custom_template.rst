@@ -179,13 +179,14 @@ For example we can not easily configure the number of bins of our energy histogr
 To circumvent this limitation we may pass create in the *user script* custom user input containing additional global information to the simulation.
 
 .. code:: python
-  import picongpu
+  from picongpu import picmi
+  from picongpu import pypicongpu
 
   # create and configure PICMI simulation object
-  picmi_simulation = picongpu.picmi.Simulation( ... )
+  picmi_simulation = picmi.Simulation( ... )
 
   # create CustomUserInput object
-  custom_input_number_bins = picongpu.pypicongpu.customuserinput.CustomUserInput()
+  custom_input_number_bins = pypicongpu.customuserinput.CustomUserInput()
   custom_input_number_bins.addToCustomInput(custom_input={"numberbins": 1023}, tag="energy_histogram_configuration_number_bins")
 
   # add custom User Input to simulation

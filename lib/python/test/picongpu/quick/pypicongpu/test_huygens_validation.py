@@ -87,6 +87,33 @@ class TestValidateHuygensSurfacePositions:
         with pytest.raises(ValueError):
             validate_huygens_surface_positions([[1, -1], [1, -1], [1, -1]], cell_cnt=(128, 512))
 
+    def test_span_at_least_two(self):
+        # C++ (Solver.hpp::checkPositioning) treats a span < 2 as a degenerate/zero volume:
+        # on a 33-cell axis [[16, -15]] spans exactly 2 and is fine, [[16, -16]] spans 1 and crosses
+        assert validate_huygens_surface_positions([[16, -15], [16, -16], [16, -16]], cell_cnt=(33, 128, 128))
+        # the default positions span exactly 2 on a 34-cell axis
+        assert validate_huygens_surface_positions([[16, -16], [16, -16], [16, -16]], cell_cnt=(34, 128, 128))
+        with pytest.raises(ValueError):
+            # span exactly 1: the two planar faces cross each other (Functors.hpp)
+            validate_huygens_surface_positions([[16, -16], [16, -16], [16, -16]], cell_cnt=(33, 128, 128))
+        with pytest.raises(ValueError):
+            # span exactly 1 with small positions
+            validate_huygens_surface_positions([[1, -1], [1, -1], [1, -1]], cell_cnt=(3, 40, 40))
+
+    def test_moving_window_y_max_outside(self):
+        # C++ (skipOffsetCheck/skipMaxCheck) allows the YMax surface to lie outside the
+        # initially simulated volume when a moving window is enabled
+        positions = [[16, -16], [16, 300], [16, -16]]
+        assert validate_huygens_surface_positions(positions, cell_cnt=(128, 200, 256), moving_window_enabled=True)
+        # ... but only for the y-axis and only with a moving window
+        with pytest.raises(ValueError):
+            validate_huygens_surface_positions(positions, cell_cnt=(128, 200, 256), moving_window_enabled=False)
+        with pytest.raises(ValueError):
+            # x-axis is not exempt, even with a moving window
+            validate_huygens_surface_positions(
+                [[16, 300], [16, -16], [16, -16]], cell_cnt=(128, 200, 256), moving_window_enabled=True
+            )
+
 
 def _minimal_gaussian_laser(huygens_surface_positions):
     return laser.GaussianLaser(
@@ -150,3 +177,56 @@ class TestLaserModelValidator:
     def test_twts_laser_inherits_shared_field(self):
         # TWTSLaser no longer redefines the field but inherits it from the base class
         assert "huygens_surface_positions" in laser.TWTSLaser.model_fields
+
+    def test_twts_laser_serialized_form(self):
+        # the shared field must still serialize to the row_x/negative/positive shape the
+        # incidentField.param mustache consumes
+        twts = laser.TWTSLaser(
+            propagation_direction=[0, 1, 0],
+            polarization_direction=[0, 0, 1],
+            polarization_type=laser.PolarizationType.LINEAR,
+            wavelength=1e-6,
+            duration=30e-15,
+            focal_position=[0, 0, 0],
+            phi0=0.0,
+            E0=1e14,
+            pulse_init=4.0,
+            waist=2e-6,
+            laserIncidenceAngle=0.0,
+            laserIncidenceAnglePositive=True,
+            polarizationAngle=0.0,
+            beta0=1.0,
+            time_offset_si=0.0,
+            focus_lateral_offset_si=0.0,
+            windowStart=0.0,
+            windowEnd=100.0,
+            windowLength=10.0,
+            huygens_surface_positions=[[16, -16], [16, -16], [17, -17]],
+        )
+        expected = {
+            "row_x": {"negative": 16, "positive": -16},
+            "row_y": {"negative": 16, "positive": -16},
+            "row_z": {"negative": 17, "positive": -17},
+        }
+        assert twts.model_dump(mode="json")["huygens_surface_positions"] == expected
+
+    def test_from_openpmd_pulse_laser_serialized_form(self):
+        # FromOpenPMDPulseLaser shares the same field/validator and serialization shape
+        fo = laser.FromOpenPMDPulseLaser(
+            propagation_direction=[0, 1, 0],
+            polarization_direction=[0, 0, 1],
+            file_path="/tmp/pulse.h5",
+            iteration=0,
+            dataset_name="pulse",
+            datatype="float64",
+            time_offset_si=0.0,
+            polarisationAxisOpenPMD="z",
+            propagationAxisOpenPMD="y",
+            huygens_surface_positions=[[1, -1], [2, -2], [3, -3]],
+        )
+        expected = {
+            "row_x": {"negative": 1, "positive": -1},
+            "row_y": {"negative": 2, "positive": -2},
+            "row_z": {"negative": 3, "positive": -3},
+        }
+        assert fo.model_dump(mode="json")["huygens_surface_positions"] == expected

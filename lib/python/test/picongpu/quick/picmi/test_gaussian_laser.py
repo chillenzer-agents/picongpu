@@ -547,3 +547,47 @@ def test_huygens_surface_positions_all_lasers_must_match():
     sim.add_laser(_minimal_gaussian_laser(picongpu_huygens_surface_positions=[[1, -1], [1, -1], [1, -1]]), None)
     with pytest.raises(ValueError, match="[Hh]uygens"):
         sim.get_as_pypicongpu()
+
+
+def _minimal_sim_with_moving_window(number_of_cells):
+    grid = picmi.Cartesian3DGrid(
+        number_of_cells=number_of_cells,
+        lower_bound=[0, 0, 0],
+        upper_bound=[0.1, 0.1, 0.1],
+        lower_boundary_conditions=["open", "open", "periodic"],
+        upper_boundary_conditions=["open", "open", "periodic"],
+    )
+    solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+    return picmi.Simulation(time_step_size=1e-15, max_steps=2, solver=solver, picongpu_moving_window_move_point=0.9)
+
+
+def test_huygens_surface_positions_moving_window_y_max_outside():
+    # C++ (Solver.hpp skipOffsetCheck/skipMaxCheck) allows the YMax surface to lie outside the
+    # initially simulated volume when a moving window is enabled; without one the configuration
+    # is invalid for both Python and C++
+    positions = [[16, -16], [16, 300], [16, -16]]
+
+    moving_window_sim = _minimal_sim_with_moving_window([128, 200, 256])
+    moving_window_sim.add_laser(_minimal_gaussian_laser(picongpu_huygens_surface_positions=positions), None)
+    assert moving_window_sim.get_as_pypicongpu().model_dump() != {}
+
+    sim = _minimal_sim([128, 200, 256])
+    sim.add_laser(_minimal_gaussian_laser(picongpu_huygens_surface_positions=positions), None)
+    with pytest.raises(ValueError, match="[Hh]uygens"):
+        sim.get_as_pypicongpu()
+
+
+def test_huygens_surface_positions_span_at_least_two():
+    # C++ (Solver.hpp::checkPositioning) requires the Huygens volume to span at least 2 cells.
+    # On a 40-cell x-axis, [[16, -23]] spans exactly 1 cell -> degenerate/crossing surfaces
+    sim = _minimal_sim([40, 512, 256])
+    sim.add_laser(_minimal_gaussian_laser(picongpu_huygens_surface_positions=[[16, -23], [16, -16], [16, -16]]), None)
+    with pytest.raises(ValueError, match="[Hh]uygens"):
+        sim.get_as_pypicongpu()
+
+    # [[16, -22]] spans exactly 2 cells on the same grid and is valid
+    ok_sim = _minimal_sim([40, 512, 256])
+    ok_sim.add_laser(
+        _minimal_gaussian_laser(picongpu_huygens_surface_positions=[[16, -22], [16, -16], [16, -16]]), None
+    )
+    assert ok_sim.get_as_pypicongpu().model_dump() != {}

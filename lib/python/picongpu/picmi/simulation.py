@@ -322,7 +322,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         one go, so ``nsteps`` must equal ``max_steps``. Note that this is
         about time stepping, not about the workflow: selecting a subset of
         the *workflow stages* (build/prepare/submit/collect) is done via
-        ``picongpu_run(up_to=..., from_=..., force=...)`` instead.
+        ``picongpu_run(up_to=..., from_=...)`` instead.
         """
         if nsteps != self.max_steps:
             raise ValueError(
@@ -457,7 +457,7 @@ class Simulation(picmistandard.PICMI_Simulation):
     def run(self, *args, **kwargs) -> None:
         return self.picongpu_run(*args, **kwargs)
 
-    def picongpu_run(self, setup_dir=None, run_dir=None, up_to=None, from_=None, force=None, **flags) -> None:
+    def picongpu_run(self, setup_dir=None, run_dir=None, up_to=None, from_=None, **flags) -> None:
         """
         build and run PIConGPU simulation
 
@@ -465,20 +465,20 @@ class Simulation(picmistandard.PICMI_Simulation):
         executed, as before. A subset of it can be selected with the stable
         stage vocabulary (see ``picongpu.picmi.Stage``):
 
-        - ``up_to=Stage.build``: run all stages up to and including the given
-          stage
-        - ``from_=Stage.submit``: start with the given stage; earlier stages
-          must already be completed, otherwise a
-          ``WorkflowPrerequisiteError`` is raised
-        - ``force=True`` (or a stage / list of stages): re-run the given
-          stages even if they are recorded as completed; stages that depend
-          on them are invalidated as well
+        - ``up_to=Stage.build``: execute only the requested stage and the
+          stages before it (a prefix of the pipeline). The workflow is passed
+          to the cwltool runner with that stage's outputs as targets, so
+          cwltool executes exactly the steps contributing to them and never
+          runs the stages after the requested one.
+        - ``from_=Stage.submit``: resume at the requested stage. The workflow
+          is run in full against the persistent cwltool job store
+          (``<run_dir>/.cwl_cache``): the earlier stages are served from the
+          store (their inputs are byte-identical) and only the requested
+          stage and everything after it recompute.
 
-        Progress is stored in ``<run_dir>/.workflow_state.json``: a run
-        started with an explicit stage range that failed or was stopped can
-        be resumed without redoing the successful stages; a failed default
-        (no-argument) run leaves no stage state and resumes at job
-        granularity via the cwltool job cache (byte-identical inputs only).
+        The cwltool job store is the only state; the runner itself records
+        none. To run everything from scratch, use a fresh setup/run directory
+        (or delete ``<run_dir>``).
         """
         runner = self.picongpu_get_runner(setup_dir=setup_dir, run_dir=run_dir)
         if not runner.workflow_input_path.exists():
@@ -488,7 +488,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                 "the setup was already generated, so workflow flags cannot be changed afterwards; "
                 "create a fresh setup (e.g. via write_input_file()) to run with different flags"
             )
-        runner.run_range(up_to=up_to, from_=from_, force=force)
+        runner.run(up_to=up_to, from_=from_)
 
     def picongpu_get_runner(self, **kwargs) -> Runner:
         if self._runner is None:

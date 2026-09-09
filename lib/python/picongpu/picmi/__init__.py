@@ -7,6 +7,7 @@ import sys
 import picmistandard
 
 from . import constants, diagnostics
+from .applied_field import AnalyticAppliedField, ConstantAppliedField
 from .constants import B, GB, GiB, KiB, MB, MiB, kB
 from .distribution import (
     AnalyticDistribution,
@@ -60,6 +61,8 @@ __all__ = [
     "GaussianLaser",
     "TWTSLaser",
     "PlaneWaveLaser",
+    "ConstantAppliedField",
+    "AnalyticAppliedField",
     "Species",
     "MemoryConfig",
     "PrecisionConfig",

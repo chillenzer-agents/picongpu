@@ -225,7 +225,9 @@ And of course it will be available as such in the rendering of the template whic
 
 .. warning::
 
-  In contrast to the default **context** the PIConGPU PICMI interface by default does not perform checks on custom user input.
+  Custom user input is checked to be JSON-serialisable: values are restricted to bool/int/float/str/None and list/dict thereof (dict keys must be strings, floats must be finite), both when it is added and whenever it is serialised. Custom user input containing anything else (e.g. sets, tuples, bytes, callables, arbitrary objects) is rejected.
+
+  However, the PIConGPU PICMI interface does not perform any checks on the physical and structural correctness of custom user input.
 
   If you use custom user input, you are responsible for its physical and structural correctness.
 

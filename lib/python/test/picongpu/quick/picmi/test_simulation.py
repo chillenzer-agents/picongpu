@@ -19,6 +19,7 @@ from picongpu import picmi
 from picongpu.picmi.diagnostics import Checkpoint, TimeStepSpec
 from picongpu.picmi.interaction.ionization.fieldionization import ADK, ADKVariant
 from picongpu.pypicongpu import customuserinput, species
+from picongpu.pypicongpu.simulation import Simulation
 
 
 def get_grid(delta_x: float, delta_y: float, delta_z: float, n: int):
@@ -681,3 +682,58 @@ class TestPicmiSimulation(TestCase):
         with pytest.raises(ValueError, match="Key test_data_1 exist already, and specified values differ."):
             self.sim.picongpu_add_custom_user_input(i_differentValue)
             self.sim.get_as_pypicongpu().get_rendering_context()
+
+    def test_custom_user_input_roundtrips_through_serialisation(self):
+        i = customuserinput.CustomUserInput()
+        i.addToCustomInput({"test_data_1": 1, "nested": {"k": [1, 2, 3]}}, "tag_1")
+        i.addToCustomInput({"test_data_2": 2}, "tag_2")
+        self.sim.picongpu_add_custom_user_input(i)
+
+        pysim = self.sim.get_as_pypicongpu()
+        dumped = pysim.model_dump(mode="json")
+
+        # the serialised custom user input is the flattened merged form
+        flat = dumped["customuserinput"]
+        self.assertEqual(flat["tags"], ["tag_1", "tag_2"])
+        self.assertEqual(flat["nested"], {"k": [1, 2, 3]})
+
+        # every other field in its native form, customuserinput as the serialised
+        # flat form: the re-validated simulation must re-dump byte-identically
+        all_fields = {name: getattr(pysim, name) for name in Simulation.model_fields}
+        all_fields["customuserinput"] = flat
+        restored = Simulation.model_validate(all_fields)
+        self.assertEqual(restored.customuserinput[0].tags, ["tag_1", "tag_2"])
+        self.assertEqual(
+            restored.customuserinput[0].rendering_context,
+            {"test_data_1": 1, "nested": {"k": [1, 2, 3]}, "test_data_2": 2},
+        )
+        self.assertEqual(restored.model_dump(mode="json"), dumped)
+
+    def test_custom_user_input_accepts_flat_merged_form(self):
+        # the flat serialised form is accepted directly at the Simulation level
+        pysim = self.sim.get_as_pypicongpu()
+        all_fields = {name: getattr(pysim, name) for name in Simulation.model_fields}
+        all_fields["customuserinput"] = {"tags": ["tag_1"], "test_data_1": 1, "nested": {"k": [1, 2, 3]}}
+
+        restored = Simulation.model_validate(all_fields)
+        self.assertEqual(restored.customuserinput[0].tags, ["tag_1"])
+        self.assertEqual(restored.customuserinput[0].rendering_context, {"test_data_1": 1, "nested": {"k": [1, 2, 3]}})
+
+    def test_in_place_mutated_custom_user_input_rejected_at_dump(self):
+        # the value restriction must hold at dump time (pypicongpu_runner.json)
+        # even when the exposed rendering_context dict is mutated in place
+        i = customuserinput.CustomUserInput()
+        i.addToCustomInput({"test_data_1": 1}, "tag_1")
+        self.sim.picongpu_add_custom_user_input(i)
+
+        pysim = self.sim.get_as_pypicongpu()
+        pysim.customuserinput[0].rendering_context["test_data_1"] = lambda x: x
+        with self.assertRaisesRegex(ValueError, "JSON-serialisable"):
+            pysim.model_dump(mode="json")
+
+    def test_custom_user_input_rejects_callable(self):
+        i = customuserinput.CustomUserInput()
+        with self.assertRaisesRegex(ValueError, "JSON-serialisable"):
+            i.addToCustomInput({"test_data_1": lambda x: x}, "tag_1")
+        with self.assertRaises(ValidationError):
+            customuserinput.CustomUserInput(rendering_context={"test_data_1": lambda x: x})

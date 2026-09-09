@@ -18,7 +18,7 @@ from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
 from picongpu.pypicongpu.species.operation import AnyOperation
 from picongpu.pypicongpu.species.species import Species
 
-from .customuserinput import CustomUserInput
+from .customuserinput import CustomUserInput, check_rendering_context_is_json_serialisable
 from .field_solver import AnySolver
 from .grid import Grid3D
 from .laser import AnyLaser
@@ -104,6 +104,21 @@ class Simulation(RenderedObject, BaseModel):
             return outputs + default
         return outputs
 
+    @field_validator("customuserinput", mode="before")
+    @classmethod
+    def _parse_custom_user_input(cls, value):
+        # accept the flattened (merged) serialised form -- a single dict with a "tags"
+        # list plus the merged rendering context -- in addition to the native
+        # list-of-entries form, so that model_dump(mode="json") output can be validated
+        # again (round-trip safety). This is the exact inverse of
+        # _render_custom_user_input_list: the merged entries are rebuilt as a single
+        # CustomUserInput, which re-serialises to the same flat form.
+        if isinstance(value, dict):
+            tags = value.get("tags")
+            rendering_context = {key: entry for key, entry in value.items() if key != "tags"}
+            return [CustomUserInput(tags=tags, rendering_context=rendering_context or None)]
+        return value
+
     @field_serializer("customuserinput")
     def _render_custom_user_input_list(self, value) -> dict[str, Any] | None:
         if value is None:
@@ -111,8 +126,8 @@ class Simulation(RenderedObject, BaseModel):
         custom_rendering_context = {"tags": []}
 
         for entry in value:
-            add_context = entry.get_rendering_context()
-            tags = entry.get_tags()
+            add_context = entry.rendering_context or {}
+            tags = entry.tags or []
 
             entry.check_does_not_change_existing_key_values(custom_rendering_context, add_context)
             entry.check_tags(custom_rendering_context["tags"], tags)
@@ -120,6 +135,9 @@ class Simulation(RenderedObject, BaseModel):
             custom_rendering_context.update(add_context)
             custom_rendering_context["tags"].extend(tags)
 
+        # re-validate the flat merged form on dump so that entries whose
+        # rendering_context was mutated in place still fail with a clear error
+        check_rendering_context_is_json_serialisable(custom_rendering_context)
         return custom_rendering_context
 
     def spread_directory_information(self, setup_dir):

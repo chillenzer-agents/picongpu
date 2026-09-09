@@ -5,11 +5,14 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import re
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, Field
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
 
 from .rendering.pmaccprinter import PMAccPrinter
+
+_RENDERED_CODE_MARKER = re.compile(r"pmacc::|::")
 
 
 def _render_field_expression(value) -> str:
@@ -23,6 +26,10 @@ def _render_field_expression(value) -> str:
     """
     if value is None:
         return "0"
+    if isinstance(value, str) and _RENDERED_CODE_MARKER.search(value):
+        # already-rendered C++ (e.g. fed back in from a model_dump / JSON round
+        # trip): keep the rendered code verbatim rather than re-rendering it
+        return value
     return PMAccPrinter().doprint(value)
 
 
@@ -33,6 +40,118 @@ class _Parameter(BaseModel):
     """name of the parameter as used inside the expressions"""
     value: float
     """value assigned to the parameter (SI units)"""
+
+
+_CPP_KEYWORDS = frozenset(
+    {
+        "alignas",
+        "alignof",
+        "and",
+        "and_eq",
+        "asm",
+        "auto",
+        "bitand",
+        "bitor",
+        "bool",
+        "break",
+        "case",
+        "catch",
+        "char",
+        "char8_t",
+        "char16_t",
+        "char32_t",
+        "class",
+        "compl",
+        "concept",
+        "const",
+        "consteval",
+        "constexpr",
+        "constinit",
+        "const_cast",
+        "continue",
+        "co_await",
+        "co_return",
+        "co_yield",
+        "decltype",
+        "default",
+        "delete",
+        "do",
+        "double",
+        "dynamic_cast",
+        "else",
+        "enum",
+        "explicit",
+        "export",
+        "extern",
+        "false",
+        "float",
+        "for",
+        "friend",
+        "goto",
+        "if",
+        "inline",
+        "int",
+        "long",
+        "mutable",
+        "namespace",
+        "new",
+        "noexcept",
+        "not",
+        "not_eq",
+        "nullptr",
+        "operator",
+        "or",
+        "or_eq",
+        "private",
+        "protected",
+        "public",
+        "register",
+        "reinterpret_cast",
+        "requires",
+        "return",
+        "short",
+        "signed",
+        "sizeof",
+        "static",
+        "static_assert",
+        "static_cast",
+        "struct",
+        "switch",
+        "template",
+        "this",
+        "thread_local",
+        "throw",
+        "true",
+        "try",
+        "typedef",
+        "typeid",
+        "typename",
+        "union",
+        "unsigned",
+        "using",
+        "virtual",
+        "void",
+        "volatile",
+        "wchar_t",
+        "while",
+        "xor",
+        "xor_eq",
+    }
+)
+
+_GENERATED_IDENTIFIERS = frozenset(
+    {
+        # mathtools free variables + locals inside the generated functors
+        "x",
+        "y",
+        "z",
+        "t",
+        "cellIdx",
+        "currentStep",
+        "m_unitField",
+        "sim",
+    }
+)
 
 
 class BackgroundField(BaseModel):
@@ -49,9 +168,10 @@ class BackgroundField(BaseModel):
     PMAccPrinter, i.e. they must be expressions sympy can parse and print.
 
     This is the minimal, whole-domain variant of the applied-field feature.
-    The design deliberately mirrors the PICMI applied-field surface so that
-    the broader "field background" scopes (field arithmetic, ``as_initial``,
-    ``as_injected``) can be added on top without reworking this model.
+    The design deliberately mirrors the PICMI applied-field surface. Field
+    arithmetic, ``as_initial`` or ``as_injected`` map onto *separate* C++
+    mechanisms (initial field assignment, incident-field planes) that would
+    need their own models and templates; they are not implemented here.
     """
 
     type_backgroundfield: Literal[True] = True
@@ -78,3 +198,20 @@ class BackgroundField(BaseModel):
     so that symbolic parameters of an ``AnalyticAppliedField`` resolve
     correctly (e.g. ``{"name": "wl", "value": 8.0e-7}``).
     """
+
+    @model_validator(mode="after")
+    def _check_parameter_names(self):
+        for parameter in self.user_defined_kw:
+            name = parameter.name
+            if name in _GENERATED_IDENTIFIERS:
+                raise ValueError(
+                    f"Parameter name {name!r} collides with a coordinate/time variable or a generated "
+                    "identifier in the C++ field functors (x, y, z, t, cellIdx, currentStep, "
+                    "m_unitField, sim); choose a different name."
+                )
+            if name in _CPP_KEYWORDS:
+                raise ValueError(
+                    f"Parameter name {name!r} is a C++ keyword and cannot be used in the generated "
+                    "field functors; choose a different name."
+                )
+        return self

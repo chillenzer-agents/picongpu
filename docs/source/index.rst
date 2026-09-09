@@ -114,6 +114,7 @@ In case you are already fluent in compiling C++ projects and HPC, running PIC si
    dev/ci
    dev/repostructure
    dev/styleguide
+   dev/units_design
    dev/sphinx
    dev/doxygen
    dev/clangtools

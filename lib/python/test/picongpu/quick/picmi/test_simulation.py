@@ -238,7 +238,7 @@ class TestPicmiSimulation(TestCase):
         # operations
         density_operations = list(
             filter(
-                lambda op: isinstance(op, species.operation.SimpleDensity),
+                lambda op: isinstance(op, species.operation.CreateDensity),
                 operations,
             )
         )
@@ -264,13 +264,13 @@ class TestPicmiSimulation(TestCase):
                 # used "other_profile"
                 assert op.profile.density_si == 17
 
-            # check layout
+            # check start position (layout)
             if "separate1" in species_names or "colocated1" in species_names:
                 # used "layout"
-                assert op.layout.ppc == 3
+                assert op.start_position.ppc == 3
             else:
                 # used "other_layout"
-                assert op.layout.ppc == 4
+                assert op.start_position.ppc == 4
 
     def test_operation_not_placed_translated(self):
         """non-placed species are correctly translated"""

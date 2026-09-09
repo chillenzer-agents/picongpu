@@ -290,7 +290,7 @@ class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
         pypic = gaussian.get_as_pypicongpu(ARBITRARY_GRID)
         assert isinstance(pypic, species.operation.densityprofile.Gaussian)
 
-        assert pypic.density == self.values["density"]
+        assert pypic.density_si == self.values["density"]
         assert pypic.gas_center_front == self.values["center_front"]
         assert pypic.gas_center_rear == self.values["center_rear"]
         assert pypic.gas_sigma_front == self.values["sigma_front"]

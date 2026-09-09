@@ -14,6 +14,7 @@ from pydantic import (
     computed_field,
     field_serializer,
     field_validator,
+    model_validator,
 )
 
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
@@ -214,6 +215,20 @@ class CollisionalPhysicsSetup(BaseModel):
         # which makes it pretty hard to apply arbitrary filters to individual pairs.
         # What we do instead is that we split each collision to only hold a single pair.
         return list(chain(*map(split_into_single, collisions)))
+
+    @model_validator(mode="after")
+    def _validate_screening_for_dynamic_log(self):
+        # C++ requirement (docs: models/binary_collisions.rst): a
+        # RelativisticCollisionDynamicLog collider computes the Coulomb
+        # logarithm from the Debye screening length, which requires at least
+        # one species in CollisionScreeningSpecies.
+        if any(isinstance(c.functor, DynamicLogCollision) for c in self.collisions) and not self.screening_species:
+            raise ValueError(
+                "A dynamic-log collision (Coulomb logarithm computed from the "
+                "Debye screening length) requires at least one screening species, "
+                f"but none were given. You gave: {self.collisions=} and {self.screening_species=}."
+            )
+        return self
 
     @computed_field
     def num_tmp_field_slots(self) -> int:

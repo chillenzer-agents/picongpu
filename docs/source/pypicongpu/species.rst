@@ -148,7 +148,7 @@ value of an attribute.
 
 Therefore, if two attributes depend on each other, they must be set **in
 the same operation**. E.g., when placing ions and their electrons, both
-are created from **the same** ``SimpleDensity`` operation.
+are created from **the same** ``CreateDensity`` operation.
 
 Also, if multiple factors determine an attribute, they must be specified
 inside of the same operation: E.g. the momentum is influenced by both
@@ -367,7 +367,7 @@ however this is not the case for all examples:
 
   - Attributes: ``position<position_pic>``, ``weighting``
   - PIConGPU: ``CreateDensity`` for first species, then ``Derive`` all other species
-  - PyPIConGPU: ``SimpleDensity`` Operation, which accepts a list of Species
+  - PyPIConGPU: ``CreateDensity`` Operation, which accepts a list of Species
 
 .. _pypicongpu_species_placement:
 
@@ -500,7 +500,7 @@ Profiles/Layouts are considered *equal* if they are ``==`` equal.
 For PICMI, ``==`` equality is the same to ``is`` (object identity),
 i.e. two species have the same profile (particle distribution) if they use **the same** particle distribution **object**. (PICMI may redefine ``==`` in the future.)
 
-In PyPIConGPU Species that are to be derived are grouped into the same ``SimpleDensity`` Operation.
+In PyPIConGPU Species that are to be derived are grouped into the same ``CreateDensity`` Operation.
 
 Ratios are stored in Constants (PIConGPU species flags),
 and the species with the **lowest ratio** is placed first to make sure the minimum weighting is always respected.

@@ -28,16 +28,16 @@ namespace picongpu
 {
     namespace densityProfiles::pypicongpu
     {
-        {{#init_operations}}{{#type_simpledensity}}
+        {{#init_operations}}{{#type_createdensity}}
         // a species has always only exactly one profile, so only one of the following blocks below will be present
 
             {{#profile.type_gaussian}}
-            /** generate the initial macroparticle position for species "{{{placed_species_initial.name}}}" ({{{placed_species_initial.typename}}})
+            /** generate the initial macroparticle position for species "{{{created_species.name}}}" ({{{created_species.typename}}})
              *
              * @note the density may be further modified from this profile by the densityRatio of the species, set in
              *  the init-pipeline.
              */
-            struct init_{{{placed_species_initial.typename}}}_GaussianParam
+            struct init_{{{created_species.typename}}}_GaussianParam
             {
                 static constexpr float_X gasFactor = {{{profile.gas_factor}}};
                 static constexpr float_X gasPower  = {{{profile.gas_power}}};
@@ -57,21 +57,21 @@ namespace picongpu
 
                     //! factor to multiply BASE_DENSITY_SI by to get density
                     static constexpr float_X densityFactor
-                        = static_cast<float_X>({{{profile.density}}} / SI::BASE_DENSITY_SI);
+                        = static_cast<float_X>({{{profile.density_si}}} / SI::BASE_DENSITY_SI);
                 };
 
-            using init_{{{placed_species_initial.typename}}} = GaussianImpl<init_{{{placed_species_initial.typename}}}_GaussianParam>;
+            using init_{{{created_species.typename}}} = GaussianImpl<init_{{{created_species.typename}}}_GaussianParam>;
             {{/profile.type_gaussian}}
 
             {{#profile.type_uniform}}
-            /** generate the initial macroparticle position for species "{{{placed_species_initial.name}}}" ({{{placed_species_initial.typename}}})
+            /** generate the initial macroparticle position for species "{{{created_species.name}}}" ({{{created_species.typename}}})
              *
              * @note the density may be further modified from this profile by the densityRatio of the species set in the
              *  init-pipeline.
              */
-            struct init_{{{placed_species_initial.typename}}}_functor
+            struct init_{{{created_species.typename}}}_functor
             {
-                /** generate the initial macroparticle position for species "{{{placed_species_initial.name}}}" ({{{placed_species_initial.typename}}})
+                /** generate the initial macroparticle position for species "{{{created_species.name}}}" ({{{created_species.typename}}})
                  *
                  * @note the density may be further modified from this profile by the densityRatio of the species, set in
                  *  the init-pipeline.
@@ -82,16 +82,16 @@ namespace picongpu
                     return static_cast<float_X>({{{profile.density_si}}} / SI::BASE_DENSITY_SI);
                 }
             };
-            using init_{{{placed_species_initial.typename}}} = FreeFormulaImpl<init_{{{placed_species_initial.typename}}}_functor>;
+            using init_{{{created_species.typename}}} = FreeFormulaImpl<init_{{{created_species.typename}}}_functor>;
             {{/profile.type_uniform}}
 
             {{#profile.type_foil}}
-            /** generate the initial macroparticle position for species "{{{placed_species_initial.name}}}" ({{{placed_species_initial.typename}}})
+            /** generate the initial macroparticle position for species "{{{created_species.name}}}" ({{{created_species.typename}}})
              *
              * @note the density may be further modified from this profile by the densityRatio of the species, set in
              *  the init-pipeline.
              */
-            struct init_{{{placed_species_initial.typename}}}_functor
+            struct init_{{{created_species.typename}}}_functor
             {
                 HDINLINE float_X operator()(const floatD_64& position_SI, const float3_64& cellSize_SI)
                 {
@@ -143,11 +143,11 @@ namespace picongpu
                     return dens;
                 }
             };
-            using init_{{{placed_species_initial.typename}}} = FreeFormulaImpl<init_{{{placed_species_initial.typename}}}_functor>;
+            using init_{{{created_species.typename}}} = FreeFormulaImpl<init_{{{created_species.typename}}}_functor>;
             {{/profile.type_foil}}
 
             {{#profile.type_cylinder}}
-            struct init_{{{placed_species_initial.typename}}}_CylindricalParam
+            struct init_{{{created_species.typename}}}_CylindricalParam
             {
                 static constexpr float3_64  centerPosition_SI{
                     {{{profile.center_position_si.0.component}}},
@@ -174,11 +174,11 @@ namespace picongpu
                 static constexpr float_64 prePlasmaCutoff_SI = 0.0;
                 {{/profile.pre_plasma_ramp.type_none}}
             };
-            using init_{{{placed_species_initial.typename}}} = CylindricalImpl<init_{{{placed_species_initial.typename}}}_CylindricalParam>;
+            using init_{{{created_species.typename}}} = CylindricalImpl<init_{{{created_species.typename}}}_CylindricalParam>;
             {{/profile.type_cylinder}}
 
             {{#profile.type_freeformula}}
-            struct init_{{{placed_species_initial.typename}}}_functor
+            struct init_{{{created_species.typename}}}_functor
             {
                 /** This formula uses SI quantities only
                  *
@@ -196,9 +196,9 @@ namespace picongpu
                   return ({{{profile.function_body}}}) / SI::BASE_DENSITY_SI;
                 }
             };
-            using init_{{{placed_species_initial.typename}}} = FreeFormulaImpl<init_{{{placed_species_initial.typename}}}_functor>;
+            using init_{{{created_species.typename}}} = FreeFormulaImpl<init_{{{created_species.typename}}}_functor>;
             {{/profile.type_freeformula}}
 
-{{/type_simpledensity}}{{/init_operations}}
+{{/type_createdensity}}{{/init_operations}}
     } // namespace densityProfiles::pypicongpu
 } // namespace picongpu

@@ -17,4 +17,8 @@ class ThomasFermi(GroundStateIonizationModel):
     def get_as_pypicongpu(self) -> pypicongpu.species.constant.ionizationmodel.IonizationModel:
         self.check()
 
-        return pypicongpu.species.constant.ionizationmodel.ThomasFermi()
+        # the C++ ThomasFermi ionizer is parameterised by the electron species
+        # to be created (T_DestSpecies)
+        return pypicongpu.species.constant.ionizationmodel.ThomasFermi(
+            ionization_electron_species=self.ionization_electron_species.get_as_pypicongpu()
+        )

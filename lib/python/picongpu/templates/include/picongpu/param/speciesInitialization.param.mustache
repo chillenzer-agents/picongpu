@@ -46,22 +46,22 @@ namespace picongpu
             /**********************************/
             /* phase 1: create macroparticles */
             /**********************************/
-{{#init_operations}}{{#type_simpledensity}}
+{{#init_operations}}{{#type_createdensity}}
                 /// @details This functor assumes the ratio to be 1. The correct density ratio of the species is applied
                 /// here (automatically by CreateDensity).
 
                 CreateDensity<
-                    densityProfiles::pypicongpu::init_{{{placed_species_initial.typename}}},
-                    startPosition::pypicongpu::init_{{{placed_species_initial.typename}}},
-                    {{{placed_species_initial.typename}}}>,
+                    densityProfiles::pypicongpu::init_{{{created_species.typename}}},
+                    startPosition::pypicongpu::init_{{{created_species.typename}}},
+                    {{{created_species.typename}}}>,
 
-                {{#placed_species_copied}}
+                {{#derived_species}}
                     ManipulateDerive<
                         manipulators::binary::DensityWeighting,
-                        {{{placed_species_initial.typename}}},
+                        {{{created_species.typename}}},
                         {{{typename}}}>,
-                {{/placed_species_copied}}
-{{/type_simpledensity}}{{/init_operations}}
+                {{/derived_species}}
+{{/type_createdensity}}{{/init_operations}}
 
             /*********************************************/
             /* phase 2: adjust other attributes (if any) */

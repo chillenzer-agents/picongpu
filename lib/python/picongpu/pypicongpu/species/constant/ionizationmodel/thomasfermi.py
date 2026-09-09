@@ -28,3 +28,9 @@ class ThomasFermi(IonizationModel):
 
     ionizer_picongpu_name: str = "ThomasFermi"
     """C++ Code type name of ionizer"""
+
+    ionization_current: None = None
+    """no ionization current: the C++ ThomasFermi ionizer (byCollision) is
+    only parameterised by the electron species to be created (T_DestSpecies)
+    and takes no ionization current template argument, unlike the byField
+    ionizers; the inherited field is therefore narrowed to None."""

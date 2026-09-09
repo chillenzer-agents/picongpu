@@ -10,8 +10,14 @@ from .attribute import Attribute
 
 class BoundElectrons(Attribute):
     """
-    Number of bound electrons per nucleus of a macroparticle,
-    [dimensionless, integer count]; set by the SetChargeState operation.
+    number of electrons still bound to the nucleus of a macroparticle
+
+    [dimensionless, integer count]; the complement of the charge state:
+    `boundElectrons = atomic_number - charge_state`.
+
+    Set by the SetChargeState operation, whose C++ counterpart
+    (`manipulators::unary::acc::ChargeState`) derives this value from the
+    charge state and stores it via `atomicPhysics::SetChargeState`.
 
     C++ name: boundElectrons (speciesDefinition.param).
     """

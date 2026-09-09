@@ -61,7 +61,7 @@ package Helium {
     object ":Uniform" as he_profile #DarkTurquoise
     he_profile : density_si = 8e24
 
-    object ":SimpleDensity" as he_placement #Orchid
+    object ":CreateDensity" as he_placement #Orchid
     he_placement : ppc = 2
     initmgr o-- he_placement
     he_placement o-- helium

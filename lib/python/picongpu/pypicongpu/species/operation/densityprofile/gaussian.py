@@ -70,9 +70,10 @@ class Gaussian(BaseModel):
     """number of vacuum cells in front of foil for laser init, [cells]; must be >= 0.
     C++ name: vacuumFront."""
 
-    density: Annotated[float, Field(gt=0.0)]
-    """particle number density, [m^-3]; must be > 0.
-    C++ name: density."""
+    density_si: Annotated[float, Field(gt=0.0, alias="density")]
+    """particle number density at the plateau, [m^-3]; must be > 0.
+    C++ name: densityFactor (density.param), the dimensionless factor rendered as
+    density_si / SI::BASE_DENSITY_SI (normalized to the base density)."""
 
     @model_validator(mode="after")
     def check(self):

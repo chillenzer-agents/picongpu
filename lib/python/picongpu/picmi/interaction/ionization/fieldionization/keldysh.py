@@ -7,12 +7,11 @@ License: GPLv3+
 
 from .fieldionization import FieldIonization
 
-from .....pypicongpu.species.constant.ionizationcurrent import None_
 from .....pypicongpu.species.constant import ionizationmodel
 
 
 class Keldysh(FieldIonization):
-    """Barrier Suppression Ioniztion model"""
+    """Keldysh ionization model (field ionization beyond the tunneling regime)"""
 
     MODEL_NAME: str = "Keldysh"
 
@@ -20,5 +19,6 @@ class Keldysh(FieldIonization):
         self.check()
 
         return ionizationmodel.Keldysh(
-            ionization_current=None_(), ionization_electron_species=self.ionization_electron_species.get_as_pypicongpu()
+            ionization_current=self._get_ionization_current(),
+            ionization_electron_species=self.ionization_electron_species.get_as_pypicongpu(),
         )

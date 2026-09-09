@@ -14,10 +14,16 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
-from picongpu.pypicongpu.collisions import Collision, CollisionNumericsConfig, ConstLogCollision
+from picongpu.pypicongpu.collisions import (
+    Collision,
+    CollisionalPhysicsSetup,
+    CollisionNumericsConfig,
+    ConstLogCollision,
+    DynamicLogCollision,
+)
 from picongpu.pypicongpu.movingwindow import MovingWindow
-from picongpu.pypicongpu.output.binning import BinSpec, Binning, BinningAxis
 from picongpu.pypicongpu.output.checkpoint import Checkpoint
+from picongpu.pypicongpu.output.binning import BinSpec, Binning, BinningAxis
 from picongpu.pypicongpu.output.openpmd_plugin import FieldDump, RangeSpec, RangeSpecEntry
 from picongpu.pypicongpu.output.radiation import (
     FrequenciesFromList,
@@ -27,9 +33,16 @@ from picongpu.pypicongpu.output.radiation import (
     RadiationObserverConfiguration,
 )
 from picongpu.pypicongpu.output.timestepspec import Spec, TimeStepSpec
+from sympy import Symbol
+
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
+from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFunctor
 from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
-from picongpu.pypicongpu.species.constant import Charge, DensityRatio, Mass
+from picongpu.pypicongpu.species.constant import (
+    Charge,
+    DensityRatio,
+    Mass,
+)
 from picongpu.pypicongpu.species.constant.synchrotron import (
     FirstSynchrotronFunctionParams,
     InterpolationParams,
@@ -39,6 +52,8 @@ from picongpu.pypicongpu.species.operation.densityprofile import Uniform
 from picongpu.pypicongpu.species.operation.densityprofile.cylinder import Cylinder
 from picongpu.pypicongpu.species.operation.densityprofile.gaussian import Gaussian
 from picongpu.pypicongpu.species.operation.densityprofile.plasmaramp import Exponential
+from picongpu.pypicongpu.species.attribute import Momentum, Position, Weighting
+from picongpu.pypicongpu.species.operation.createdensity import CreateDensity
 from picongpu.pypicongpu.species.operation.layout import OnePosition, Quiet, Random
 from picongpu.pypicongpu.species.operation.momentum import Drift, Temperature
 from picongpu.pypicongpu.walltime import Walltime
@@ -81,6 +96,53 @@ def test_time_steps_must_be_non_negative(time_steps):
 def test_typical_ppc_must_be_positive(typical_ppc):
     with pytest.raises(ValidationError):
         make_sim(typical_ppc=typical_ppc)
+
+
+class TestCreateDensityInvariants:
+    def test_created_and_derived_species(self):
+        op = CreateDensity(
+            profile=Uniform(density_si=42.0),
+            species=[make_species(name="a"), make_species(name="b"), make_species(name="c")],
+            start_position=Random(ppc=4),
+        )
+        assert [s.name for s in op.species] == ["a", "b", "c"]
+        assert op.created_species.name == "a"
+        assert [s.name for s in op.derived_species] == ["b", "c"]
+
+    def test_species_sorted_by_ratio_then_name(self):
+        # ratio-less species are placed first (as ratio 0), then increasing
+        # ratio; equal ratios (incl. ratio-less) are ordered by name, so the
+        # rendered species order is deterministic
+        op = CreateDensity(
+            profile=Uniform(density_si=42.0),
+            species=[
+                make_species(name="zeta"),
+                make_species(name="alpha", constants=[DensityRatio(ratio=4)]),
+                make_species(name="beta"),
+                make_species(name="gamma", constants=[DensityRatio(ratio=2)]),
+            ],
+            start_position=Random(ppc=4),
+        )
+        assert [s.name for s in op.species] == ["beta", "zeta", "gamma", "alpha"]
+
+    def test_species_must_be_a_list(self):
+        with pytest.raises(ValidationError, match="species must be a list"):
+            CreateDensity(
+                profile=Uniform(density_si=42.0),
+                species=make_species(name="a"),
+                start_position=Random(ppc=4),
+            )
+
+
+class TestMomentumInvariants:
+    @pytest.mark.parametrize("gamma", [0.5, 0.99])
+    def test_drift_gamma_must_be_at_least_one(self, gamma):
+        with pytest.raises(ValidationError):
+            Drift(direction_normalized=(1.0, 0.0, 0.0), gamma=gamma)
+
+    def test_drift_direction_must_be_unit_vector(self):
+        with pytest.raises(ValidationError, match="unit vector"):
+            Drift(direction_normalized=(2.0, 0.0, 0.0), gamma=1.0)
 
 
 def test_laser_exceeding_run_warns():
@@ -260,22 +322,16 @@ def test_species_name_must_be_cpp_identifier(name):
 
 
 def test_position_attribute_mandatory():
-    from picongpu.pypicongpu.species.attribute import Momentum, Weighting
-
     with pytest.raises(ValidationError, match="position attribute"):
         make_species(attributes=[Weighting(), Momentum()])
 
 
 def test_momentum_attribute_mandatory():
-    from picongpu.pypicongpu.species.attribute import Position, Weighting
-
     with pytest.raises(ValidationError, match="momentum attribute"):
         make_species(attributes=[Position(), Weighting()])
 
 
 def test_duplicate_attribute_rejected():
-    from picongpu.pypicongpu.species.attribute import Momentum, Position, Weighting
-
     with pytest.raises(ValidationError, match="unique"):
         make_species(attributes=[Position(), Weighting(), Momentum(), Weighting()])
 
@@ -353,6 +409,37 @@ def test_gaussian_center_ordering():
             vacuum_cells_front=0,
             density=1.0,
         )
+
+    def test_gaussian_density_si_field(self):
+        # the SI field name is density_si (like Uniform/Foil/Cylinder);
+        # the picmi attribute name `density` is accepted as an alias
+        g = Gaussian(
+            center_front=0.2,
+            center_rear=0.4,
+            sigma_front=0.01,
+            sigma_rear=0.01,
+            factor=-1.0,
+            power=2.0,
+            vacuum_cells_front=0,
+            density_si=42.0,
+        )
+        assert g.density_si == 42.0
+        # serialisation uses the field name, so round-trips via the alias-free key
+        assert Gaussian.model_validate(g.model_dump()).density_si == 42.0
+
+    @pytest.mark.parametrize("density_si", [0.0, -1.0])
+    def test_gaussian_density_must_be_positive(self, density_si):
+        with pytest.raises(ValidationError):
+            Gaussian(
+                center_front=0.2,
+                center_rear=0.4,
+                sigma_front=0.01,
+                sigma_rear=0.01,
+                factor=-1.0,
+                power=2.0,
+                vacuum_cells_front=0,
+                density_si=density_si,
+            )
 
 
 def test_cylinder_radius_too_small_for_ramp():
@@ -696,6 +783,76 @@ def test_binner_name_must_be_c_identifier():
             openPMDInfix=None,
             dumpPeriod=1,
         )
+
+
+class TestCollisionInvariants:
+    def test_coulomb_log_must_be_positive(self):
+        with pytest.raises(ValidationError, match="coulomb_log"):
+            ConstLogCollision(coulomb_log=0.0)
+        with pytest.raises(ValidationError, match="coulomb_log"):
+            ConstLogCollision(coulomb_log=-1.0)
+
+    def test_valid_const_log(self):
+        assert ConstLogCollision(coulomb_log=12.0).coulomb_log == 12.0
+
+    def test_valid_dynamic_log(self):
+        assert DynamicLogCollision().type_dynamiclog is True
+
+    def test_intra_species_differently_filtered_rejected(self):
+        e = make_species()
+        filtered = FilteredSpecies(species=e, functor=make_binning_functor("myFilter"))
+        with pytest.raises(ValidationError, match="not supported"):
+            Collision(species_pairs=[(e, filtered)], functor=ConstLogCollision(coulomb_log=10.0))
+
+    def test_cell_list_chunk_size_must_be_positive(self):
+        with pytest.raises(ValidationError, match="cell_list_chunk_size"):
+            CollisionNumericsConfig(cell_list_chunk_size=0)
+
+    def test_default_numerics_config_valid(self):
+        assert CollisionNumericsConfig().cell_list_chunk_size is None
+
+    def test_dynamic_log_requires_screening_species(self):
+        # C++ requirement: the dynamic Coulomb logarithm is computed from the
+        # Debye screening length, which needs at least one screening species
+        e = make_species()
+        with pytest.raises(ValidationError, match="screening"):
+            CollisionalPhysicsSetup(collisions=[Collision(species_pairs=[(e, e)], functor=DynamicLogCollision())])
+
+    def test_dynamic_log_with_screening_species_valid(self):
+        e = make_species()
+        setup = CollisionalPhysicsSetup(
+            collisions=[Collision(species_pairs=[(e, e)], functor=DynamicLogCollision())],
+            screening_species=[e],
+        )
+        assert len(setup.screening_species) == 1
+
+    def test_const_log_without_screening_species_valid(self):
+        e = make_species()
+        setup = CollisionalPhysicsSetup(
+            collisions=[Collision(species_pairs=[(e, e)], functor=ConstLogCollision(coulomb_log=10.0))]
+        )
+        assert setup.screening_species == []
+
+
+class TestParticleFunctorInvariants:
+    @pytest.mark.parametrize("name", ["with space", "with-dot", "1leading", "with\nnewline", ""])
+    def test_name_must_be_c_identifier(self, name):
+        with pytest.raises(ValidationError, match="valid C\\+\\+ identifier"):
+            make_binning_functor(name=name)
+
+    def test_valid_functor(self):
+        functor = make_binning_functor()
+        assert functor.name == "positionCell"
+        assert functor.unit_dimension is None
+
+    def test_float_return_type_keeps_unit_dimension(self):
+        functor = ParticleFunctor(
+            name="positionCell",
+            functor_expression=Symbol("px"),
+            functor_preamble=[],
+            return_type="float_X",
+        )
+        assert functor.unit_dimension is not None
 
 
 def test_binning_requires_axes_and_species():

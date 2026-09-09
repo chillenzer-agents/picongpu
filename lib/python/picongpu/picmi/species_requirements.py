@@ -16,9 +16,9 @@ from picongpu.pypicongpu.species.attribute.attribute import Attribute
 from picongpu.pypicongpu.species.constant.constant import Constant
 from picongpu.pypicongpu.species.constant.groundstateionization import GroundStateIonization
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant
+from picongpu.pypicongpu.species.operation.createdensity import CreateDensity
 from picongpu.pypicongpu.species.operation.momentum.temperature import Temperature
 from picongpu.pypicongpu.species.operation.setchargestate import SetChargeState
-from picongpu.pypicongpu.species.operation.simpledensity import SimpleDensity
 from picongpu.pypicongpu.species.operation.simplemomentum import SimpleMomentum
 
 
@@ -225,26 +225,29 @@ class SetChargeStateOperation(DelayedConstruction):
         return super().__init__(metadata=metadata, must_be_unique=True)
 
 
-class SimpleDensityOperation(DelayedConstruction):
+class CreateDensityOperation(DelayedConstruction):
+    # C++ counterpart: the CreateDensity init-pipeline functor; species with
+    # the same profile and start position are created together (the first is
+    # created, the rest are derived via ManipulateDerive<DensityWeighting>)
     def __init__(self, /, species, grid, layout):
         def constructor(self):
             kwargs = self.metadata.kwargs
             return self.metadata.Type(
                 species=[s.get_as_pypicongpu() for s in sorted(kwargs["species"])],
                 profile=kwargs["profile"].get_as_pypicongpu(kwargs["grid"]),
-                layout=kwargs["layout"].get_as_pypicongpu(),
+                start_position=kwargs["layout"].get_as_pypicongpu(),
             )
 
         def try_update_with(self, other):
             return (
-                isinstance(other, SimpleDensityOperation)
+                isinstance(other, CreateDensityOperation)
                 and other.metadata.kwargs["profile"] == self.metadata.kwargs["profile"]
                 and other.metadata.kwargs["layout"] == self.metadata.kwargs["layout"]
                 and (self.metadata.kwargs["species"].extend(other.metadata.kwargs["species"]) or True)
             )
 
         metadata = {
-            "Type": SimpleDensity,
+            "Type": CreateDensity,
             "kwargs": {
                 "species": [species],
                 "profile": species.initial_distribution,

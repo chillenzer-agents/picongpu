@@ -151,7 +151,12 @@ class Species(PICMI_Species):
                 f"Species {self.name} specified fixed charge without also specifying particle_type"
             )
         # Returns None if it is not an element, so is False-y in those cases, and True-y otherwise:
-        elif not self.picongpu_element:
+        elif self.picongpu_element:
+            if self.charge_state is not None:
+                assert Element(openpmd_name=self.particle_type).get_atomic_number() >= self.charge_state, (
+                    f"Species {self.name} intial charge state is unphysical"
+                )
+        else:
             assert self.charge_state is None, "charge_state may only be set for ions"
             assert self.picongpu_fixed_charge is False, (
                 f"Species {self.name} configured with fixed charge state but particle_type indicates non ion"
@@ -164,7 +169,9 @@ class Species(PICMI_Species):
             return None
         try:
             return (
-                pypicongpu.species.util.Element(self.particle_type) if Element.is_element(self.particle_type) else None
+                pypicongpu.species.util.Element(openpmd_name=self.particle_type)
+                if Element.is_element(self.particle_type)
+                else None
             )
         except ValueError:
             return None
@@ -225,7 +232,7 @@ def particle_type_requirements(particle_type):
     if particle_type in (props := PredefinedParticleTypeProperties()).get_known_particle_types():
         mass, charge = props.get_mass_and_charge_of_non_element(particle_type)
     elif Element.is_element(particle_type):
-        element = pypicongpu.species.util.Element(particle_type)
+        element = pypicongpu.species.util.Element(openpmd_name=particle_type)
         mass = element.get_mass_si()
         charge = element.get_charge_si()
     else:

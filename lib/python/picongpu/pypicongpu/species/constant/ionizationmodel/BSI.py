@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 from .ionizationmodel import IonizationModel
-from ..ionizationcurrent import IonizationCurrent
+from ..ionizationcurrent import None_
 
 
 class BSI(IonizationModel):
@@ -27,5 +27,5 @@ class BSI(IonizationModel):
     ionizer_picongpu_name: str = "BSI"
     """C++ Code type name of ionizer"""
 
-    ionization_current: IonizationCurrent
+    ionization_current: None_
     """ionization current implementation to use"""

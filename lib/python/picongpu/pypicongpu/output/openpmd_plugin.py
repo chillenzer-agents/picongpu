@@ -21,6 +21,7 @@ from pydantic import (
     ValidationError,
     field_validator,
     model_serializer,
+    model_validator,
 )
 
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
@@ -73,6 +74,16 @@ class RangeSpecEntry(BaseModel):
         raise ValueError(f"Can't serialize RangeSpecEntry with {self.data=}.")
 
 
+def _parse_range_part(part: str) -> None | int | tuple[int, int]:
+    part = part.strip()
+    if part == "":
+        return None
+    if ":" in part:
+        lo, hi = part.split(":")
+        return (int(lo), int(hi))
+    return int(part)
+
+
 class RangeSpec(BaseModel):
     """
     the output range in cells for each spatial dimension
@@ -86,6 +97,20 @@ class RangeSpec(BaseModel):
     data: tuple[RangeSpecEntry, RangeSpecEntry, RangeSpecEntry] = (RangeSpecEntry(), RangeSpecEntry(), RangeSpecEntry())
     """exactly three entries (x, y, z); each entry is None (full dimension),
     a single cell index >= 0, or a (lo, hi) cell range"""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _from_serialised(cls, value):
+        # accept the serialised form (three comma-separated dimension ranges,
+        # e.g. ",42,1:10") in addition to the native entry form, so that
+        # model_dump(mode="json") output can be validated again
+        # (round-trip safety)
+        if isinstance(value, str):
+            parts = value.split(",")
+            if len(parts) != 3:
+                raise ValueError(f"Expected three comma-separated dimension ranges. You gave: {value=}.")
+            return {"data": tuple(RangeSpecEntry(data=_parse_range_part(part)) for part in parts)}
+        return value
 
     @model_serializer()
     def _serialize_data(self) -> str:
@@ -127,6 +152,11 @@ class OpenPMDConfig(BaseModel):
     @field_validator("range", mode="before")
     @classmethod
     def _validate_range(cls, value):
+        # the serialised form is a string of three comma-separated ranges
+        # (the inverse of RangeSpec's model serializer); pass it through and
+        # let RangeSpec's own before validator parse it (round-trip safety)
+        if isinstance(value, str):
+            return value
         try:
             return RangeSpec(data=value)
         except ValidationError as error1:
@@ -209,6 +239,19 @@ class OpenPMDPlugin(BaseModel):
     type_openPMD: Literal[True] = True
     """tag field identifying the openPMD plugin (discriminator)"""
 
+    @field_validator("sources", mode="before")
+    @classmethod
+    def _parse_sources(cls, value):
+        # inverse of the "sources" form in _get_serialized: a list of
+        # {"period": ..., "source": ...} dicts is turned back into
+        # (period, source) pairs so that model_dump(mode="json") output can
+        # be validated again (round-trip safety)
+        if isinstance(value, list) and all(
+            isinstance(entry, dict) and "period" in entry and "source" in entry for entry in value
+        ):
+            return [[entry["period"], entry["source"]] for entry in value]
+        return value
+
     _setup_dir: Path | None = PrivateAttr(None)
     # We're using a negation here because now `False` and `None` (evaluating to `False`)
     # both mean that we can't rely on `setup_dir` being anything permanent:
@@ -216,9 +259,15 @@ class OpenPMDPlugin(BaseModel):
 
     def config_filename(self, content, context: Literal["runtime", "setup"]):
         filename = f"openPMD_config_{sha256(tomli_w.dumps(content).encode()).hexdigest()}.toml"
-        if not self._setup_dir_is_not_temporary or context == "setup":
+        if context == "setup":
+            # the config file is written into the (temporary or persistent)
+            # setup directory during generate()
             return self.setup_dir / "etc" / filename
         if context == "runtime":
+            # at runtime the simulation reads the config from the (copied)
+            # input directory, relative to the working directory -- this is a
+            # pure function of the plugin's state (sources + config), so the
+            # serialised form round-trips (round-trip safety)
             return Path("..") / "input" / "etc" / filename
         raise ValueError(f"Unknown {context=} upon requesting the openPMD config filename.")
 
@@ -253,14 +302,29 @@ class OpenPMDPlugin(BaseModel):
         content = self.config.model_dump(mode="json", exclude_none=True) | {
             "sink": {"dummy_application_name": {"period": sources}}
         }
-        with self.config_filename(content, context="setup").open("wb") as file:
+        config_path = self.config_filename(content, context="setup")
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with config_path.open("wb") as file:
             tomli_w.dump(content, file)
         return content
 
     @model_serializer(mode="plain")
     def _get_serialized(self) -> dict[str, Any] | None:
         content = self._generate_config_file()
+        # In addition to the rendering-relevant keys (type_openPMD,
+        # config_filename, derived_fields -- see fileOutput.param.mustache and
+        # N.cfg.mustache), carry the full plugin state (sources and config)
+        # so that the plugin can be reconstructed from its serialised form
+        # (round-trip safety); the extra keys are ignored by the templates.
         return {
+            # one dict per (period, source) pair -- a list of lists would be
+            # rejected by the rendering context checker (lists may only
+            # contain dicts)
+            "sources": [
+                {"period": period.model_dump(mode="json"), "source": source.model_dump(mode="json")}
+                for period, source in self.sources
+            ],
+            "config": self.config.model_dump(mode="json"),
             "type_openPMD": True,
             "config_filename": str(self.config_filename(content, context="runtime")),
             "derived_fields": unique(

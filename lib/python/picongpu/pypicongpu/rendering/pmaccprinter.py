@@ -13,6 +13,15 @@ PMACC_MATH_FUNCTIONS = {
 }
 
 
+def serialise_expression(value):
+    # Accept both sympy expressions (printed to the C++ form) and strings
+    # that are already in the C++ form, so that model_dump(mode="json")
+    # output can be validated again (round-trip safety).
+    if isinstance(value, str):
+        return value
+    return PMAccPrinter().doprint(value)
+
+
 class PMAccPrinter(cxx_code_printers["c++17"]):
     # Originally, the C++ printers use `_ns = "std::"`.
     _ns = "pmacc::math::"

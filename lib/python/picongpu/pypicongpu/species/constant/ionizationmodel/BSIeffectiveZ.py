@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 from .ionizationmodel import IonizationModel
-from ..ionizationcurrent import IonizationCurrent
+from ..ionizationcurrent import None_
 
 
 class BSIEffectiveZ(IonizationModel):
@@ -22,5 +22,5 @@ class BSIEffectiveZ(IonizationModel):
     ionizer_picongpu_name: str = "BSIEffectiveZ"
     """C++ Code type name of ionizer"""
 
-    ionization_current: IonizationCurrent
+    ionization_current: None_
     """ionization current implementation to use"""

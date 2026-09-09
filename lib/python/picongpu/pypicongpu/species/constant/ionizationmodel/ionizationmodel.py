@@ -7,10 +7,10 @@ License: GPLv3+
 
 import typing
 
-from pydantic import Field
+from pydantic import ConfigDict, Field, field_validator
 
 from picongpu.pypicongpu.species.constant import Constant
-from picongpu.pypicongpu.species.constant.ionizationcurrent import IonizationCurrent
+from picongpu.pypicongpu.species.constant.ionizationcurrent import None_
 
 
 class IonizationModel(Constant):
@@ -28,6 +28,8 @@ class IonizationModel(Constant):
     include/picongpu/param/speciesDefinition.param.
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     ionizer_picongpu_name: str = Field(alias="picongpu_name")
     """C++ type name of the ionizer (e.g. "BSI", "ADKLinPol"), rendered into the
     ionizers particle flag; must be a valid C++ identifier."""
@@ -37,5 +39,18 @@ class IonizationModel(Constant):
     """species to be used as the ionization electrons (rendered as a template
     argument of the ionizer)"""
 
-    ionization_current: IonizationCurrent | None = None
+    ionization_current: None_ | None = None
     """ionization current implementation to use (None = no current model)"""
+
+    @field_validator("ionization_electron_species", mode="before")
+    @classmethod
+    def _rehydrate_electron_species(cls, value):
+        # the model_dump of a species held in this (Any-typed) field is a plain
+        # dict in json mode; reconstruct the species so that the model can be
+        # used (e.g. rendered) again after a serialization round-trip.
+        # import here to avoid a circular import (species -> constants -> species)
+        if isinstance(value, dict):
+            from picongpu.pypicongpu.species.species import Species
+
+            return Species.model_validate(value)
+        return value

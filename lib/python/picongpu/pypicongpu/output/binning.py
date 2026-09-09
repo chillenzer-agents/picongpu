@@ -8,7 +8,7 @@ License: GPLv3+
 import json
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, computed_field, field_serializer, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer, field_validator, model_validator
 
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
@@ -68,13 +68,16 @@ class BinningAxis(RenderedObject, BaseModel):
     Units policy: see the bin spec and the axis functor.
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     axis_name: str = Field(alias="name")
     """name of the axis, rendered as the C++ variable axis_{name}, so it must
     be a valid C++ identifier ([A-Za-z0-9_]+)"""
 
-    bin_spec_raw: BinSpec = Field(exclude=True)
+    bin_spec_raw: BinSpec
     """the binning specification as given by the user (pre unit-translation);
-    the translated ``bin_spec`` is exposed as a computed field"""
+    the translated ``bin_spec`` is exposed as a computed field. Kept in the
+    serialised form so the model is reconstructable (round-trip safety)."""
 
     axis_functor: ParticleFunctor = Field(alias="functor")
     """the particle functor computing the axis value"""
@@ -111,6 +114,8 @@ class Binning(BaseModel):
     Units policy: see the axes, the deposition functor, and the time steps
     (dimensionless).
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     binner_name: str = Field(alias="name")
     """name of the binner, rendered as the C++ function {name}(BinningCreator&),
@@ -151,6 +156,14 @@ class Binning(BaseModel):
     @field_serializer("openPMDBackendConfig")
     def _serialize_openPMDBackendConfig(self, value) -> str | None:
         return None if value is None else json.dumps(value)
+
+    @field_validator("openPMDBackendConfig", mode="before")
+    @classmethod
+    def _deserialize_openPMDBackendConfig(cls, value):
+        # the model serializer writes a compact JSON string (inverse of
+        # field_serializer above); parse it back on the way in (round-trip
+        # safety)
+        return None if value is None else (value if isinstance(value, dict) else json.loads(value))
 
     @field_validator("binner_name")
     @classmethod

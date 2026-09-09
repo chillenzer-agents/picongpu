@@ -22,7 +22,7 @@ from picongpu.pypicongpu.species.util.element import Element
 def _element_species(symbol):
     return Species(
         name="ion",
-        constants=[ElementProperties(element=Element(symbol)), Mass(mass_si=1.0), Charge(charge_si=1.0)],
+        constants=[ElementProperties(element=Element(openpmd_name=symbol)), Mass(mass_si=1.0), Charge(charge_si=1.0)],
         attributes=[Position(), Momentum(), Weighting()],
     )
 

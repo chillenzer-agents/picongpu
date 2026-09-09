@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 from .ionizationmodel import IonizationModel
-from ..ionizationcurrent import IonizationCurrent
+from ..ionizationcurrent import None_
 
 
 class BSIStarkShifted(IonizationModel):
@@ -21,5 +21,5 @@ class BSIStarkShifted(IonizationModel):
     ionizer_picongpu_name: str = "BSIStarkShifted"
     """C++ Code type name of ionizer"""
 
-    ionization_current: IonizationCurrent
+    ionization_current: None_
     """ionization current implementation to use"""

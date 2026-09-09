@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 from .ionizationmodel import IonizationModel
-from ..ionizationcurrent import IonizationCurrent
+from ..ionizationcurrent import None_
 
 
 class Keldysh(IonizationModel):
@@ -25,5 +25,5 @@ class Keldysh(IonizationModel):
     ionizer_picongpu_name: str = "Keldysh"
     """C++ Code type name of ionizer"""
 
-    ionization_current: IonizationCurrent
+    ionization_current: None_
     """ionization current implementation to use"""

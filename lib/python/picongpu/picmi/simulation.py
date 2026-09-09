@@ -42,6 +42,7 @@ from picongpu.pypicongpu.species.attribute.momentum import Momentum
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
 from picongpu.pypicongpu.util import UnpackChain, unique
+from picongpu.pypicongpu.validation import validate_huygens_against_absorber
 from picongpu.pypicongpu.walltime import Walltime
 
 
@@ -421,6 +422,7 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         field_absorber = self.solver.grid.get_as_pypicongpu_field_absorber()
         absorber_kwarg = {"field_absorber": field_absorber} if field_absorber is not None else {}
+        self._validate_huygens_surfaces_against_absorber(field_absorber)
 
         return pypicongpu.simulation.Simulation(
             species=map(get_as_pypicongpu, sorted(self.species)),
@@ -445,6 +447,40 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     def _get_base_density(self) -> float:
         return self.picongpu_base_density or 1.0e25
+
+    def _validate_huygens_surfaces_against_absorber(self, field_absorber) -> None:
+        """
+        Depth-2 boundary-distance checks for all Huygens surfaces against the field absorber.
+
+        Uses the actual absorber thickness (per axis and boundary) configured via
+        ``picongpu_field_absorber`` / ``pml_cells``; falls back to the C++ defaults
+        (NUM_CELLS = 12 everywhere) when the user did not configure an absorber, so the
+        check still guards the default case.
+
+        Mirroring the C++ ``Absorber::getGlobalThickness()``, axes with periodic boundary
+        conditions carry no absorber and are exempt from the check.
+
+        The YMax boundary is exempt when a moving window is active.
+        """
+        thickness = (
+            field_absorber.thickness
+            if field_absorber is not None
+            else pypicongpu.fieldabsorber.FieldAbsorber().thickness
+        )
+        grid = self.solver.grid
+        # C++ Absorber::getGlobalThickness() zeroes the thickness on periodic axes
+        is_periodic = [bc == "periodic" for bc in grid.lower_boundary_conditions]
+        moving_window = self.picongpu_moving_window_move_point is not None
+        for laser in self.lasers:
+            validate_huygens_against_absorber(
+                laser.picongpu_huygens_surface_positions,
+                thickness,
+                # Yee/order-2 FDTD solver: FDTD_spatial_order / 2 = 1 (see FDTD_spatial_order)
+                solver_margin=1,
+                moving_window=moving_window,
+                grid_size=grid.number_of_cells,
+                is_periodic=is_periodic,
+            )
 
     def run(self, *args, **kwargs) -> None:
         return self.picongpu_run(*args, **kwargs)

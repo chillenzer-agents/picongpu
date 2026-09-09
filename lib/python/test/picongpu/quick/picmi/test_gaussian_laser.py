@@ -544,7 +544,9 @@ def test_huygens_surface_positions_fit_into_grid():
 def test_huygens_surface_positions_all_lasers_must_match():
     sim = _minimal_sim([128, 512, 256])
     sim.add_laser(_minimal_gaussian_laser(), None)
-    sim.add_laser(_minimal_gaussian_laser(picongpu_huygens_surface_positions=[[1, -1], [1, -1], [1, -1]]), None)
+    # mismatched but Depth-2-valid (far enough from every absorbing boundary) positions,
+    # so the all-lasers-must-match check is what fires and not the absorber-distance one
+    sim.add_laser(_minimal_gaussian_laser(picongpu_huygens_surface_positions=[[12, -16], [12, -16], [12, -16]]), None)
     with pytest.raises(ValueError, match="[Hh]uygens"):
         sim.get_as_pypicongpu()
 

@@ -21,15 +21,21 @@ class IonizationModel(Constant):
 
     Identified by its PIConGPU name.
 
-    PIConGPU term: "ionizer"
+    PIConGPU term: "ionizer".
+
+    C++ counterpart: the `particles::ionization::<ionizer>` template argument
+    of the `ionizers<...>` particle flag in
+    include/picongpu/param/speciesDefinition.param.
     """
 
     ionizer_picongpu_name: str = Field(alias="picongpu_name")
-    """C++ Code type name of ionizer"""
+    """C++ type name of the ionizer (e.g. "BSI", "ADKLinPol"), rendered into the
+    ionizers particle flag; must be a valid C++ identifier."""
 
     # no typecheck here -- would require circular imports
     ionization_electron_species: typing.Any
-    """species to be used as electrons"""
+    """species to be used as the ionization electrons (rendered as a template
+    argument of the ionizer)"""
 
     ionization_current: IonizationCurrent | None = None
-    """ionization current implementation to use"""
+    """ionization current implementation to use (None = no current model)"""

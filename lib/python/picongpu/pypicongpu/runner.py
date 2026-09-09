@@ -93,13 +93,23 @@ def get_tmpdir_with_name(name, parent: Path | None = None):
 
 
 class PicBuildFlags(BaseModel):
-    # We explicitly disallow the some shorthands like `-c`, `-t`, ...
-    # because they overlap with tbg flags and could thus lead to confusion.
-    jobs: int | None = Field(
+    """
+    the command-line flags of the pic-build step (build the simulation
+    executable).
+
+    Some shorthands (e.g. ``-c``, ``-t``) are deliberately not exposed as
+    aliases because they overlap with the tbg flags and would be ambiguous.
+
+    Units policy: dimensionless (build configuration).
+    """
+
+    jobs: Annotated[int, Field(gt=0)] | None = Field(
         default=4,
         description="allow N jobs at once; infinite jobs if set to None",
         validation_alias=AliasChoices("jobs", "j"),
     )
+    """number of parallel build jobs, [dimensionless]; must be > 0 when set
+    (None = unlimited)"""
 
     cmake: str | None = Field(
         default=None,
@@ -108,6 +118,8 @@ class PicBuildFlags(BaseModel):
         ),
         validation_alias=AliasChoices("cmake"),
     )
+    """extra arguments passed straight to CMake, e.g.
+    ``-DPIC_VERBOSE=21 -DCMAKE_BUILD_TYPE=Debug``; None = none"""
 
     preset: int | None = Field(
         default=None,
@@ -115,52 +127,75 @@ class PicBuildFlags(BaseModel):
         ge=0,
         validation_alias=AliasChoices("preset"),
     )
+    """the CMake preset number to configure, [dimensionless]; must be >= 0
+    when set (None = default preset)"""
 
     force: bool = Field(
         default=False,
         description=("When set, clears the CMake file cache and forces a scan for new .param files."),
         validation_alias=AliasChoices("force", "f"),
     )
+    """if True, clear the CMake file cache and force a scan for new .param
+    files"""
 
     cmake_build_system: str | None = Field(
         default=None,
         description=("Select the build system used by CMake (e.g. ``Ninja``)."),
         validation_alias=AliasChoices("G"),
     )
+    """the CMake build system generator (e.g. ``Ninja``); None = CMake
+    default"""
 
 
 class TBGFlags(BaseModel):
-    # We explicitly disallow the some shorthands like `-c`, `-t`, ...
-    # because they overlap with pic-build flags and could thus lead to confusion.
+    """
+    the command-line flags of the tbg step (generate and submit the batch
+    file).
+
+    Some shorthands (e.g. ``-c``, ``-t``) are deliberately not exposed as
+    aliases because they overlap with the pic-build flags and would be
+    ambiguous.
+
+    Units policy: dimensionless (run configuration).
+    """
+
     cfg_file: str = Field(
         default="etc/picongpu/N.cfg",
         description="Configuration file to set up batch file.",
         validation_alias=AliasChoices("cfg"),
     )
+    """the configuration file used to set up the batch file"""
 
     submit_system: str | None = Field(
         default_factory=lambda: rc_params.get("tbg_submit", "bash"),
         description="Submit command (qsub, 'qsub -h', sbatch, ...).",
         validation_alias=AliasChoices("submit", "s"),
     )
+    """the submission command (qsub, sbatch, bash, ...); defaults to the
+    ``tbg_submit`` rc parameter (``bash``)"""
 
     template_file: str | None = Field(
         default_factory=lambda: rc_params.get("tbg_tpl_file", None), validation_alias=AliasChoices("tpl")
     )
+    """the batch-file template file; defaults to the ``tbg_tpl_file`` rc
+    parameter (None = built-in template)"""
 
     overwrite_vars: list[str] | None = Field(
         default=None,
         description="Overwrite any template variable.",
         validation_alias=AliasChoices("o"),
     )
+    """template variables to overwrite (``name=value`` entries); None = none"""
 
     force: bool = Field(
         default=False,
         description="Override if 'destinationPath' exists.",
         validation_alias=AliasChoices("force", "f"),
     )
+    """if True, overwrite the destination path if it already exists"""
 
     project_path: Path = Field(description="Simulation setup directory to run.")
+    """the simulation setup directory to run"""
 
     @field_serializer("project_path")
     def _serialize_project_path(self, value) -> dict[str, str]:
@@ -208,13 +243,25 @@ class Runner(BaseModel):
     """
 
     template_dir: Annotated[Sequence[Path], AfterValidator(lambda t: tuple(p.absolute() for p in t))] = (tpath(),)
+    """the template directories copied into the setup directory (absolute
+    paths); defaults to the package's template directory"""
+
     setup_dir: Annotated[Path, AfterValidator(Path.absolute)] = Field(
         default_factory=lambda: Path(get_tmpdir_with_name("setup")).absolute()
     )
+    """the directory the simulation setup is generated into and the
+    executable is built in (absolute path); defaults to a fresh temporary
+    directory"""
+
     run_dir: Annotated[Path, AfterValidator(Path.absolute)] = Field(
         default_factory=lambda: Path(get_tmpdir_with_name("run")).absolute()
     )
+    """the directory where the execution's data is stored (absolute path);
+    defaults to a fresh temporary directory"""
+
     sim: Annotated[Simulation, BeforeValidator(lambda s: alt(lambda: s.get_as_pypicongpu(), s))]
+    """the simulation to run (a picmi.Simulation is converted to the
+    pypicongpu representation during validation)"""
 
     def _log_dirs(self):
         """print human-readble list of paths to log"""

@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 from itertools import chain
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
@@ -22,12 +22,38 @@ from picongpu.pypicongpu.util import alt, unique
 
 
 class ConstLogCollision(BaseModel):
+    """
+    collision functor with a constant Coulomb logarithm
+
+    C++ counterpart: the constant-log Coulomb collision functor
+    (particles/collision/relativistic/RelativisticCollisionConstLog.hpp,
+    the `coulombLog` parameter).
+
+    Units policy: dimensionless.
+    """
+
     type_constlog: Literal[True] = True
-    coulomb_log: float
+    """tag field identifying the constant-log collision functor (discriminator)"""
+
+    coulomb_log: Annotated[float, Field(gt=0.0)]
+    """the Coulomb logarithm, [dimensionless]; must be > 0 (it is the
+    logarithm of the Debye-screened range ratio)"""
 
 
 class DynamicLogCollision(BaseModel):
+    """
+    collision functor with a dynamically computed Coulomb logarithm
+
+    C++ counterpart: the dynamic-log Coulomb collision functor
+    (particles/collision/relativistic/RelativisticCollisionDynamicLog.hpp);
+    the Coulomb logarithm is computed from the Debye length and clamped to
+    >= 2 by the C++ implementation.
+
+    Units policy: dimensionless.
+    """
+
     type_dynamiclog: Literal[True] = True
+    """tag field identifying the dynamic-log collision functor (discriminator)"""
 
 
 CollisionFunctor = ConstLogCollision | DynamicLogCollision
@@ -42,8 +68,21 @@ def functor(s: Species | FilteredSpecies):
 
 
 class Collision(BaseModel):
+    """
+    one collision interaction between species pairs
+
+    C++ counterpart: one entry of the CollisionPipeline
+    (include/picongpu/param/collision.param).
+
+    Units policy: see the collision functor.
+    """
+
     species_pairs: list[tuple[Species | FilteredSpecies, Species | FilteredSpecies]]
+    """the interacting species pairs; pairs with the same species but
+    different filters are rejected (not supported by PIConGPU)"""
+
     functor: CollisionFunctor
+    """the collision functor (constant or dynamic Coulomb logarithm)"""
 
     @field_validator("species_pairs", mode="after")
     @classmethod
@@ -78,9 +117,27 @@ class Collision(BaseModel):
 
 
 class CollisionNumericsConfig(BaseModel):
+    """
+    the numerics configuration of the collision plugin
+
+    C++ counterpart: include/picongpu/param/collision.param
+    (float_COLL precision, cellListChunkSize, debugScreeningLength).
+
+    Units policy: dimensionless.
+    """
+
     precision: Literal[32, 64, "X"] = 64
-    cell_list_chunk_size: int | None = None
+    """floating-point precision of the collision kernel
+    (C++: precision::float_COLL; 32, 64, or X = double precision)"""
+
+    cell_list_chunk_size: Annotated[int, Field(gt=0)] | None = None
+    """chunk size for the cell-list allocations, [particle count];
+    must be > 0 when set (C++: cellListChunkSize, uint32_t);
+    None = the C++ default"""
+
     debug_screening_length: bool = False
+    """if True, write the average Debye screening length to a file for
+    debugging (C++: debugScreeningLength)"""
 
 
 def split_into_single(collision):
@@ -88,9 +145,25 @@ def split_into_single(collision):
 
 
 class CollisionalPhysicsSetup(BaseModel):
+    """
+    the collisional physics setup (top level)
+
+    C++ counterpart: include/picongpu/param/collision.param
+    (CollisionPipeline, CollisionScreeningSpecies, numerics settings).
+
+    Units policy: see the sub-models.
+    """
+
     collisions: list[Collision] = Field(default_factory=list)
+    """the collisions; each is split into single-pair collisions during
+    validation (the C++ pipeline syntax does not support per-pair filters)"""
+
     screening_species: list[Species | FilteredSpecies] = Field(default_factory=list)
+    """the species contributing to the Debye screening length
+    (C++: CollisionScreeningSpecies)"""
+
     numerics_config: CollisionNumericsConfig = CollisionNumericsConfig()
+    """the numerics configuration of the collision plugin"""
 
     @field_validator("collisions", mode="after")
     @classmethod

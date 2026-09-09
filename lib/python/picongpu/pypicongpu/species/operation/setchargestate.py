@@ -1,11 +1,11 @@
 """
 This file is part of PIConGPU.
-Copyright 2021-2024 PIConGPU contributors
+Copyright 2021-2025 PIConGPU contributors
 Authors: Hannes Troepgen, Brian Edward Marre, Masoud Afshari
 License: GPLv3+
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -17,15 +17,21 @@ class SetChargeState(BaseModel):
     assigns boundElectrons attribute and sets it to the initial charge state
 
     used for ionization of ions
+
+    C++ counterpart: the boundElectrons initialization in
+    include/picongpu/param/speciesInitialization.param.
+
+    Units policy: charge_state is an integer count (dimensionless).
     """
 
     species: Species
     """species which will have boundElectrons set"""
 
-    charge_state: int = Field(ge=0)
-    """initial ion charge state"""
+    charge_state: Annotated[int, Field(ge=0)]
+    """initial ion charge state, [dimensionless count]; must be >= 0."""
 
     type_setchargestate: Literal[True] = True
+    """discriminator for the AnyOperation union."""
 
     @model_validator(mode="after")
     def check(self) -> "SetChargeState":

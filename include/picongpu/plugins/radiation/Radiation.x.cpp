@@ -23,12 +23,14 @@
 #    include "picongpu/plugins/radiation/Radiation.kernel"
 
 #    include "picongpu/particles/filter/filter.hpp"
+#    include "picongpu/particles/traits/GenerateSolversIfSpeciesEligible.hpp"
 #    include "picongpu/particles/traits/SpeciesEligibleForSolver.hpp"
 #    include "picongpu/plugins/ISimulationPlugin.hpp"
 #    include "picongpu/plugins/PluginRegistry.hpp"
 #    include "picongpu/plugins/common/openPMDDefaultExtension.hpp"
 #    include "picongpu/plugins/common/openPMDVersion.def"
 #    include "picongpu/plugins/common/stringHelpers.hpp"
+#    include "picongpu/plugins/misc/misc.hpp"
 #    include "picongpu/plugins/radiation/executeParticleFilter.hpp"
 #    include "picongpu/plugins/radiation/frequencies/radiation_lin_freq.hpp"
 #    include "picongpu/plugins/radiation/frequencies/radiation_list_freq.hpp"
@@ -48,6 +50,7 @@
 #    include <complex>
 #    include <cstdlib>
 #    include <fstream>
+#    include <functional>
 #    include <iostream>
 #    include <memory>
 #    include <optional>
@@ -123,6 +126,23 @@ namespace picongpu
                 int numJobs;
 
                 /**
+                 * name of the particle filter (see `particleFilters.param`) used to
+                 * select the particles that contribute to the radiation calculation.
+                 * Empty means: use the default (`RadiationParticleFilter` / the
+                 * `radiationMask` attribute).
+                 */
+                std::string m_filterName;
+                /** names of all particle filters valid for the current species */
+                std::vector<std::string> m_allowedFilters;
+                std::string m_filterHelp;
+
+                // find all valid filters for the current used species
+                template<typename T>
+                using Op = typename particles::traits::GenerateSolversIfSpeciesEligible<T, ParticlesType>::type;
+                using EligibleFilters
+                    = pmacc::mp_flatten<pmacc::mp_transform<Op, particles::filter::AllParticleFilters>>;
+
+                /**
                  * Data structure for storage and summation of the intermediate values of
                  * the calculated Amplitude from every host for every direction and
                  * frequency.
@@ -193,10 +213,20 @@ namespace picongpu
 
                 void pluginRegisterHelp(po::options_description& desc) override
                 {
+                    meta::ForEach<EligibleFilters, plugins::misc::AppendName<boost::mpl::_1>> getEligibleFilterNames;
+                    getEligibleFilterNames(m_allowedFilters);
+
+                    m_filterHelp = "name of the particle filter (see `particleFilters.param`) that selects the "
+                                   "particles whose radiation is calculated; available filters: ["
+                                   + plugins::misc::concatenateToString(m_allowedFilters, ", ") + "]";
+
                     desc.add_options()(
                         (pluginPrefix + ".period").c_str(),
                         po::value<std::string>(&notifyPeriod),
                         "enable plugin [for each n-th step]")(
+                        (pluginPrefix + ".filter").c_str(),
+                        po::value<std::string>(&m_filterName),
+                        m_filterHelp.c_str())(
                         (pluginPrefix + ".dump").c_str(),
                         po::value<uint32_t>(&dumpPeriod)->default_value(0),
                         "dump integrated radiation from last dumped step [for each n-th step] (0 = only print data at "
@@ -323,6 +353,20 @@ namespace picongpu
                  * is created.       */
                 void pluginLoad() override
                 {
+                    // check if user passed filter name is valid (fail early on a typo)
+                    if(m_allowedFilters.empty())
+                    {
+                        meta::ForEach<EligibleFilters, plugins::misc::AppendName<boost::mpl::_1>>
+                            getEligibleFilterNames;
+                        getEligibleFilterNames(m_allowedFilters);
+                    }
+                    if(!m_filterName.empty()
+                       && std::find(m_allowedFilters.begin(), m_allowedFilters.end(), m_filterName)
+                              == m_allowedFilters.end())
+                        throw std::runtime_error(
+                            pluginPrefix + ": unknown filter '" + m_filterName + "'. Available filters are: ["
+                            + plugins::misc::concatenateToString(m_allowedFilters, ", ") + "].");
+
                     if(!notifyPeriod.empty())
                     {
                         if(numJobs <= 0)
@@ -1167,9 +1211,7 @@ namespace picongpu
 
                     DataConnector& dc = Environment<>::get().DataConnector();
                     auto particles = dc.get<ParticlesType>(ParticlesType::FrameType::getName());
-
-                    /* execute the particle filter */
-                    radiation::executeParticleFilter(particles, currentStep);
+                    auto idProvider = dc.get<IdProvider>("globalId");
 
                     /* the parallelization is ONLY over directions:
                      * (a combined parallelization over direction AND frequencies
@@ -1195,9 +1237,40 @@ namespace picongpu
                     DataSpace<simDim> globalOffset(subGrid.getLocalDomain().offset);
                     globalOffset.y() += (localSize.y() * numSlides);
 
-                    // PIC-like kernel call of the radiation kernel
-                    PMACC_LOCKSTEP_KERNEL(KernelRadiationParticles{})
-                        .config(DataSpace<2>(gridDim_rad, numJobs), *particles)(
+                    // PIC-like kernel call of the radiation kernel; the last argument is the particle filter
+                    auto kernel = PMACC_LOCKSTEP_KERNEL(KernelRadiationParticles{})
+                                      .config(DataSpace<2>(gridDim_rad, numJobs), *particles);
+
+                    /* Two mutually exclusive particle-selection mechanisms:
+                     *
+                     * 1. No `.filter` given (default): the per-species particle filter is executed beforehand
+                     *    (`executeParticleFilter`), writing the `radiationMask` attribute of every contributing
+                     *    particle into the species' frames; the kernel then reads it via the default
+                     *    `ReadRadiationMaskFilter`. This is the historic gamma-filter path and is exactly the
+                     *    mechanism the PICMI particle-filter support (task-04 / radiation PICMI filters, a
+                     *    Python-side prerequisite) builds on: it renders a per-species `<species>_<filter>`
+                     *    mask functor into `radiation.param` and registers the `radiationMask` attribute for the
+                     *    filtered species. Running this branch for such a species uses that rendered mask as
+                     *    designed.
+                     *
+                     * 2. Named `.filter` (command line): the filter is resolved by name against
+                     *    `AllParticleFilters` (`particleFilters.param`) and evaluated as an inline predicate
+                     *    inside the kernel; `executeParticleFilter` is deliberately NOT run here, so a
+                     *    `radiationMask` attribute (e.g. a mask functor rendered by the PICMI side) is left
+                     *    unused for that species. For the same filter name both mechanisms select the same
+                     *    particles, so the two paths are compatible, but a species must not rely on both at
+                     *    once. NOTE (stacking with task-04): the PICMI flow emits both a mask functor and the
+                     *    `.filter` option for a `FilteredSpecies`; the inline predicate below takes precedence and
+                     *    the rendered mask functor becomes inert for that species. This pairing must remain a
+                     *    compile-clean stacked build (CI gate) and is covered by the e2e test in the Python
+                     *    suite once the prerequisite is merged.
+                     */
+                    if(m_filterName.empty())
+                    {
+                        /* execute the particle filter */
+                        radiation::executeParticleFilter(particles, currentStep);
+
+                        kernel(
                             /*Pointer to particles memory on the device*/
                             particles->getDeviceParticlesBox(),
 
@@ -1207,7 +1280,34 @@ namespace picongpu
                             currentStep,
                             *cellDescription,
                             freqFkt,
-                            subGrid.getGlobalDomain().size);
+                            subGrid.getGlobalDomain().size,
+                            particles::filter::IUnary<radiation::ReadRadiationMaskFilter>{
+                                currentStep,
+                                idProvider->getDeviceGenerator()});
+                    }
+                    else
+                    {
+                        /* a name-based filter from `particleFilters.param` selects the particles inside the kernel */
+                        auto bindKernel = std::bind(
+                            kernel,
+                            /*Pointer to particles memory on the device*/
+                            particles->getDeviceParticlesBox(),
+
+                            /*Pointer to memory of radiated amplitude on the device*/
+                            radiation->getDeviceBuffer().getDataBox(),
+                            globalOffset,
+                            currentStep,
+                            *cellDescription,
+                            freqFkt,
+                            subGrid.getGlobalDomain().size,
+                            std::placeholders::_1);
+
+                        meta::ForEach<EligibleFilters, plugins::misc::ExecuteIfNameIsEqual<boost::mpl::_1>>{}(
+                            m_filterName,
+                            currentStep,
+                            idProvider->getDeviceGenerator(),
+                            bindKernel);
+                    }
 
                     if(dumpPeriod != 0 && currentStep % dumpPeriod == 0)
                     {

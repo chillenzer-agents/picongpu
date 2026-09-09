@@ -115,29 +115,32 @@ pypicongpu_output_with_newlines="
     {{#type_radiation}}
     {{#species}}
     {{#config}}
-          --{{{name}}}_radiation.period {{#period.specs}}{{{start}}}:{{{stop}}}:{{{step}}}{{^_last}},{{/_last}}{{/period.specs}}
-          --{{{name}}}_radiation.dump {{{num_accumulation_steps}}}
+          --{{{species_name}}}_radiation.period {{#period.specs}}{{{start}}}:{{{stop}}}:{{{step}}}{{^_last}},{{/_last}}{{/period.specs}}
+           {{#type_filtered}}
+          --{{{species_name}}}_radiation.filter {{{filter_name}}}
+           {{/type_filtered}}
+          --{{{species_name}}}_radiation.dump {{{num_accumulation_steps}}}
            {{#last_radiation}}
-          --{{{name}}}_radiation.lastRadiation
-          --{{{name}}}_radiation.folderLastRad {{{folder_last_rad}}}
+          --{{{species_name}}}_radiation.lastRadiation
+          --{{{species_name}}}_radiation.folderLastRad {{{folder_last_rad}}}
            {{/last_radiation}}
            {{#total_radiation}}
-          --{{{name}}}_radiation.totalRadiation
-          --{{{name}}}_radiation.folderTotalRad {{{folder_total_rad}}}
+          --{{{species_name}}}_radiation.totalRadiation
+          --{{{species_name}}}_radiation.folderTotalRad {{{folder_total_rad}}}
            {{/total_radiation}}
-          --{{{name}}}_radiation.start {{{start}}}
-          --{{{name}}}_radiation.end {{{end}}}
+          --{{{species_name}}}_radiation.start {{{start}}}
+          --{{{species_name}}}_radiation.end {{{end}}}
            {{#rad_per_gpu}}
-          --{{{name}}}_radiation.radPerGPU
-          --{{{name}}}_radiation.folderRadPerGPU {{{folder_rad_per_gpu}}}
+          --{{{species_name}}}_radiation.radPerGPU
+          --{{{species_name}}}_radiation.folderRadPerGPU {{{folder_rad_per_gpu}}}
            {{/rad_per_gpu}}
-          --{{{name}}}_radiation.numJobs {{{num_jobs}}}
-          --{{{name}}}_radiation.openPMDSuffix {{{open_pmd_suffix}}}
-          --{{{name}}}_radiation.openPMDCheckpointExtension {{{open_pmd_checkpoint_extension}}}
-          --{{{name}}}_radiation.openPMDConfig {{{open_pmd_config}}}
-          --{{{name}}}_radiation.openPMDCheckpointConfig {{{open_pmd_checkpoint_config}}}
+          --{{{species_name}}}_radiation.numJobs {{{num_jobs}}}
+          --{{{species_name}}}_radiation.openPMDSuffix {{{open_pmd_suffix}}}
+          --{{{species_name}}}_radiation.openPMDCheckpointExtension {{{open_pmd_checkpoint_extension}}}
+          --{{{species_name}}}_radiation.openPMDConfig {{{open_pmd_config}}}
+          --{{{species_name}}}_radiation.openPMDCheckpointConfig {{{open_pmd_checkpoint_config}}}
            {{#distributed_amplitude}}
-          --{{{name}}}_radiation.distributedAmplitude
+          --{{{species_name}}}_radiation.distributedAmplitude
            {{/distributed_amplitude}}
     {{/config}}
     {{/species}}

@@ -1,3 +1,1 @@
-from .ionizationcurrent import IonizationCurrent
-
-__all__ = ["IonizationCurrent"]
+from .ionizationcurrent import IonizationCurrent as IonizationCurrent

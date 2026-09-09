@@ -10,7 +10,7 @@ from unittest import TestCase
 import pytest
 from picongpu.picmi.interaction.ionization.fieldionization import ADK, BSI
 from picongpu.picmi.species import Species
-from picongpu.picmi.species_requirements import RequirementConflict, SetChargeStateOperation, run_construction
+from picongpu.picmi._species_requirements import RequirementConflict, SetChargeStateOperation, run_construction
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.species.constant.mass import Mass
 from picongpu.pypicongpu.species.operation.setchargestate import SetChargeState

@@ -8,7 +8,7 @@ License: GPLv3+
 from pydantic import BaseModel, model_validator
 
 from picongpu.picmi.species import DependsOn, Species
-from picongpu.picmi.species_requirements import (
+from picongpu.picmi._species_requirements import (
     GroundStateIonizationConstruction,
     SetChargeStateOperation,
 )

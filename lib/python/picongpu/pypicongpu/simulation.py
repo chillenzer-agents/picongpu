@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
-from picongpu.pypicongpu.collisions import CollisionalPhysicsSetup
+from picongpu.pypicongpu.collision import CollisionalPhysicsSetup
 from picongpu.pypicongpu.output.radiation import RadiationPlugin
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
 from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFunctor

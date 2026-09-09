@@ -10,7 +10,7 @@ import picmistandard
 from pydantic import AfterValidator, Field, computed_field
 
 from ..pypicongpu import grid, util
-from .copy_attributes import converts_to
+from ._copy_attributes import converts_to
 
 
 def _normalise_type(kw, key, t):

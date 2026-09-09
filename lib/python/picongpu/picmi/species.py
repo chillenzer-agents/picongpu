@@ -20,7 +20,7 @@ from pydantic import (
     model_validator,
 )
 
-from picongpu.picmi.species_requirements import evaluate_requirements, resolving_add, run_construction
+from picongpu.picmi._species_requirements import evaluate_requirements, resolving_add, run_construction
 from picongpu.pypicongpu.species.attribute import Momentum, Position
 from picongpu.pypicongpu.species.attribute.attribute import Attribute
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
@@ -34,7 +34,7 @@ from picongpu.pypicongpu.species.species import Species as PyPIConGPUSpecies
 
 from .. import pypicongpu
 from ..pypicongpu.species.util.element import Element
-from .predefinedparticletypeproperties import PredefinedParticleTypeProperties
+from ._predefinedparticletypeproperties import PredefinedParticleTypeProperties
 
 
 # Accepted particle-shape terms: the PICMI-standard names plus PIConGPU-only

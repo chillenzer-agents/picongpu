@@ -78,6 +78,18 @@ namespace picongpu
                  */
                 HDINLINE float_X operator()(const floatD_64& position_SI, const float3_64& cellSize_SI)
                 {
+                    {{#profile.lower_bound}}
+                    //! requested lower bound of the sub-volume (lower_bound = ({{{profile.lower_bound.x.value}}}, {{{profile.lower_bound.y.value}}}, {{{profile.lower_bound.z.value}}}) m, None = unbounded)
+                    //! note: Python-side only — not yet honoured by the C++ homogeneous profile (see @todo below)
+                    {{/profile.lower_bound}}
+                    {{#profile.upper_bound}}
+                    //! requested upper bound of the sub-volume (upper_bound = ({{{profile.upper_bound.x.value}}}, {{{profile.upper_bound.y.value}}}, {{{profile.upper_bound.z.value}}}) m, None = unbounded)
+                    //! note: Python-side only — not yet honoured by the C++ homogeneous profile (see @todo below)
+                    {{/profile.upper_bound}}
+                    {{#profile.fill_in}}
+                    //! requested to refill the sub-volume newly exposed by a moving simulation window
+                    //! note: Python-side only — not yet honoured by the C++ homogeneous profile (see @todo below)
+                    {{/profile.fill_in}}
                     //! @todo respect bounding box, Brian Marre, 2023
                     return static_cast<float_X>({{{profile.density_si}}} / SI::BASE_DENSITY_SI);
                 }

@@ -91,7 +91,16 @@ def gather_results(result_path: Path):
     # CWLtool has to copy over the files
     _wait_until(lambda: (result_path / "link_results.sh").exists())
 
-    run([result_path / "link_results.sh", result_path])
+    result = run([result_path / "link_results.sh", result_path])
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"gather_results: link_results.sh exited with {result.returncode} -- the simulation run failed."
+        )
+    if not (result_path / "simOutput").exists():
+        raise RuntimeError(
+            f"gather_results: no simulation output at {result_path / 'simOutput'} -- "
+            "the simulation most likely never produced any output (e.g. mpiexec aborted)."
+        )
 
 
 def directory_in(path, offset=0):

@@ -463,3 +463,30 @@ class Runner(BaseModel):
                     }
                 )
             ).make(str(self.workflow_definition_path))(**json.load(file))
+
+    def build(self):
+        """
+        compile the generated picongpu input files
+
+        Only runs the ``build.cwl`` step of the workflow, i.e. invokes
+        ``pic-build`` on the generated setup directory, without submitting or
+        running the simulation.
+        """
+        with self.workflow_input_path.open("r") as file:
+            # `generate_workflow_input` prefixes every build-related key with
+            # `build_`. Strip that prefix to match the input names of the
+            # standalone `build.cwl` CommandLineTool.
+            build_args = {
+                key.removeprefix("build_"): value for key, value in json.load(file).items() if key.startswith("build_")
+            }
+        return WorkflowFactory(
+            runtime_context=RuntimeContext(
+                kwargs={
+                    "outdir": str(self.setup_dir),
+                    "rm_tmpdir": False,
+                    "move_outputs": "copy",
+                    "cachedir": str(self.cwl_cachedir),
+                    "preserve_entire_environment": True,
+                }
+            )
+        ).make(str(self.build_step_path))(**build_args)

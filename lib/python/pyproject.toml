@@ -88,5 +88,6 @@ markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
   "compiling: tests that compile PIConGPU simulations",
   "end_to_end: end-to-end simulation tests",
+  "ci_no_compile: example/test opted out of compilation (deselect with '-m \"not ci_no_compile\"')",
 ]
 filterwarnings = [ "error" ]

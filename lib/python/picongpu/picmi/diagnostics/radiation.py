@@ -8,6 +8,7 @@ License: GPLv3+
 from pydantic import ConfigDict, field_validator
 
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
+from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species
 from picongpu.pypicongpu.output.radiation import (
     FormFactorConfiguration as FormFactorConfiguration,
@@ -26,25 +27,41 @@ from picongpu.pypicongpu.species.attribute.radiation_mask import RadiationMask
 
 
 class Radiation(RadiationPluginConfig):
-    species: list[Species]
+    species: list[Species | FilteredSpecies]
     period: TimeStepSpec
 
     @field_validator("species", mode="before")
     @classmethod
     def _validate_species(cls, value):
-        return [value] if isinstance(value, Species) else value
+        if isinstance(value, (Species, FilteredSpecies)):
+            return [value]
+        if isinstance(value, (list, tuple)):
+            return value
+        raise ValueError(f"species must be a Species or FilteredSpecies (or a list thereof), got {value!r}")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for s in self.species:
-            s.register_requirements(
-                [MomentumPrev1()] + ([RadiationMask()] if self.gamma_filter_threshold is not None else [])
-            )
+            species = s.species if isinstance(s, FilteredSpecies) else s
+            requirements = [MomentumPrev1()]
+            # The C++ filter (plugins::radiation::executeParticleFilter) only
+            # runs on species that carry the radiationMask attribute, and a mask
+            # functor is rendered for exactly those species: a filtered species,
+            # whose mask is set by its particle filter. A plain species has no
+            # mask, so all of its particles contribute unfiltered. Register the
+            # attribute for filtered species so the mask is actually written and
+            # read.
+            if isinstance(s, FilteredSpecies):
+                requirements.append(RadiationMask())
+            species.register_requirements(requirements)
 
     def get_as_pypicongpu(self, time_step_size, num_steps):
         return RadiationPlugin(
             config=self,
-            species=[s.get_as_pypicongpu() for s in self.species],
+            species=[
+                s.get_as_pypicongpu(mode="Filter") if isinstance(s, FilteredSpecies) else s.get_as_pypicongpu()
+                for s in self.species
+            ],
             period=self.period.get_as_pypicongpu(time_step_size=time_step_size, num_steps=num_steps),
         )
 

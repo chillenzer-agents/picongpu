@@ -19,6 +19,7 @@ from sympy import Expr, Symbol
 from sympy.vector import CoordSys3D, Vector
 
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
+from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
 from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.species import Species
 
@@ -132,8 +133,8 @@ class RadiationConfiguration(BaseModel):
 class RadiationPluginConfig(BaseModel):
     """Top-level radiation plugin configuration.
 
-    Combines radiation settings, observer settings, gamma filtering,
-    and window function configuration into a single coherent model.
+    Combines radiation settings, observer settings, and window function
+    configuration into a single coherent model.
     """
 
     radiation: RadiationConfiguration = Field(
@@ -142,11 +143,6 @@ class RadiationPluginConfig(BaseModel):
     )
 
     observer: RadiationObserverConfiguration = Field(description="Observer configuration for virtual detectors")
-
-    gamma_filter_threshold: float | None = Field(
-        None,
-        description="Minimum gamma value for particles to be included in radiation calculation",
-    )
 
     window_function: WindowFunctionConfiguration = Field(
         WindowFunctionConfiguration.NONE,
@@ -232,7 +228,7 @@ class RadiationPluginConfig(BaseModel):
 class RadiationPlugin(BaseModel):
     type_radiation: Literal[True] = True
     config: RadiationPluginConfig
-    species: list[Species]
+    species: list[Species | FilteredSpecies]
     period: TimeStepSpec
 
     @field_validator("period", mode="after")

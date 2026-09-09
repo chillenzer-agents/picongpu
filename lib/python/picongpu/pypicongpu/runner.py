@@ -30,6 +30,7 @@ from rocrate.rocrate import ROCrate
 from picongpu import core, rc_params
 from picongpu.templates import path as tpath
 
+from .lexis_workflow import parse_lexis_config
 from .rendering import Renderer
 from .simulation import Simulation
 from .util import alt
@@ -277,6 +278,10 @@ class Runner(BaseModel):
         return self.workflow_dir_path / "workflow.cwl"
 
     @property
+    def workflow_lwd_path(self):
+        return self.workflow_dir_path / "workflow.lwd.yaml"
+
+    @property
     def workflow_input_path(self):
         return self.workflow_dir_path / "input.yaml"
 
@@ -397,6 +402,21 @@ class Runner(BaseModel):
         with (self.metadata_path / filename).open("w") as file:
             json.dump(metadata, file, indent=4)
 
+    def generate_lexis_workflow(self, workflow_id: str | None = None):
+        """Emit a LEXIS Workflow Definition (workflow.lwd.yaml).
+
+        Called from :meth:`generate` when ``workflow_backend == "lexis"``. The
+        LWD describes the PIConGPU run as LEXIS HPC job node(s) with the
+        setup_dir staged as an input dataset and the output staged out, in
+        place of the CWL pipeline. See :mod:`pypicongpu.lexis_workflow`.
+        """
+        spec = parse_lexis_config(rc_params)
+        workflow_id = workflow_id or f"picongpu-{self.setup_dir.name}"
+        self.workflow_lwd_path.parent.mkdir(parents=True, exist_ok=True)
+        self.workflow_lwd_path.write_text(spec.to_yaml(workflow_id=workflow_id))
+        logging.info("wrote LEXIS workflow definition to %s", self.workflow_lwd_path)
+        return self.workflow_lwd_path
+
     def generate(self, printDirToConsole=False, exist_ok=False, **flags):
         """
         generate the picongpu-compatible input files
@@ -439,6 +459,9 @@ class Runner(BaseModel):
 
         self.store_metadata(self.model_dump(mode="json"), filename="pypicongpu_runner.json")
         self.store_metadata(rc_params.model_dump(mode="json"), filename="rc_params.json")
+
+        if rc_params.model_dump().get("workflow_backend", "cwl") == "lexis":
+            self.generate_lexis_workflow()
 
         self._write_rocrate()
 

@@ -8,7 +8,7 @@ License: GPLv3+
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 from picongpu.pypicongpu.collisions import CollisionalPhysicsSetup
 from picongpu.pypicongpu.output.radiation import RadiationPlugin
@@ -25,6 +25,7 @@ from .laser import AnyLaser
 from .movingwindow import MovingWindow
 from .output import AnyPlugin, OpenPMDPlugin
 from .rendering import RenderedObject
+from .validation import validate_huygens_surface_positions
 from .walltime import Walltime
 
 
@@ -121,6 +122,28 @@ class Simulation(RenderedObject, BaseModel):
             custom_rendering_context["tags"].extend(tags)
 
         return custom_rendering_context
+
+    @model_validator(mode="after")
+    def _check_lasers(self):
+        if not self.laser:
+            return self
+        first_positions = self.laser[0].huygens_surface_positions
+        for ll in self.laser:
+            # a single Huygens POSITION is rendered per simulation (from the first
+            # laser), so all lasers must agree on the surface positions
+            if ll.huygens_surface_positions != first_positions:
+                raise ValueError(
+                    "All lasers in a simulation must use the same huygens_surface_positions, "
+                    "as a single Huygens surface position is rendered for the whole simulation. "
+                    f"You gave {first_positions=} for the first laser and {ll.huygens_surface_positions=} "
+                    "for another one."
+                )
+            validate_huygens_surface_positions(
+                ll.huygens_surface_positions,
+                cell_cnt=self.grid.cell_cnt,
+                moving_window_enabled=self.moving_window is not None,
+            )
+        return self
 
     def spread_directory_information(self, setup_dir):
         for plugin in self.output or []:

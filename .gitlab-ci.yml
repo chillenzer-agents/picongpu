@@ -201,3 +201,52 @@ pypicongpu-compiling-test:
     CMAKE_VERSION: '3.28'
     BOOST_VERSION: '1.75.0'
     PYTHON_COMPILING_TEST: 'ON'
+
+# tests the documentation snippets (docs/source/python_package/snippets):
+#   - executes every python snippet (simulation runs are emulated, no compilation)
+#   - syntax-checks every bash snippet
+#   - sources the profile of a generated input set, as the "legacy workflow" snippet does
+#   - builds the documentation and fails if a snippet cannot be included
+docs-snippets:
+  stage: test
+  image: registry.hzdr.de/crp/alpaka-group-container/alpaka-ci-${CI_CONTAINER_NAME}-gcc-pic:${CONTAINER_TAG}
+  variables:
+    GIT_SUBMODULE_STRATEGY: normal
+    CI_CONTAINER_NAME: 'ubuntu24.04'
+    PYTHON_VERSION: '3.11.*'
+    # reuse the pypicongpu environment without writing /.picongpurc.toml
+    # (the snippet tests need a pristine rc_params state) and without running
+    # the quick tests (covered by the pypicongpu jobs)
+    PYPICONGPU_SKIP_QUICK_TEST: '1'
+  script:
+    - echo "CI_CONTAINER_NAME -> $CI_CONTAINER_NAME"
+    - echo "PYTHON_VERSION -> $PYTHON_VERSION"
+    - source $CI_PROJECT_DIR/share/ci/install/pypicongpu.sh
+    - pip3 install -r $CI_PROJECT_DIR/docs/requirements.txt
+    - apt update
+    - apt install -y doxygen
+    # the build and submission tools referenced by the "running a simulation" snippets
+    - pic-build --help
+    - pic-configure --help
+    - tbg --help
+    # run the snippet test suite
+    - cd $CI_PROJECT_DIR
+    - python3 -m pytest docs/source/python_package/snippets -q -p no:cacheprovider
+    # generate a minimal input set with the bash preset and source its profile
+    # (no compilation), as the "legacy workflow" snippet does
+    - $CI_PROJECT_DIR/share/ci/docs_snippets_profile_check.sh
+    # build the documentation
+    - cd $CI_PROJECT_DIR/docs
+    - doxygen
+    - sphinx-build -b html source build/html 2>&1 | tee $CI_PROJECT_DIR/docs-snippets-sphinx.log
+    # a missing snippet file only produces a sphinx warning, so fail explicitly
+    - |
+      if grep -E "Include file .+ not found or reading it failed" $CI_PROJECT_DIR/docs-snippets-sphinx.log; then
+          echo "ERROR: at least one documentation snippet is missing or unreadable"
+          exit 1
+      fi
+      grep "build succeeded" $CI_PROJECT_DIR/docs-snippets-sphinx.log
+  tags:
+    - cpuonly
+    - x86_64
+  interruptible: true

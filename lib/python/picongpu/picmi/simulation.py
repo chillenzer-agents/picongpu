@@ -467,9 +467,10 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         - ``up_to=Stage.build``: execute only the requested stage and the
           stages before it (a prefix of the pipeline). The workflow is passed
-          to the cwltool runner with that stage's outputs as targets, so
-          cwltool executes exactly the steps contributing to them and never
-          runs the stages after the requested one.
+          to the cwltool runner (invoked in-process via its
+          WorkflowFactory) with that stage's outputs as targets, so cwltool
+          executes exactly the steps contributing to them and never runs the
+          stages after the requested one.
         - ``from_=Stage.submit``: resume at the requested stage. The workflow
           is run in full against the persistent cwltool job store
           (``<run_dir>/.cwl_cache``): the earlier stages are served from the

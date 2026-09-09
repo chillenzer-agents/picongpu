@@ -6,8 +6,8 @@ License: GPLv3+
 """
 
 from functools import lru_cache
-from typing import Literal
 from pathlib import Path
+from typing import Literal
 
 
 @lru_cache
@@ -30,6 +30,7 @@ def path(component: Literal["bin", "etc", "include"] | None = None):
     except StopIteration:
         message = (
             f"Our heuristic for finding PIConGPU core {component=} has failed. "
-            f"We have looked for {here / component} and {alternative_location_in_source / component / expected_components} without success."
+            f"We have looked for {here / component} and "
+            f"{alternative_location_in_source / component / expected_components} without success."
         )
-        raise FileNotFoundError(message)
+        raise FileNotFoundError(message) from None

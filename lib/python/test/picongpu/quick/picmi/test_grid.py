@@ -5,19 +5,21 @@ Authors: Richard Pausch, Brian Edward Marre
 License: GPLv3+
 """
 
-from picongpu import picmi
-
+from typing import ClassVar
 from unittest import TestCase
+
 import pytest
+
+from picongpu import picmi
 
 
 class TestCartesian3DGrid(TestCase):
-    COMMON_KWARGS = dict(
-        lower_bound=[0, 0, 0],
-        upper_bound=[3.40992e-5, 9.07264e-5, 2.1312e-6],
-        lower_boundary_conditions=["open", "open", "periodic"],
-        upper_boundary_conditions=["open", "open", "periodic"],
-    )
+    COMMON_KWARGS: ClassVar[dict[str, list]] = {
+        "lower_bound": [0, 0, 0],
+        "upper_bound": [3.40992e-5, 9.07264e-5, 2.1312e-6],
+        "lower_boundary_conditions": ["open", "open", "periodic"],
+        "upper_boundary_conditions": ["open", "open", "periodic"],
+    }
 
     def setUp(self):
         """default setup"""
@@ -30,7 +32,7 @@ class TestCartesian3DGrid(TestCase):
         """simple translation"""
         grid = self.grid
         g = grid.get_as_pypicongpu()
-        assert [] != g.get_rendering_context(), "grid rendering context should not be empty"
+        assert g.get_rendering_context() != [], "grid rendering context should not be empty"
 
     def test_n_gpus_asserts(self):
         """test too many GPUs for grid"""

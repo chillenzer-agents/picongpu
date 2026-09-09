@@ -5,9 +5,10 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+from collections.abc import Callable
 from enum import Enum
 from operator import attrgetter, itemgetter
-from typing import Callable, Literal
+from typing import Literal
 
 from pydantic import (
     BaseModel,
@@ -75,11 +76,13 @@ class WindowFunctionConfiguration(Enum):
     NONE = "None"
 
 
-def _make_vector(coefficients, basis_vectors=CoordSys3D("e")):
+def _make_vector(coefficients, basis_vectors=None):
+    if basis_vectors is None:
+        basis_vectors = CoordSys3D("e")
     # In sympy, vectors are represented as linear combinations of basis vectors.
     # The last argument is important.
     # Otherwise Python tries to start from an integer (scalar) 0 which is not well-defined.
-    return sum((coeff * vec for coeff, vec in zip(coefficients, basis_vectors)), Vector.zero)
+    return sum((coeff * vec for coeff, vec in zip(coefficients, basis_vectors, strict=False)), Vector.zero)
 
 
 class RadiationObserverConfiguration(BaseModel):
@@ -104,7 +107,8 @@ class RadiationObserverConfiguration(BaseModel):
     @computed_field
     def component_expressions(self) -> dict[str, str]:
         return {
-            key: PMAccPrinter().doprint(value) for key, value in zip("xyz", self.index_to_direction(Symbol("index")))
+            key: PMAccPrinter().doprint(value)
+            for key, value in zip("xyz", self.index_to_direction(Symbol("index")), strict=False)
         }
 
 
@@ -155,17 +159,20 @@ class RadiationPluginConfig(BaseModel):
 
     num_accumulation_steps: int = Field(
         0,
-        description="Period, after which the calculated radiation data should be dumped to the file system. Default is 0, therefore never. In order to store the radiation data, a value >=1 should be used.",
+        description="Period, after which the calculated radiation data should be dumped to the file system. "
+        "Default is 0, therefore never. In order to store the radiation data, a value >=1 should be used.",
     )
 
     last_radiation: bool = Field(
         False,
-        description="If set, the radiation spectra summed between the last and the current dump-time-step are stored. Used for a better evaluation of the temporal evolution of the emitted radiation.",
+        description="If set, the radiation spectra summed between the last and the current dump-time-step are stored. "
+        "Used for a better evaluation of the temporal evolution of the emitted radiation.",
     )
 
     folder_last_rad: str = Field(
         "lastRad",
-        description="Name of the folder, in which the summed spectra for the simulation time between the last dump and the current dump are stored. Default is 'lastRad'.",
+        description="Name of the folder, in which the summed spectra for the simulation time between the last dump "
+        "and the current dump are stored. Default is 'lastRad'.",
     )
 
     total_radiation: bool = Field(
@@ -175,22 +182,26 @@ class RadiationPluginConfig(BaseModel):
 
     folder_total_rad: str = Field(
         "totalRad",
-        description="Folder name in which the total radiation spectra, integrated from the beginning of the simulation, are stored. Default 'totalRad'.",
+        description="Folder name in which the total radiation spectra, "
+        "integrated from the beginning of the simulation, are stored. Default 'totalRad'.",
     )
 
     start: int = Field(
         2,
-        description="Time step, at which PIConGPU starts calculating the radiation. Default is 2 in order to get enough history of the particles.",
+        description="Time step, at which PIConGPU starts calculating the radiation. Default is 2 in order to get "
+        "enough history of the particles.",
     )
 
     end: int = Field(
         0,
-        description="Time step, at which the radiation calculation should end. Default: 0 (stops at end of simulation).",
+        description="Time step, at which the radiation calculation should end. "
+        "Default: 0 (stops at end of simulation).",
     )
 
     rad_per_gpu: bool = Field(
         False,
-        description="If set, each GPU additionally stores its own spectra without summing over the entire simulation area. This allows for a localization of specific spectral features.",
+        description="If set, each GPU additionally stores its own spectra without summing over "
+        "the entire simulation area. This allows for a localization of specific spectral features.",
     )
 
     folder_rad_per_gpu: str = Field(
@@ -200,12 +211,16 @@ class RadiationPluginConfig(BaseModel):
 
     num_jobs: int = Field(
         2,
-        description="Number of independent jobs used for the radiation calculation. This option is used to increase the utilization of the device by producing more independent work. This option enables accumulation of data in parallel into multiple temporary arrays, thereby increasing the utilization of the device by increasing the memory footprint. Default: 2",
+        description="Number of independent jobs used for the radiation calculation. "
+        "This option is used to increase the utilization of the device by producing more independent work. "
+        "This option enables accumulation of data in parallel into multiple temporary arrays, "
+        "thereby increasing the utilization of the device by increasing the memory footprint. Default: 2",
     )
 
     open_pmd_suffix: str = Field(
         "_%T_0_0_0.h5",
-        description="This sets the suffix for openPMD filename extension and iteration expansion pattern. Default: '_%T_0_0_0.h5'",
+        description="This sets the suffix for openPMD filename extension and iteration expansion pattern. "
+        "Default: '_%T_0_0_0.h5'",
     )
 
     open_pmd_checkpoint_extension: str = Field(
@@ -215,17 +230,20 @@ class RadiationPluginConfig(BaseModel):
 
     open_pmd_config: str = Field(
         "{}",
-        description="Give JSON/TOML configuration for initializing openPMD. Default: '{}' (no JSON/TOML configuration used)",
+        description="Give JSON/TOML configuration for initializing openPMD. "
+        "Default: '{}' (no JSON/TOML configuration used)",
     )
 
     open_pmd_checkpoint_config: str = Field(
         "{}",
-        description="Give JSON/TOML configuration for initializing openPMD checkpointing. Default: '{}' (no JSON/TOML configuration used)",
+        description="Give JSON/TOML configuration for initializing openPMD checkpointing. "
+        "Default: '{}' (no JSON/TOML configuration used)",
     )
 
     distributed_amplitude: bool = Field(
         False,
-        description="Activate the optional output of distributed amplitudes per MPI rank. in the openPMD output. Default: 0 (deactivated/no additional output)",
+        description="Activate the optional output of distributed amplitudes per MPI rank. in the openPMD output. "
+        "Default: 0 (deactivated/no additional output)",
     )
 
 

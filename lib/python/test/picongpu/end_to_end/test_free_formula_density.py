@@ -5,14 +5,17 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import functools
 import logging
+import operator
 from pathlib import Path
 from unittest import TestCase
 
 import numpy as np
+
 from picongpu import picmi, rc_params
-from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 from picongpu.picmi.diagnostics.checkpoint import Checkpoint
+from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 
 from .arbitrary_parameters import CELL_SIZE, NUMBER_OF_CELLS, UPPER_BOUNDARY, directory_in_home, gather_results
 from .binning_functors import binning_diagnostics
@@ -66,7 +69,8 @@ def generate_species(name, distribution):
 def setup_sim():
     sim = basic_simulation()
 
-    species = sum(
+    species = functools.reduce(
+        operator.iadd,
         (
             generate_species(generate_name(name, suffix), dist)
             for name, distributions in DISTRIBUTIONS.items()
@@ -75,7 +79,7 @@ def setup_sim():
         [],
     )
 
-    diagnostics = [Checkpoint(period=TimeStepSpec[:])] + binning_diagnostics(species, sim.time_step_size)
+    diagnostics = [Checkpoint(period=TimeStepSpec[:]), *binning_diagnostics(species, sim.time_step_size)]
 
     for s in species:
         sim.add_species(s, LAYOUT)
@@ -152,7 +156,7 @@ class TestFreeFormulaDensity(TestCase):
         )
 
         for setup, dists in DISTRIBUTIONS.items():
-            for impl in dists.keys():
+            for impl in dists:
                 mesh = read_binning(
                     self.result_path
                     / "simOutput"

@@ -6,12 +6,12 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-from ...utils.find_time import FindTime
-
 import numpy as np
 
+from ...utils.find_time import FindTime
 
-class DataReader(object):
+
+class DataReader:
     """
     Base class that all data readers should inherit from.
     """
@@ -110,7 +110,6 @@ class DataReader(object):
                 iteration = self.get_iterations(*args, **kwargs)
             else:
                 iteration = self.find_time.get_iteration(time, method="closest")
-            # print("got 'time'=", time, ", converted to iter", iteration)
 
         return self._get_for_iteration(iteration, *args, **kwargs)
 

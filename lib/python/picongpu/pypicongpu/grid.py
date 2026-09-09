@@ -6,10 +6,9 @@ License: GPLv3+
 """
 
 import enum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from pydantic import AfterValidator, BaseModel, Field, PlainSerializer, model_validator
-from typing_extensions import Self
 
 from .rendering import RenderedObject
 
@@ -40,7 +39,7 @@ class BoundaryCondition(enum.Enum):
 
 
 def serialise_vec(value) -> dict:
-    return dict(zip("xyz", value))
+    return dict(zip("xyz", value, strict=False))
 
 
 Vec3_float = Annotated[tuple[float, float, float], PlainSerializer(serialise_vec)]
@@ -62,16 +61,18 @@ def serialise_grid_dist(value) -> None | dict[Literal["x", "y", "z"], list[dict[
 def all_gt(iterable, m):
     if all(correct := [x > m for x in iterable]):
         return iterable
-    else:
-        message = f"{iterable=} contains values <= {m=} while all should be greater than m. Valid are the following: {correct=}."
-        raise ValueError(message)
+    message = (
+        f"{iterable=} contains values <= {m=} while all should be greater than m. Valid are the following: {correct=}."
+    )
+    raise ValueError(message)
 
 
 def grid_dist_validate(grid_dist):
     if grid_dist is None:
         return None
-    if all_gt(sum(grid_dist, []), 0):
+    if all_gt([cell for sub in grid_dist for cell in sub], 0):
         return grid_dist
+    return None
 
 
 class Grid3D(BaseModel, RenderedObject):
@@ -112,8 +113,11 @@ class Grid3D(BaseModel, RenderedObject):
     def check(self) -> Self:
         """serialized representation provided for RenderedObject"""
         if self.grid_dist is not None:
-            assert sum(self.grid_dist[0]) == self.cell_cnt[0], "sum of grid_dists in x must be equal to number_of_cells"
-            assert sum(self.grid_dist[1]) == self.cell_cnt[1], "sum of grid_dists in y must be equal to number_of_cells"
-            assert sum(self.grid_dist[2]) == self.cell_cnt[2], "sum of grid_dists in z must be equal to number_of_cells"
+            if sum(self.grid_dist[0]) != self.cell_cnt[0]:
+                raise AssertionError("sum of grid_dists in x must be equal to number_of_cells")
+            if sum(self.grid_dist[1]) != self.cell_cnt[1]:
+                raise AssertionError("sum of grid_dists in y must be equal to number_of_cells")
+            if sum(self.grid_dist[2]) != self.cell_cnt[2]:
+                raise AssertionError("sum of grid_dists in z must be equal to number_of_cells")
 
         return self

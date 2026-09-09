@@ -6,12 +6,13 @@ Authors: Axel Huebl
 License: GPLv3+
 """
 
-from .base_reader import DataReader
+import collections
+import os
 
 import numpy as np
-import os
 import openpmd_api as opmd
-import collections
+
+from .base_reader import DataReader
 
 try:
     collectionsAbc = collections.abc
@@ -19,7 +20,7 @@ except AttributeError:
     collectionsAbc = collections
 
 
-class PhaseSpaceMeta(object):
+class PhaseSpaceMeta:
     """
     Meta information for data of a phase space iteration.
     """
@@ -111,13 +112,13 @@ class PhaseSpaceData(DataReader):
 
         output_dir = os.path.join(self.run_directory, "simOutput", "phaseSpace")
         if not os.path.isdir(output_dir):
-            raise IOError(
+            raise OSError(
                 "The simOutput/phaseSpace/ directory does not "
-                "exist inside path:\n  {}\n"
+                f"exist inside path:\n  {self.run_directory}\n"
                 "Did you set the proper path to the "
                 "run directory?\n"
                 "Did you enable the phase space plugin?\n"
-                "Did the simulation already run?".format(self.run_directory)
+                "Did the simulation already run?"
             )
 
         iteration_str = "%T"
@@ -151,11 +152,9 @@ class PhaseSpaceData(DataReader):
         data_file_path = self.get_data_path(ps, species, species_filter, file_ext=file_ext)
 
         series = opmd.Series(data_file_path, opmd.Access.read_only)
-        iterations = [key for key, _ in series.iterations.items()]
+        return [key for key, _ in series.iterations.items()]
 
-        return iterations
-
-    def _get_for_iteration(self, iteration, ps, species, species_filter="all", file_ext="h5", **kwargs):
+    def _get_for_iteration(self, iteration, ps, species, species_filter="all", file_ext="h5", **_kwargs):
         """
         Get a phase space histogram.
 
@@ -199,9 +198,7 @@ class PhaseSpaceData(DataReader):
             # verify requested iterations exist
             if not set(iteration).issubset(available_iterations):
                 raise IndexError(
-                    "Iteration {} is not available!\nList of available iterations: \n{}".format(
-                        iteration, available_iterations
-                    )
+                    f"Iteration {iteration} is not available!\nList of available iterations: \n{available_iterations}"
                 )
         else:
             # take all availble iterations
@@ -210,7 +207,7 @@ class PhaseSpaceData(DataReader):
         ret = []
         for index in iteration:
             it = series.iterations[index]
-            dataset_name = "{}_{}_{}".format(species, species_filter, ps)
+            dataset_name = f"{species}_{species_filter}_{ps}"
             mesh = it.meshes[dataset_name]
             ps_data = mesh[opmd.Mesh_Record_Component.SCALAR]
 
@@ -243,5 +240,4 @@ class PhaseSpaceData(DataReader):
 
         if len(iteration) == 1:
             return ret[0]
-        else:
-            return ret
+        return ret

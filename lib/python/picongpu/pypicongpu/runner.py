@@ -9,11 +9,12 @@ import datetime
 import json
 import logging
 import tempfile
+from collections.abc import Sequence
 from importlib.util import module_from_spec, spec_from_file_location
 from os import chmod
 from pathlib import Path
 from shutil import copy2, copytree
-from typing import Annotated, Sequence
+from typing import Annotated
 
 from cwltool.context import RuntimeContext
 from cwltool.factory import Factory as WorkflowFactory
@@ -33,6 +34,8 @@ from picongpu.templates import path as tpath
 from .rendering import Renderer
 from .simulation import Simulation
 from .util import alt
+
+logger = logging.getLogger(__name__)
 
 
 def script_content_with(commands, rc_params=rc_params):
@@ -59,9 +62,8 @@ def generate_bare_profile(path=None, rc_params=rc_params):
     if not isinstance(path, Path):
         return generate_bare_profile(path=Path(path), rc_params=rc_params)
 
-    with rc_params.set_temporarily(preamble="", override_existing=False):
-        with path.open("w") as file:
-            file.write(script_content_with("", rc_params=rc_params))
+    with rc_params.set_temporarily(preamble="", override_existing=False), path.open("w") as file:
+        file.write(script_content_with("", rc_params=rc_params))
 
     return path
 
@@ -218,9 +220,9 @@ class Runner(BaseModel):
 
     def _log_dirs(self):
         """print human-readble list of paths to log"""
-        logging.info(" template dir: {}".format(self.template_dir))
-        logging.info("    setup dir: {}".format(self.setup_dir))
-        logging.info("      run dir: {}".format(self.run_dir))
+        logger.info(" template dir: %s", self.template_dir)
+        logger.info("    setup dir: %s", self.setup_dir)
+        logger.info("      run dir: %s", self.run_dir)
 
     def _render_templates(self):
         """
@@ -228,7 +230,7 @@ class Runner(BaseModel):
 
         Delegates work to Renderer(), see there for details.
         """
-        logging.info("rendering templates...")
+        logger.info("rendering templates...")
         # This is kind of a dirty hack:
         self.sim.spread_directory_information(self.setup_dir)
         # check 1 (implicit): according to schema?
@@ -405,10 +407,8 @@ class Runner(BaseModel):
         if printDirToConsole:
             print(" [" + str(self.setup_dir) + "]")
 
-        if not exist_ok:
-            assert not self.setup_dir.is_dir(), (
-                "setup directory must not exist before generation -- did you call generate() already?"
-            )
+        if not exist_ok and self.setup_dir.is_dir():
+            raise AssertionError("setup directory must not exist before generation -- did you call generate() already?")
         preset = rc_params.preset_dir
         copytree(core.path("etc") / f"picongpu/{preset}", self.setup_dir / f"etc/picongpu/{preset}")
         for path in (core.path("etc") / "picongpu").iterdir():
@@ -416,9 +416,9 @@ class Runner(BaseModel):
                 copy2(path, self.setup_dir / f"etc/picongpu/{path.name}")
 
         for t in self.template_dir:
-            for src, dst in map(
-                lambda f: (t / f, self.setup_dir / f),
-                ("etc/picongpu", "bin", "include/picongpu", "lib", "validation", "workflow"),
+            for src, dst in (
+                (t / f, self.setup_dir / f)
+                for f in ("etc/picongpu", "bin", "include/picongpu", "lib", "validation", "workflow")
             ):
                 if src.is_dir():
                     dst.mkdir(parents=True, exist_ok=True)

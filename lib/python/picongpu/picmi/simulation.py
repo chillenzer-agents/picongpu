@@ -6,18 +6,19 @@ License: GPLv3+
 """
 
 # make pypicongpu classes accessible for conversion to pypicongpu
+import contextlib
 import datetime
 import logging
 import math
+from collections.abc import Iterable
 from functools import reduce
 from itertools import chain, groupby
 from os import PathLike
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Annotated
 
 import picmistandard
-from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, PrivateAttr, model_validator
 
 from picongpu import pypicongpu, templates
 from picongpu.picmi import constants
@@ -43,6 +44,8 @@ from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
 from picongpu.pypicongpu.util import UnpackChain, unique
 from picongpu.pypicongpu.walltime import Walltime
+
+logger = logging.getLogger(__name__)
 
 
 class _DensityImpl(BaseModel):
@@ -76,7 +79,7 @@ def _not_allowed_template_directories(directories: tuple[Path]) -> dict[Path, st
     """
     Check the directories and return a path->reason mapping of non-allowed ones.
     """
-    return {d: "is not an existing directory" for d in filter(lambda p: not p.is_dir(), directories)}
+    return dict.fromkeys(filter(lambda p: not p.is_dir(), directories), "is not an existing directory")
 
 
 def _normalise_template_dir(directory: None | PathLike | Iterable[PathLike]) -> tuple[Path]:
@@ -85,15 +88,13 @@ def _normalise_template_dir(directory: None | PathLike | Iterable[PathLike]) -> 
     """
     # The ordering of these recursions matters!
     if directory is None:
-        return tuple()
+        return ()
 
     try:
         directory = (Path(directory),)
     except TypeError:
-        try:
-            directory = sum(map(_normalise_template_dir, directory), tuple())
-        except TypeError:
-            pass
+        with contextlib.suppress(TypeError):
+            directory = sum(map(_normalise_template_dir, directory), ())
 
     if not isinstance(directory, (tuple, list)) or any(filter(lambda p: not isinstance(p, Path), directory)):
         raise ValueError(
@@ -123,7 +124,8 @@ def _validate_collisional_physics_setup(interactions):
     if "setup" in types:
         if "collision" in types:
             raise ValueError(
-                f"If you give a CollisionalPhysicsSetup, you have to subsume all collisions under it. You gave: {types['collision']=} and {types['setup']=}."
+                f"If you give a CollisionalPhysicsSetup, you have to subsume all collisions under it. "
+                f"You gave: {types['collision']=} and {types['setup']=}."
             )
         if len(list(types["setup"])) > 1:
             raise ValueError(f"Please, only provide at most one CollisionalPhysicsSetup. You gave {types['setup']=}.")
@@ -133,7 +135,7 @@ def _validate_collisional_physics_setup(interactions):
     if "collision" in types:
         # We've found one or more bare collision flying around in the list,
         # so we've gotta merge them into one setup.
-        return list(types["other"]) + [CollisionalPhysicsSetup(collisions=list(types["collision"]))]
+        return [*list(types["other"]), CollisionalPhysicsSetup(collisions=list(types["collision"]))]
 
     # No collisions whatsoever...
     return interactions
@@ -163,9 +165,11 @@ class Simulation(picmistandard.PICMI_Simulation):
     picongpu_interaction: Annotated[list[Interaction], BeforeValidator(_validate_collisional_physics_setup)] = Field(
         default_factory=list
     )
-    """Interaction instance containing all particle interactions of the simulation, set to None to have no interactions"""
+    """
+    Interaction instance containing all particle interactions of the simulation, set to None to have no interactions
+    """
 
-    def _validate_typical_ppc(value: int | None) -> int | None:
+    def _validate_typical_ppc(value: int | None) -> int | None:  # noqa: N805
         if value is not None and value <= 0:
             raise ValueError(f"Typical ppc should be > 0, not {value=}.")
         return value
@@ -189,8 +193,9 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     in multiples of the simulation window size
 
-    @attention if moving window is active, one gpu in y direction is reserved for initializing new spaces,
-        thereby reducing the simulation window size accordingrelative spot at which to start moving the simulation window
+        @attention if moving window is active, one gpu in y direction is reserved for initializing new spaces,
+        thereby reducing the simulation window size accordingrelative spot at which to start moving the simulation
+        window
     """
 
     picongpu_moving_window_stop_iteration: int | None = Field(default=None)
@@ -246,9 +251,12 @@ class Simulation(picmistandard.PICMI_Simulation):
         delta_t not set, cfl not set either:
           nop (do nothing)
         """
-        assert self.solver is not None
-        assert self.solver.method in ["Yee", "Lehe"]
-        assert isinstance(self.solver.grid, Cartesian3DGrid)
+        if self.solver is None:
+            raise AssertionError
+        if self.solver.method not in ["Yee", "Lehe"]:
+            raise AssertionError
+        if not isinstance(self.solver.grid, Cartesian3DGrid):
+            raise AssertionError
 
         delta_x = (
             self.solver.grid.upper_bound[0] - self.solver.grid.lower_bound[0]
@@ -269,20 +277,19 @@ class Simulation(picmistandard.PICMI_Simulation):
             if delta_t_from_cfl != self.time_step_size:
                 raise ValueError(
                     "time step size (delta t) does not match CFL "
-                    "(Courant-Friedrichs-Lewy) parameter! delta_t: {}; "
-                    "expected from CFL: {}".format(self.time_step_size, delta_t_from_cfl)
+                    f"(Courant-Friedrichs-Lewy) parameter! delta_t: {self.time_step_size}; "
+                    f"expected from CFL: {delta_t_from_cfl}"
                 )
-        else:
-            if self.time_step_size is not None:
-                # calculate cfl
-                self.solver.cfl = self.time_step_size * (
-                    constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
-                )
-            elif self.solver.cfl is not None:
-                # calculate delta_t
-                self.time_step_size = self.solver.cfl / (
-                    constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
-                )
+        elif self.time_step_size is not None:
+            # calculate cfl
+            self.solver.cfl = self.time_step_size * (
+                constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
+            )
+        elif self.solver.cfl is not None:
+            # calculate delta_t
+            self.time_step_size = self.solver.cfl / (
+                constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
+            )
 
             # if neither delta_t nor cfl are given simply silently pass
             # (might change in the future)
@@ -297,7 +304,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         :param pypicongpu_simulation: manipulated pypicongpu simulation
         """
         if self._runner is not None:
-            logging.warning("runner already initialized, overwriting")
+            logger.warning("runner already initialized, overwriting")
 
         self._runner = Runner(
             sim=self, template_dir=self.picongpu_template_dir or (templates.path(),), setup_dir=Path(file_name)
@@ -308,16 +315,17 @@ class Simulation(picmistandard.PICMI_Simulation):
         """add custom user input to previously stored input"""
         self.picongpu_custom_user_input = (self.picongpu_custom_user_input or []) + [custom_user_input]
 
-    def add_interaction(self, interaction) -> None:
+    def add_interaction(self, interaction) -> None:  # noqa: ARG002 -- parameter name follows the PICMI standard signature
         pypicongpu.util.unsupported(
-            "PICMI standard interactions are not supported by PIConGPU, use the picongpu specific Interaction object instead"
+            "PICMI standard interactions are not supported by PIConGPU, "
+            "use the picongpu specific Interaction object instead"
         )
 
     # @todo add refactor once restarts are supported by the Runner, Brian Marre, 2024
     def step(self, nsteps: int = 1, **flags):
         if nsteps != self.max_steps:
             raise ValueError(
-                "PIConGPU does not support stepwise running. Invoke step() with max_steps (={})".format(self.max_steps)
+                f"PIConGPU does not support stepwise running. Invoke step() with max_steps (={self.max_steps})"
             )
         self.picongpu_run(**flags)
 
@@ -342,7 +350,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                 ],
                 config=options,
             )
-            for options in unique(map(lambda x: x.options, diagnostics))
+            for options in unique(x.options for x in diagnostics)
         ]
 
     def _generate_plugins(self, num_steps):
@@ -392,7 +400,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         typical_ppc = (
             self.picongpu_typical_ppc
             if self.picongpu_typical_ppc is not None
-            else _mid_window(map(lambda op: op.layout.ppc, filter(lambda op: hasattr(op, "layout"), init_operations)))
+            else _mid_window(op.layout.ppc for op in filter(lambda op: hasattr(op, "layout"), init_operations))
         )
         moving_window = (
             None
@@ -407,12 +415,14 @@ class Simulation(picmistandard.PICMI_Simulation):
         )
         time_steps = self.max_steps if self.max_steps is not None else math.ceil(self.max_time / self.time_step_size)
         # We provide the default as last element and we'll only read the first element:
-        synchrotron_params = unique(
-            [x.synchrotron_parameters for x in self.picongpu_interaction if isinstance(x, Synchrotron)]
-        ) + [SynchrotronParams()]
+        synchrotron_params = [
+            *unique([x.synchrotron_parameters for x in self.picongpu_interaction if isinstance(x, Synchrotron)]),
+            SynchrotronParams(),
+        ]
         if len(synchrotron_params) > 2:
             raise ValueError(
-                f"You have configured the Synchrotron extension multiple times with different arguments. This is not allowed! You gave {synchrotron_params[:-1]=}."
+                f"You have configured the Synchrotron extension multiple times with different arguments. "
+                f"This is not allowed! You gave {synchrotron_params[:-1]=}."
             )
         # We provide the default as last element and we'll only read the first element:
         collisions = [x for x in self.picongpu_interaction if isinstance(x, CollisionalPhysicsSetup)] + [
@@ -455,7 +465,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         if self._runner is None:
             self._runner = Runner(
                 **_drop_none(
-                    dict(sim=self.get_as_pypicongpu(), template_dir=self.picongpu_template_dir or (templates.path(),))
+                    {"sim": self.get_as_pypicongpu(), "template_dir": self.picongpu_template_dir or (templates.path(),)}
                     | kwargs
                 )
             )

@@ -65,7 +65,7 @@ class Binning(BaseModel):
     @field_validator("species", mode="before")
     @classmethod
     def _normalise_species_to_list(cls, species):
-        if isinstance(species, Species) or isinstance(species, FilteredSpecies):
+        if isinstance(species, (Species, FilteredSpecies)):
             return [species]
         return species
 

@@ -7,9 +7,9 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-import os
-import json
 import getopt
+import json
+import os
 import sys
 
 
@@ -42,18 +42,17 @@ def read_range_file(file, values_only=True):
     True.
     """
     if not os.path.isfile(file):
-        raise IOError("File {} does not exist".format(file))
+        raise OSError(f"File {file} does not exist")
 
-    with open(file, "r") as json_file:
+    with open(file) as json_file:
         range_dict = json.load(json_file)
     if values_only:
-        filtered_range_dict = dict()
+        filtered_range_dict = {}
         for name, attrs in range_dict.items():
             filtered_range_dict[name] = attrs["values"]
 
         return filtered_range_dict
-    else:
-        return range_dict
+    return range_dict
 
 
 def to_macro_name(name):
@@ -63,8 +62,7 @@ def to_macro_name(name):
     """
     if not name.startswith("_"):
         return "PARAM_" + name.upper()
-    else:
-        return "PARAM" + name.upper()
+    return "PARAM" + name.upper()
 
 
 def parse(file, ptype):
@@ -81,7 +79,7 @@ def parse(file, ptype):
     """
     range_dict = read_range_file(file, values_only=False)
     # filter for correct ptype
-    filtered_dict = dict()
+    filtered_dict = {}
     for param_name, attrs in range_dict.items():
         if attrs["type"] == ptype:
             # name, value mapping
@@ -90,15 +88,15 @@ def parse(file, ptype):
     # construct the statement passed to picongpu
     if ptype == "compile":
         ostr = [to_macro_name(name) + "=" + str(value) for name, value in filtered_dict.items()]
-        cxx_defines = ";".join(map(lambda s: "-D" + s, ostr))
+        cxx_defines = ";".join("-D" + s for s in ostr)
         return "-DPARAM_OVERWRITES:LIST='" + cxx_defines + "'"
 
-    elif ptype == "run":
+    if ptype == "run":
         ostr = [str(name) + "=" + str(value) for name, value in filtered_dict.items()]
         if not ostr:
             return ""
-        else:
-            return "-o " + "'" + " ".join(ostr) + "'"
+        return "-o " + "'" + " ".join(ostr) + "'"
+    return None
 
 
 if __name__ == "__main__":

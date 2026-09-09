@@ -13,24 +13,27 @@ from .runner import Runner
 from .simulation import Simulation
 
 __all__ = [
-    "Simulation",
+    "Checkpoint",
+    "EnergyHistogram",
+    "LeheSolver",
+    "MacroParticleCount",
+    "PhaseSpace",
     "Runner",
+    "Simulation",
+    "YeeSolver",
+    "customuserinput",
+    "grid",
     "laser",
     "output",
     "rendering",
-    "YeeSolver",
-    "LeheSolver",
     "species",
     "util",
-    "grid",
-    "customuserinput",
-    "PhaseSpace",
-    "EnergyHistogram",
-    "MacroParticleCount",
-    "Checkpoint",
 ]
 
 # note: put down here b/c linter complains if imports are not at top
 import sys
 
-assert sys.version_info.major > 3 or sys.version_info.minor >= 9, "Python 3.9 is required for PIConGPU"
+# friendly error for too-old interpreters; kept although it predates the
+# minimum supported version (UP036)
+if sys.version_info < (3, 9):  # noqa: UP036
+    raise AssertionError("Python 3.9 is required for PIConGPU")

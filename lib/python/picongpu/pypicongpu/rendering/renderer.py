@@ -16,6 +16,8 @@ import typing
 import sympy
 from moosetash import MissingVariable, render
 
+logger = logging.getLogger(__name__)
+
 
 class Renderer:
     """
@@ -42,18 +44,18 @@ class Renderer:
             # note on typechecks here: we want *exact* types,
             # so don't use instanceof()
             if str != type(key):
-                raise TypeError("all keys must be strings: {}".format(path))
+                raise TypeError(f"all keys must be strings: {path}")
             if "." in key:
-                raise ValueError("keys may NOT contain dot: {}.{}".format(path, key))
+                raise ValueError(f"keys may NOT contain dot: {path}.{key}")
             if key.startswith("_"):
-                raise ValueError("keys may NOT start with underscore: {}.{}".format(path, key))
+                raise ValueError(f"keys may NOT start with underscore: {path}.{key}")
 
             # value validation
             if type(value) is dict:
-                if {} == value:
+                if value == {}:
                     raise TypeError("leaf must not be empty dict")
                 # dict -> recursive call
-                Renderer.__check_rendering_context_recursive("{}.{}".format(path, key), value)
+                Renderer.__check_rendering_context_recursive(f"{path}.{key}", value)
             elif key == "tags":
                 # tags do not need to be checked
                 return
@@ -64,22 +66,20 @@ class Renderer:
                 # mylist: [1, 2, 3] is performed by
                 # {{#mylist}}{{{.}}}{{/mylist}}, which is somewhat unintuitive)
                 not_dict = list(filter(lambda e: type(e) is not dict, value))
-                if 0 != len(not_dict):
-                    raise TypeError("lists may only contains dicts: {}.{}".format(path, key))
+                if len(not_dict) != 0:
+                    raise TypeError(f"lists may only contains dicts: {path}.{key}")
                 # check the children
                 for i in range(len(value)):
-                    Renderer.__check_rendering_context_recursive("{}[{}]".format(path, i), value[i])
+                    Renderer.__check_rendering_context_recursive(f"{path}[{i}]", value[i])
             else:
                 # leaf
                 invalid_floats = [math.inf, -math.inf, math.nan]
                 if value in invalid_floats:
-                    raise ValueError("invalid value for leaf: {} at {}.{}".format(value, path, key))
+                    raise ValueError(f"invalid value for leaf: {value} at {path}.{key}")
 
                 allowed_types = [str, bool, type(None), int, float]
                 if type(value) not in allowed_types:
-                    raise TypeError(
-                        "leaf may only be str, bool, None, number; found: {} at {}.{}".format(type(value), path, key)
-                    )
+                    raise TypeError(f"leaf may only be str, bool, None, number; found: {type(value)} at {path}.{key}")
 
     @staticmethod
     def check_rendering_context(context: typing.Any) -> None:
@@ -126,7 +126,7 @@ class Renderer:
                 new_list = []
                 for i in range(len(value)):
                     elem = Renderer.__get_context_preprocessed_recursive(value[i])
-                    elem["_first"] = 0 == i
+                    elem["_first"] = i == 0
                     elem["_last"] = len(value) - 1 == i
                     elem["_idx"] = i
                     new_list.append(elem)
@@ -179,12 +179,13 @@ class Renderer:
         mustache_block_re = re.compile(r"{{({*(?:}?[^}]+)*}*)}}")
         for match in mustache_block_re.finditer(template):
             block_content = match.group(1)
-            if "" == block_content:
-                logging.warning("empty mustache block encountered")
+            if block_content == "":
+                logger.warning("empty mustache block encountered")
             if block_content[0] not in "{^#/>!":
                 # note: use string composition instead of normal formatstrings
-                logging.warning(
-                    "do NOT use HTML escaped syntax (only {{two braces}}) for vars, offending var: " + match.group(1)
+                logger.warning(
+                    "do NOT use HTML escaped syntax (only {{two braces}}) for vars, offending var: %s",
+                    match.group(1),
                 )
         return render(template, context, missing_variable_handler=_allow_only_missing_type_variables)
 
@@ -201,7 +202,7 @@ class Renderer:
         :param path: directory containing ".mustache" files
         """
         if not pathlib.Path(path).is_dir():
-            raise ValueError("is not a directory: {}".format(path))
+            raise ValueError(f"is not a directory: {path}")
 
         mustache_fileending_re = re.compile(r"[.]mustache$")
         all_mustache_files = list(
@@ -213,20 +214,19 @@ class Renderer:
         for template_path in all_mustache_files:
             rendered_path = pathlib.Path(mustache_fileending_re.sub("", str(template_path)))
             if rendered_path.exists():
-                raise ValueError("would overwrite {}, aborting".format(rendered_path))
+                raise ValueError(f"would overwrite {rendered_path}, aborting")
 
-            with open(rendered_path, "w") as outfile:
-                with open(template_path, "r") as infile:
-                    template_str = infile.read()
-                    rendered = Renderer.get_rendered_template(context, template_str)
-                    outfile.write(rendered)
+            with open(rendered_path, "w") as outfile, open(template_path) as infile:
+                template_str = infile.read()
+                rendered = Renderer.get_rendered_template(context, template_str)
+                outfile.write(rendered)
 
             # prefix filename with .
             # (on that note: screw pathlib for only disassembling, but not
             # reassembling paths from parts)
             parts = list(template_path.parts)
             parts[-1] = "." + parts[-1]
-            new_path = functools.reduce(lambda a, b: a / b, map(lambda s: pathlib.Path(s), parts))
+            new_path = functools.reduce(lambda a, b: a / b, (pathlib.Path(s) for s in parts))
 
             template_path.rename(new_path)
 

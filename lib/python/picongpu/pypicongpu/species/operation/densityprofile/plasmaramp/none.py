@@ -6,10 +6,11 @@ License: GPLv3+
 """
 
 from typing import Literal
+
 from pydantic import BaseModel
 
 
-class None_(BaseModel):
+class None_(BaseModel):  # noqa: N801 (intentional: the "None" plasma ramp, mirrors the C++ "None" value)
     """no plasma ramp, either up or down"""
 
     type_none: Literal[True] = True

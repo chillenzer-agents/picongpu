@@ -4,11 +4,12 @@ This file is part of PIConGPU and based on energy_histogram_visualizer.py.
 Authors: Finn-Ole Carstens, Sebastian Starke
 """
 
-from ..data import TransitionRadiationData
-from .base_visualizer import Visualizer as BaseVisualizer
-from matplotlib.ticker import FixedLocator
 import numpy as np
 import scipy.constants as const
+from matplotlib.ticker import FixedLocator
+
+from ..data import TransitionRadiationData
+from .base_visualizer import Visualizer as BaseVisualizer
 
 
 class Visualizer(BaseVisualizer):
@@ -52,9 +53,9 @@ class Visualizer(BaseVisualizer):
         elif self.type == "heatmap":
             theta_mesh, phi_mesh, spectral_power = self.data[idx]
             im = self.plt_obj[idx] = self.ax.pcolormesh(theta_mesh, phi_mesh, spectral_power)
-            self.ax.get_figure().colorbar(im, label=r"Spectral Power $d^2 W / " r"d\omega d\Omega$ [Js]")
+            self.ax.get_figure().colorbar(im, label=r"Spectral Power $d^2 W / d\omega d\Omega$ [Js]")
 
-    def _update_plt_obj(self, idx):
+    def _update_plt_obj(self, _idx):
         """
         Implementation of base class function.
         """
@@ -154,12 +155,10 @@ class Visualizer(BaseVisualizer):
                 if x == 0:
                     return "$0$"
                 exponent = np.int32(np.log10(x))
-                return r"$10^{{ {:2d} }}$".format(exponent)
+                return rf"$10^{{ {exponent:2d} }}$"
 
             # create names for top ticks with log scale
-            lambda_names = []
-            for i in range(len(lambda_locations)):
-                lambda_names.append(maketentothepower(lambda_locations[i]))
+            lambda_names = [maketentothepower(lambda_location) for lambda_location in lambda_locations]
 
             # set tick labels and ax label for top label
             axtop.set_xticklabels(lambda_names)
@@ -167,11 +166,11 @@ class Visualizer(BaseVisualizer):
         elif self.type == "sliceovertheta":
             self.ax.set_title("Angular transition radiation distribution for " + species)
             self.ax.set_xlabel(r"Detector Angle $\theta$")
-            self.ax.set_ylabel(r"Spectral Power " r"$d^2 W / d\omega d\Omega$ [Js]")
+            self.ax.set_ylabel(r"Spectral Power $d^2 W / d\omega d\Omega$ [Js]")
         elif self.type == "sliceoverphi":
             self.ax.set_title("Angular transition radiation distribution for " + species)
             self.ax.set_xlabel(r"Detector Angle $\phi$")
-            self.ax.set_ylabel(r"Spectral Power " r"$d^2 W / d\omega d\Omega$ [Js]")
+            self.ax.set_ylabel(r"Spectral Power $d^2 W / d\omega d\Omega$ [Js]")
         elif self.type == "heatmap":
             self.ax.set_title("Angular transition radiation distribution for " + species)
             self.ax.set_xlabel(r"Detector Angle $\theta$")
@@ -181,8 +180,9 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
+
         import matplotlib.pyplot as plt
 
         def usage():

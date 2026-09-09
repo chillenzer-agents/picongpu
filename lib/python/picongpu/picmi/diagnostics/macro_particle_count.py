@@ -12,7 +12,7 @@ from picongpu.picmi.copy_attributes import default_converts_to
 from ...pypicongpu.output.macro_particle_count import (
     MacroParticleCount as PyPIConGPUMacroParticleCount,
 )
-from ..species import Species as Species
+from ..species import Species
 from .timestepspec import TimeStepSpec
 
 

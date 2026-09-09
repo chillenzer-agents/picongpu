@@ -21,11 +21,12 @@ from typing import Literal
 
 import numpy as np
 import sympy
+from scipy.constants import c, elementary_charge
+
 from picongpu import picmi
 from picongpu.picmi.diagnostics import binning
 from picongpu.picmi.diagnostics.radiation import RadiationObserverConfiguration
 from picongpu.picmi.particle_functor.unit_dimension import I, L, M, T
-from scipy.constants import c, elementary_charge
 
 """
 @file PICMI user script reproducing the PIConGPU LWFA example

@@ -11,20 +11,20 @@ from .energy_histogram import EnergyHistogram
 from .macro_particle_count import MacroParticleCount
 from .openpmd_plugin import OpenPMDPlugin
 from .phase_space import PhaseSpace
-from .radiation import RadiationConfiguration, RadiationPlugin, RadiationObserverConfiguration
+from .radiation import RadiationConfiguration, RadiationObserverConfiguration, RadiationPlugin
 from .timestepspec import TimeStepSpec
 
 AnyPlugin = Binning | Checkpoint | EnergyHistogram | MacroParticleCount | OpenPMDPlugin | PhaseSpace | RadiationPlugin
 
 __all__ = [
-    "OpenPMDPlugin",
     "AnyPlugin",
-    "PhaseSpace",
+    "Checkpoint",
     "EnergyHistogram",
     "MacroParticleCount",
-    "TimeStepSpec",
-    "Checkpoint",
-    "RadiationPlugin",
-    "RadiationObserverConfiguration",
+    "OpenPMDPlugin",
+    "PhaseSpace",
     "RadiationConfiguration",
+    "RadiationObserverConfiguration",
+    "RadiationPlugin",
+    "TimeStepSpec",
 ]

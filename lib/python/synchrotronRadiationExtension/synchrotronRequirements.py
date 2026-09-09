@@ -18,8 +18,11 @@
 #  */
 
 import argparse
+
 import numpy as np
-from scipy.constants import elementary_charge as e, m_e, c, hbar, epsilon_0 as eps0
+from scipy.constants import c, hbar, m_e
+from scipy.constants import elementary_charge as e
+from scipy.constants import epsilon_0 as eps0
 
 Es = m_e**2 * c**3 / e / hbar  # Schwinger limit in V/m
 
@@ -36,7 +39,6 @@ def Heff_(v, B, E):
 def Heff_a0(a0, gamma):
     w = 2 * np.pi * c / 800e-9  # Angular frequency for 800nm laser
     El = a0 * m_e * w * c / e  # Electric field strength in V/m
-    # print("El", El)
     beta = np.sqrt(1 - 1 / gamma**2)  # Beta value for the particles
     vel = c * beta
 
@@ -55,7 +57,7 @@ def calculate_dt(gamma, Heff):
     numericFactor = e**2 * m_e * c / (hbar**2 * eps0 * 4 * np.pi)
     requirement1 = numericFactor * 1.5 * chi ** (2 / 3) / gamma
     requirement2 = numericFactor * 0.5 * chi ** (1) / gamma
-    # dt < 0.1/requirement(1/2)
+    # dt must be smaller than 0.1 divided by the respective requirement
     return np.min([0.1 / requirement1, 0.1 / requirement2])
 
 

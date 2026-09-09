@@ -13,6 +13,8 @@ from pydantic import BeforeValidator
 
 from .. import constants
 
+logger = logging.getLogger(__name__)
+
 PositiveFloat = Annotated[
     float,
     BeforeValidator(lambda v: float(v) if (float(v) > 0) else (_ for _ in ()).throw(ValueError("value must be > 0"))),
@@ -75,10 +77,10 @@ class BaseLaser:
         )  # unit: multiple of the laser pulse duration (1 sigma of the intensity)
         # @todo extend this to other propagation directions than +y
         if pulse_init < 3.0:
-            logging.warning(
+            logger.warning(
                 "set centroid_position and propagation_direction indicate that laser "
-                + "initalization might be too short.\n"
-                + f"Details: {pulse_init=} < 3"
+                "initalization might be too short.\nDetails: pulse_init=%s < 3",
+                pulse_init,
             )
         return pulse_init
 

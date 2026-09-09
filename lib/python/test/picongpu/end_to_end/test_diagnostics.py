@@ -6,16 +6,18 @@ License: GPLv3+
 """
 
 import logging
-from typing import Any
 from functools import partial
 from hashlib import sha256 as compute_hash
 from itertools import chain
 from pathlib import Path
+from typing import Any
 from unittest import TestCase
 
 import numpy as np
 import pandas as pd
-from pydantic import ConfigDict, BaseModel
+from pydantic import BaseModel, ConfigDict
+from sympy import And, Eq, Piecewise
+
 from picongpu import rc_params
 from picongpu.picmi import (
     Cartesian3DGrid,
@@ -41,7 +43,6 @@ from picongpu.picmi.diagnostics.backend_config import RangeSpec
 from picongpu.picmi.layout import OnePositionLayout
 from picongpu.picmi.particle_functor import Particle
 from picongpu.picmi.particle_functor.rng_arg import RNGArg
-from sympy import And, Eq, Piecewise
 
 from .arbitrary_parameters import CELL_SIZE, NUMBER_OF_CELLS, UPPER_BOUNDARY, directory_in_home, gather_results
 from .compare_particles import (
@@ -151,7 +152,7 @@ def range_filter(particle, range):
     # But that's not implemented for filters.
     # "total" is identical because we don't have moving window active.
     pos = particle.get("position", unit="cell", origin="total")
-    return And(*(in_range_expression(p, r) for p, r in zip(pos, range.data)))
+    return And(*(in_range_expression(p, r) for p, r in zip(pos, range.data, strict=False)))
 
 
 def generate_range_restricted_particle_dumps(species):
@@ -212,7 +213,7 @@ class RandomParticleFilter(ParticleFilter):
 
             # If we've requested a specific shape of our random numbers,
             # we do a quick check that we actually got what we asked for:
-            assert np.shape(nums) == distribution.get("shape", tuple())
+            assert np.shape(nums) == distribution.get("shape", ())
             # But it's just for checking that it works.
             # We don't actually use it here:
             nums = np.reshape(nums, -1)
@@ -319,7 +320,7 @@ def setup_sim():
     sim = basic_simulation()
     for species in SPECIES:
         sim.add_species(species, LAYOUT)
-    sim.diagnostics = [Checkpoint(period=TimeStepSpec[:])] + generate_diagnostics(SPECIES, FUNCTORS)
+    sim.diagnostics = [Checkpoint(period=TimeStepSpec[:]), *generate_diagnostics(SPECIES, FUNCTORS)]
     if "rosi-hzdr" in rc_params.get("preset", "bash"):
         # On ROSI, the tmp directories are inaccessible to compute nodes.
         sim.picongpu_get_runner().setup_dir = directory_in_home() / "setup"
@@ -374,7 +375,9 @@ class TestDiagnostics(TestCase):
 
     def test_compare_derived_fields_and_binning(self):
         for dump, binning in zip(
-            generate_derived_field_dumps(SPECIES, FUNCTORS), generate_derived_field_dumps_as_binnings(SPECIES, FUNCTORS)
+            generate_derived_field_dumps(SPECIES, FUNCTORS),
+            generate_derived_field_dumps_as_binnings(SPECIES, FUNCTORS),
+            strict=False,
         ):
             np.testing.assert_allclose(
                 load_diagnostic_result(dump, self.result_path), load_diagnostic_result(binning, self.result_path)

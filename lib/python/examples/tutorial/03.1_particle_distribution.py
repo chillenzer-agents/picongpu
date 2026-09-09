@@ -16,11 +16,12 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-import matplotlib
+import matplotlib as mpl
 import numpy as np
 from matplotlib import pyplot as plt
-from picongpu.picmi.distribution import GaussianDistribution, AnalyticDistribution
-from sympy import Piecewise, Abs, exp
+from sympy import Abs, Piecewise, exp
+
+from picongpu.picmi.distribution import AnalyticDistribution, GaussianDistribution
 
 NUM_CELLS = np.array([192, 2048, 192])
 CELL_SIZE = np.array([0.1772e-6, 0.4430e-7, 0.1772e-6])
@@ -42,13 +43,13 @@ x = NUM_CELLS[0] / 2 * CELL_SIZE[0]
 y, z = np.mgrid[: 2 * NUM_CELLS[1], : NUM_CELLS[2]] * CELL_SIZE[1:3, np.newaxis, np.newaxis]
 predefined_values = particle_distribution(x, y, z)
 
-matplotlib.use("module://mpl_ascii")
+mpl.use("module://mpl_ascii")
 plt.figure()
 plt.contour(y, z, predefined_values)
 
 
 @AnalyticDistribution
-def custom_particle_distribution(x, y, z):
+def custom_particle_distribution(_x, y, _z):
     # PIConGPU's predefined GaussianDistribution is evaluated at the center of the cell
     y += -0.5 * CELL_SIZE[1]
     # The last term undoes the shift to the cell origin.

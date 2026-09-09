@@ -9,8 +9,8 @@ import logging
 from pathlib import Path
 from unittest import TestCase
 
-from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation
 from picongpu import rc_params
+from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation
 
 from .arbitrary_parameters import NUMBER_OF_CELLS, UPPER_BOUNDARY, directory_in_home, gather_results
 

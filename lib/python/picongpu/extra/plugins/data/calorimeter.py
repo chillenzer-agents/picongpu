@@ -114,19 +114,17 @@ class particleCalorimeter:
         """
         if self.detector_params["N_energy"] is None:
             return None
-        else:
-            if self.detector_params["logScale"] is False:
-                return np.linspace(
-                    self.detector_params["minEnergy[keV]"],
-                    self.detector_params["maxEnergy[keV]"],
-                    self.detector_params["N_energy"],
-                )
-            else:
-                return np.logspace(
-                    np.log10(self.detector_params["minEnergy[keV]"]),
-                    np.log10(self.detector_params["maxEnergy[keV]"]),
-                    self.detector_params["N_energy"],
-                )
+        if self.detector_params["logScale"] is False:
+            return np.linspace(
+                self.detector_params["minEnergy[keV]"],
+                self.detector_params["maxEnergy[keV]"],
+                self.detector_params["N_energy"],
+            )
+        return np.logspace(
+            np.log10(self.detector_params["minEnergy[keV]"]),
+            np.log10(self.detector_params["maxEnergy[keV]"]),
+            self.detector_params["N_energy"],
+        )
 
     def getData(self, iteration):
         """

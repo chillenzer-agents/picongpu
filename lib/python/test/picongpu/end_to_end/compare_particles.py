@@ -11,6 +11,7 @@ import numpy as np
 import openpmd_api as opmd
 import pandas as pd
 from openpmd_api.openpmd_api_cxx import ErrorWrongAPIUsage
+
 from picongpu.picmi.diagnostics import Binning, ParticleDump
 from picongpu.picmi.species import Species
 
@@ -39,7 +40,7 @@ def _normalize_range_spec_entry(data):
 
 
 def apply_range(particles, range):
-    lower_bound, upper_bound = zip(*map(_normalize_range_spec_entry, range.data))
+    lower_bound, upper_bound = zip(*map(_normalize_range_spec_entry, range.data), strict=False)
     cells = np.round(
         particles[["positionOffset_x", "positionOffset_y", "positionOffset_z"]].to_numpy() / CELL_SIZE
     ).astype(int)
@@ -61,7 +62,7 @@ def read_fields(series_name, names=("E", "B")):
 
 def read_particles(series_name):
     series = opmd.Series(str(series_name), opmd.Access.read_only)
-    names, particles = zip(*series.iterations[0].particles.items())
+    names, particles = zip(*series.iterations[0].particles.items(), strict=False)
 
     data = pd.concat((particle.to_df() for particle in particles), keys=names)
     return data.assign(
@@ -114,18 +115,18 @@ def _density_into_mesh(df, number_of_cells, cell_size):
 
 
 def read_densities_into_mesh(data_or_filename, number_of_cells, cell_size):
-    df = (
+    densities = (
         compute_densities_from_particles(data_or_filename)
         .reset_index(drop=False)
         .rename({"positionOffset_" + key: key for key in "xyz"}, axis=1)
     )
 
     for i, key in enumerate("xyz"):
-        df[key] *= 1 / cell_size[i]
-        df[key] = df[key].round()
+        densities[key] *= 1 / cell_size[i]
+        densities[key] = densities[key].round()
 
     return (
-        df.astype(dict(x=int, y=int, z=int))
+        densities.astype({"x": int, "y": int, "z": int})
         .set_index(["x", "y", "z"])
         .groupby(["setup", "impl"])
         .apply(

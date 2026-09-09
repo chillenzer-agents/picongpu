@@ -16,6 +16,7 @@ License: GPLv3+
 from pathlib import Path
 
 import numpy as np
+
 from picongpu.picmi import (
     ADK,
     ADKVariant,

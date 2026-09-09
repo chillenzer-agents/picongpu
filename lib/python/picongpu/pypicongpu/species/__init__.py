@@ -7,10 +7,7 @@ than both (!) PIConGPU and PICMI.
 Please refer to the documentation for a deeper discussion.
 """
 
-from . import operation
-from . import attribute
-from . import constant
-
+from . import attribute, constant, operation
 from .species import Species
 
 __all__ = [

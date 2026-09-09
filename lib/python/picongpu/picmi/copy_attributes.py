@@ -6,15 +6,15 @@ License: GPLv3+
 """
 
 import inspect
+from collections.abc import Callable
 from itertools import chain
-from typing import Callable
 
 from pydantic import BaseModel, ValidationError
 
 
 def has_attribute(instance, name):
     if isinstance(instance, type) and issubclass(instance, BaseModel):
-        return name in instance.model_fields or name in map(lambda x: x.alias, instance.model_fields.values())
+        return name in instance.model_fields or name in (x.alias for x in instance.model_fields.values())
 
     # Using hasattr() interacts weirdly with pydantic models,
     # so we use dir() directly.
@@ -52,7 +52,7 @@ def copy_attributes(
     to,
     conversions: None | dict[str, str | Callable] = None,
     remove_prefix: str = "",
-    ignore=tuple(),
+    ignore=(),
     default_converter=lambda self: self,
 ):
     """
@@ -116,7 +116,8 @@ def copy_attributes(
 
     if isinstance(to, type):
         try:
-            # First case: `to` is a class and can be constructed with a fully-qualified constructor call (pydantic.BaseModel).
+            # First case: `to` is a class and can be constructed with a fully-qualified constructor call
+            # (pydantic.BaseModel).
             return to(**assignments)
         except TypeError:
             try:
@@ -125,7 +126,8 @@ def copy_attributes(
             except (ValidationError, TypeError) as e:
                 message = (
                     "Instantiation failed. The receiving class must be default constructible. "
-                    f"You gave {to} which expects {len(inspect.signature(to.__init__).parameters) - 1} argument in its constructor. "
+                    f"You gave {to} which expects "
+                    f"{len(inspect.signature(to.__init__).parameters) - 1} argument in its constructor. "
                     "You can work with an instance instead of a class in this case."
                 )
                 raise ValueError(message) from e
@@ -150,8 +152,8 @@ def converts_to(
     conversions=None,
     preamble=None,
     remove_prefix="",
-    ignore=tuple(),
-    default_converter=lambda self, *args, **kwargs: self,
+    ignore=(),
+    default_converter=lambda self, *_args, **_kwargs: self,
 ):
     """
     Add a get_as_pypicongpu method that uses copy_attributes.
@@ -176,8 +178,8 @@ def converts_to(
                 if isinstance(value, str)
                 # Python binds lambdas by reference, so if we were to use the seemingly obvious implementation,
                 # all lambdas in this dictionary would use the last value of `value`.
-                # That is why we need to force immediate evaluation:
-                else (lambda local_value: lambda self: local_value(self, *args, **kwargs))(value)
+                # That is why we need to force immediate evaluation (via a default argument):
+                else (lambda self, _value=value: _value(self, *args, **kwargs))
                 for key, value in (conversions or {}).items()
             }
             return copy_attributes(
@@ -195,7 +197,7 @@ def converts_to(
     return decorator
 
 
-def default_converts_to(to_class, conversions=None, preamble=None, remove_prefix="", ignore=tuple()):
+def default_converts_to(to_class, conversions=None, preamble=None, remove_prefix="", ignore=()):
     return converts_to(
         to_class,
         conversions=conversions,

@@ -9,16 +9,18 @@ License: GPLv3+
 
 __all__ = ["CMAKEFlagReader"]
 
-from . import readFiles as rF
+import contextlib
 import os
+
+from . import readFiles as rF
 
 
 class CMAKEFlagReader(rF.ReadFiles):
     def __init__(
         self,
-        fileExtension: str = None,
-        direction: str = None,
-        directiontype: str = None,
+        fileExtension: str | None = None,
+        direction: str | None = None,
+        directiontype: str | None = None,
     ):
         """
         constructor
@@ -63,10 +65,7 @@ class CMAKEFlagReader(rF.ReadFiles):
 
         files = os.listdir(self._direction)
 
-        if "cmakeFlags" in files and "cmakeFlagsSetup" in files:
-            return True
-        else:
-            return False
+        return bool("cmakeFlags" in files and "cmakeFlagsSetup" in files)
 
     def usedSetup(self) -> int:
         """
@@ -95,8 +94,8 @@ class CMAKEFlagReader(rF.ReadFiles):
 
         flags = []
 
-        file = open(self._direction + "cmakeFlags", "r")
-        lines = file.readlines()
+        with open(self._direction + "cmakeFlags") as file:
+            lines = file.readlines()
 
         i = 0
         for line in lines:
@@ -133,7 +132,7 @@ class CMAKEFlagReader(rF.ReadFiles):
         allparameters = self.getAllSetups()[setup]
 
         if (parameter and parameter.upper()) not in allparameters:
-            raise ValueError("The parameter {} could not be found.".format(parameter))
+            raise ValueError(f"The parameter {parameter} could not be found.")
 
         allparameters = allparameters.split(";")
 
@@ -143,9 +142,8 @@ class CMAKEFlagReader(rF.ReadFiles):
                 try:
                     value = int(value)
                 except Exception:
-                    try:
+                    # keep the value as a string if it is not numeric
+                    with contextlib.suppress(Exception):
                         value = float(value)
-                    except Exception:
-                        value = value
 
         return value

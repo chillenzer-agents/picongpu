@@ -5,10 +5,12 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from unittest import TestCase
 import inspect
+from unittest import TestCase
+
 import pytest
-from picongpu.picmi.copy_attributes import copy_attributes, converts_to, default_converts_to
+
+from picongpu.picmi.copy_attributes import converts_to, copy_attributes, default_converts_to
 
 CLASS_NAME = "TmpClass"
 ARBITRARY_VALUE = 42
@@ -20,7 +22,7 @@ def custom_conversion(self):
 
 def gen_class(attributes=None, use_values=True):
     attributes = {key: value if use_values else None for key, value in (attributes or {}).items()}
-    return type(CLASS_NAME, tuple(), attributes)
+    return type(CLASS_NAME, (), attributes)
 
 
 def gen_two_classes(common_attributes=None, only_provider=None, only_receiver=None):
@@ -79,8 +81,7 @@ class TestCopyAttributes(TestCase):
         ):
             # This fails because it tries to instantiate DummyReceiver as DummyReceiver().
             copy_attributes(dummy_provider, DummyReceiver)
-            # This would have worked:
-            # copy_attributes(dummy_provider, DummyReceiver(1))
+            # (passing an instance, DummyReceiver(1), would have worked)
 
     def test_returns_identical_instance(self):
         dummy_provider, DummyReceiver = gen_provider_and_matching_receiver_class()
@@ -183,9 +184,7 @@ class TestCopyAttributes(TestCase):
     def test_copies_property_by_value(self):
         dummy_provider = ClassWithProperty()
         DummyReceiver = gen_class({"attribute": None})
-        assert isinstance(
-            getattr(copy_attributes(dummy_provider, DummyReceiver), "attribute"), type(dummy_provider._attribute)
-        )
+        assert isinstance(copy_attributes(dummy_provider, DummyReceiver).attribute, type(dummy_provider._attribute))
 
 
 class TestConvertsTo(TestCase):
@@ -289,7 +288,7 @@ class TestConvertsTo(TestCase):
     def test_default_converts_to_uses_get_as_pypicongpu(self):
         DummyProvider, DummyReceiver = gen_two_classes(
             common_attributes={
-                "arbitrary_name": gen_class({"get_as_pypicongpu": lambda self: ARBITRARY_VALUE}, use_values=True)()
+                "arbitrary_name": gen_class({"get_as_pypicongpu": lambda _self: ARBITRARY_VALUE}, use_values=True)()
             }
         )
         dummy_provider = default_converts_to(DummyReceiver)(DummyProvider)()

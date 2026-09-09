@@ -25,9 +25,8 @@ def plot_with_std(ax, x, y, y_std, label=None):
 
 def _get_debug_data(sim_path, collider_id):
     debug_file_path = Path(sim_path) / "simOutput" / f"debug_values_collider_{collider_id}_species_pair_0.dat"
-    debug_data = None
-    with open(debug_file_path, "r") as f:
-        debug_data = np.loadtxt(
+    with open(debug_file_path) as f:
+        return np.loadtxt(
             f,
             dtype=[
                 ("iteration", np.uint32),
@@ -35,7 +34,6 @@ def _get_debug_data(sim_path, collider_id):
                 ("s_param", np.float64),
             ],
         )
-    return debug_data
 
 
 class BeamRelaxationVerifier:
@@ -64,7 +62,7 @@ class BeamRelaxationVerifier:
         debug_file_path = Path(sim_output_path) / "simOutput" / "average_debye_length_for_collisions.dat"
         self.average_debye_present = True
         try:
-            with open(debug_file_path, "r") as f:
+            with open(debug_file_path) as f:
                 self.debug_values["all"] = np.loadtxt(f, dtype=[("iteration", np.uint32), ("debye_length", np.float64)])
         except FileNotFoundError:
             print("No average debye length output present")
@@ -243,7 +241,7 @@ class BeamRelaxationVerifier:
         for ax in ax_dict.values():
             ax.set_xlabel("t [fs]")
 
-        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup", "r") as file:
+        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup") as file:
             f.suptitle(file.readline() + "\n" + textwrap.fill(file.readline(), 80))
         f.tight_layout()
         f.subplots_adjust(top=0.90)
@@ -315,7 +313,7 @@ class BeamRelaxationVerifier:
         axs[1].set_ylabel(r"$s$")
         axs[2].set_ylabel(r"$\lambda_D [m]$")
 
-        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup", "r") as file:
+        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup") as file:
             f.suptitle(file.readline() + "\n" + textwrap.fill(file.readline(), 80))
         plt.tight_layout()
         if to_file:

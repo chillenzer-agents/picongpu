@@ -5,10 +5,9 @@ Authors: Hannes Troepgen, Brian Edward Marre
 License: GPLv3+
 """
 
-from ...pypicongpu import species
-from ...pypicongpu import util
-
 import picmistandard
+
+from ...pypicongpu import species, util
 
 """
 note on rms_velocity:
@@ -27,8 +26,8 @@ note on drift:
 The drift ("velocity") is represented using either directed_velocity or centroid_velocity (v, gamma*v respectively) and
 for the pypicongpu representation stored in a separate object (Drift).
 
-To accommodate that, this separate Drift object can be requested by the method get_picongpu_drift(). In case of no drift,
-this method returns None.
+To accommodate that, this separate Drift object can be requested by the method get_picongpu_drift().
+In case of no drift, this method returns None.
 """
 
 
@@ -38,12 +37,12 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
     def picongpu_get_rms_velocity_si(self) -> tuple[float, float, float]:
         return tuple(self.rms_velocity)
 
-    def get_as_pypicongpu(self, grid):
+    def get_as_pypicongpu(self, grid):  # noqa: ARG002 -- grid is part of the pypicongpu translation protocol signature
         util.unsupported("fill in", self.fill_in)
         util.unsupported("lower bound", self.lower_bound, [None, None, None])
         util.unsupported("upper bound", self.upper_bound, [None, None, None])
 
-        profile = species.operation.densityprofile.Uniform(density_si=self.density)
+        return species.operation.densityprofile.Uniform(density_si=self.density)
 
         # @todo respect bounding box, Brian Marre, 2023
         # profile.lower_bound = tuple(map(
@@ -51,14 +50,12 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
         # profile.upper_bound = tuple(map(
         #   lambda x: math.inf if x is None else x, self.upper_bound))
 
-        return profile
-
     def get_picongpu_drift(self) -> species.operation.momentum.Drift | None:
         """
         Get drift for pypicongpu
         :return: pypicongpu drift object or None
         """
-        if [0, 0, 0] == self.directed_velocity:
+        if self.directed_velocity == [0, 0, 0]:
             return None
         return species.operation.momentum.Drift.from_velocity(tuple(self.directed_velocity))
 

@@ -13,10 +13,11 @@ resultLog(direction:str = None, title:str = None)
 errorLog()
 """
 
-__all__ = ["resultLog", "errorLog"]
+__all__ = ["errorLog", "resultLog"]
 
 import sys
 from time import localtime, strftime
+
 import testsuite._checkData as cD
 
 
@@ -27,8 +28,8 @@ def resultLog(
     perc_diff: int,
     result: bool,
     difference: float,
-    direction: str = None,
-    title: str = None,
+    direction: str | None = None,
+    title: str | None = None,
     inputparameter=None,
 ):
     """
@@ -98,25 +99,23 @@ def resultLog(
 
         direction = cD.checkDirection(variable="resultDirection", direction=direction)
 
-        fobj_out = open(direction + "/testresult.log", "w+")
-        fobj_out.write(date + " " + timeOfDay + "\n")
-        fobj_out.write("\n")
-        fobj_out.write("testcase: " + title + "\n")
-        fobj_out.write("theoretically expected value: {}\n".format(theory))
-        fobj_out.write("Value from simulation: {}\n".format(value_sim))
-        fobj_out.write("acceptance: {}\n".format(acceptance))
-        fobj_out.write("result of the test:{} \n".format(result))
-        fobj_out.write("difference: {}\n".format(difference))
-        fobj_out.write("difference in percentage: {}\n".format(perc_diff))
-        for key in inputparameter.keys():
-            fobj_out.write("input parameter: {}={}\n".format(key, inputparameter[key]))
-        fobj_out.close()
+        with open(direction + "/testresult.log", "w+") as fobj_out:
+            fobj_out.write(date + " " + timeOfDay + "\n")
+            fobj_out.write("\n")
+            fobj_out.write("testcase: " + title + "\n")
+            fobj_out.write(f"theoretically expected value: {theory}\n")
+            fobj_out.write(f"Value from simulation: {value_sim}\n")
+            fobj_out.write(f"acceptance: {acceptance}\n")
+            fobj_out.write(f"result of the test:{result} \n")
+            fobj_out.write(f"difference: {difference}\n")
+            fobj_out.write(f"difference in percentage: {perc_diff}\n")
+            fobj_out.writelines(f"input parameter: {key}={inputparameter[key]}\n" for key in inputparameter)
 
     except Exception:
         errorLog()
 
 
-def errorLog(direction: str = None):
+def errorLog(direction: str | None = None):
     """
     Catches errors while executing the test-suite and saves
     them in the error.log file.
@@ -141,11 +140,10 @@ def errorLog(direction: str = None):
     error2 = str(sys.exc_info()[2])
 
     # print error0 + error1 + error2
-    fobj_out = open(direction + "/error.log", "w")
-    fobj_out.write(date + " " + timeOfDay + "\n")
-    fobj_out.write("\n")
-    fobj_out.write(error0 + " " + error1 + " " + error2 + "\n")
-    fobj_out.close()
+    with open(direction + "/error.log", "w") as fobj_out:
+        fobj_out.write(date + " " + timeOfDay + "\n")
+        fobj_out.write("\n")
+        fobj_out.write(error0 + " " + error1 + " " + error2 + "\n")
 
     sys.exit(42)
 

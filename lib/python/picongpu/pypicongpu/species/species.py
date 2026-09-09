@@ -6,8 +6,9 @@ License: GPLv3+
 """
 
 import re
-from pydantic import BaseModel, computed_field, field_validator
 from enum import Enum
+
+from pydantic import BaseModel, computed_field, field_validator
 
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant
 
@@ -88,7 +89,7 @@ def get_constant_by_type(constants, needle_type: type[Constant]) -> Constant:
         if needle_type is type(const):
             return const
 
-    raise RuntimeError("no constant of requested type available: {}".format(needle_type))
+    raise RuntimeError(f"no constant of requested type available: {needle_type}")
 
 
 class Species(RenderedObject, BaseModel):
@@ -174,8 +175,8 @@ class Species(RenderedObject, BaseModel):
 
         # each constant type can only be used once
         const_types = list(map(type, self.constants))
-        non_unique_constants = set([c for c in const_types if const_types.count(c) > 1])
-        if 0 != len(non_unique_constants):
+        non_unique_constants = {c for c in const_types if const_types.count(c) > 1}
+        if len(non_unique_constants) != 0:
             raise ValueError(
                 "constant names must be unique per species, offending: {}".format(
                     ", ".join(map(str, non_unique_constants))
@@ -183,9 +184,9 @@ class Species(RenderedObject, BaseModel):
             )
 
         # each attribute (-name) can only be used once
-        attr_names = list(map(lambda attr: attr.picongpu_name, self.attributes))
-        non_unique_attributes = set([c for c in attr_names if attr_names.count(c) > 1])
-        if 0 != len(non_unique_attributes):
+        attr_names = [attr.picongpu_name for attr in self.attributes]
+        non_unique_attributes = {c for c in attr_names if attr_names.count(c) > 1}
+        if len(non_unique_attributes) != 0:
             raise ValueError(
                 "attribute names must be unique per species, offending: {}".format(", ".join(non_unique_attributes))
             )

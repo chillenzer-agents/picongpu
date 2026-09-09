@@ -14,9 +14,10 @@ The deviation/width should be < 0.05.
 
 """
 
-import openpmd_api as opmd
-import numpy as np
 import sys
+
+import numpy as np
+import openpmd_api as opmd
 
 
 class Comparison:
@@ -47,25 +48,24 @@ class Comparison:
         if len(series.iterations) == 1:
             raise ValueError("There is just 1 iteration in the series \n make sure, there are at least two")
 
-        elif len(np.array(i.particles)) != 1:
+        if len(np.array(i.particles)) != 1:
             raise ValueError("There is not only 1 particle in the series \n make sure, there is only least one")
 
-        else:
-            # read parameters of the simulation
-            params = {
-                "cell_depth": i.get_attribute("cell_depth"),
-                "cell_height": i.get_attribute("cell_height"),
-                "cell_width": i.get_attribute("cell_width"),
-                "dt": i.get_attribute("dt"),
-                "unit_time": i.get_attribute("unit_time"),
-                "unit_length": i.get_attribute("unit_length"),
-                "unit_charge": i.get_attribute("unit_charge"),
-                "unit_bfield": i.get_attribute("unit_bfield"),
-                "unit_speed": i.get_attribute("unit_speed"),
-                "unit_mass": i.get_attribute("unit_mass"),
-            }
-            self.series = series
-            self.params = params
+        # read parameters of the simulation
+        params = {
+            "cell_depth": i.get_attribute("cell_depth"),
+            "cell_height": i.get_attribute("cell_height"),
+            "cell_width": i.get_attribute("cell_width"),
+            "dt": i.get_attribute("dt"),
+            "unit_time": i.get_attribute("unit_time"),
+            "unit_length": i.get_attribute("unit_length"),
+            "unit_charge": i.get_attribute("unit_charge"),
+            "unit_bfield": i.get_attribute("unit_bfield"),
+            "unit_speed": i.get_attribute("unit_speed"),
+            "unit_mass": i.get_attribute("unit_mass"),
+        }
+        self.series = series
+        self.params = params
 
     def read_series(self):
         """Reads the position and momentum of the particle in the x-y-plane
@@ -182,19 +182,24 @@ class Comparison:
         timestep = self.params["dt"] * self.params["unit_time"]
 
         total_phasediff = 0
-        for counter in range(0, len(theta) - 1, 1):
+        for _ in range(0, len(theta) - 1, 1):
             total_phasediff = np.sum(np.abs(np.diff(theta)))
 
         return total_phasediff, timestep
 
 
 def correct_starting_values_for_technical_details(x_poss, y_poss, x_offSet, y_offSet, R_c, halfStepPhase):
-    """The particle is initialized at the arbitary position (5, 32) in the x-y-plane (some arbitrary z which is irrelevant for our computation...).
-    So we have to shift the coordinates in a form, that the initialization point is exactly on the circle with the radius of the particle trajectory with its center at the origin.
+    """The particle is initialized at the arbitary position (5, 32) in the x-y-plane
+    (some arbitrary z which is irrelevant for our computation...).
+    So we have to shift the coordinates in a form, that the initialization point is exactly on
+    the circle with the radius of the particle trajectory with its center at the origin.
     This shifting is done by the transformation (subtraction of the initialization coordinates and radius).
-    But we also need to compensate for a half-step, which is automatically done by PIConGPU to improve the accuracy of the Boris Pusher
-    (see: B. Ripperda et al 2018 ApJS 235 21 https://iopscience.iop.org/article/10.3847/1538-4365/aab114 ; 10.3847/1538-4365/aab114).
-    This half-step is the first data written by PIConGPU and is corrected by the trigonometry operations in the transformation.
+    But we also need to compensate for a half-step, which is automatically done by PIConGPU
+    to improve the accuracy of the Boris Pusher
+    (see: B. Ripperda et al 2018 ApJS 235 21
+    https://iopscience.iop.org/article/10.3847/1538-4365/aab114 ; 10.3847/1538-4365/aab114).
+    This half-step is the first data written by PIConGPU and is corrected by the trigonometry
+    operations in the transformation.
 
     """
     # the coordinates where the particle is initialized in the simulation
@@ -236,7 +241,7 @@ def main():
         phaseDifferences[j - 1], timesteps[j - 1] = phase_class.get_total_phasediff()
 
     quotients = np.zeros(len(phaseDifferences) - 1)
-    for j in range(len(phaseDifferences) - 1):
+    for _ in range(len(phaseDifferences) - 1):
         quotients = phaseDifferences[1:] / phaseDifferences[:-1]
 
     b = np.mean(quotients)  # base b
@@ -272,9 +277,7 @@ def main():
         sigma_compare = 0
         print("pusher is valid (deviation/width)")
 
-    compare_result = x_compare + sigma_compare
-
-    return compare_result
+    return x_compare + sigma_compare
 
 
 if __name__ == "__main__":

@@ -16,14 +16,15 @@ For information:
     two cases of KHI currently have to be treated differently.
 """
 
-from scipy.signal import argrelextrema
-from scipy.constants import c
-import numpy as np
 import os
 import sys
 
+import numpy as np
+from scipy.constants import c
+from scipy.signal import argrelextrema
+
 sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)) + "/../../")
-import testsuite as ts  # noqa
+import testsuite as ts
 
 # general information about the test
 title = "KHI Growthrate (2D MI)"
@@ -53,7 +54,7 @@ plot_xaxis = None
 # for more values see the documentation (e.g. 2D plot needs zaxis and yaxis)
 
 
-def theory(gamma, **kwargs):
+def theory(gamma, **_kwargs):
     """
     this function indicates how the theoretical values
     can be calculated from the data. Please complete this
@@ -72,7 +73,7 @@ def theory(gamma, **kwargs):
     return v / (c * np.sqrt(gamma))
 
 
-def simData(Bx, **kwargs):
+def simData(Bx, **_kwargs):
     """
     this function indicates how the values from the simulation
     can be calculated from the data. Please complete this
@@ -90,6 +91,4 @@ def simData(Bx, **kwargs):
     time = ts.Math.physics.calculateTimeFreq(frequency, step_direction="fields_energy.dat")
 
     sim_values = ts.Math.math.growthRate(Bx, time)
-    sim_values = sim_values[argrelextrema(sim_values, np.less)[0][0] :]
-
-    return sim_values
+    return sim_values[argrelextrema(sim_values, np.less)[0][0] :]

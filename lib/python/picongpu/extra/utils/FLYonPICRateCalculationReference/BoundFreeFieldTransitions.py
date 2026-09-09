@@ -7,9 +7,9 @@ Authors: Brian Marre, Marco Garten
 License: GPLv3+
 """
 
+import mpmath as mp
 import numpy as np
 import scipy.constants as sc
-import mpmath as mp
 
 """ @file reference implementation of the rate calculation for bound-free field based transitions """
 
@@ -84,17 +84,17 @@ class BoundFreeFieldTransitions:
         dBase = np.float64(4.0 * np.exp(1.0) * Z**3.0 / (F * nEff**4.0))
         D = dBase ** np.float64(nEff)
 
-        print("\t\t nEff: {:.4e}".format(nEff))
-        print("\t\t dBase: {:.4e}".format(dBase))
-        print("\t\t D: {:.4e}".format(D))
+        print(f"\t\t nEff: {nEff:.4e}")
+        print(f"\t\t dBase: {dBase:.4e}")
+        print(f"\t\t D: {D:.4e}")
 
         gamowFactor = np.exp(-(2.0 * Z**3.0) / (3.0 * nEff**3.0 * F))
-        print("\t\t gamowFactor: {:.4e}".format(gamowFactor))
+        print(f"\t\t gamowFactor: {gamowFactor:.4e}")
 
         rate = (
             F * np.float32(D**2.0 * gamowFactor) * np.sqrt((3.0 * nEff**3.0 * F) / (np.pi * Z**3.0)) / (8.0 * np.pi * Z)
         )
-        print("\t\t rate[AU]: {:.6}".format(rate))
+        print(f"\t\t rate[AU]: {rate:.6}")
         return rate
 
     @staticmethod
@@ -118,11 +118,9 @@ class BoundFreeFieldTransitions:
         dBase = (mp.mpf(4) * mp.e * Z ** mp.mpf(3)) / (F * nEff ** mp.mpf(4))
         D = dBase**nEff
 
-        rate = (
+        return (
             (F * D ** mp.mpf(2))
             / (mp.mpf(8) * mp.pi * Z)
             * mp.exp(-(mp.mpf(2) * Z ** mp.mpf(3)) / (mp.mpf(3) * nEff ** mp.mpf(3) * F))
             * mp.sqrt((mp.mpf(3) * nEff ** mp.mpf(3) * F) / (mp.pi * Z ** mp.mpf(3)))
         )
-
-        return rate

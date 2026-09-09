@@ -6,7 +6,9 @@ License: GPLv3+
 """
 
 from typing import Annotated
+
 from pydantic import BaseModel, PlainSerializer, field_validator
+
 from ..rendering.renderedobject import RenderedObject
 
 
@@ -23,7 +25,7 @@ class TimeStepSpec(RenderedObject, BaseModel):
         # allow to give specs as positional argument
         if len(args) > 0 and "specs" not in kwargs:
             kwargs |= {"specs": args[0]}
-        super(TimeStepSpec, self).__init__(*args[1:], **kwargs)
+        super().__init__(*args[1:], **kwargs)
 
     @field_validator("specs", mode="before")
     @classmethod

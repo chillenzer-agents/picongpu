@@ -19,10 +19,11 @@
 # If not, see <http://www.gnu.org/licenses/>.
 #
 
+import argparse
 import os
+
 import numpy as np
 from matplotlib import pyplot as plt
-import argparse
 from matplotlib.colors import LogNorm
 
 __doc__ = """This tool analyzes spectra for different directions.
@@ -142,16 +143,16 @@ for myfile in args.path2Data:
         first = False
 
     # verbose user output to inform on loading progress and statistics
-    print("file loaded:              {}".format(os.path.basename(myfile.name)))
+    print(f"file loaded:              {os.path.basename(myfile.name)}")
 
     # regions:
-    print("shape input data:         {}".format(np.shape(data)))
-    print("range selected:           {}".format((omega_min_index, omega_max_index, theta_min_index, theta_max_index)))
+    print(f"shape input data:         {np.shape(data)}")
+    print(f"range selected:           {(omega_min_index, omega_max_index, theta_min_index, theta_max_index)}")
 
     selectedOnly = data[theta_min_index:theta_max_index, omega_min_index:omega_max_index]
 
-    print("shape of data analyzed:   {}".format(np.shape(selectedOnly)))
-    print("")
+    print(f"shape of data analyzed:   {np.shape(selectedOnly)}")
+    print()
 
     # statistics:
     my_sum = np.sum(selectedOnly)
@@ -159,12 +160,12 @@ for myfile in args.path2Data:
     my_std = np.std(selectedOnly)
     my_size = np.size(selectedOnly)
 
-    print("sum:         {}".format(my_sum))
-    print("average:     {}".format(my_avg))
-    print("std:         {}".format(my_std))
-    print("")
-    print("sum + error: {} +/- {}".format(my_size * my_avg, np.sqrt(my_size) * my_std))
+    print(f"sum:         {my_sum}")
+    print(f"average:     {my_avg}")
+    print(f"std:         {my_std}")
+    print()
+    print(f"sum + error: {my_size * my_avg} +/- {np.sqrt(my_size) * my_std}")
 
     # finalize
-    print("")
-    print("")
+    print()
+    print()

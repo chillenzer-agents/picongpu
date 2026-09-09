@@ -10,10 +10,9 @@ License: GPLv3+
 import BoundBoundTransitions as boundbound
 import BoundFreeCollisionalTransitions as boundfreecollisional
 import BoundFreeFieldTransitions as boundfreefield
-
-import scipy.constants as const
-import numpy as np
 import mpmath as mp
+import numpy as np
+import scipy.constants as const
 
 """ @file call to get print out of reference rates/crossections """
 
@@ -23,7 +22,7 @@ if __name__ == "__main__":
     energyElectron = 1000.0
     # eV
     energyElectronBinWidth = 10.0
-    # 1/(eV * m^3)
+    # in 1/(eV m^3) units
     densityElectrons = 1e28
 
     # bound-free collisional transition data
@@ -64,7 +63,7 @@ if __name__ == "__main__":
     print("cross sections:")
     print("- bound-free")
     print(
-        "\t collisional ionization cross section: \t  {0:.12e} 1e6*barn".format(
+        "\t collisional ionization cross section: \t  {:.12e} 1e6*barn".format(
             boundfreecollisional.BoundFreeCollisionalTransitions.collisionalIonizationCrossSection(
                 energyElectron,
                 ionizationEnergy,
@@ -78,7 +77,7 @@ if __name__ == "__main__":
 
     print("- bound-bound")
     print(
-        "\t collisional excitation cross section: \t  {0:.12e} 1e6*barn".format(
+        "\t collisional excitation cross section: \t  {:.12e} 1e6*barn".format(
             boundbound.BoundBoundTransitions.collisionalBoundBoundCrossSection(
                 energyElectron,
                 energyDiffLowerUpper,
@@ -95,7 +94,7 @@ if __name__ == "__main__":
         )
     )
     print(
-        "\t collisional deexcitation cross section:  {0:.12e} 1e6*barn".format(
+        "\t collisional deexcitation cross section:  {:.12e} 1e6*barn".format(
             boundbound.BoundBoundTransitions.collisionalBoundBoundCrossSection(
                 energyElectron,
                 energyDiffLowerUpper,
@@ -115,7 +114,7 @@ if __name__ == "__main__":
     print("rates:")
     print("- bound-free collsional")
     print(
-        "\t collisional ionization rate:  \t\t  {0:.12e} 1/s".format(
+        "\t collisional ionization rate:  \t\t  {:.12e} 1/s".format(
             boundfreecollisional.BoundFreeCollisionalTransitions.rateCollisionalIonization(
                 energyElectron,
                 energyElectronBinWidth,
@@ -134,15 +133,13 @@ if __name__ == "__main__":
     nEff = boundfreefield.BoundFreeFieldTransitions.n_eff_numpy(screenedCharge, ionizationEnergy_ADK)
     fieldStrengthMaxADKRate = 4.0 * screenedCharge**3 / (3.0 * nEff**3 * (4.0 * nEff - 3.0))
     print(
-        "\t ADK:\n \t\t fieldStrength: {0:.4e}\n\t\t F_maxADK: {1:.4e}\n\t\t F_crit_BSI: {2:.4e}".format(
-            fieldStrength,
-            fieldStrengthMaxADKRate,
-            boundfreefield.BoundFreeFieldTransitions.F_crit_BSI(screenedCharge, ionizationEnergy_ADK),
-        )
+        f"\t ADK:\n \t\t fieldStrength: {fieldStrength:.4e}\n\t\t F_maxADK: {fieldStrengthMaxADKRate:.4e}\n"
+        f"\t\t F_crit_BSI: "
+        f"{boundfreefield.BoundFreeFieldTransitions.F_crit_BSI(screenedCharge, ionizationEnergy_ADK):.4e}"
     )
 
     print(
-        "\t ADK rate(numpy) : {0:.9e} * 1/(3.3e-17s)".format(
+        "\t ADK rate(numpy) : {:.9e} * 1/(3.3e-17s)".format(
             np.float32(
                 boundfreefield.BoundFreeFieldTransitions.ADKRate_numpy(
                     np.float32(screenedCharge), np.float32(ionizationEnergy_ADK), np.float32(fieldStrength)
@@ -168,7 +165,7 @@ if __name__ == "__main__":
 
     print("- bound-bound")
     print(
-        "\t collisional excitation rate:  \t\t  {0:.12e} 1/s".format(
+        "\t collisional excitation rate:  \t\t  {:.12e} 1/s".format(
             boundbound.BoundBoundTransitions.rateCollisionalBoundBoundTransition(
                 energyElectron,
                 energyElectronBinWidth,
@@ -187,7 +184,7 @@ if __name__ == "__main__":
         )
     )
     print(
-        "\t collisional deexcitation rate:  \t  {0:.12e} 1/s".format(
+        "\t collisional deexcitation rate:  \t  {:.12e} 1/s".format(
             boundbound.BoundBoundTransitions.rateCollisionalBoundBoundTransition(
                 energyElectron,
                 energyElectronBinWidth,
@@ -206,7 +203,7 @@ if __name__ == "__main__":
         )
     )
     print(
-        "\t spontaneous radiative deexcitation rate: {0:.12e} 1/s".format(
+        "\t spontaneous radiative deexcitation rate: {:.12e} 1/s".format(
             boundbound.BoundBoundTransitions.rateSpontaneousDeexcitation(
                 absorptionOscillatorStrength,
                 frequencyPhoton,

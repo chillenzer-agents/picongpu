@@ -20,8 +20,9 @@
 #
 
 import argparse
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 import openpmd_api as opmd
 
 __doc__ = """
@@ -52,7 +53,7 @@ def set_colorbar(cb):
         t.set_fontsize(16)
 
 
-def plotError(file_pattern, slice_pos=[0.5, 0.5, 0.5], timestep=-1):
+def plotError(file_pattern, slice_pos=None, timestep=-1):
     """
     read field data from an openPMD file
     compute div(E) - rho/epsilon_0
@@ -70,6 +71,8 @@ def plotError(file_pattern, slice_pos=[0.5, 0.5, 0.5], timestep=-1):
         simulation step used if file is an
         openPMD file series pattern e.g. simData_%%T.bp
     """
+    if slice_pos is None:
+        slice_pos = [0.5, 0.5, 0.5]
     # load file
     series = opmd.Series(file_pattern, opmd.Access.read_only)
 
@@ -127,7 +130,7 @@ def plotError(file_pattern, slice_pos=[0.5, 0.5, 0.5], timestep=-1):
 
     plt.subplot(131)
     slice_cell_z = int(np.floor((diff.shape[0] - 1) * slice_pos[0]))
-    plt.title("slice in z at {}".format(slice_cell_z), fontsize=20)
+    plt.title(f"slice in z at {slice_cell_z}", fontsize=20)
     plt.imshow(
         diff[slice_cell_z, :, :],
         vmin=-limit,
@@ -150,7 +153,7 @@ def plotError(file_pattern, slice_pos=[0.5, 0.5, 0.5], timestep=-1):
 
     plt.subplot(132)
     slice_cell_y = int(np.floor((diff.shape[1] - 1) * slice_pos[1]))
-    plt.title("slice in y at {}".format(slice_cell_y), fontsize=20)
+    plt.title(f"slice in y at {slice_cell_y}", fontsize=20)
     plt.imshow(
         diff[:, slice_cell_y, :],
         vmin=-limit,
@@ -173,7 +176,7 @@ def plotError(file_pattern, slice_pos=[0.5, 0.5, 0.5], timestep=-1):
 
     plt.subplot(133)
     slice_cell_x = int(np.floor((diff.shape[2] - 1) * slice_pos[2]))
-    plt.title("slice in x at {}".format(slice_cell_x), fontsize=20)
+    plt.title(f"slice in x at {slice_cell_x}", fontsize=20)
     plt.imshow(
         diff[:, :, slice_cell_x],
         vmin=-limit,

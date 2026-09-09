@@ -1,12 +1,13 @@
-from typing import List, Dict, Callable
+import re
 import sys
 import tomllib
-import re
+from collections.abc import Callable
+
 import packaging.requirements
 import packaging.version
 import requests
-import yaml
 import typeguard
+import yaml
 
 """
 This file is part of PIConGPU.
@@ -91,7 +92,7 @@ def exit_error(text: str):
 
 
 @typeguard.typechecked
-def get_all_pypy_releases(package_name: str, version_strategy: Callable[[str], List[str]]) -> List[str]:
+def get_all_pypy_releases(package_name: str, version_strategy: Callable[[str], list[str]]) -> list[str]:
     """Return release version of given package depending on the version_strategy.
 
     Parameters
@@ -108,7 +109,7 @@ def get_all_pypy_releases(package_name: str, version_strategy: Callable[[str], L
 
 
 @typeguard.typechecked
-def get_all_pypi_versions(package_name: str) -> List[str]:
+def get_all_pypi_versions(package_name: str) -> list[str]:
     """Returns all release versions of a package registered on pypi.org
 
     Parameters
@@ -160,7 +161,7 @@ def get_all_major_pypi_versions(package_name):
 
 
 @typeguard.typechecked
-def get_supported_versions(package_name: str, versions: List[str], pyproject_toml: Dict) -> List[str]:
+def get_supported_versions(package_name: str, versions: list[str], pyproject_toml: dict) -> list[str]:
     """Take a list of package versions and remove all versions, which are not supported by the
     pyproject.toml.
 
@@ -177,18 +178,14 @@ def get_supported_versions(package_name: str, versions: List[str], pyproject_tom
     for dep in pyproject_toml["project"]["dependencies"]:
         parsed_dep = packaging.requirements.Requirement(dep)
         if parsed_dep.name == package_name:
-            supported_versions: List[str] = []
+            return [
+                release_version
+                for release_version in versions
+                if packaging.version.parse(release_version) in parsed_dep.specifier
+            ]
 
-            for release_version in versions:
-                if packaging.version.parse(release_version) in parsed_dep.specifier:
-                    supported_versions.append(release_version)
-
-            return supported_versions
-
-    exit_error(
-        f"{package_name} is not defined in dependency section.\n"
-        + f"{'\n'.join(pyproject_toml['project']['dependencies'])}"
-    )
+    dependencies = "\n".join(pyproject_toml["project"]["dependencies"])
+    exit_error(f"{package_name} is not defined in dependency section.\n{dependencies}")
 
     return []
 
@@ -200,7 +197,7 @@ class Job:
     which makes it much easier to access the job name.
     """
 
-    def __init__(self, name: str, body: Dict):
+    def __init__(self, name: str, body: dict):
         """Creates a Job object, see class description.
 
         Parameters
@@ -248,8 +245,8 @@ def extend_job_with_test_requirement(job: Job, package_name: str, package_versio
 @typeguard.typechecked
 def construct_job(
     job: Job,
-    current_test_pkgs: List[str],
-    test_pkg_versions: Dict[str, List[str]],
+    current_test_pkgs: list[str],
+    test_pkg_versions: dict[str, list[str]],
 ):
     """Recursive function to construct all test jobs.
 
@@ -287,7 +284,7 @@ def construct_job(
 
 
 @typeguard.typechecked
-def print_job_yaml(test_pkg_versions: Dict[str, List[str]]):
+def print_job_yaml(test_pkg_versions: dict[str, list[str]]):
     """Prints all GitLab CI jobs on stdout.
 
     Parameters
@@ -313,13 +310,13 @@ def print_job_yaml(test_pkg_versions: Dict[str, List[str]]):
 
 
 # Python versions to test
-PYTHON_VERSIONS: List[str] = ["3.11", "3.12", "3.13"]
+PYTHON_VERSIONS: list[str] = ["3.11", "3.12", "3.13"]
 # Define, which dependencies should be explicit tests.
 # The key is the name of the package, and function returns the versions to
 # test.
 # If a package is not define in the list, but defined in the pyproject.toml,
 # pip decides which version is used.
-PACKAGES_TO_TEST: Dict[str, Callable] = {
+PACKAGES_TO_TEST: dict[str, Callable] = {
     "jsonschema": get_all_major_pypi_versions,
     "pydantic": get_all_major_pypi_versions,
     "referencing": get_all_major_pypi_versions,
@@ -334,7 +331,7 @@ if __name__ == "__main__":
         pyproject_toml = tomllib.load(f)
 
     # the key is the name of the package and the value are all versions to be tested
-    test_pkg_versions: Dict[str, List[str]] = {}
+    test_pkg_versions: dict[str, list[str]] = {}
 
     # pull release versions from pypy.org
     # depending on the version_strategy maybe all versions are crawled or less, like all major
@@ -344,7 +341,7 @@ if __name__ == "__main__":
 
     # remove all release version, which are not supported by the version range configured in the
     # pyproject.toml
-    for pkg in test_pkg_versions:
-        test_pkg_versions[pkg] = get_supported_versions(pkg, test_pkg_versions[pkg], pyproject_toml)
+    for pkg, versions in test_pkg_versions.items():
+        test_pkg_versions[pkg] = get_supported_versions(pkg, versions, pyproject_toml)
 
     print_job_yaml(test_pkg_versions)

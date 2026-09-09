@@ -7,8 +7,8 @@ License: LGPLv3+
 
 import sys
 
-import openpmd_api as opmd
 import numpy as np
+import openpmd_api as opmd
 
 
 class vec3D:
@@ -46,9 +46,9 @@ class vec3D:
         """
         helper function to print values to screen
         """
-        print("x: {}".format(self.x))
-        print("y: {}".format(self.y))
-        print("z: {}".format(self.z))
+        print(f"x: {self.x}")
+        print(f"y: {self.y}")
+        print(f"z: {self.z}")
 
     def __truediv__(self, other):
         """
@@ -108,7 +108,7 @@ class addParticles2Checkpoint:
         self.filename_in = filename_in
         self.filename_out = filename_out
         self.f = opmd.Series(self.filename_in, opmd.Access.read_only)
-        if int(list(self.f.iterations)[0]) != self.timestep:
+        if int(next(iter(self.f.iterations))) != self.timestep:
             # throw error if not time step zero
             raise NameError("Not time step zero")
         # TODO: maybe raise error, when filename_out already exists
@@ -207,13 +207,13 @@ class addParticles2Checkpoint:
             self.has_probeE = True
             # type of E-Field
             self.dtype_probeE = self.f.iterations[self.timestep].particles[self.speciesName]["probeE"]["x"].dtype
-        self.print("contains probeE = {}".format(self.has_probeE))
+        self.print(f"contains probeE = {self.has_probeE}")
 
         if "probeB" in self.f.iterations[self.timestep].particles[self.speciesName]:
             self.has_probeB = True
             # type of B-Field
             self.dtype_probeB = self.f.iterations[self.timestep].particles[self.speciesName]["probeB"]["x"].dtype
-        self.print("contains probeB {}".format(self.has_probeB))
+        self.print(f"contains probeB {self.has_probeB}")
 
         # extract data type for weighting
         self.dtype_weighting = (
@@ -230,7 +230,7 @@ class addParticles2Checkpoint:
                 .particles[self.speciesName]["id"][opmd.Mesh_Record_Component.SCALAR]
                 .dtype
             )
-        self.print("contains id =  {}".format(self.has_id))
+        self.print(f"contains id =  {self.has_id}")
 
         if "momentumPrev1" in self.f.iterations[self.timestep].particles[self.speciesName]:
             self.has_momentumPrev1 = True
@@ -238,7 +238,7 @@ class addParticles2Checkpoint:
             self.dtype_momentumPrev1 = (
                 self.f.iterations[self.timestep].particles[self.speciesName]["momentumPrev1"]["x"].dtype
             )
-        self.print("contains momentumPrev1 =  {}".format(self.has_momentumPrev1))
+        self.print(f"contains momentumPrev1 =  {self.has_momentumPrev1}")
 
         if "transitionRadiationMask" in self.f.iterations[self.timestep].particles[self.speciesName]:
             self.has_transitionRadiationMask = True
@@ -248,7 +248,7 @@ class addParticles2Checkpoint:
                 .particles[self.speciesName]["transitionRadiationMask"][opmd.Mesh_Record_Component.SCALAR]
                 .dtype
             )
-        self.print("contains transitionRadiationMask =  {}".format(self.has_transitionRadiationMask))
+        self.print(f"contains transitionRadiationMask =  {self.has_transitionRadiationMask}")
 
         del self.f  # close checkpoint file
 
@@ -376,7 +376,8 @@ class Chunk:
                 extent of each slice
 
         """
-        assert len(offset) == len(extent)
+        if len(offset) != len(extent):
+            raise AssertionError
         self.offset = offset
         self.extent = extent
 
@@ -397,9 +398,11 @@ class Chunk:
         for k, v in enumerate(self.extent):
             if v > maximum:
                 dimension = k
-        assert dimension < len(self)
+        if dimension >= len(self):
+            raise AssertionError
         # no offset
-        assert self.offset == [0 for _ in range(len(self))]
+        if self.offset != [0 for _ in range(len(self))]:
+            raise AssertionError
         offset = [0 for _ in range(len(self))]
         extent = self.extent.copy()
 
@@ -450,7 +453,7 @@ class pipe:
         self,
         infile,
         outfile,
-        particles=[],
+        particles=None,
         inconfig="{}",
         # can increase write performance with no known downsides, see:
         # https://adios2.readthedocs.opmd/en/latest/engines/engines.html#bp5
@@ -474,6 +477,8 @@ class pipe:
         verbose: bool
                 prints verbose messages to the screen if True
         """
+        if particles is None:
+            particles = []
         self.infile = infile
         self.outfile = outfile
         self.particles = particles  # particle data to write
@@ -533,28 +538,24 @@ class pipe:
             opmd.Particle_Patches,
             opmd.Patch_Record,
         ]
-        is_container = any([isinstance(src, container_type) for container_type in container_types])
+        is_container = any(isinstance(src, container_type) for container_type in container_types)
 
         if isinstance(src, opmd.Series):
             # main loop: read iterations of src, write to dest
             write_iterations = dest.write_iterations()
             for in_iteration in src.read_iterations():
-                print(
-                    "Iteration {0} contains {1} meshes:".format(in_iteration.iteration_index, len(in_iteration.meshes))
-                )
+                print(f"Iteration {in_iteration.iteration_index} contains {len(in_iteration.meshes)} meshes:")
                 for m in in_iteration.meshes:
-                    print("\t {0}".format(m))
-                print("")
+                    print(f"\t {m}")
+                print()
                 print(
-                    "Iteration {0} contains {1} particle species:".format(
-                        in_iteration.iteration_index, len(in_iteration.particles)
-                    )
+                    f"Iteration {in_iteration.iteration_index} contains {len(in_iteration.particles)} particle species:"
                 )
                 for ps in in_iteration.particles:
-                    print("\t {0}".format(ps))
+                    print(f"\t {ps}")
                     print("With records:")
                     for r in in_iteration.particles[ps]:
-                        print("\t {0}".format(r))
+                        print(f"\t {r}")
                 out_iteration = write_iterations[in_iteration.iteration_index]
                 sys.stdout.flush()
                 self.__particle_patches = []
@@ -588,8 +589,8 @@ class pipe:
             offset = [0 for _ in shape]
             dest.reset_dataset(opmd.Dataset(dtype, shape))
             if src.empty:
-                # empty record component automatically created by
-                # dest.reset_dataset()
+                # an empty record component is created automatically
+                # by dest.reset_dataset()
                 pass
             elif src.constant:
                 dest.make_constant(src.get_attribute("value"))

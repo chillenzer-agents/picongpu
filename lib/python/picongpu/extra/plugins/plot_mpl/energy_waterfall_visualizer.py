@@ -6,13 +6,14 @@ Authors: Sophie Rudat, Sebastian Starke
 License: GPLv3+
 """
 
-from ..data import EnergyHistogramData
-from .base_visualizer import Visualizer as BaseVisualizer
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from .utils import get_different_colormaps
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
-import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+from ..data import EnergyHistogramData
+from .base_visualizer import Visualizer as BaseVisualizer
+from .utils import get_different_colormaps
 
 
 class Visualizer(BaseVisualizer):
@@ -71,15 +72,12 @@ class Visualizer(BaseVisualizer):
         # clear potentially occuring colorbars that are not from this object
         # i.e. the ax was used by a different object before
         for plt_obj in self.ax.images:
-            if self.plt_obj is not None:
-                if plt_obj not in self.plt_obj:
-                    # there is an image that comes from other visualizer
-                    if plt_obj.colorbar is not None:
-                        plt_obj.colorbar.remove()
-            else:
-                # we can delete since it is not from our object
-                if plt_obj.colorbar is not None:
-                    plt_obj.colorbar.remove()
+            # skip images owned by this visualizer
+            if self.plt_obj is not None and plt_obj in self.plt_obj:
+                continue
+            # we can delete since it is not from our object
+            if plt_obj.colorbar is not None:
+                plt_obj.colorbar.remove()
 
         # this removes all imshow images or previous plots
         # regardless if they were our own or from some other object
@@ -131,7 +129,7 @@ class Visualizer(BaseVisualizer):
         """
         counts, bins, all_iterations, dt = self.data[idx]
         np_data = np.zeros((len(bins), len(all_iterations)))
-        for index, ts in enumerate(all_iterations):
+        for index, _ in enumerate(all_iterations):
             np_data[:, index] = counts[index]
         ps = 1.0e12  # for conversion from s to ps
         max_iter = max(all_iterations * dt * ps)
@@ -163,7 +161,7 @@ class Visualizer(BaseVisualizer):
         """
         counts, bins, all_iterations, dt = self.data[idx]
         np_data = np.zeros((len(bins), len(all_iterations)))
-        for index, ts in enumerate(all_iterations):
+        for index, _ in enumerate(all_iterations):
             np_data[:, index] = counts[index]
         self.plt_obj[idx].set_data(np_data)
         if self.plt_lin:
@@ -201,7 +199,7 @@ class Visualizer(BaseVisualizer):
     def adjust_plot(self, **kwargs):
         species = kwargs["species"]
         species_filter = kwargs.get("species_filter", "all")
-        idx = [i for i, cbar in enumerate(self.colorbars) if cbar is not None][0]
+        idx = next(i for i, cbar in enumerate(self.colorbars) if cbar is not None)
         self.colorbars[idx].ax.text(
             -1.2,
             0.5,
@@ -229,8 +227,8 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
 
         def usage():
             print("usage:")

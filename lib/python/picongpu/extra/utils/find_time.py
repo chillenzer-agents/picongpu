@@ -6,11 +6,12 @@ Authors: Axel Huebl
 License: GPLv3+
 """
 
-import numpy as np
 import os
 
+import numpy as np
 
-class FindTime(object):
+
+class FindTime:
     """
     Convert iterations (time steps) to time [seconds] and back.
     """
@@ -41,16 +42,16 @@ class FindTime(object):
         """
         sim_output_dir = os.path.join(self.run_directory, "simOutput")
         if not os.path.isdir(sim_output_dir):
-            raise IOError(
+            raise OSError(
                 "The simOutput/ directory does not exist inside "
-                "path:\n  {}\n"
+                f"path:\n  {self.run_directory}\n"
                 "Did you set the proper path to the run directory?\n"
-                "Did the simulation already run?".format(self.run_directory)
+                "Did the simulation already run?"
             )
 
         data_file_path = os.path.join(sim_output_dir, self.data_file)
         if not os.path.isfile(data_file_path):
-            raise IOError("The file {} does not exist.\nDid the simulation already run?".format(data_file_path))
+            raise OSError(f"The file {data_file_path} does not exist.\nDid the simulation already run?")
 
         return data_file_path
 
@@ -121,7 +122,7 @@ class FindTime(object):
 
         implemented_methods = ["previous", "closest", "next"]
         if method not in implemented_methods:
-            raise ValueError("The method needs to be one of: {}".format(implemented_methods))
+            raise ValueError(f"The method needs to be one of: {implemented_methods}")
 
         if iterations is None:
             guess = t / self.dt
@@ -132,18 +133,14 @@ class FindTime(object):
             if method == "next":
                 iteration = np.ceil(guess)
             return np.uint64(iteration)
-        else:
-            if type(iterations) is not np.ndarray:
-                raise ValueError("iterations must to be a numpy array!")
+        if type(iterations) is not np.ndarray:
+            raise ValueError("iterations must to be a numpy array!")
 
         iterations_sorted = np.sort(iterations)
         times_sorted = iterations_sorted * self.dt
 
         next_i = np.argmax(times_sorted > t)
-        if next_i > 0:
-            prev_i = next_i - 1
-        else:
-            prev_i = 0
+        prev_i = next_i - 1 if next_i > 0 else 0
 
         if method == "previous":
             iteration = iterations_sorted[prev_i]

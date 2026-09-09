@@ -8,6 +8,7 @@ License: GPLv3+
 from unittest import TestCase
 
 import pytest
+
 from picongpu.picmi.interaction.ionization.fieldionization import ADK, BSI
 from picongpu.picmi.species import Species
 from picongpu.picmi.species_requirements import RequirementConflict, SetChargeStateOperation, run_construction
@@ -117,8 +118,8 @@ class TestSpeciesRequirementResolution(TestCase):
         # so the electron species gets defined before the ion species.
         assert electron < ion
 
-        set_charge_state_op = [
+        set_charge_state_op = next(
             run_construction(op) for op in ion.get_operation_requirements() if op.metadata.Type == SetChargeState
-        ][0]
+        )
         assert set_charge_state_op.charge_state == ion.charge_state
         assert len(ion.get_as_pypicongpu().constants.ground_state_ionization.ionization_model_list) == len(ionizations)

@@ -69,7 +69,7 @@ class OpenPMDConfig(BaseModel):
             return RangeSpec(data=value)
         except ValidationError as error1:
             try:
-                return RangeSpec(data=map(lambda x: RangeSpecEntry(data=x), value))
+                return RangeSpec(data=(RangeSpecEntry(data=x) for x in value))
             except ValidationError as error2:
                 raise error2 from error1
         return value
@@ -85,12 +85,7 @@ class OpenPMDConfig(BaseModel):
 
 
 def to_string(timestepspec: TimeStepSpec):
-    return ",".join(
-        map(
-            lambda x: "{start}:{stop}:{step}".format(**x),
-            timestepspec.get_rendering_context()["specs"],
-        )
-    )
+    return ",".join("{start}:{stop}:{step}".format(**x) for x in timestepspec.get_rendering_context()["specs"])
 
 
 class FieldDump(BaseModel):

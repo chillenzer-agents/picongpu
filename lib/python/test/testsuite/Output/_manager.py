@@ -12,13 +12,15 @@ Plots the given case and generates the log files.
 ToDo: So far only the 1D plot is integrated in the plot.
 """
 
-from . import Log
-from . import Viewer
-import config
 import sys
+from inspect import getmembers, isfunction
+
+import config
+
 import testsuite._checkData as cD
 import testsuite.Math.physics as ph
-from inspect import getmembers, isfunction
+
+from . import Log, Viewer
 
 
 def __calculate(axis, parameter, *args):
@@ -29,16 +31,15 @@ def __calculate(axis, parameter, *args):
     try:
         if axis == "plot_xaxis":
             return config.plot_xaxis(*args)
-        elif axis == "plot_yaxis":
+        if axis == "plot_yaxis":
             return config.plot_yaxis(*args)
-        else:
-            return config.plot_zaxis(*args)
+        return config.plot_zaxis(*args)
 
     except Exception:
         error1 = str(sys.exc_info()[1])
         for var in parameter:
             if var in error1.split(":")[-1]:
-                args = args + (parameter[var],)
+                args = (*args, parameter[var])
                 return __calculate(axis, parameter, *args)
 
 
@@ -56,7 +57,7 @@ def getaxisvalues(parameter, axis: str = "plot_xaxis"):
         values = cD.checkVariables(variable=axis, default="")
 
         # check if the value is a parameter
-        if values in parameter.keys():
+        if values in parameter:
             values = parameter[values]
 
         # else a default value should be defined
@@ -72,11 +73,12 @@ def getInputparameter(parameter: dict) -> dict:
     param_Parameter = cD.checkExistVariables("param_Parameter")
     if param_Parameter:
         return {key: parameter[key] for key in config.param_Parameter}
-    else:
-        return None
+    return None
 
 
-def _output(direction, theory, simulation, max_diff, perc, acc_range, result, parameter):
+# the caller (testsuite/_manager.py) passes every parameter by keyword,
+# so the names are part of the call contract
+def _output(direction, theory, simulation, max_diff, perc, acc_range, result, parameter):  # noqa: ARG001
     """
     generates the output. For this purpose, the plot is created
     first and then the log file is written

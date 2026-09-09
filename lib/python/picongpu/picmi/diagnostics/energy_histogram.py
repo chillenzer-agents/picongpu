@@ -56,7 +56,7 @@ class EnergyHistogram(BaseModel):
         Optional name for the energy histogram plugin.
     """
 
-    def check(self, *args, **kwargs):
+    def check(self, *_args, **_kwargs):
         if self.min_energy >= self.max_energy:
             raise ValueError("min_energy must be less than max_energy")
         if self.bin_count <= 0:

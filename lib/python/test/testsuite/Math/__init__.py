@@ -38,11 +38,9 @@ For more information, see the documentation for the individual modules
 """
 
 # To get sub-modules
-from . import math
-from . import physics
-from . import deviation
+from . import deviation, math, physics
 
-__all__ = ["math", "physics", "deviation"]
+__all__ = ["deviation", "math", "physics"]
 __all__ += math.__all__
 __all__ += physics.__all__
 __all__ += deviation.__all__

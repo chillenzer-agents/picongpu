@@ -23,9 +23,9 @@ checkExistVariables(variable:str) -> bool
 
 __all__ = ["checkDirection", "checkVariables"]
 
-import warnings
 import importlib.util
 import os
+import warnings
 
 if importlib.util.find_spec("config") is None:
     from testsuite.Template import config
@@ -35,13 +35,14 @@ if importlib.util.find_spec("config") is None:
         " optional parameters must be passed. Otherwise error"
         " messages will be generated or default values will"
         " be used. See the documentation for more"
-        " information."
+        " information.",
+        stacklevel=2,
     )
 else:
     import config
 
 
-def checkDirection(variable: str = "undefined", direction: str = None, errorhandling: bool = False) -> str:
+def checkDirection(variable: str = "undefined", direction: str | None = None, errorhandling: bool = False) -> str:
     """
     Checks whether the value is present in config.py. If so, this is
     returned if the directory exists. If there is no corresponding
@@ -90,16 +91,16 @@ def checkDirection(variable: str = "undefined", direction: str = None, errorhand
 
     # Since the variable does not necessarily have to be set,
     # this must be checked beforehand
-    if variable in dir(config):
-        val = eval(val_name)
-    else:
-        val = None
+    val = eval(val_name) if variable in dir(config) else None
 
     # check if at least one direction is given
     # if there are two use config.py value
 
     if val is not None and direction is not None:
-        warnings.warn("Both " + variable + " and direction are set.Note that the value from config.py is used.")
+        warnings.warn(
+            "Both " + variable + " and direction are set.Note that the value from config.py is used.",
+            stacklevel=2,
+        )
 
         direction = val
 
@@ -112,13 +113,16 @@ def checkDirection(variable: str = "undefined", direction: str = None, errorhand
     elif val is None and direction is None and errorhandling:
         direction = os.path.abspath(os.getcwd())
     else:
-        exec("%s = direction" % (val_name))
+        exec(f"{val_name} = direction")
 
     # all cases are handled
 
     # check if the direction exist
     if not os.path.isdir(direction):
-        warnings.warn("The specified directory does not exist. The current working directory is used for the output.")
+        warnings.warn(
+            "The specified directory does not exist. The current working directory is used for the output.",
+            stacklevel=2,
+        )
 
         direction = os.path.abspath(os.getcwd())
 
@@ -144,12 +148,8 @@ def checkExistVariables(variable: str) -> bool:
 
     if variable not in dir(config):
         return False
-    else:
-        val = eval(val_name)
-        if val is None:
-            return False
-        else:
-            return True
+    val = eval(val_name)
+    return val is not None
 
 
 def checkVariables(variable: str = "undefined", default=None, parameter=None):
@@ -186,10 +186,7 @@ def checkVariables(variable: str = "undefined", default=None, parameter=None):
 
     # Since the variable does not necessarily have to be set,
     # this must be checked beforehand
-    if variable in dir(config):
-        val = eval(val_name)
-    else:
-        val = None
+    val = eval(val_name) if variable in dir(config) else None
 
     if val is None and parameter is None and default is None:
         raise ValueError(
@@ -200,7 +197,8 @@ def checkVariables(variable: str = "undefined", default=None, parameter=None):
 
     if val is not None and parameter is not None:
         warnings.warn(
-            "Both " + val_name + " and the optional parameter are set. Note that the value from config.py is used."
+            "Both " + val_name + " and the optional parameter are set. Note that the value from config.py is used.",
+            stacklevel=2,
         )
 
         value = val
@@ -210,7 +208,7 @@ def checkVariables(variable: str = "undefined", default=None, parameter=None):
 
     # standard value if both are None
     elif val is None and parameter is None:
-        warnings.warn("Both " + val_name + " and the optional parameter are empty.")
+        warnings.warn("Both " + val_name + " and the optional parameter are empty.", stacklevel=2)
 
         value = default
 

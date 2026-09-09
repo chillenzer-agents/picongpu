@@ -6,8 +6,9 @@ License: GPLv3+
 """
 
 import sympy
-from picongpu import picmi
 from sympy.vector import CoordSys3D, Vector
+
+from picongpu import picmi
 
 from .arbitrary_parameters import CELL_SIZE
 
@@ -30,7 +31,7 @@ class Gaussian:
         self.distributions = {
             "predefined": picmi.GaussianDistribution(**self.parameters),
             "free_form": picmi.AnalyticDistribution(
-                lambda x, y, z: self.free_form(y, cell_size_y=CELL_SIZE[1], **self.parameters)
+                lambda _x, y, _z: self.free_form(y, cell_size_y=CELL_SIZE[1], **self.parameters)
             ),
         }
 
@@ -66,24 +67,24 @@ class Uniform:
         self.arbitrary_value = 8.0e24
         self.distributions = {
             "predefined": picmi.UniformDistribution(density=self.arbitrary_value),
-            "free_form": picmi.AnalyticDistribution(lambda x, y, z: self.arbitrary_value),
+            "free_form": picmi.AnalyticDistribution(lambda _x, _y, _z: self.arbitrary_value),
         }
 
 
 class Foil:
     def __init__(self):
-        self.parameters = dict(
-            density=8.0e24,
-            front=10,
-            thickness=17,
-            exponential_pre_plasma_length=12,
-            exponential_pre_plasma_cutoff=14,
-            exponential_post_plasma_length=5,
-            exponential_post_plasma_cutoff=16,
-        )
+        self.parameters = {
+            "density": 8.0e24,
+            "front": 10,
+            "thickness": 17,
+            "exponential_pre_plasma_length": 12,
+            "exponential_pre_plasma_cutoff": 14,
+            "exponential_post_plasma_length": 5,
+            "exponential_post_plasma_cutoff": 16,
+        }
         self.distributions = {
             "predefined": picmi.FoilDistribution(**self.parameters),
-            "free_form": picmi.AnalyticDistribution(lambda x, y, z: self.free_form(y, **self.parameters)),
+            "free_form": picmi.AnalyticDistribution(lambda _x, y, _z: self.free_form(y, **self.parameters)),
         }
 
     @staticmethod
@@ -128,19 +129,19 @@ def _make_vector(coefficients, basis_vectors):
     # In sympy, vectors are represented as linear combinations of basis vectors.
     # The last argument is important.
     # Otherwise Python tries to start from an integer (scalar) 0 which is not well-defined.
-    return sum((coeff * vec for coeff, vec in zip(coefficients, basis_vectors)), Vector.zero)
+    return sum((coeff * vec for coeff, vec in zip(coefficients, basis_vectors, strict=False)), Vector.zero)
 
 
 class Cylinder:
     def __init__(self):
-        self.parameters = dict(
-            density=8.0e24,
-            center_position=(17.0, 23.0, 45.0),
-            radius=10,
-            cylinder_axis=(1.0, 2.0, 3.0),
-            exponential_pre_plasma_length=5.0,
-            exponential_pre_plasma_cutoff=3.0,
-        )
+        self.parameters = {
+            "density": 8.0e24,
+            "center_position": (17.0, 23.0, 45.0),
+            "radius": 10,
+            "cylinder_axis": (1.0, 2.0, 3.0),
+            "exponential_pre_plasma_length": 5.0,
+            "exponential_pre_plasma_cutoff": 3.0,
+        }
         self.distributions = {
             "predefined": picmi.CylindricalDistribution(**self.parameters),
             "free_form": picmi.AnalyticDistribution(lambda x, y, z: self.free_form(x, y, z, **self.parameters)),
@@ -195,16 +196,16 @@ class Cylinder:
 # This is a predefined setup within PIConGPU but not PICMI.
 class LinearExponential:
     def __init__(self):
-        self.parameters = dict(
-            density=8.0e24,
-            vacuum_y=14.0,
-            gas_a=10.0,
-            gas_b=12.0,
-            gas_d=-0.1,
-            gas_y_max=25.0,
-        )
+        self.parameters = {
+            "density": 8.0e24,
+            "vacuum_y": 14.0,
+            "gas_a": 10.0,
+            "gas_b": 12.0,
+            "gas_d": -0.1,
+            "gas_y_max": 25.0,
+        }
         self.distributions = {
-            "free_form": picmi.AnalyticDistribution(lambda x, y, z: self.free_form(y, **self.parameters)),
+            "free_form": picmi.AnalyticDistribution(lambda _x, y, _z: self.free_form(y, **self.parameters)),
         }
 
     @staticmethod
@@ -225,14 +226,14 @@ class LinearExponential:
 # This is a predefined setup within PIConGPU but not PICMI.
 class SphereFlanks:
     def __init__(self):
-        self.parameters = dict(
-            density=8.0e24,
-            vacuum_y=14.0,
-            center=[10.0, 40.0, 35.0],
-            r=20.0,
-            ri=10.0,
-            exponent=1.0,
-        )
+        self.parameters = {
+            "density": 8.0e24,
+            "vacuum_y": 14.0,
+            "center": [10.0, 40.0, 35.0],
+            "r": 20.0,
+            "ri": 10.0,
+            "exponent": 1.0,
+        }
         self.distributions = {
             "free_form": picmi.AnalyticDistribution(lambda x, y, z: self.free_form(x, y, z, **self.parameters)),
         }
@@ -252,7 +253,7 @@ class SphereFlanks:
 
 
 @picmi.AnalyticDistribution
-def uniformdec(x, y, z):
+def uniformdec(_x, _y, _z):
     return Uniform().arbitrary_value
 
 

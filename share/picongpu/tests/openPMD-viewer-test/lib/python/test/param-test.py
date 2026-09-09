@@ -22,10 +22,11 @@ If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
 import sys
+
 import numpy as np
+import openpmd_viewer
 import scipy.constants as spc
 from openpmd_viewer import OpenPMDTimeSeries
-import openpmd_viewer
 
 print("openPMD-viewer version:", openpmd_viewer.__version__)
 parser = argparse.ArgumentParser(description="1")
@@ -120,9 +121,8 @@ def check_params(num_iterations):
                         field_param["field_epsilon"],
                     ):
                         return False
-                else:
-                    if not np.std(value) == 0:
-                        return False
+                elif np.std(value) != 0:
+                    return False
         # Check if the densities are correct
         densities = [
             "e_all_chargeDensity",
@@ -155,9 +155,8 @@ def check_params(num_iterations):
                     field_param["density_epsilon"],
                 ):
                     return False
-            else:
-                if not np.std(value) == 0:
-                    return False
+            elif np.std(value) != 0:
+                return False
 
         x, y, z = ts.get_particle(
             var_list=["x", "y", "z"],

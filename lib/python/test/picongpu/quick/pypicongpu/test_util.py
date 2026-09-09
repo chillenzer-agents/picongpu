@@ -5,9 +5,12 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from typing import Annotated, Callable
-from pydantic import BaseModel, ValidationError
+from collections.abc import Callable
+from typing import Annotated
 from unittest import TestCase
+
+from pydantic import BaseModel, ValidationError
+
 from picongpu.pypicongpu.util import (
     UnsupportedFeatureError,
     decorating_class,
@@ -58,7 +61,7 @@ class TestDecoratingClass(TestCase):
         with self.assertRaises(TypeError):
 
             @decorating_class
-            class _:
+            class _Throwaway:
                 def __init__(self):
                     pass
 
@@ -66,7 +69,7 @@ class TestDecoratingClass(TestCase):
         with self.assertRaises(TypeError):
 
             @decorating_class
-            class _:
+            class _Throwaway:
                 def __init__(self, *_):
                     pass
 
@@ -74,7 +77,7 @@ class TestDecoratingClass(TestCase):
         with self.assertRaises(TypeError):
 
             @decorating_class
-            class _:
+            class _Throwaway:
                 def __init__(self, **_):
                     pass
 
@@ -101,7 +104,9 @@ class TestDecoratingClass(TestCase):
 
         @decorating_class
         class SpecialFunctor:
-            def __new__(cls, functor, **kwargs):
+            # the parameter name must match __init__'s first parameter, which
+            # decorating_class forwards to __new__ by keyword
+            def __new__(cls, functor, **kwargs):  # noqa: ARG004
                 assert kwargs == given_kwargs
                 return super().__new__(cls)
 

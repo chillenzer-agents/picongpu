@@ -33,9 +33,10 @@ If not, see <http://www.gnu.org/licenses/>.
 # are in the directory ../include/picongpu/param
 # and that the output directory ./simOutput exists
 
+from pathlib import Path
+
 import numpy as np
 from synchrotron_lib import calculate_dt, predictNumPhotons
-from pathlib import Path
 
 paramsPath = Path(__file__).absolute().parent / "../include/picongpu/param"
 
@@ -43,13 +44,12 @@ paramsPath = Path(__file__).absolute().parent / "../include/picongpu/param"
 # read the files change the values and write them back
 def change_param_file(file_name, param_name, value):
     filePath = paramsPath / file_name
-    with open(filePath, "r") as f:
+    with open(filePath) as f:
         lines = f.readlines()
     with open(filePath, "w") as f:
         for line in lines:
             if param_name + " = " in line:
                 changedLine = line.split("=")[0] + "= " + value + ";\n"
-                # print(changedLine)
                 f.write(changedLine)
             else:
                 f.write(line)
@@ -64,21 +64,22 @@ def changeParams(dt, Heff, gamma):
 # the code checks if we have enough photons generated for the given parameters:
 # gamma, Heff can be any value, dt is calculated based on gamma and Heff
 def main():
+    rng = np.random.default_rng()
     yNum = 0
     while yNum < 5e6:
         gamma = [10, 50, 100, 500, 1000]  # include all gamma values you want to check
         Heff = [1e13, 1e14, 1e15, 1e16, 1e17, 1e18]  # similarly with Heff
 
-        gamma = gamma[np.random.randint(len(gamma))]
-        Heff = Heff[np.random.randint(len(Heff))]
+        gamma = gamma[rng.randint(len(gamma))]
+        Heff = Heff[rng.randint(len(Heff))]
         dt = calculate_dt(gamma, Heff) * 0.95
-        dt = dt if dt < 1e-16 else 1e-16  # if dt is larger than the grid condition, set it to the grid condition
+        dt = min(1e-16, dt)  # if dt is larger than the grid condition, set it to the grid condition
         yNum = predictNumPhotons(gamma, Heff, dt, 4000, 5e5)
 
     # make Heff, gamma and dt strings in scientific notation
-    Heff = "{:.2e}".format(Heff)
-    gamma = "{:.3e}".format(gamma)
-    dt = "{:.2e}".format(dt)
+    Heff = f"{Heff:.2e}"
+    gamma = f"{gamma:.3e}"
+    dt = f"{dt:.2e}"
     changeParams(dt, Heff, gamma)
     print("gamma: ", gamma, "Heff: ", Heff, "dt: ", dt)
     print(f"Predicted number of photons: {yNum}")

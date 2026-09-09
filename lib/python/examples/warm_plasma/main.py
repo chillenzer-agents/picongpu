@@ -22,7 +22,7 @@ MODE: Literal["run", "write"] = "run"
 
 boundary_conditions = ["periodic", "periodic", "periodic"]
 grid = picmi.Cartesian3DGrid(
-    # note: [x] * 3 == [x, x, x]
+    # note: [x] * 3 gives [x, x, x]
     number_of_cells=[192] * 3,
     lower_bound=[0, 0, 0],
     upper_bound=[0.0111152256] * 3,

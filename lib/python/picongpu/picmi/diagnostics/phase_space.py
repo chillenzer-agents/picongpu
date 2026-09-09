@@ -74,7 +74,7 @@ class PhaseSpace(BaseModel):
     min_momentum: float
     max_momentum: float
 
-    def check(self, *args, **kwargs):
+    def check(self, *_args, **_kwargs):
         if self.min_momentum >= self.max_momentum:
             raise ValueError("min_momentum must be less than max_momentum")
 

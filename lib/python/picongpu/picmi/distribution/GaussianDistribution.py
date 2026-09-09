@@ -5,13 +5,13 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
+import numpy as np
+
 from picongpu.picmi.copy_attributes import converts_to
 from picongpu.pypicongpu.species.operation.densityprofile.gaussian import Gaussian
+
 from ...pypicongpu import util
-
 from .Distribution import Distribution
-
-import numpy as np
 
 
 @converts_to(
@@ -82,8 +82,8 @@ class GaussianDistribution(Distribution):
     def __call__(self, x, y, z):
         if self.cell_size is None:
             message = (
-                "Due to inconsistencies in the backend, evaluation of this function requires information about the cell_size."
-                " You can either set it manually "
+                "Due to inconsistencies in the backend, evaluation of this function requires information "
+                "about the cell_size. You can either set it manually "
                 " or you can perform anything that includes writing the input files on your simulation object."
                 " This is a temporary workaround and will be fixed in the future."
             )

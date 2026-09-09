@@ -5,13 +5,12 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
-from .fieldionization import FieldIonization
+import enum
 
 from ..... import pypicongpu
-from .....pypicongpu.species.constant.ionizationcurrent import None_
 from .....pypicongpu.species.constant import ionizationmodel
-
-import enum
+from .....pypicongpu.species.constant.ionizationcurrent import None_
+from .fieldionization import FieldIonization
 
 
 class BSIExtension(enum.Enum):

@@ -21,14 +21,14 @@ from ....rendering import RenderedObject
 
 
 def serialise_vec(value) -> dict:
-    return dict(zip("xyz", value))
+    return dict(zip("xyz", value, strict=False))
 
 
 def validate_unit_vec(value):
     epsilon = 1.0e-5
     if any(np.isinf(value)) or any(np.isnan(value)):
         raise ValueError(f"{value=} must not contain infs or nans.")
-    if np.abs((vector_length := np.sqrt(sum(map(lambda n: n**2, value)))) - 1.0) > epsilon:
+    if np.abs((vector_length := np.sqrt(sum((n**2 for n in value)))) - 1.0) > epsilon:
         raise ValueError(f"Expected unit vector but {value=} has {vector_length=}.")
     return value
 
@@ -60,18 +60,16 @@ class Drift(RenderedObject, BaseModel):
 
         :param velocity: velocity given as vector
         """
-        if (0, 0, 0) == velocity:
+        if velocity == (0, 0, 0):
             raise ValueError("velocity must not be zero")
 
-        velocity_linear = math.sqrt(sum(map(lambda x: x**2, velocity)))
+        velocity_linear = math.sqrt(sum(x**2 for x in velocity))
         if velocity_linear >= constants.speed_of_light:
-            raise ValueError(
-                "linear velocity must be less than the speed of light (currently: {})".format(velocity_linear)
-            )
+            raise ValueError(f"linear velocity must be less than the speed of light (currently: {velocity_linear})")
 
         return cls(
             gamma=math.sqrt(1 / (1 - (velocity_linear**2 / constants.speed_of_light**2))),
-            direction_normalized=tuple(map(lambda x: x / velocity_linear, velocity)),
+            direction_normalized=tuple(x / velocity_linear for x in velocity),
         )
 
     @classmethod
@@ -83,10 +81,10 @@ class Drift(RenderedObject, BaseModel):
 
         :param velocity: velocity given as vector multiplied with gamma
         """
-        if (0, 0, 0) == gamma_velocity:
+        if gamma_velocity == (0, 0, 0):
             raise ValueError("velocity must not be zero")
 
-        gamma_velocity_linear = math.sqrt(sum(map(lambda x: x**2, gamma_velocity)))
+        gamma_velocity_linear = math.sqrt(sum(x**2 for x in gamma_velocity))
         gamma = math.sqrt(1 + ((gamma_velocity_linear) ** 2 / constants.speed_of_light**2))
 
-        return cls(direction_normalized=tuple(map(lambda x: x / gamma_velocity_linear, gamma_velocity)), gamma=gamma)
+        return cls(direction_normalized=tuple(x / gamma_velocity_linear for x in gamma_velocity), gamma=gamma)

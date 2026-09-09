@@ -6,12 +6,13 @@ License: GPLv3+
 """
 
 from unittest import TestCase
-import numpy as np
 
+import numpy as np
+import pytest
+from pydantic_core import ValidationError
 from scipy.constants import c
 
 from picongpu.picmi import AnalyticDistribution
-import pytest
 
 # allow numpy broadcasting (see https://numpy.org/doc/stable/user/basics.broadcasting.html)
 # some examples to check:
@@ -31,7 +32,7 @@ INVALID_DENSITIES = [
     (lambda x, y: x + y, TypeError),
     (lambda x, y, z, too_much: x + y + z + too_much, TypeError),
     # bad return type
-    (lambda x, y, z: "string", TypeError),
+    (lambda _x, _y, _z: "string", TypeError),
     # constructs not understood by sympy
     (lambda x, y, z: x if x > 0 else y * z, TypeError),
 ]
@@ -48,9 +49,8 @@ class TestAnalyticDistribution(TestCase):
 
     def test_density_expression_invalid(self):
         for density, err in INVALID_DENSITIES:
-            with self.subTest(density=density, err=err):
-                with pytest.raises(err):
-                    AnalyticDistribution(density).get_as_pypicongpu()
+            with self.subTest(density=density, err=err), pytest.raises(err):
+                AnalyticDistribution(density).get_as_pypicongpu()
 
     def test_drift_input_types(self):
         types = [list, tuple, np.array]
@@ -65,8 +65,6 @@ class TestAnalyticDistribution(TestCase):
         assert AnalyticDistribution(lambda *x: sum(x), directed_velocity=[0, 0, 0]).get_picongpu_drift() is None
 
     def test_drift_wrong_dimensionality(self):
-        from pydantic_core import ValidationError
-
         # Test drift with wrong dimensionality
         with pytest.raises(ValidationError):
             AnalyticDistribution(

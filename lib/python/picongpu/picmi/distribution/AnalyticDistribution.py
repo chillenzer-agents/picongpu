@@ -18,6 +18,8 @@ from sympy import Expr, Symbol, lambdify, symbols
 from picongpu.pypicongpu import species
 from picongpu.pypicongpu.util import decorating_class
 
+logger = logging.getLogger(__name__)
+
 """
 note on rms_velocity:
 ---------------------
@@ -35,8 +37,8 @@ note on drift:
 The drift ("velocity") is represented using either directed_velocity or centroid_velocity (v, gamma*v respectively) and
 for the pypicongpu representation stored in a separate object (Drift).
 
-To accommodate that, this separate Drift object can be requested by the method get_picongpu_drift(). In case of no drift,
-this method returns None.
+To accommodate that, this separate Drift object can be requested by the method get_picongpu_drift().
+In case of no drift, this method returns None.
 """
 
 
@@ -119,7 +121,7 @@ class AnalyticDistribution(PICMI_Extension):
     """
 
     density_function: Callable[[Symbol, Symbol, Symbol], Expr]
-    rms_velocity: Literal[(0.0, 0.0, 0.0)] = (0.0, 0.0, 0.0)
+    rms_velocity: Literal[0.0] = (0.0, 0.0, 0.0)
     directed_velocity: list[float] = Field(default_factory=lambda: [0, 0, 0])
     _warned_about_lambdify_failure: bool = PrivateAttr(False)
 
@@ -164,9 +166,9 @@ class AnalyticDistribution(PICMI_Extension):
                     "If you run into performance problems, try to rewrite your function. "
                     "Here's the original error message:"
                 )
-                logging.warning(message)
-                logging.warning(traceback.format_exc())
-                logging.warning("Continuing operation using a slower serialised version now.")
+                logger.warning(message)
+                logger.warning(traceback.format_exc())
+                logger.warning("Continuing operation using a slower serialised version now.")
                 self._warned_about_lambdify_failure = True
         # This basically calls the original function in a big loop.
         # Slower but more reliable in some cases of difficult broadcasting.

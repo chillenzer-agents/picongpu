@@ -9,6 +9,8 @@ from functools import reduce
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+import pytest
+
 from picongpu import rc_params
 from picongpu._rc_params import RCParams
 from picongpu.pypicongpu.runner import (
@@ -18,15 +20,14 @@ from picongpu.pypicongpu.runner import (
     generate_bare_profile_as_in,
 )
 from picongpu.pypicongpu.util import UnpackChain
-from pytest import fixture
 
 
-@fixture
+@pytest.fixture
 def empty_rc_params():
     return type(rc_params)()
 
 
-@fixture
+@pytest.fixture
 def arbitrary_string():
     return "Hello World"
 

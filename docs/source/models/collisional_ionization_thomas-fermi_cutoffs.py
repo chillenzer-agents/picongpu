@@ -1,7 +1,6 @@
 import matplotlib as mpl
-from matplotlib import pyplot as plt
 import numpy as np
-
+from matplotlib import pyplot as plt
 
 params = {
     "font.size": 20,
@@ -107,8 +106,7 @@ class ThomasFermiIonization:
         Q = self.CalcQ(R, Q_1, C)
         x = self.Calcx(Q)
 
-        ionState = self.CalcZStar(x, self.Z)
-        return ionState
+        return self.CalcZStar(x, self.Z)
 
 
 if __name__ == "__main__":
@@ -132,17 +130,14 @@ TF_C = ThomasFermiIonization(Z_C, A_C)
 alpha = 1.0
 # linestyles to distinguish the plots further
 linestyles = ["solid", "dashed", "dotted"]
-# index for linestyles
-i = 0
-
-for temp in temp_array:
+for i, temp in enumerate(temp_array):
     CS_H = TF_H.TFIonState(temp, mass_density)
     CS_C = TF_C.TFIonState(temp, mass_density)
 
     plt.plot(
         mass_density,
         CS_H,
-        label="H @ {} eV".format(temp),
+        label=f"H @ {temp} eV",
         color="blue",
         alpha=alpha,
         ls=linestyles[i],
@@ -150,7 +145,7 @@ for temp in temp_array:
     plt.plot(
         mass_density,
         CS_C,
-        label="C @ {} eV".format(temp),
+        label=f"C @ {temp} eV",
         color="orange",
         alpha=alpha,
         ls=linestyles[i],
@@ -158,8 +153,6 @@ for temp in temp_array:
 
     # reduce alpha value to differentiate between electron temperatures
     alpha -= 0.1
-    # increment i
-    i += 1
 
 plt.xscale("log")
 plt.ylabel(r"Charge State Prediction $\langle Z \rangle$")

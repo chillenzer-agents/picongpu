@@ -1,9 +1,8 @@
 import typeguard
-import typing
 
 
 @typeguard.typechecked
-def my_func(a_char: str, num: int) -> typing.List[str]:
+def my_func(a_char: str, num: int) -> list[str]:
     """
     build list with "triangle" of chars
 
@@ -31,10 +30,12 @@ def my_func(a_char: str, num: int) -> typing.List[str]:
     :raises AssertionError: if num < 0
     :return: [".", "..", "..."]
     """
-    assert 1 == len(a_char)
-    assert 0 <= num
+    if len(a_char) != 1:
+        raise AssertionError
+    if num < 0:
+        raise AssertionError
 
-    if 0 == num:
+    if num == 0:
         return []
 
-    return my_func(a_char, num - 1) + [num * a_char]
+    return [*my_func(a_char, num - 1), num * a_char]

@@ -5,8 +5,8 @@ Authors: Hannes Troepgen, Brian Edward Marre, Julian Lenz
 License: GPLv3+
 """
 
-from unittest import TestCase
 from pathlib import Path
+from unittest import TestCase
 
 import pytest
 

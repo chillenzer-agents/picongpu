@@ -98,8 +98,9 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
+
         import matplotlib.pyplot as plt
 
         def usage():

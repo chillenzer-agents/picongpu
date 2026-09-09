@@ -22,7 +22,7 @@ from .polarization_type import PolarizationType
     # PICMI's `duration` is the standard 1/e field width (tau), while PIConGPU's
     # `pulse_duration_si` (aliased as `duration`) is the 1 sigma of the intensity,
     # i.e. PULSE_DURATION = duration / 2 (#5739)
-    conversions={"duration": lambda self, *args, **kwargs: self._pulse_duration_sigma_si()},
+    conversions={"duration": lambda self, *_args, **_kwargs: self._pulse_duration_sigma_si()},
 )
 class GaussianLaser(PICMI_GaussianLaser, BaseLaser):
     """
@@ -127,7 +127,6 @@ class GaussianLaser(PICMI_GaussianLaser, BaseLaser):
             )
         self._validate_common_properties()
 
-        assert self._propagation_connects_centroid_and_focus(), (
-            "propagation_direction must connect centroid_position and focus_position"
-        )
+        if not self._propagation_connects_centroid_and_focus():
+            raise ValueError("propagation_direction must connect centroid_position and focus_position")
         return self

@@ -12,9 +12,10 @@ epsilon = 1e-5, the test fails. Also, the absolute phase change during one turn
 is regarded. It should be smaller than 0.2 rad.
 """
 
-import openpmd_api as opmd
-import numpy as np
 import sys
+
+import numpy as np
+import openpmd_api as opmd
 
 
 def get_params(path):
@@ -50,25 +51,24 @@ def get_params(path):
     if len(series.iterations) == 1:
         raise ValueError("There is just 1 iteration in the seriesmake sure, there are at least two")
 
-    elif len(np.array(i.particles)) != 1:
+    if len(np.array(i.particles)) != 1:
         raise ValueError("There is not only 1 particle in the seriesmake sure, there is only one")
 
-    else:
-        # read parameters of the simulation
-        params = {
-            "cell_depth": i.get_attribute("cell_depth"),
-            "cell_height": i.get_attribute("cell_height"),
-            "cell_width": i.get_attribute("cell_width"),
-            "dt": i.get_attribute("dt"),
-            "unit_time": i.get_attribute("unit_time"),
-            "unit_length": i.get_attribute("unit_length"),
-            "unit_charge": i.get_attribute("unit_charge"),
-            "unit_bfield": i.get_attribute("unit_bfield"),
-            "unit_speed": i.get_attribute("unit_speed"),
-            "unit_mass": i.get_attribute("unit_mass"),
-        }
+    # read parameters of the simulation
+    params = {
+        "cell_depth": i.get_attribute("cell_depth"),
+        "cell_height": i.get_attribute("cell_height"),
+        "cell_width": i.get_attribute("cell_width"),
+        "dt": i.get_attribute("dt"),
+        "unit_time": i.get_attribute("unit_time"),
+        "unit_length": i.get_attribute("unit_length"),
+        "unit_charge": i.get_attribute("unit_charge"),
+        "unit_bfield": i.get_attribute("unit_bfield"),
+        "unit_speed": i.get_attribute("unit_speed"),
+        "unit_mass": i.get_attribute("unit_mass"),
+    }
 
-        return series, params
+    return series, params
 
 
 def read_series(series):
@@ -237,7 +237,7 @@ def compare_radius(
 
 
 def compare_phases(
-    x_poss, y_poss, x_offSet, y_offSet, x_momentum, y_momentum, charge, mass, B, params, num_iter, period
+    x_poss, _y_poss, x_offSet, _y_offSet, x_momentum, y_momentum, charge, mass, B, params, num_iter, period
 ):
     """Tests if the phase difference from one revolution to the other is
     greater than delta = 0.25.
@@ -274,14 +274,12 @@ def compare_phases(
 
     x = x_poss + x_offSet  # real x coordinates
     R_c = np.mean(
-        (
-            np.sqrt(x_momentum**2 + y_momentum**2)
-            * params["unit_mass"]
-            * params["unit_speed"]
-            / (abs(charge[0]) * params["unit_charge"] * B)
-            / params["cell_depth"]
-            / params["unit_length"]
-        )
+        np.sqrt(x_momentum**2 + y_momentum**2)
+        * params["unit_mass"]
+        * params["unit_speed"]
+        / (abs(charge[0]) * params["unit_charge"] * B)
+        / params["cell_depth"]
+        / params["unit_length"]
     )
 
     theta = np.arccos(x / R_c)  # calculate the phase
@@ -313,12 +311,17 @@ def compare_phases(
 
 
 def correct_starting_values_for_technical_details(x_poss, y_poss, x_offSet, y_offSet, R_c):
-    """The particle is initialized at the arbitary position (5, 32) in the x-y-plane (some arbitrary z which is irrelevant for our computation...).
-    So we have to shift the coordinates in a form, that the initialization point is exactly on the circle with the radius of the particle trajectory with its center at the origin.
+    """The particle is initialized at the arbitary position (5, 32) in the x-y-plane
+    (some arbitrary z which is irrelevant for our computation...).
+    So we have to shift the coordinates in a form, that the initialization point is exactly on
+    the circle with the radius of the particle trajectory with its center at the origin.
     This shifting is done by the transformation (subtraction of the initialization coordinates and radius).
-    But we also need to compensate for a half-step, which is automatically done by PIConGPU to improve the accuracy of the Boris Pusher
-    (see: B. Ripperda et al 2018 ApJS 235 21 https://iopscience.iop.org/article/10.3847/1538-4365/aab114 ; 10.3847/1538-4365/aab114).
-    This half-step is the first data written by PIConGPU and is corrected by the trigonometry operations in the transformation.
+    But we also need to compensate for a half-step, which is automatically done by PIConGPU
+    to improve the accuracy of the Boris Pusher
+    (see: B. Ripperda et al 2018 ApJS 235 21
+    https://iopscience.iop.org/article/10.3847/1538-4365/aab114 ; 10.3847/1538-4365/aab114).
+    This half-step is the first data written by PIConGPU and is corrected by the trigonometry
+    operations in the transformation.
 
     """
     # the coordinates where the particle is initialized in the simulation
@@ -377,9 +380,7 @@ def main(dataPath):
     )
 
     # yield both tests/comparisions a positive result?
-    compare_result = compare_result_radius + compare_result_phases
-
-    return compare_result
+    return compare_result_radius + compare_result_phases
 
 
 if __name__ == "__main__":

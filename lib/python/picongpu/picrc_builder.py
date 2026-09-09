@@ -21,10 +21,9 @@ from pathlib import Path
 
 import questionary
 import tomli_w
-
 from moosetash import MissingVariable
 
-from picongpu._rc_params import RCParams, _KEEP_AS_DEFAULT, get_available_presets
+from picongpu._rc_params import _KEEP_AS_DEFAULT, RCParams, get_available_presets
 
 __all__ = ["main"]
 
@@ -277,13 +276,15 @@ def main(argv=None):
 
         new_path = Path(new_path_str)
 
-        if new_path.exists():
-            if not questionary.confirm(
+        if (
+            new_path.exists()
+            and not questionary.confirm(
                 f"{new_path} already exists. Overwrite?",
                 default=False,
-            ).ask():
-                questionary.print("Aborted. Nothing was written.")
-                return
+            ).ask()
+        ):
+            questionary.print("Aborted. Nothing was written.")
+            return
         write_output(output, new_path)
         questionary.print(f"Written to {new_path}.")
         questionary.print("You can start your simulation now.")

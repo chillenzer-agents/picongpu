@@ -14,6 +14,7 @@ from unittest import TestCase
 
 import pytest
 from pydantic import ValidationError
+
 from picongpu import picmi
 from picongpu.picmi.interaction.ionization.fieldionization import ADK, ADKVariant
 from picongpu.pypicongpu import customuserinput, species
@@ -24,7 +25,7 @@ def get_grid(delta_x: float, delta_y: float, delta_z: float, n: int):
     return picmi.Cartesian3DGrid(
         number_of_cells=[n, n, n],
         lower_bound=[0, 0, 0],
-        upper_bound=list(map(lambda x: n * x, [delta_x, delta_y, delta_z])),
+        upper_bound=[n * x for x in [delta_x, delta_y, delta_z]],
         # required, otherwise won't spawn
         lower_boundary_conditions=["open", "open", "periodic"],
         upper_boundary_conditions=["open", "open", "periodic"],
@@ -47,9 +48,7 @@ class TestPicmiSimulation(TestCase):
     def __get_sim(self):
         grid = get_grid(1, 1, 1, 32)
         solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
-        sim = picmi.Simulation(time_step_size=17, max_steps=4, solver=solver)
-
-        return sim
+        return picmi.Simulation(time_step_size=17, max_steps=4, solver=solver)
 
     def __get_tmpdir_name(self):
         """
@@ -106,9 +105,9 @@ class TestPicmiSimulation(TestCase):
         # case a: silently pass if they do match
         get_sim_cfl_helper(7.14500557764070900528e-9, 0.99, (3, 4, 5), "Yee")
 
-        # case b: raise error if no match
+        # case b: an error is raised on mismatch
         with pytest.raises(ValueError):
-            # delta_t does not match cfl at all
+            # the delta_t here does not match the cfl at all
             get_sim_cfl_helper(1, 0.99, (3, 4, 5), "Yee")
 
     def test_species_translation(self):
@@ -135,7 +134,7 @@ class TestPicmiSimulation(TestCase):
 
         picongpu = sim.get_as_pypicongpu()
         assert len(picongpu.species) == 3
-        species_names = set(map(lambda species: species.name, picongpu.species))
+        species_names = {species.name for species in picongpu.species}
         assert species_names == {"dummy1", "dummy2", "dummy3"}
 
         # check typical ppc is derived
@@ -159,7 +158,7 @@ class TestPicmiSimulation(TestCase):
 
         picongpu = sim.get_as_pypicongpu()
         assert len(picongpu.species) == 2
-        species_names = set(map(lambda species: species.name, picongpu.species))
+        species_names = {species.name for species in picongpu.species}
         assert species_names == {"dummy2", "dummy3"}
 
         # check explicitly set typical ppc is respected
@@ -231,9 +230,12 @@ class TestPicmiSimulation(TestCase):
 
         # species
         assert len(my_species) == 4
-        assert ["colocated1", "colocated2", "separate1", "separate2"] == list(
-            map(lambda species: species.name, my_species)
-        )
+        assert [species.name for species in my_species] == [
+            "colocated1",
+            "colocated2",
+            "separate1",
+            "separate2",
+        ]
 
         # operations
         density_operations = list(
@@ -246,7 +248,7 @@ class TestPicmiSimulation(TestCase):
         for op in density_operations:
             assert isinstance(op.profile, species.operation.densityprofile.Uniform)
 
-            species_names = set(map(lambda species: species.name, op.species))
+            species_names = {species.name for species in op.species}
 
             # ensure grouping:
             if "separate1" in species_names or "separate2" in species_names:
@@ -330,7 +332,7 @@ class TestPicmiSimulation(TestCase):
         )
         solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
         sim = picmi.Simulation(
-            time_step_size=1.39e-16, max_steps=int(2048), solver=solver, picongpu_moving_window_move_point=0.9
+            time_step_size=1.39e-16, max_steps=2048, solver=solver, picongpu_moving_window_move_point=0.9
         )
         pypic = sim.get_as_pypicongpu()
 

@@ -25,6 +25,7 @@ getValue(parameter:str, direction:str = None)
 __all__ = ["JSONReader"]
 
 import json
+
 from . import readFiles as rF
 
 
@@ -32,8 +33,8 @@ class JSONReader(rF.ReadFiles):
     def __init__(
         self,
         fileExtension: str = r".json",
-        direction: str = None,
-        directiontype: str = None,
+        direction: str | None = None,
+        directiontype: str | None = None,
     ):
         """
         constructor
@@ -143,6 +144,6 @@ class JSONReader(rF.ReadFiles):
                 if "value" not in locals():
                     value = data[parameter]
                 elif "value" in locals() and value != data[parameter]:
-                    raise ValueError("More than one value could be found for {}".format(parameter))
+                    raise ValueError(f"More than one value could be found for {parameter}")
 
         return value["values"]

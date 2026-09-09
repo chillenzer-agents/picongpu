@@ -8,24 +8,25 @@ License: GPLv3+
 
 __all__ = ["plot_1D", "plot_2D"]
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
-import testsuite._checkData as cD
-import matplotlib
 
-matplotlib.use("Agg")
+import testsuite._checkData as cD
+
+mpl.use("Agg")
 
 
 def plot_1D(
     theory,
     simulation,
     x_value,
-    xlabel: str = None,
-    ylabel: str = None,
-    title: str = None,
-    plotLog: str = None,
-    acceptance: float = None,
+    xlabel: str | None = None,
+    ylabel: str | None = None,
+    title: str | None = None,
+    plotLog: str | None = None,
+    acceptance: float | None = None,
     savefig: bool = True,
-    direction: str = None,
+    direction: str | None = None,
 ):
     """
     Input:
@@ -80,7 +81,7 @@ def plot_1D(
     direction = cD.checkDirection(variable="resultDirection", direction=direction)
     # If only one value is given, a horizontal line is plotted
     # as the theoretical value
-    if isinstance(theory, int) or isinstance(theory, float):
+    if isinstance(theory, int | float):
         plt.axhline(theory, color="k", label="theory")
         if acceptance is not None:
             offset = theory * acceptance
@@ -103,7 +104,7 @@ def plot_1D(
             plt.plot(x_value, theory - offset, color="g")
             plt.fill_between(x_value, theory + offset, theory - offset, color="green", alpha=0.5)
 
-    if isinstance(simulation, int) or isinstance(simulation, float):
+    if isinstance(simulation, int | float):
         plt.axhline(simulation, label="simulation")
 
     elif len(simulation) == 2:
@@ -143,4 +144,3 @@ def plot_1D(
 
 def plot_2D():
     """ """
-    pass

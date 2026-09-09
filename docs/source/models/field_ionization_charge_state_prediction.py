@@ -6,13 +6,14 @@ Authors: Marco Garten
 License: GPLv3+
 """
 
-import sys
 import os
+import sys
+from importlib import import_module
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.constants as sc
-from importlib import import_module
 
 picongpu_package_path = os.path.abspath("../../../lib/python/")
 
@@ -164,7 +165,7 @@ if __name__ == "__main__":
     for i in np.arange(t_res):
         # calculate the transition matrix of this step
         trans_mat = trans_mat_base
-        for k, cs in enumerate(Z):
+        for k, _ in enumerate(Z):
             # probability to stay bound
             trans_mat[k, k] = np.exp(-rate_matrix[k, i] * dt)
             # probability to ionize
@@ -180,7 +181,7 @@ if __name__ == "__main__":
 
     # find times when BSI fields are exceeded
     time_BSI = np.zeros([Z_max])
-    for i, cs in enumerate(Z):
+    for i, _ in enumerate(Z):
         idx = np.where(e_field_envelope_AU > electric_field_BSI[i])[0][0]
         time_BSI[i] = time[idx - 1]
 
@@ -210,19 +211,19 @@ if __name__ == "__main__":
             ax_rate.plot(
                 time / fs,
                 rate_matrix[i, :],
-                label="{}+ to {}+".format(Z[i] - 1, Z[i]),
+                label=f"{Z[i] - 1}+ to {Z[i]}+",
                 color=color[i],
             )
             ax_bsi.axvline(
                 time_BSI[i] / fs,
-                label="{}+ to {}+".format(Z[i] - 1, Z[i]),
+                label=f"{Z[i] - 1}+ to {Z[i]}+",
                 color=color[i],
             )
 
         ax_pop.plot(
             time / fs,
             charge_dist[i, :-1] / percent,
-            label="{}+".format(i),
+            label=f"{i}+",
             color=color[i],
         )
         ax_pop.fill_between(

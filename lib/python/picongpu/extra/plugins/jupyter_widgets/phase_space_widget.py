@@ -6,10 +6,10 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-from .base_widget import BaseWidget
-from ..plot_mpl import PhaseSpaceMPL
-
 from ipywidgets import widgets
+
+from ..plot_mpl import PhaseSpaceMPL
+from .base_widget import BaseWidget
 
 
 class PhaseSpaceWidget(BaseWidget):

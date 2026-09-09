@@ -8,6 +8,7 @@ License: GPLv3+
 """
 
 import collections
+
 import pint
 
 ureg = pint.UnitRegistry()
@@ -18,7 +19,7 @@ except AttributeError:
     collectionsAbc = collections
 
 
-class Parameter(object):
+class Parameter:
     """
     Parameter that can have a corresponding representation as a jupyter widget
     within interactive jupyter notebooks.
@@ -103,7 +104,7 @@ class Parameter(object):
 
         if values is not None and range is not None:
             raise ValueError("Can only set either 'values' or 'range'!")
-        elif values is not None:
+        if values is not None:
             if not isinstance(values, collectionsAbc.Iterable):
                 values = [values]
             if not values:
@@ -119,11 +120,10 @@ class Parameter(object):
         elif range is not None:
             if len(range) != 2:
                 raise ValueError("Range needs to be a tuple of length 2!")
-            else:
-                self.range = range
-                self.pic_range = tuple(self.convert_to_PIC(range))
+            self.range = range
+            self.pic_range = tuple(self.convert_to_PIC(range))
         else:
-            # raise ValueError("Need either 'values' or 'range' parameter!")
+            # silently fall back to the default instead of raising a ValueError
             self.values = self.default
             self.pic_values = self.convert_to_PIC(default)
             print(
@@ -144,17 +144,17 @@ class Parameter(object):
         """
         if self.values is not None:
             # check for valid values
-            res = all([v in self.pic_values for v in vals])
+            res = all(v in self.pic_values for v in vals)
             if not res:
                 raise ValueError(
-                    "Invalid values found! Values should be elements of {0} but are {1}!".format(self.pic_values, vals)
+                    f"Invalid values found! Values should be elements of {self.pic_values} but are {vals}!"
                 )
         else:
             # check for valid range
-            res = all([self.pic_range[0] <= v <= self.pic_range[1] for v in vals])
+            res = all(self.pic_range[0] <= v <= self.pic_range[1] for v in vals)
             if not res:
                 raise ValueError(
-                    "Invalid values found! Values should be contained in {0} but are {1}!".format(self.pic_range, vals)
+                    f"Invalid values found! Values should be contained in {self.pic_range} but are {vals}!"
                 )
 
     def convert_to_PIC(self, vals, check_vals=False):
@@ -203,9 +203,7 @@ class Parameter(object):
         if check_vals:
             self._check_input(vals)
 
-        ui_results = [ureg.convert(self.pic_to_SI(v), self.base_unit, self.unit) for v in vals]
-
-        return ui_results
+        return [ureg.convert(self.pic_to_SI(v), self.base_unit, self.unit) for v in vals]
 
     def dict_name(self):
         """

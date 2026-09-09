@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from typing import Annotated, Literal
+
 from pydantic import BaseModel, BeforeValidator, computed_field
 
 from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_to_cpp_type

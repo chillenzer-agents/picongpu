@@ -2,7 +2,7 @@
 internal representation of params to generate PIConGPU input files
 """
 
-from . import customuserinput, grid, laser, output, rendering, species, util
+from . import backgroundfield, customuserinput, grid, laser, output, rendering, species, util
 from .field_solver.Lehe import LeheSolver
 from .field_solver.Yee import YeeSolver
 from .output.checkpoint import Checkpoint
@@ -24,6 +24,7 @@ __all__ = [
     "util",
     "grid",
     "customuserinput",
+    "backgroundfield",
     "PhaseSpace",
     "EnergyHistogram",
     "MacroParticleCount",

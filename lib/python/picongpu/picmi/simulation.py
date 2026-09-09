@@ -21,6 +21,7 @@ from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Fie
 
 from picongpu import pypicongpu, templates
 from picongpu.picmi import constants
+from picongpu.picmi.applied_field import AnyAppliedField
 from picongpu.picmi.diagnostics.field_dump import NativeFieldDump, _FieldDump
 from picongpu.picmi.diagnostics.particle_dump import ParticleDump
 from picongpu.picmi.grid import Cartesian3DGrid
@@ -432,6 +433,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             walltime=walltime or Walltime(walltime=datetime.timedelta(hours=1)),
             time_steps=time_steps,
             laser=[ll.get_as_pypicongpu() for ll in self.lasers] or None,
+            background_field=self._get_background_field(),
             output=self._generate_plugins(time_steps),
             particle_filters=self._collect_particle_filters(),
             base_density=self._get_base_density(),
@@ -441,6 +443,22 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     def _get_base_density(self) -> float:
         return self.picongpu_base_density or 1.0e25
+
+    def _get_background_field(self) -> "pypicongpu.backgroundfield.BackgroundField | None":
+        """Translate the configured applied fields into a single pypicongpu background field."""
+        unsupported = [f for f in self.applied_fields if not isinstance(f, AnyAppliedField)]
+        if unsupported:
+            raise NotImplementedError(
+                "The following applied field(s) cannot be used as PIConGPU background fields "
+                f"(only ConstantAppliedField and AnalyticAppliedField are supported): {unsupported=}"
+            )
+        if len(self.applied_fields) > 1:
+            raise NotImplementedError(
+                f"PIConGPU currently supports at most one applied/background field, got {len(self.applied_fields)}."
+            )
+        if not self.applied_fields:
+            return None
+        return self.applied_fields[0].get_as_pypicongpu()
 
     def run(self, *args, **kwargs) -> None:
         return self.picongpu_run(*args, **kwargs)

@@ -243,6 +243,10 @@ Example:
 
 Currently only the whole simulation domain is supported (``lower_bound``/``upper_bound`` must stay at their default ``None`` values).
 
+The expressions are evaluated on the cell **node** positions ``x = cellIdx.x() * cellSize.x()`` (and analogously ``y``, ``z``), not on the cell centers.
+As soon as *any* applied field is configured, the generated functors enable ``InfluenceParticlePusher`` for **both** the ``E`` and ``B`` contribution: a field-only background therefore still adds a zero ``B`` (and vice versa) during the push, which is harmless but slightly wasteful.
+Parameters whose names collide with ``x``/``y``/``z``/``t`` or with identifiers generated inside the C++ functors, or that are C++ keywords, are rejected with a ``ValueError``, as are expressions that reference undefined symbols.
+
 Unsupported Features
 ^^^^^^^^^^^^^^^^^^^^
 

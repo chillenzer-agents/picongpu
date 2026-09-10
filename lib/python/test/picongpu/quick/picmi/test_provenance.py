@@ -125,7 +125,8 @@ def test_provenance_enabled_by_default(picmi_sim):
 def test_provenance_close_failure_does_not_discard_result(picmi_sim, monkeypatch):
     # A failure while moving the Research Object into place (e.g. disk full in _finalize,
     # or an IO/permission error on the move) must NOT discard the already-computed result.
-    import picongpu.pypicongpu.runner as runner_mod
+    # close_ro is resolved in the cwl module (where the Research Object is managed).
+    import picongpu.pypicongpu.cwl as cwl_mod
 
     def _raise(ro, save_to):
         # Only fail the "into place" call; let the finally-block cleanup (save_to=None)
@@ -134,8 +135,8 @@ def test_provenance_close_failure_does_not_discard_result(picmi_sim, monkeypatch
             raise OSError("simulated disk full while finalizing the Research Object")
         _orig_close_ro(ro, save_to)
 
-    _orig_close_ro = runner_mod.close_ro
-    monkeypatch.setattr(runner_mod, "close_ro", _raise)
+    _orig_close_ro = cwl_mod.close_ro
+    monkeypatch.setattr(cwl_mod, "close_ro", _raise)
     with _new_base() as base:
         runner = _build_probe_runner(picmi_sim, base)
         with rc_params.set_temporarily(provenance={"enabled": True}):

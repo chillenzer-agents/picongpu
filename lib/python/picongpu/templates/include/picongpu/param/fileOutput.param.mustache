@@ -30,6 +30,8 @@
 
 #include <pmacc/meta/conversion/MakeSeq.hpp>
 #include <pmacc/traits/GetCTName.hpp>
+#include <pmacc/traits/HasFlag.hpp>
+#include <pmacc/traits/HasIdentifiers.hpp>
 
 #include <type_traits>
 
@@ -43,13 +45,12 @@ namespace picongpu
     struct {{{typename}}} {
          HDINLINE float1_64 getUnit() const
          {
-             return 1.;
+             return {{{get_unit_cpp}}};
          }
 
          HINLINE std::vector<float_64> getUnitDimension() const
          {
-             std::vector<float_64> unitDimension(7, 0.0);
-             return unitDimension;
+             return std::vector<float_64>{{{unit_dimension_cpp}}};
          }
 
          HINLINE static std::string getName()
@@ -75,17 +76,23 @@ namespace picongpu
 
 {{#output}} {{#type_openPMD}} {{#derived_fields}} {{#functor}} {{#species_name}}
     namespace particles::traits {
-        /* Restrict the derived attribute {{{typename}}} to the species it is actually
-         * defined for, so that `CreateEligible_t` (via `mp_copy_if`) instantiates the
-         * solver for only that species instead of every species in `VectorAllSpecies`.
+        /* Restrict the derived attribute {{{typename}}} to (a) the species it is actually
+         * defined for and (b) the species carrying the particle attributes the functor
+         * accesses, so that `CreateEligible_t` (via `mp_copy_if`) instantiates the solver
+         * for only the eligible species instead of every species in `VectorAllSpecies`.
          * The primary `SpeciesEligibleForSolver` is `mp_bool<true>` for all species, and
          * the `FilteredDerivedAttribute` overload forwards the attribute part here, so
-         * this single name-keyed specialization narrows the whole combination matrix. */
+         * this single specialization narrows the whole combination matrix on both axes. */
         template<typename T_Species>
         struct SpeciesEligibleForSolver<T_Species, particleToGrid::derivedAttributes::{{{typename}}}>
         {
-            using type = pmacc::mp_bool<
-                std::is_same_v<pmacc::traits::GetCTName_t<T_Species>, PMACC_CSTRING("{{{species_name}}}")>>;
+            using FrameType = typename T_Species::FrameType;
+
+            using type = pmacc::mp_and<
+                pmacc::mp_bool<
+                    std::is_same_v<pmacc::traits::GetCTName_t<T_Species>, PMACC_CSTRING("{{{species_name}}}")>>,
+                {{{identifier_requirement_cpp}}},
+                {{{flag_requirement_cpp}}}>;
         };
     }
 {{/species_name}} {{/functor}} {{/derived_fields}} {{/type_openPMD}} {{/output}}

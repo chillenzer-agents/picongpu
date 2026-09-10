@@ -387,7 +387,7 @@ class TestPicmiSimulation(TestCase):
         assert not os.path.isdir(outdir)
         sim.write_input_file(outdir)
         assert os.path.isdir(outdir)
-        assert os.path.exists(outdir + "/include/picongpu/param/simulation.param")
+        assert os.path.exists(outdir + "/input/include/picongpu/param/simulation.param")
 
     def test_custom_template_dir_basic_write_input_file(self):
         """providing custom template dir possible or write_input_file"""
@@ -414,14 +414,14 @@ class TestPicmiSimulation(TestCase):
             sim.write_input_file(out_dir)
 
         # check for generated (rendered) dir
-        assert os.path.isfile(out_dir + "/include/picongpu/time_steps")
-        with open(out_dir + "/include/picongpu/time_steps") as rendered_file:
+        assert os.path.isfile(out_dir + "/input/include/picongpu/time_steps")
+        with open(out_dir + "/input/include/picongpu/time_steps") as rendered_file:
             assert rendered_file.read() == "128"
 
         # JSON has been dumped
-        assert os.path.isfile(out_dir + "/metadata/pypicongpu_rendering_context.json")
-        assert os.path.isfile(out_dir + "/metadata/pypicongpu_runner.json")
-        assert os.path.isfile(out_dir + "/metadata/rc_params.json")
+        assert os.path.isfile(out_dir + "/input/metadata/pypicongpu_rendering_context.json")
+        assert os.path.isfile(out_dir + "/input/metadata/pypicongpu_runner.json")
+        assert os.path.isfile(out_dir + "/input/metadata/rc_params.json")
 
     def test_custom_input_basic_write_input_file(self):
         """test custom input may be rendered"""
@@ -454,9 +454,9 @@ class TestPicmiSimulation(TestCase):
         assert os.path.isdir(out_dir)
 
         # JSON has been dumped
-        assert os.path.isfile(out_dir + "/metadata/pypicongpu_rendering_context.json")
-        assert os.path.isfile(out_dir + "/metadata/pypicongpu_runner.json")
-        assert os.path.isfile(out_dir + "/metadata/rc_params.json")
+        assert os.path.isfile(out_dir + "/input/metadata/pypicongpu_rendering_context.json")
+        assert os.path.isfile(out_dir + "/input/metadata/pypicongpu_runner.json")
+        assert os.path.isfile(out_dir + "/input/metadata/rc_params.json")
 
     def test_custom_template_dir_basic_get_runner(self):
         """using picongpu_get_runner() directly sets template dir"""

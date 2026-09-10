@@ -198,7 +198,18 @@ class Simulation(RenderedObject, BaseModel):
 
         return custom_rendering_context
 
+    def render_context(self) -> dict[str, Any]:
+        # The one render-projection step of the Simulation that is not a simple
+        # field rename: an embedded openPMD plugin must be spliced with its own
+        # render projection (a full custom projection) instead of its clean
+        # lossless serialisation, because the templates key the plugin by
+        # type_openPMD / config_filename / derived_fields, not by sources/config.
+        return self._openpmd_plugin_render_substituted(self.model_dump(mode="json"))
+
     def spread_directory_information(self, setup_dir):
         for plugin in self.output or []:
             if isinstance(plugin, OpenPMDPlugin):
                 plugin.setup_dir = Path(setup_dir)
+                # materialise the openPMD backend config file once the setup dir
+                # is known (a side effect of generation, not of serialisation)
+                plugin.write_config_file()

@@ -7,7 +7,7 @@ License: GPLv3+
 
 from collections.abc import Callable, Iterable
 from inspect import signature
-from typing import Any
+from typing import Any, get_type_hints
 
 from pydantic import BaseModel, computed_field, model_validator
 from sympy import Expr, Symbol, symbols
@@ -116,6 +116,8 @@ class MacroParticle(Particle):
 
 # Symbols whose value scales linearly with the macroparticle weighting, and thus
 # must be rescaled by ``weighting ** -1`` to obtain the single-particle value.
+# Any symbol not listed here is already a per-particle quantity (e.g. momentum,
+# velocity, position, damped_weighting), so it is left untouched (identity, 0).
 _SCALING = {Symbol("mass"): 1, Symbol("Ekin"): 1, Symbol("charge"): 1}
 
 
@@ -137,7 +139,7 @@ class PhysicalParticle(MacroParticle):
         my_symbols = super().get(*args, **kwargs)
         if self.scales_with_weighting is None:
             w = super().get("weighting")
-            rescaled = tuple(s * (w ** (-_SCALING[s])) for s in alt(lambda: iter(my_symbols), [my_symbols]))
+            rescaled = tuple(s * (w ** (-_SCALING.get(s, 0))) for s in alt(lambda: iter(my_symbols), [my_symbols]))
             my_symbols = rescaled if is_iterable(my_symbols) else rescaled[0]
         return my_symbols
 
@@ -189,8 +191,17 @@ class ParticleFunctor(BaseModel):
         return rng_classes[0] if rng_classes else (lambda: None)
 
     def _particle_class(self) -> type[Particle]:
-        parameters = signature(self.functor).parameters.values()
-        annotation = next(iter(parameters)).annotation
+        first = next(iter(signature(self.functor).parameters.values()), None)
+        if first is None:
+            return MacroParticle
+        annotation = first.annotation
+        if isinstance(annotation, str):
+            # A string (forward) reference, e.g. under ``from __future__ import annotations``;
+            # resolve it in the functor's module namespace rather than silently degrading.
+            try:
+                annotation = get_type_hints(self.functor).get(first.name, annotation)
+            except (NameError, TypeError):
+                pass
         if isinstance(annotation, type) and issubclass(annotation, Particle):
             return annotation
         return MacroParticle
@@ -198,6 +209,11 @@ class ParticleFunctor(BaseModel):
     @model_validator(mode="after")
     def _init(self):
         sig = signature(self.functor)
+        if len(sig.parameters) == 0:
+            raise TypeError(
+                "A particle functor must take the particle as its first argument, e.g. "
+                "`def my_functor(particle: MacroParticle)`. You gave a zero-argument functor."
+            )
         if self.name is None:
             self.name = self.functor.__name__
         if self.return_type is None:

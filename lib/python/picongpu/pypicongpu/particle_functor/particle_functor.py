@@ -115,15 +115,19 @@ ACCESSORS = {
 # capabilities checked with ``pmacc::traits::HasFlag`` (always ``alias``, hence
 # the ``<>`` suffix). The strings are stored in their exact C++ spelling.
 _ATTRIBUTE_REQUIREMENTS = {
-    "mass": {"identifiers": ["weighting"]},
+    # Mass is resolved through the `massRatio<>` flag (see `frame::getMass`), so every
+    # attribute whose accessor reads `getMass` (mass / gamma / kinetic energy / velocity)
+    # must require it, exactly like the built-in `Energy` / `LarmorPower` /
+    # `WeightedVelocity` / `MidCurrentDensityComponent` traits do.
+    "mass": {"identifiers": ["weighting"], "flags": ["massRatio<>"]},
     "momentum": {"identifiers": ["momentum"]},
     "momentumPrev1": {"identifiers": ["momentumPrev1"]},
     "charge": {"identifiers": ["weighting"], "flags": ["chargeRatio<>"]},
     "charge_state": {"identifiers": ["boundElectrons"], "flags": ["atomicNumbers<>"]},
     "damped_weighting": {"identifiers": ["weighting"]},
-    "gamma": {"identifiers": ["weighting", "momentum"]},
-    "kinetic energy": {"identifiers": ["weighting", "momentum"]},
-    "velocity": {"identifiers": ["weighting", "momentum"]},
+    "gamma": {"identifiers": ["weighting", "momentum"], "flags": ["massRatio<>"]},
+    "kinetic energy": {"identifiers": ["weighting", "momentum"], "flags": ["massRatio<>"]},
+    "velocity": {"identifiers": ["weighting", "momentum"], "flags": ["massRatio<>"]},
 }
 _NO_REQUIREMENT = {"identifiers": [], "flags": []}
 
@@ -172,6 +176,11 @@ def _unit_monomial(exponents):
             "getUnit() cannot be auto-derived from this unit_dimension "
             "(it has temperature/amount-of-substance/luminous-intensity components). "
             "Provide an explicit unit_factor."
+        )
+    if any(abs(float(exp) - round(float(exp))) > 1.0e-12 for exp in exponents[:4]):
+        raise ValueError(
+            f"getUnit() cannot be auto-derived from a non-integer unit_dimension. "
+            f"Provide an explicit unit_factor. You gave: {list(exponents[:4])}."
         )
     # The SI current is a charge per time, so it folds into charge^I * time^-I.
     aggregated = {
@@ -278,6 +287,10 @@ class ParticleFunctor(RenderedObject, BaseModel):
                 raise ValueError(
                     f"unit_dimension is not supported for integral types. You gave {self.unit_dimension=}."
                 )
+        # Validate up front that `getUnit()` can be auto-derived (or an explicit
+        # `unit_factor` was given), so a non-derivable dimension is rejected at
+        # construction rather than surfacing a wrong value at render time.
+        self.get_unit_cpp
         if self.needs_total_position and self.rng_info is not None:
             raise ValueError(
                 f"PIConGPU does not support particle functors that need total position and random numbers. You gave: {self.rng_info=}."

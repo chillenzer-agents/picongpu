@@ -17,9 +17,10 @@ from picongpu.picmi.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.particle_functor import (
     ParticleFunctor as PyPIConGPUParticleFunctor,
     UnitDimension as PyPIConGPUUnitDimension,
+    derive_requirements,
     generate_preamble,
 )
-from picongpu.pypicongpu.util import alt, decorating_class
+from picongpu.pypicongpu.util import alt, decorating_class, is_iterable
 
 _COORDINATE_SYSTEM = {
     (
@@ -41,87 +42,28 @@ _COORDINATE_SYSTEM = {
 
 
 class Particle:
+    """Base class for the particle argument of a functor.
+
+    A functor declares which flavour of particle it operates on by the type
+    annotation of its first parameter (``MacroParticle`` or
+    ``PhysicalParticle``). This is purely semantic: every functor is
+    implemented on macroparticles, but the annotation controls whether the
+    returned quantity is interpreted as a macro- or a physical-particle
+    property.
+    """
+
     def get(self, attribute, **kwargs) -> Expr | Iterable[Expr]:
         NotImplementedError()
 
-
-@decorating_class("functor")
-class ParticleFunctor(BaseModel):
-    """
-    A functor that operates on a Particle and returns a sympy expression.
-
-    Usage as decorator::
-
-        @ParticleFunctor
-        def kinetic_energy(particle):
-            return particle.get("kinetic energy")
-
-        @ParticleFunctor(unit_dimension=M * L / T)
-        def momentum_x(particle):
-            return particle.get("momentum")[0]
-
-    Or as constructor::
-
-        pf = ParticleFunctor(functor=lambda p: p.get("weighting"), name="density")
-    """
-
-    model_config = {"arbitrary_types_allowed": True}
-
-    functor: Callable[[Any], Any]
-    name: str | None = None
-    return_type: type | str | None = None
-    unit_dimension: UnitDimension | None = None
-
-    def _rng_classes(self) -> list[type]:
-        return [
-            cls
-            for p in signature(self.functor).parameters.values()
-            if isinstance(p.annotation, type) and issubclass((cls := p.annotation), RNGArg)
-        ]
-
-    @computed_field
-    def rng_class(self) -> Callable[[Any], Any]:
-        rng_classes = self._rng_classes()
-        return rng_classes[0] if rng_classes else (lambda: None)
-
-    @model_validator(mode="after")
-    def _init(self):
-        sig = signature(self.functor)
-        if self.name is None:
-            self.name = self.functor.__name__
-        if self.return_type is None:
-            self.return_type = float if sig.return_annotation == sig.empty else sig.return_annotation
-        if self.unit_dimension is None:
-            self.unit_dimension = UnitDimension()
-        if len(rng_classes := self._rng_classes()) > 1:
-            raise ValueError(
-                f"ParticleFunctor can take at most one RNG. You have requested {rng_classes=} in your signature."
-            )
-        return self
-
-    def get_as_pypicongpu(self, mode) -> PyPIConGPUParticleFunctor:
-        particle = AbstractParticle()
-        rng = self.rng_class()
-        functor_expression = self(particle) if rng is None else self(particle, rng)
-        return PyPIConGPUParticleFunctor(
-            name=self.name,
-            functor_expression=functor_expression,
-            functor_preamble=generate_preamble(
-                particle.get_attribute_map() | alt(lambda: rng.get_attribute_map(), {}), mode=mode
-            ),
-            return_type=self.return_type,
-            unit_dimension=PyPIConGPUUnitDimension(unit_dimension=self.unit_dimension.unit_vector.tolist()),
-            needs_total_position=particle.needs_total_position,
-            rng_info=alt(lambda: rng.model_dump(mode="python"), None),
-        )
-
-    def __call__(self, *args):
-        return self.functor(*args)
+    def finalize(self, expression):
+        return expression
 
 
-class AbstractParticle(Particle):
-    """
-    Particle implementation that tracks attribute access and returns sympy symbols.
+class MacroParticle(Particle):
+    """A functor operating directly on macroparticles.
+
+    The returned quantity is a macro-particle (weighting-scaled) property,
+    which is what the accessors produce as-is.
     """
 
     needs_total_position = False
@@ -150,6 +92,9 @@ class AbstractParticle(Particle):
             self.used_attributes |= {my_symbols: "momentumPrev1"}
 
         elif attribute in ["gamma", "kinetic energy", "velocity"]:
+            # This relies on python dictionaries having a stable ordering.
+            # We first add mass and momentum and later use their symbols
+            # inside of the same preamble.
             self.get("mass")
             self.get("momentum")
             if attribute == "gamma":
@@ -167,3 +112,130 @@ class AbstractParticle(Particle):
             self.used_attributes |= {my_symbols: attribute}
 
         return my_symbols
+
+
+# Symbols whose value scales linearly with the macroparticle weighting, and thus
+# must be rescaled by ``weighting ** -1`` to obtain the single-particle value.
+_SCALING = {Symbol("mass"): 1, Symbol("Ekin"): 1, Symbol("charge"): 1}
+
+
+class PhysicalParticle(MacroParticle):
+    """A functor operating on single (physical) particles.
+
+    The implementation still acts on macroparticles, but the returned quantity
+    is interpreted as a single-particle property. This is achieved by
+    symbolically dividing the scaling-sensitive symbols by the weighting (or,
+    via ``scales_with_weighting``, by multiplying the whole result by an
+    explicit power of the weighting).
+    """
+
+    def __init__(self, scales_with_weighting=None):
+        self.scales_with_weighting = scales_with_weighting
+        super().__init__()
+
+    def get(self, *args, **kwargs):
+        my_symbols = super().get(*args, **kwargs)
+        if self.scales_with_weighting is None:
+            w = super().get("weighting")
+            rescaled = tuple(s * (w ** (-_SCALING[s])) for s in alt(lambda: iter(my_symbols), [my_symbols]))
+            my_symbols = rescaled if is_iterable(my_symbols) else rescaled[0]
+        return my_symbols
+
+    def finalize(self, expression):
+        if self.scales_with_weighting is not None:
+            expression *= super().get("weighting") ** (-self.scales_with_weighting)
+        return expression
+
+
+@decorating_class("functor")
+class ParticleFunctor(BaseModel):
+    """
+    A functor that operates on a Particle and returns a sympy expression.
+
+    Usage as decorator::
+
+        @ParticleFunctor
+        def kinetic_energy(particle):
+            return particle.get("kinetic energy")
+
+        @ParticleFunctor(unit_dimension=M * L / T)
+        def momentum_x(particle):
+            return particle.get("momentum")[0]
+
+    Or as constructor::
+
+        pf = ParticleFunctor(functor=lambda p: p.get("weighting"), name="density")
+    """
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    functor: Callable[[Any], Any]
+    name: str | None = None
+    return_type: type | str | None = None
+    unit_dimension: UnitDimension | None = None
+    unit_factor: str | None = None
+    scales_with_weighting: int | None = None
+
+    def _rng_classes(self) -> list[type]:
+        return [
+            cls
+            for p in signature(self.functor).parameters.values()
+            if isinstance(p.annotation, type) and issubclass((cls := p.annotation), RNGArg)
+        ]
+
+    @computed_field
+    def rng_class(self) -> Callable[[Any], Any]:
+        rng_classes = self._rng_classes()
+        return rng_classes[0] if rng_classes else (lambda: None)
+
+    def _particle_class(self) -> type[Particle]:
+        parameters = signature(self.functor).parameters.values()
+        annotation = next(iter(parameters)).annotation
+        if isinstance(annotation, type) and issubclass(annotation, Particle):
+            return annotation
+        return MacroParticle
+
+    @model_validator(mode="after")
+    def _init(self):
+        sig = signature(self.functor)
+        if self.name is None:
+            self.name = self.functor.__name__
+        if self.return_type is None:
+            self.return_type = float if sig.return_annotation == sig.empty else sig.return_annotation
+        if self.unit_dimension is None:
+            self.unit_dimension = UnitDimension()
+        if self.scales_with_weighting is not None and self._particle_class() is not PhysicalParticle:
+            raise TypeError(
+                f"Can't apply scaling to a non-PhysicalParticle functor. You gave: {self.scales_with_weighting=}."
+            )
+        if len(rng_classes := self._rng_classes()) > 1:
+            raise ValueError(
+                f"ParticleFunctor can take at most one RNG. You have requested {rng_classes=} in your signature."
+            )
+        return self
+
+    def get_as_pypicongpu(self, mode) -> PyPIConGPUParticleFunctor:
+        particle = (
+            self._particle_class()(self.scales_with_weighting)
+            if self._particle_class() is PhysicalParticle
+            else self._particle_class()()
+        )
+        rng = self.rng_class()
+        functor_expression = self(particle) if rng is None else self(particle, rng)
+        attribute_map = particle.get_attribute_map() | alt(lambda: rng.get_attribute_map(), {})
+        identifiers, flags = derive_requirements(attribute_map)
+        return PyPIConGPUParticleFunctor(
+            name=self.name,
+            functor_expression=functor_expression,
+            functor_preamble=generate_preamble(attribute_map, mode=mode),
+            return_type=self.return_type,
+            unit_dimension=PyPIConGPUUnitDimension(unit_dimension=self.unit_dimension.unit_vector.tolist()),
+            unit_factor=self.unit_factor,
+            needs_total_position=particle.needs_total_position,
+            required_identifiers=identifiers,
+            required_flags=flags,
+            rng_info=alt(lambda: rng.model_dump(mode="python"), None),
+        )
+
+    def __call__(self, *args):
+        return args[0].finalize(self.functor(*args))

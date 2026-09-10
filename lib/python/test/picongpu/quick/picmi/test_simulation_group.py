@@ -72,7 +72,7 @@ def group_dir(simulations):
         # Explicit names: the default names are now unique uuids (see
         # test_default_names_are_unique_hashed); these layout/RO-Crate tests want
         # a deterministic layout to assert against.
-        SimulationGroup(simulations, names=["sim_00", "sim_01"]).write_input_file(d, exist_ok=True)
+        SimulationGroup(simulations=simulations, names=["sim_00", "sim_01"]).write_input_file(d, exist_ok=True)
         yield Path(d)
 
 
@@ -85,28 +85,28 @@ def standalone_baseline():
 
 
 def test_default_names_are_unique_hashed(simulations):
-    group = SimulationGroup(simulations)
+    group = SimulationGroup(simulations=simulations)
     assert len(group.names) == 2
     # 8-hex-char hash suffix per default name.
     assert all(re.fullmatch(r"sim_[0-9a-f]{8}", name) for name in group.names)
     # Two independent groups get independent (non-colliding) default names.
-    other = SimulationGroup(simulations)
+    other = SimulationGroup(simulations=simulations)
     assert not (set(group.names) & set(other.names))
 
 
 def test_custom_names_are_used(simulations):
-    group = SimulationGroup(simulations, names=["a", "b"])
+    group = SimulationGroup(simulations=simulations, names=["a", "b"])
     assert group.names == ["a", "b"]
 
 
 def test_empty_group_rejected():
     with raises(ValueError):
-        SimulationGroup([])
+        SimulationGroup(simulations=[])
 
 
 def test_duplicate_names_rejected(simulations):
     with raises(ValueError):
-        SimulationGroup(simulations, names=["same", "same"])
+        SimulationGroup(simulations=simulations, names=["same", "same"])
 
 
 def test_write_input_file_produces_group_layout(group_dir):
@@ -120,7 +120,7 @@ def test_write_input_file_produces_group_layout(group_dir):
 def test_write_input_file_with_custom_names(simulations):
     with TemporaryDirectory() as d:
         d = Path(d)
-        SimulationGroup(simulations, names=["alpha", "beta"]).write_input_file(d, exist_ok=True)
+        SimulationGroup(simulations=simulations, names=["alpha", "beta"]).write_input_file(d, exist_ok=True)
         assert (d / "alpha" / "workflow" / "workflow.cwl").is_file()
         assert (d / "beta" / "workflow" / "workflow.cwl").is_file()
         assert not (d / "sim_00").exists()
@@ -159,7 +159,7 @@ def test_run_creates_cwl_cache_dir_before_invoking_cwltool(simulations, monkeypa
     monkeypatch.setattr(_simulation_group, "WorkflowFactory", _StubFactory)
     with TemporaryDirectory() as d:
         d = Path(d)
-        SimulationGroup(simulations).run(d, exist_ok=True)
+        SimulationGroup(simulations=simulations).run(d, exist_ok=True)
         cache = Path(captured["cachedir"])
         assert cache == d / ".cwl_cache"
         assert cache.is_dir()

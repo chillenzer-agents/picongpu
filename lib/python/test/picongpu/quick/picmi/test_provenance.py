@@ -122,6 +122,54 @@ def test_provenance_enabled_by_default(picmi_sim):
         assert (runner.provenance_path / "workflow" / "packed.cwl").is_file()
 
 
+def test_provenance_close_failure_does_not_discard_result(picmi_sim, monkeypatch):
+    # A failure while moving the Research Object into place (e.g. disk full in _finalize,
+    # or an IO/permission error on the move) must NOT discard the already-computed result.
+    import picongpu.pypicongpu.runner as runner_mod
+
+    def _raise(ro, save_to):
+        # Only fail the "into place" call; let the finally-block cleanup (save_to=None)
+        # remove the temp RO so it does not raise on the way out.
+        if save_to is not None:
+            raise OSError("simulated disk full while finalizing the Research Object")
+        _orig_close_ro(ro, save_to)
+
+    _orig_close_ro = runner_mod.close_ro
+    monkeypatch.setattr(runner_mod, "close_ro", _raise)
+    with _new_base() as base:
+        runner = _build_probe_runner(picmi_sim, base)
+        with rc_params.set_temporarily(provenance={"enabled": True}):
+            out = runner.run()  # must not raise
+
+        # The simulation result is returned even though the RO could not be moved into place.
+        assert out is not None and isinstance(out, dict)
+        # ...and the (not fully written) Research Object was not left in place.
+        assert not runner.provenance_path.exists()
+
+
+def test_provenance_string_false_disables(picmi_sim):
+    # A string-typed flag must not silently defeat the opt-out (bool("false") is True).
+    with _new_base() as base:
+        runner = _build_probe_runner(picmi_sim, base)
+        with rc_params.set_temporarily(provenance={"enabled": "false"}):
+            out = runner.run()
+
+        assert out is not None and isinstance(out, dict)
+        assert not runner.provenance_path.exists()
+
+
+def test_provenance_non_dict_table_does_not_raise(picmi_sim):
+    # A non-dict value for the table must not raise inside run() (rc_params is free-form).
+    with _new_base() as base:
+        runner = _build_probe_runner(picmi_sim, base)
+        with rc_params.set_temporarily(provenance="not-a-table"):
+            out = runner.run()
+
+        assert out is not None and isinstance(out, dict)
+        # Falls back to the enabled default, so a Research Object is produced.
+        assert runner.provenance_path.is_dir()
+
+
 def _new_base():
     from contextlib import contextmanager
 

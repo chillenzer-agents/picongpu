@@ -99,6 +99,26 @@ def get_tmpdir_with_name(name, parent: Path | None = None):
         return Path(tmpdir).absolute()
 
 
+def _coerce_flag(value, default: bool) -> bool:
+    """Coerce an rc_params flag to a bool so string values like ``"false"`` opt out.
+
+    ``rc_params`` tables are free-form (a plain dict), so a flag may arrive as a string
+    (e.g. from a TOML comment or a typo). A bare ``bool("false")`` is ``True`` and a
+    bare ``not "false"`` is ``False`` -- both would silently defeat an opt-out. This maps
+    the common textual forms ("false"/"0"/"no"/"off"/"none" and their negations) to the
+    intended boolean and leaves real booleans/ints intact.
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "false", "0", "no", "off", "none"}
+    return bool(value)
+
+
 class PicBuildFlags(BaseModel):
     # We explicitly disallow the some shorthands like `-c`, `-t`, ...
     # because they overlap with tbg flags and could thus lead to confusion.
@@ -465,10 +485,16 @@ class Runner(BaseModel):
         # cwltool provenance (a Research Object) is tracked in-process and written to
         # `run_dir/provenance/`. It is on by default and configured via the `[provenance]`
         # table of rc_params (see `.picongpurc.toml`); set `enabled = false` to opt out.
-        provenance_config = rc_params.get("provenance", {}) or {}
-        if not provenance_config.get("enabled", True):
+        raw_provenance = rc_params.get("provenance", {}) or {}
+        if not isinstance(raw_provenance, dict):
+            logging.warning(
+                "[provenance] the rc_params 'provenance' table must be a dict; got %s; using defaults",
+                type(raw_provenance).__name__,
+            )
+            raw_provenance = {}
+        if not _coerce_flag(raw_provenance.get("enabled"), default=True):
             return self._run_bare()
-        return self._run_with_provenance(provenance_config)
+        return self._run_with_provenance(raw_provenance)
 
     def _run_bare(self):
         """Run the workflow without any cwltool provenance tracking."""
@@ -507,8 +533,8 @@ class Runner(BaseModel):
 
         full_name = provenance_config.get("full_name", "") or environ.get("CWL_FULL_NAME", "") or ""
         orcid = provenance_config.get("orcid", "") or environ.get("ORCID", "") or ""
-        host_provenance = bool(provenance_config.get("host", True))
-        user_provenance = bool(provenance_config.get("user", False))
+        host_provenance = _coerce_flag(provenance_config.get("host"), default=True)
+        user_provenance = _coerce_flag(provenance_config.get("user"), default=False)
 
         ro = None
         prov_log_handler = None
@@ -587,15 +613,25 @@ class Runner(BaseModel):
                 )
 
             # Finalize: stop the log (adds the log tagfile to the manifest) while the RO is
-            # still open, then move the RO into place.
-            stop_prov_log()
-            provenance_path = self.provenance_path
-            if provenance_path.is_dir() and any(provenance_path.iterdir()):
-                logging.warning(
-                    "[provenance] %s already exists and is non-empty; it will be overwritten", provenance_path
+            # still open, then move the RO into place. A failure here (e.g. temp disk full in
+            # _finalize, or an IO/permission error on the move) must not discard the
+            # (already successful) result: log it and return the result anyway. On failure the
+            # temp Research Object is still cleaned up by the ``finally`` below (best effort).
+            try:
+                stop_prov_log()
+                provenance_path = self.provenance_path
+                if provenance_path.is_dir() and any(provenance_path.iterdir()):
+                    logging.warning(
+                        "[provenance] %s already exists and is non-empty; it will be overwritten",
+                        provenance_path,
+                    )
+                close_ro(ro, str(provenance_path))
+                closed = True
+            except Exception:
+                logging.exception(
+                    "[provenance] Failed to move the Research Object into place; the simulation "
+                    "result is returned without a finalized provenance Research Object"
                 )
-            close_ro(ro, str(provenance_path))
-            closed = True
             return out
         finally:
             # On any path that didn't move the RO into place, stop the log (best effort) and

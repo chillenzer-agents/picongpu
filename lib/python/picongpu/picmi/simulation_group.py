@@ -10,9 +10,12 @@ from datetime import datetime, timezone
 from os import PathLike
 from pathlib import Path
 from typing import Sequence
+from uuid import uuid4
 
+import yaml
 from cwltool.context import RuntimeContext
 from cwltool.factory import Factory as WorkflowFactory
+from pydantic import BaseModel, ConfigDict, model_validator
 from rocrate.model import SoftwareApplication
 from rocrate.rocrate import ROCrate
 
@@ -39,8 +42,7 @@ _REQUIRED_SUB_SIM_INPUTS = {
 
 
 def _default_names(count: int) -> list[str]:
-    width = max(2, len(str(max(count, 1) - 1)))
-    return [f"sim_{index:0{width}d}" for index in range(count)]
+    return [f"sim_{uuid4().hex[:8]}" for _ in range(count)]
 
 
 def _assert_valid_names(names: Sequence[str], count: int) -> None:
@@ -58,53 +60,47 @@ def _assert_valid_names(names: Sequence[str], count: int) -> None:
 
 
 def _generate_group_workflow(names: Sequence[str]) -> str:
-    steps = []
-    outputs = []
+    steps = {}
+    outputs = {}
     for name in names:
-        run = f"../{name}/workflow/workflow.cwl"
-        in_lines = []
-        for key, (cwl_class, location) in _REQUIRED_SUB_SIM_INPUTS.items():
-            in_lines.append(
-                f'      {key}:\n        default: {{class: {cwl_class}, location: "../{name}/{location}"}}\n'
-            )
-        steps.append(
-            f"  {name}_step:\n"
-            f"    id: {name}_step\n"
-            f'    label: "Build and run sub-simulation {name}"\n'
-            f'    doc: "Nests the self-contained per-simulation workflow of {name}."\n'
-            f"    run: {run}\n"
-            f"    in:\n"
-            f"{''.join(in_lines)}"
-            f"    out: [input_directory, submission_information]\n"
-        )
-        outputs.append(
-            f"  {name}_input_directory:\n"
-            f"    type: Directory\n"
-            f"    outputSource: {name}_step/input_directory\n"
-            f'    label: "{name} input directory"\n'
-            f"  {name}_submission_information:\n"
-            f"    type: File\n"
-            f"    outputSource: {name}_step/submission_information\n"
-            f'    label: "{name} submission information"\n'
-        )
-    return (
-        "cwlVersion: v1.2\n"
-        "class: Workflow\n"
-        'label: "PIConGPU Simulation Group Workflow"\n'
-        "doc: |\n"
-        "  Overarching workflow that builds and runs every sub-simulation in the group.\n"
-        "  Each step nests one self-contained per-simulation workflow.\n"
-        "requirements:\n"
-        "  SubworkflowFeatureRequirement: {}\n"
-        "inputs: {}\n"
-        "outputs:\n"
-        f"{''.join(outputs)}"
-        "steps:\n"
-        f"{''.join(steps)}"
-    )
+        steps[f"{name}_step"] = {
+            "id": f"{name}_step",
+            "label": f"Build and run sub-simulation {name}",
+            "doc": f"Nests the self-contained per-simulation workflow of {name}.",
+            "run": f"../{name}/workflow/workflow.cwl",
+            "in": {
+                key: {"default": {"class": cwl_class, "location": f"../{name}/{location}"}}
+                for key, (cwl_class, location) in _REQUIRED_SUB_SIM_INPUTS.items()
+            },
+            "out": ["input_directory", "submission_information"],
+        }
+        outputs[f"{name}_input_directory"] = {
+            "type": "Directory",
+            "outputSource": f"{name}_step/input_directory",
+            "label": f"{name} input directory",
+        }
+        outputs[f"{name}_submission_information"] = {
+            "type": "File",
+            "outputSource": f"{name}_step/submission_information",
+            "label": f"{name} submission information",
+        }
+    workflow = {
+        "cwlVersion": "v1.2",
+        "class": "Workflow",
+        "label": "PIConGPU Simulation Group Workflow",
+        "doc": (
+            "Overarching workflow that builds and runs every sub-simulation in the group.\n"
+            "Each step nests one self-contained per-simulation workflow."
+        ),
+        "requirements": {"SubworkflowFeatureRequirement": {}},
+        "inputs": {},
+        "outputs": outputs,
+        "steps": steps,
+    }
+    return yaml.safe_dump(workflow, sort_keys=False, width=120)
 
 
-class SimulationGroup:
+class SimulationGroup(BaseModel):
     """
     A group of multiple :class:`Simulation` instances.
 
@@ -117,12 +113,22 @@ class SimulationGroup:
     building and submitting every sub-simulation.
     """
 
+    simulations: list[Simulation]
+    names: list[str] | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     def __init__(self, simulations: Sequence[Simulation], names: Sequence[str] | None = None):
-        self.simulations = list(simulations)
+        super().__init__(simulations=list(simulations), names=list(names) if names is not None else None)
+
+    @model_validator(mode="after")
+    def _validate_group(self):
         if not self.simulations:
             raise ValueError("A SimulationGroup requires at least one Simulation.")
-        self.names = list(names) if names is not None else _default_names(len(self.simulations))
+        if self.names is None:
+            self.names = _default_names(len(self.simulations))
         _assert_valid_names(self.names, len(self.simulations))
+        return self
 
     def _group_workflow_path(self, group_dir: Path) -> Path:
         return group_dir / "workflow" / "group_workflow.cwl"

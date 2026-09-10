@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 import json
+import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -68,7 +69,10 @@ def simulations():
 @fixture
 def group_dir(simulations):
     with TemporaryDirectory() as d:
-        SimulationGroup(simulations).write_input_file(d, exist_ok=True)
+        # Explicit names: the default names are now unique uuids (see
+        # test_default_names_are_unique_hashed); these layout/RO-Crate tests want
+        # a deterministic layout to assert against.
+        SimulationGroup(simulations, names=["sim_00", "sim_01"]).write_input_file(d, exist_ok=True)
         yield Path(d)
 
 
@@ -80,9 +84,14 @@ def standalone_baseline():
         yield Path(d)
 
 
-def test_default_names_are_zero_padded_index(simulations):
+def test_default_names_are_unique_hashed(simulations):
     group = SimulationGroup(simulations)
-    assert group.names == ["sim_00", "sim_01"]
+    assert len(group.names) == 2
+    # 8-hex-char hash suffix per default name.
+    assert all(re.fullmatch(r"sim_[0-9a-f]{8}", name) for name in group.names)
+    # Two independent groups get independent (non-colliding) default names.
+    other = SimulationGroup(simulations)
+    assert not (set(group.names) & set(other.names))
 
 
 def test_custom_names_are_used(simulations):

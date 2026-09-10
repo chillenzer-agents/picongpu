@@ -610,6 +610,84 @@ def test_runner_roundtrips_from_runner_metadata():
     assert restored.model_dump(mode="json") == runner_json
 
 
+def _openpmd_plugin():
+    return OpenPMDPlugin(
+        sources=[
+            (_TSS, _ELECTRON),
+            (_TSS, FieldDump(name="derivedField", functor=_FUNCTOR)),
+            (_TSS, FilteredSpecies(species=_ELECTRON, functor=_FUNCTOR)),
+        ],
+        config=OpenPMDConfig(file="simData"),
+    )
+
+
+def test_openpmd_plugin_lossless_dump_is_side_effect_free():
+    # model_dump is the clean canonical form: it must not materialise the
+    # openPMD backend config file (a generation side effect) and must not carry
+    # the render-projection keys (config_filename / derived_fields)
+    plugin = _openpmd_plugin()
+    dumped = plugin.model_dump(mode="json")
+    assert set(dumped) == {"sources", "config", "type_openPMD"}
+    # no .toml written anywhere under the (possibly lazily created) setup dir
+    setup_dir = Path(plugin._setup_dir) if plugin._setup_dir is not None else None
+    assert setup_dir is None or not any(setup_dir.rglob("*.toml"))
+    # lossless round-trip
+    assert OpenPMDPlugin.model_validate(dumped).model_dump(mode="json") == dumped
+
+
+def test_openpmd_plugin_render_context_is_pure_projection():
+    plugin = _openpmd_plugin()
+    context = plugin.render_context()
+    # the render projection carries the template keys and the full state,
+    # but is a pure function of the plugin state (independent of setup_dir)
+    assert set(context) >= {"type_openPMD", "config_filename", "derived_fields", "sources", "config"}
+    assert isinstance(context["config_filename"], str) and context["config_filename"].endswith(".toml")
+    # two fresh plugins with identical state project identically (no setup_dir dependence)
+    assert plugin.render_context() == _openpmd_plugin().render_context()
+    # and the side effect (write_config_file) is separate and explicit
+    assert not any(Path(plugin.setup_dir).rglob("openPMD_config_*.toml"))
+    plugin.write_config_file()
+    assert list(Path(plugin.setup_dir).rglob("openPMD_config_*.toml"))
+
+
+def test_simulation_render_context_splices_openpmd_projection():
+    from picongpu.pypicongpu.field_solver import YeeSolver
+    from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
+    from picongpu.pypicongpu.walltime import Walltime
+
+    sim = Simulation(
+        base_density=1.0e25,
+        delta_t_si=1.0e-15,
+        time_steps=100,
+        grid=Grid3D(
+            cell_size_si=(1e-6, 1e-6, 1e-6),
+            cell_cnt=(16, 16, 16),
+            boundary_condition=(BoundaryCondition.PERIODIC,) * 3,
+            n_gpus=(1, 1, 1),
+            super_cell_size=(2, 2, 2),
+        ),
+        solver=YeeSolver(),
+        typical_ppc=4,
+        laser=None,
+        customuserinput=None,
+        moving_window=None,
+        walltime=Walltime(walltime=timedelta(hours=1)),
+        binomial_current_interpolation=False,
+        output=[_openpmd_plugin()],
+        species=[_ELECTRON],
+        init_operations=[SimpleDensity(profile=Uniform(density_si=42.0), species=[_ELECTRON], layout=Random(ppc=4))],
+    )
+    clean = sim.model_dump(mode="json")
+    render = sim.render_context()
+    # the clean form keeps the openPMD plugin in its lossless shape...
+    assert "config_filename" not in clean["output"][0]
+    # ...while the render projection splices in the openPMD render context
+    assert "config_filename" in render["output"][0]
+    assert "derived_fields" in render["output"][0]
+    # the rendering context must round-trip back to the clean form
+    assert Simulation.model_validate(render).model_dump(mode="json") == clean
+
+
 def _collision_sim():
     # a representative simulation whose collisional physics carries a real
     # (constant-log) collision, built through the picmi interaction API

@@ -187,6 +187,13 @@ class SimulationGroup:
         Generate the group (see :meth:`write_input_file`) and execute the
         overarching group workflow, building and submitting every
         sub-simulation. Mirrors ``Simulation.run``.
+
+        Unlike ``Simulation.run`` (which forwards ``flags`` to the per-simulation
+        build/submit cwltool job), the group workflow nests each sub-simulation as
+        a self-contained step fed only by its generated setup; runtime ``flags``
+        (e.g. ``jobs``, ``cmake``) reach each sub-simulation's generated
+        ``input.yaml`` but are not forwarded to the group-level build/submit
+        invocation.
         """
         group_dir = Path(group_dir)
         self.write_input_file(group_dir, exist_ok=exist_ok, **flags)

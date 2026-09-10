@@ -315,6 +315,15 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     # @todo add refactor once restarts are supported by the Runner, Brian Marre, 2024
     def step(self, nsteps: int = 1, **flags):
+        """
+        Run the simulation for ``nsteps`` time steps.
+
+        PIConGPU runs the whole workflow for the full number of time steps in
+        one go, so ``nsteps`` must equal ``max_steps``. Note that this is
+        about time stepping, not about the workflow: selecting a subset of
+        the *workflow stages* (build/prepare/submit/collect) is done via
+        ``picongpu_run(up_to=..., from_=...)`` instead.
+        """
         if nsteps != self.max_steps:
             raise ValueError(
                 "PIConGPU does not support stepwise running. Invoke step() with max_steps (={})".format(self.max_steps)
@@ -445,11 +454,39 @@ class Simulation(picmistandard.PICMI_Simulation):
     def run(self, *args, **kwargs) -> None:
         return self.picongpu_run(*args, **kwargs)
 
-    def picongpu_run(self, setup_dir=None, run_dir=None, **flags) -> None:
-        """build and run PIConGPU simulation"""
+    def picongpu_run(self, setup_dir=None, run_dir=None, up_to=None, from_=None, **flags) -> None:
+        """
+        build and run PIConGPU simulation
+
+        By default the full pipeline (build, prepare, submit, collect) is
+        executed, as before. A subset of it can be selected with the stable
+        stage vocabulary (see ``picongpu.picmi.Stage``):
+
+        - ``up_to=Stage.build``: execute only the requested stage and the
+          stages before it (a prefix of the pipeline). The workflow is passed
+          to the cwltool runner (invoked in-process via its
+          WorkflowFactory) with that stage's outputs as targets, so cwltool
+          executes exactly the steps contributing to them and never runs the
+          stages after the requested one.
+        - ``from_=Stage.submit``: resume at the requested stage. The workflow
+          is run in full against the persistent cwltool job store
+          (``<run_dir>/.cwl_cache``): the earlier stages are served from the
+          store (their inputs are byte-identical) and only the requested
+          stage and everything after it recompute.
+
+        The cwltool job store is the only state; the runner itself records
+        none. To run everything from scratch, use a fresh setup/run directory
+        (or delete ``<run_dir>``).
+        """
         runner = self.picongpu_get_runner(setup_dir=setup_dir, run_dir=run_dir)
-        runner.generate(**flags)
-        runner.run()
+        if not runner.workflow_input_path.exists():
+            runner.generate(**flags)
+        elif flags:
+            raise ValueError(
+                "the setup was already generated, so workflow flags cannot be changed afterwards; "
+                "create a fresh setup (e.g. via write_input_file()) to run with different flags"
+            )
+        runner.run(up_to=up_to, from_=from_)
 
     def picongpu_get_runner(self, **kwargs) -> Runner:
         if self._runner is None:

@@ -6,6 +6,8 @@ import sys
 
 import picmistandard
 
+from picongpu.pypicongpu import Stage
+
 from . import constants, diagnostics
 from .distribution import (
     AnalyticDistribution,
@@ -47,6 +49,7 @@ assert sys.version_info.major > 3 or sys.version_info.minor >= 11, "Python 3.11 
 
 __all__ = [
     "Simulation",
+    "Stage",
     "ParticleFunctor",
     "Cartesian3DGrid",
     "ElectromagneticSolver",

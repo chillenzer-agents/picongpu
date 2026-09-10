@@ -8,5 +8,6 @@ License: GPLv3+
 from .pmaccprinter import PMAccPrinter
 from .renderedobject import RenderedObject
 from .renderer import Renderer
+from .renderprojection import render_converts_to
 
-__all__ = ["PMAccPrinter", "Renderer", "RenderedObject"]
+__all__ = ["PMAccPrinter", "Renderer", "RenderedObject", "render_converts_to"]

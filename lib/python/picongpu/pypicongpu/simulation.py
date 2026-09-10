@@ -26,10 +26,20 @@ from .grid import Grid3D
 from .laser import AnyLaser, PlaneWaveLaser, TWTSLaser
 from .movingwindow import MovingWindow
 from .output import AnyPlugin, OpenPMDPlugin
-from .rendering import RenderedObject
+from .rendering import RenderedObject, render_converts_to
 from .walltime import Walltime
 
 
+def _render_output(self, clean):
+    # the one (b)-style minor adjustment of the Simulation render projection:
+    # splice each embedded openPMD plugin with its own render projection (a full
+    # custom projection) instead of its clean lossless serialisation, because the
+    # templates key the plugin by type_openPMD / config_filename /
+    # derived_fields, not by sources/config.
+    return self._openpmd_plugin_render_substituted(clean["output"])
+
+
+@render_converts_to(conversions={"output": _render_output})
 class Simulation(RenderedObject, BaseModel):
     """
     Represents all parameters required to build & run a PIConGPU simulation.
@@ -197,14 +207,6 @@ class Simulation(RenderedObject, BaseModel):
             custom_rendering_context["tags"].extend(tags)
 
         return custom_rendering_context
-
-    def render_context(self) -> dict[str, Any]:
-        # The one render-projection step of the Simulation that is not a simple
-        # field rename: an embedded openPMD plugin must be spliced with its own
-        # render projection (a full custom projection) instead of its clean
-        # lossless serialisation, because the templates key the plugin by
-        # type_openPMD / config_filename / derived_fields, not by sources/config.
-        return self._openpmd_plugin_render_substituted(self.model_dump(mode="json"))
 
     def spread_directory_information(self, setup_dir):
         for plugin in self.output or []:

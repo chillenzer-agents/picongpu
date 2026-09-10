@@ -285,7 +285,11 @@ class OpenPMDPlugin(BaseModel):
     def setup_dir(self, other):
         self._setup_dir = Path(other)
 
-    def _generate_config_file(self):
+    def _openpmd_sink_content(self) -> dict[str, Any]:
+        # the content of the openPMD backend configuration file, as a pure
+        # function of the plugin's state (sources + config). Kept separate from
+        # the file-writing write_config_file() so that the render projection and
+        # the (de)serialisation stay side-effect free.
         # There's some strange interaction with the custom hashing of TimeStepSpec
         # that's implemented on RenderedObject
         # hindering the storage of this data structure.
@@ -299,23 +303,29 @@ class OpenPMDPlugin(BaseModel):
             self.sources,
             {},
         )
-        content = self.config.model_dump(mode="json", exclude_none=True) | {
+        return self.config.model_dump(mode="json", exclude_none=True) | {
             "sink": {"dummy_application_name": {"period": sources}}
         }
+
+    def write_config_file(self) -> None:
+        # Materialise the openPMD backend configuration file into the setup
+        # directory. This is a side effect of *generation*, invoked once the
+        # setup dir is known (see Simulation.spread_directory_information), and
+        # deliberately NOT part of the serialisation/render path.
+        content = self._openpmd_sink_content()
         config_path = self.config_filename(content, context="setup")
         config_path.parent.mkdir(parents=True, exist_ok=True)
         with config_path.open("wb") as file:
             tomli_w.dump(content, file)
-        return content
 
-    @model_serializer(mode="plain")
-    def _get_serialized(self) -> dict[str, Any] | None:
-        content = self._generate_config_file()
-        # In addition to the rendering-relevant keys (type_openPMD,
-        # config_filename, derived_fields -- see fileOutput.param.mustache and
-        # N.cfg.mustache), carry the full plugin state (sources and config)
-        # so that the plugin can be reconstructed from its serialised form
-        # (round-trip safety); the extra keys are ignored by the templates.
+    def render_context(self) -> dict[str, Any]:
+        # the openPMD plugin's render context has no correlation with its clean
+        # lossless serialisation: the templates key it by type_openPMD /
+        # config_filename / derived_fields (fileOutput.param.mustache,
+        # N.cfg.mustache), not by sources/config. It is therefore a full custom
+        # projection (the "render_context()" tier of the hybrid), not a minor
+        # adjustment of model_dump(). Pure: it does not write the config file.
+        content = self._openpmd_sink_content()
         return {
             # one dict per (period, source) pair -- a list of lists would be
             # rejected by the rendering context checker (lists may only
@@ -332,6 +342,22 @@ class OpenPMDPlugin(BaseModel):
                 for source in self.sources
                 if isinstance(source[1], FieldDump) and source[1].functor is not None
             ),
+        }
+
+    @model_serializer(mode="plain")
+    def _get_serialized(self) -> dict[str, Any] | None:
+        # the clean, lossless canonical form: the full plugin state (sources +
+        # config + the discriminator), deserialisable back into a live plugin
+        # (round-trip safety). The render-relevant projection (config_filename,
+        # derived_fields) lives in render_context(), not here; the dict[str,
+        # Any] return type keeps the serialization schema permissive for it.
+        return {
+            "sources": [
+                {"period": period.model_dump(mode="json"), "source": source.model_dump(mode="json")}
+                for period, source in self.sources
+            ],
+            "config": self.config.model_dump(mode="json"),
+            "type_openPMD": True,
         }
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

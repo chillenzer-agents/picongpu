@@ -688,6 +688,49 @@ def test_simulation_render_context_splices_openpmd_projection():
     assert Simulation.model_validate(render).model_dump(mode="json") == clean
 
 
+def test_runner_roundtrips_with_openpmd_plugin():
+    # the Runner round-trip must also hold when the simulation carries an
+    # openPMD plugin (the one object whose clean dump differs from its render
+    # projection): the on-disk runner metadata (clean/lossless) must
+    # reconstruct into a Runner whose sim is a proper pypicongpu Simulation and
+    # re-serialises identically
+    from picongpu.pypicongpu.field_solver import YeeSolver
+    from picongpu.pypicongpu.grid import BoundaryCondition, Grid3D
+    from picongpu.pypicongpu.walltime import Walltime
+
+    sim = Simulation(
+        base_density=1.0e25,
+        delta_t_si=1.0e-15,
+        time_steps=100,
+        grid=Grid3D(
+            cell_size_si=(1e-6, 1e-6, 1e-6),
+            cell_cnt=(16, 16, 16),
+            boundary_condition=(BoundaryCondition.PERIODIC,) * 3,
+            n_gpus=(1, 1, 1),
+            super_cell_size=(2, 2, 2),
+        ),
+        solver=YeeSolver(),
+        typical_ppc=4,
+        laser=None,
+        customuserinput=None,
+        moving_window=None,
+        walltime=Walltime(walltime=timedelta(hours=1)),
+        binomial_current_interpolation=False,
+        output=[_openpmd_plugin()],
+        species=[_ELECTRON],
+        init_operations=[SimpleDensity(profile=Uniform(density_si=42.0), species=[_ELECTRON], layout=Random(ppc=4))],
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        setup = Path(tmp) / "setup"
+        Runner(sim=sim, setup_dir=setup, run_dir=Path(tmp) / "run").generate()
+        runner_json = json.loads((setup / "metadata" / "pypicongpu_runner.json").read_text())
+
+    restored = Runner.model_validate(runner_json)
+    assert isinstance(restored, Runner)
+    assert isinstance(restored.sim, Simulation)
+    assert restored.model_dump(mode="json") == runner_json
+
+
 def _collision_sim():
     # a representative simulation whose collisional physics carries a real
     # (constant-log) collision, built through the picmi interaction API

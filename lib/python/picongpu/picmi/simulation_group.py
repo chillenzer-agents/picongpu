@@ -65,14 +65,13 @@ def _generate_group_workflow(names: Sequence[str]) -> str:
         in_lines = []
         for key, (cwl_class, location) in _REQUIRED_SUB_SIM_INPUTS.items():
             in_lines.append(
-                f"      {key}:\n"
-                f"        default: {{class: {cwl_class}, location: \"../{name}/{location}\"}}\n"
+                f'      {key}:\n        default: {{class: {cwl_class}, location: "../{name}/{location}"}}\n'
             )
         steps.append(
             f"  {name}_step:\n"
             f"    id: {name}_step\n"
-            f"    label: \"Build and run sub-simulation {name}\"\n"
-            f"    doc: \"Nests the self-contained per-simulation workflow of {name}.\"\n"
+            f'    label: "Build and run sub-simulation {name}"\n'
+            f'    doc: "Nests the self-contained per-simulation workflow of {name}."\n'
             f"    run: {run}\n"
             f"    in:\n"
             f"{''.join(in_lines)}"
@@ -82,16 +81,16 @@ def _generate_group_workflow(names: Sequence[str]) -> str:
             f"  {name}_input_directory:\n"
             f"    type: Directory\n"
             f"    outputSource: {name}_step/input_directory\n"
-            f"    label: \"{name} input directory\"\n"
+            f'    label: "{name} input directory"\n'
             f"  {name}_submission_information:\n"
             f"    type: File\n"
             f"    outputSource: {name}_step/submission_information\n"
-            f"    label: \"{name} submission information\"\n"
+            f'    label: "{name} submission information"\n'
         )
     return (
         "cwlVersion: v1.2\n"
         "class: Workflow\n"
-        "label: \"PIConGPU Simulation Group Workflow\"\n"
+        'label: "PIConGPU Simulation Group Workflow"\n'
         "doc: |\n"
         "  Overarching workflow that builds and runs every sub-simulation in the group.\n"
         "  Each step nests one self-contained per-simulation workflow.\n"
@@ -192,6 +191,8 @@ class SimulationGroup:
         group_dir = Path(group_dir)
         self.write_input_file(group_dir, exist_ok=exist_ok, **flags)
         group_workflow_path = self._group_workflow_path(group_dir)
+        cwl_cache_dir = group_dir / ".cwl_cache"
+        cwl_cache_dir.mkdir(parents=True, exist_ok=True)
         logging.info("Running group workflow: %s", group_workflow_path)
         return WorkflowFactory(
             runtime_context=RuntimeContext(
@@ -199,7 +200,7 @@ class SimulationGroup:
                     "outdir": str(group_dir),
                     "rm_tmpdir": False,
                     "move_outputs": "copy",
-                    "cachedir": str(group_dir / ".cwl_cache"),
+                    "cachedir": str(cwl_cache_dir),
                     "preserve_entire_environment": True,
                 }
             )

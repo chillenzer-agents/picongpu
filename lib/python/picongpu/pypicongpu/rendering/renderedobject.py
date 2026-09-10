@@ -175,24 +175,59 @@ class RenderedObject:
         validator.check_schema(schema)
         return schema
 
-    def _get_serialized(self) -> dict | None:
+    def _openpmd_plugin_render_substituted(self, value):
         """
-        return all required content for rendering as a dict
-        :return: content as dictionary
+        Recursively walk a clean (lossless) dump and, wherever an openPMD
+        plugin appears as a dict, replace it with the plugin's render
+        projection.
+
+        This is the one minor-adjustment step of the hybrid render projection
+        that cannot be expressed as a simple field rename: the openPMD plugin's
+        render context (``type_openPMD`` / ``config_filename`` /
+        ``derived_fields``) is unrelated to its clean lossless serialisation
+        (``sources`` / ``config``), so the projection is derived from the
+        plugin's own render_context() (a full custom projection) and spliced in
+        where the clean dump embeds the plugin.
         """
-        raise NotImplementedError("called parent _get_serialized of parent RenderedObject")
+        if type(value) is list:
+            return [self._openpmd_plugin_render_substituted(entry) for entry in value]
+        if type(value) is dict:
+            if value.get("type_openPMD") is True:
+                from picongpu.pypicongpu.output.openpmd_plugin import OpenPMDPlugin
+
+                return OpenPMDPlugin.model_validate(value).render_context()
+            return {key: self._openpmd_plugin_render_substituted(item) for key, item in value.items()}
+        return value
+
+    def render_context(self) -> dict | None:
+        """
+        the rendering context of this object, projected from the clean,
+        lossless canonical serialisation.
+
+        The default projection is the identity: the clean ``model_dump(mode=
+        "json")`` already is a valid render context for most models. A model
+        whose render context needs a minor adjustment declares this via the
+        ``render_converts_to`` decorator (rename / transform / omit a small
+        number of fields); a model whose serialisation has no correlation with
+        the render context overrides this method with a full custom projection.
+
+        Unlike the canonical serialisation, the render projection is allowed
+        to be lossy and must be a pure function of the model state.
+        :return: self as a (lossy) rendering context
+        """
+        return self.model_dump(mode="json")
 
     def get_rendering_context(self) -> dict | None:
         """
         get rendering context representation of this object
 
-        delegates work to _get_serialized and invokes checks performed by
-        check_context_for_type().
+        Delegates work to render_context() (the hybrid render projection) and
+        invokes the checks performed by check_context_for_type().
         :raise ValidationError: on schema violation
         :raise RuntimeError: on schema not found
         :return: self as rendering context
         """
-        return RenderedObject.check_context_for_type(self.__class__, self.model_dump(mode="json"))
+        return RenderedObject.check_context_for_type(self.__class__, self.render_context())
 
     @staticmethod
     def check_context_for_type(type_to_check: type, context: dict | None):

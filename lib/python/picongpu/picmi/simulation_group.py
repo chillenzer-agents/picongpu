@@ -7,7 +7,6 @@ License: GPLv3+
 
 import logging
 from datetime import datetime, timezone
-from os import PathLike
 from pathlib import Path
 from typing import Sequence
 from uuid import uuid4
@@ -15,7 +14,7 @@ from uuid import uuid4
 import yaml
 from cwltool.context import RuntimeContext
 from cwltool.factory import Factory as WorkflowFactory
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, model_validator
 from rocrate.model import SoftwareApplication
 from rocrate.rocrate import ROCrate
 
@@ -40,6 +39,14 @@ _REQUIRED_SUB_SIM_INPUTS = {
     "run_project_path": ("Directory", "."),
 }
 
+# The per-simulation outputs exposed by the group workflow, keyed by the suffix
+# appended to the (unique) simulation name; maps to (CWL type, human label).
+# Ordered so each simulation's `input_directory` precedes its `submission_information`.
+_GROUP_OUTPUT_DEFS = {
+    "input_directory": ("Directory", "input directory"),
+    "submission_information": ("File", "submission information"),
+}
+
 
 def _default_names(count: int) -> list[str]:
     return [f"sim_{uuid4().hex[:8]}" for _ in range(count)]
@@ -60,10 +67,8 @@ def _assert_valid_names(names: Sequence[str], count: int) -> None:
 
 
 def _generate_group_workflow(names: Sequence[str]) -> str:
-    steps = {}
-    outputs = {}
-    for name in names:
-        steps[f"{name}_step"] = {
+    steps = {
+        f"{name}_step": {
             "id": f"{name}_step",
             "label": f"Build and run sub-simulation {name}",
             "doc": f"Nests the self-contained per-simulation workflow of {name}.",
@@ -74,16 +79,17 @@ def _generate_group_workflow(names: Sequence[str]) -> str:
             },
             "out": ["input_directory", "submission_information"],
         }
-        outputs[f"{name}_input_directory"] = {
-            "type": "Directory",
-            "outputSource": f"{name}_step/input_directory",
-            "label": f"{name} input directory",
+        for name in names
+    }
+    outputs = {
+        f"{name}_{suffix}": {
+            "type": cwl_type,
+            "outputSource": f"{name}_step/{suffix}",
+            "label": f"{name} {label}",
         }
-        outputs[f"{name}_submission_information"] = {
-            "type": "File",
-            "outputSource": f"{name}_step/submission_information",
-            "label": f"{name} submission information",
-        }
+        for name in names
+        for suffix, (cwl_type, label) in _GROUP_OUTPUT_DEFS.items()
+    }
     workflow = {
         "cwlVersion": "v1.2",
         "class": "Workflow",
@@ -114,26 +120,26 @@ class SimulationGroup(BaseModel):
     """
 
     simulations: list[Simulation]
-    names: list[str] | None = None
+    names: list[str]
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    def __init__(self, simulations: Sequence[Simulation], names: Sequence[str] | None = None):
-        super().__init__(simulations=list(simulations), names=list(names) if names is not None else None)
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_default_names(cls, data):
+        if isinstance(data, dict) and (data.get("names") is None or "names" not in data):
+            data = {**data, "names": _default_names(len(data.get("simulations") or []))}
+        return data
 
     @model_validator(mode="after")
     def _validate_group(self):
         if not self.simulations:
             raise ValueError("A SimulationGroup requires at least one Simulation.")
-        if self.names is None:
-            self.names = _default_names(len(self.simulations))
         _assert_valid_names(self.names, len(self.simulations))
         return self
 
     def _group_workflow_path(self, group_dir: Path) -> Path:
         return group_dir / "workflow" / "group_workflow.cwl"
 
-    def write_input_file(self, group_dir: str | PathLike, exist_ok=False, **flags) -> None:
+    def write_input_file(self, group_dir: str | Path, exist_ok=False, **flags) -> None:
         """
         Generate a PIConGPU input set for every sub-simulation and the overarching
         group workflow + root RO-Crate.
@@ -188,7 +194,7 @@ class SimulationGroup(BaseModel):
 
         crate.metadata.write(group_dir)
 
-    def run(self, group_dir: str | PathLike, exist_ok=False, **flags) -> None:
+    def run(self, group_dir: str | Path, exist_ok=False, **flags) -> None:
         """
         Generate the group (see :meth:`write_input_file`) and execute the
         overarching group workflow, building and submitting every

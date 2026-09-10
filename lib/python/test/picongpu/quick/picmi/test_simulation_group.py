@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 from cwltool.context import RuntimeContext
 from cwltool.factory import Factory, WorkflowStatus
 from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation, SimulationGroup
+from picongpu.picmi import simulation_group as _simulation_group
 from pytest import fixture, raises
 from rocrate_validator.services import validate
 
@@ -128,6 +129,31 @@ def test_root_rocrate_points_at_each_subcrate_via_has_content_section(group_dir)
 def test_each_subcrate_keeps_its_own_main_entity(group_dir):
     for name in ("sim_00", "sim_01"):
         assert _main_entity_id(_root_dataset(group_dir / name)) == "workflow/workflow.cwl"
+
+
+def test_run_creates_cwl_cache_dir_before_invoking_cwltool(simulations, monkeypatch):
+    # Regression: `run()` must create `<group_dir>/.cwl_cache` before handing it
+    # to cwltool as `cachedir`; otherwise cwltool fails to open the per-step job
+    # cache lock on a fresh dir (FileNotFoundError -> permanentFail).
+    captured = {}
+
+    class _StubFactory:
+        def __init__(self, runtime_context):
+            captured["cachedir"] = runtime_context.cachedir
+
+        def make(self, _path):
+            def _run(*_args, **_kwargs):
+                return None
+
+            return _run
+
+    monkeypatch.setattr(_simulation_group, "WorkflowFactory", _StubFactory)
+    with TemporaryDirectory() as d:
+        d = Path(d)
+        SimulationGroup(simulations).run(d, exist_ok=True)
+        cache = Path(captured["cachedir"])
+        assert cache == d / ".cwl_cache"
+        assert cache.is_dir()
 
 
 def test_group_workflow_passes_cwltool_validate_only(group_dir):

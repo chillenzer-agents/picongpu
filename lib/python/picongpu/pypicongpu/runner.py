@@ -15,8 +15,6 @@ from pathlib import Path
 from shutil import copy2, copytree
 from typing import Annotated, Sequence
 
-from cwltool.context import RuntimeContext
-from cwltool.factory import Factory as WorkflowFactory
 from pydantic import (
     AfterValidator,
     AliasChoices,
@@ -30,6 +28,7 @@ from rocrate.rocrate import ROCrate
 from picongpu import core, rc_params
 from picongpu.templates import path as tpath
 
+from .cwl import CWLWorkflow
 from .rendering import Renderer
 from .simulation import Simulation
 from .util import alt
@@ -296,6 +295,10 @@ class Runner(BaseModel):
     def cwl_cachedir(self):
         return self.run_dir / ".cwl_cache"
 
+    @property
+    def provenance_path(self):
+        return self.run_dir / "provenance"
+
     def generate_profile(self):
         self.profile_path.parent.mkdir(parents=True, exist_ok=True)
         generate_bare_profile(self.profile_path)
@@ -451,15 +454,24 @@ class Runner(BaseModel):
         """
         run compiled picongpu simulation
         """
-        with self.workflow_input_path.open("r") as file:
-            return WorkflowFactory(
-                runtime_context=RuntimeContext(
-                    kwargs={
-                        "outdir": str(self.run_dir),
-                        "rm_tmpdir": False,
-                        "move_outputs": "copy",
-                        "cachedir": str(self.cwl_cachedir),
-                        "preserve_entire_environment": True,
-                    }
-                )
-            ).make(str(self.workflow_definition_path))(**json.load(file))
+        # cwltool provenance (a Research Object) is tracked in-process and written to
+        # `run_dir/provenance/`. It is on by default and configured via the `[provenance]`
+        # table of rc_params (see `.picongpurc.toml`); set `enabled = false` to opt out.
+        # The cwltool-specific workflow execution and provenance wiring live in
+        # :class:`picongpu.pypicongpu.cwl.CWLWorkflow`; this method only handles the
+        # rc_params config surface and hands off the workflow locations.
+        raw_provenance = rc_params.get("provenance", {}) or {}
+        if not isinstance(raw_provenance, dict):
+            logging.warning(
+                "[provenance] the rc_params 'provenance' table must be a dict; got %s; using defaults",
+                type(raw_provenance).__name__,
+            )
+            raw_provenance = {}
+        return CWLWorkflow(
+            workflow_definition=self.workflow_definition_path,
+            workflow_input=self.workflow_input_path,
+            run_dir=self.run_dir,
+            cwl_cachedir=self.cwl_cachedir,
+            provenance_path=self.provenance_path,
+            provenance_config=raw_provenance,
+        ).run()

@@ -17,105 +17,77 @@
 # along with PIConGPU.
 # If not, see <http://www.gnu.org/licenses/>.
 #
-# last updated: 2025-01-06
+# Dependency installation for perlmutter / NERSC.
+#
+# Thin wrapper around the shared, parameterised installer
+# etc/picongpu/dependencies/picongpu-deps.sh (DRAFT).
+#
+# NOTE: DRAFT - reproduces the old per-cluster install *in intent*, but the
+# shared installer has only been validated locally so far; run at least
+# `bash <this script> --list` and a dry cache-hit run before relying on it.
+#
+# Scope (matches the old perlmutter script): the cluster modules provide
+# libpng, HDF5 and FFTW, so only boost, c-blosc2, pngwriter, adios2 and
+# openpmd are built; openPMD is built with the module's (parallel) HDF5.
+#
+# The wrapper sources $PIC_PROFILE (the shared installer does so again,
+# which is harmless) so that the cluster settings below can use the
+# profile's variables ($CFS/$proj, $MPI_CXX, ...).
 
-PIC_BRANCH="dev"
-PROJECT=$proj
-echo $PROJECT
-
-# get PIConGPU profile
-if [ ! -f "$PIC_PROFILE" ]; then
-    printf "Source a profile!\n"
+if [ -z "${PIC_PROFILE:-}" ] || [ ! -f "${PIC_PROFILE:-}" ]; then
+    printf 'Set PIC_PROFILE to your PIConGPU profile (e.g. etc/picongpu/perlmutter-nersc/gpu.profile.example)!\n'
     exit 1
-else
-    source "$PIC_PROFILE"
+fi
+# shellcheck disable=SC1090
+source "$PIC_PROFILE"
+
+# cluster-specific settings for the shared installer
+export DEPS_JOBS=${DEPS_JOBS:-16}
+# shared source cache on the scratch filesystem (fetch once per cluster)
+if [ -n "${CFS:-}" ] && [ -n "${proj:-}" ]; then
+    export DEPS_SOURCE_CACHE=${DEPS_SOURCE_CACHE:-"$CFS/$proj/$USER/deps-sources"}
+fi
+# perlmutter uses MPICH; the old script patched ADIOS2's client/server check
+export DEPS_ADIOS2_PATCH_CLIENT_SERVER=1
+# modules provide libpng/HDF5/FFTW; build the rest (old script's scope)
+export DEPS_ONLY=${DEPS_ONLY:-boost,c-blosc2,pngwriter,adios2,openpmd}
+# the module's parallel HDF5 is not at a DEPS/HDF5_ROOT location, so tell
+# openPMD to enable the HDF5 backend explicitly (the old script hardcoded ON)
+export DEPS_OPENPMD_USE_HDF5=${DEPS_OPENPMD_USE_HDF5:-ON}
+
+# The old perlmutter script pointed ADIOS2/openPMD at this MPI library:
+#   -DMPI_mpi_gnu_123_LIBRARY=${MPICH_DIR}/lib/libmpi_gnu_123.so
+# Default the equivalent DEPS_CMAKE_EXTRA_* flags when the library exists
+# (the profile's MPI module must be loaded, as by sourcing the profile).
+if [ -z "${DEPS_CMAKE_EXTRA_ADIOS2:-}" ]; then
+    _deps_mpi_cxx="${MPI_CXX:-}"
+    if [ ! -x "$_deps_mpi_cxx" ]; then
+        _deps_mpi_cxx=$(command -v mpicxx 2>/dev/null || true)
+    fi
+    if [ -n "$_deps_mpi_cxx" ]; then
+        _deps_mpi_prefix=$(cd "$(dirname "$_deps_mpi_cxx")/.." 2>/dev/null && pwd)
+    fi
+    if [ -n "${_deps_mpi_prefix:-}" ] && [ -f "$_deps_mpi_prefix/lib/libmpi_gnu_123.so" ]; then
+        export DEPS_CMAKE_EXTRA_ADIOS2="-DMPI_mpi_gnu_123_LIBRARY=$_deps_mpi_prefix/lib/libmpi_gnu_123.so"
+        export DEPS_CMAKE_EXTRA_OPENPMD="-DMPI_mpi_gnu_123_LIBRARY=$_deps_mpi_prefix/lib/libmpi_gnu_123.so"
+    else
+        printf '[deps] note: <mpi prefix>/lib/libmpi_gnu_123.so not found; the legacy -DMPI_mpi_gnu_123_LIBRARY hint is not set. Override via DEPS_CMAKE_EXTRA_ADIOS2 / DEPS_CMAKE_EXTRA_OPENPMD if needed.\n' >&2
+    fi
 fi
 
-set -euf -o pipefail
-# create temporary directory for software source files
-export SOURCE_DIR="$CFS/$PROJECT/$USER/lib_run_tmp"
-mkdir -p $SOURCE_DIR
-# Boost
-if [ ! -d "$BOOST_ROOT" ]; then
-    cd $SOURCE_DIR
-    curl -L -s -o boost_1_87_0.tar.gz \
-        https://archives.boost.io/release/1.87.0/source/boost_1_87_0.tar.gz
-    tar -xzf boost_1_87_0.tar.gz
-    cd boost_1_87_0/
-    ./bootstrap.sh --with-libraries=atomic,chrono,context,date_time,fiber,filesystem,math,program_options,serialization,system,thread --prefix=$BOOST_ROOT \
-        CC=$(which cc) CXX=$(which CC)
-    ./b2 cxxflags="-std=c++20" -j 10 && ./b2 install
+DEPS_INSTALLER=""
+for cand in \
+    "${PICSRC:-}/etc/picongpu/dependencies/picongpu-deps.sh" \
+    "$(cd "$(dirname "${BASH_SOURCE[0]}")/../dependencies" && pwd)/picongpu-deps.sh"; do
+    if [ -f "$cand" ]; then
+        DEPS_INSTALLER=$cand
+        break
+    fi
+done
+if [ -z "$DEPS_INSTALLER" ]; then
+    printf 'Could not find the shared installer etc/picongpu/dependencies/picongpu-deps.sh.\n'
+    printf 'Set PICSRC to your PIConGPU checkout, or run it from a checkout of PIConGPU.\n'
+    exit 1
 fi
 
-#   c-blosc
-if [ ! -d "$BLOSC_ROOT" ]; then
-    cd $SOURCE_DIR
-    git clone -b v2.22.0 https://github.com/Blosc/c-blosc2.git \
-        $SOURCE_DIR/c-blosc
-    mkdir c-blosc-build
-    cd c-blosc-build
-    cmake -DCMAKE_INSTALL_PREFIX=$BLOSC_ROOT \
-        -DMPI_C_COMPILER=cc -DMPI_CXX_COMPILER=CC \
-        $SOURCE_DIR/c-blosc
-    make -j 16 install
-fi
-
-#   PNGwriter
-if [ ! -d "$PNGwriter_ROOT" ]; then
-    cd $SOURCE_DIR
-    git clone -b 0.7.0 https://github.com/pngwriter/pngwriter.git \
-        $SOURCE_DIR/pngwriter
-    mkdir pngwriter-build
-    cd pngwriter-build
-    cmake -DCMAKE_INSTALL_PREFIX=$PNGwriter_ROOT \
-        $SOURCE_DIR/pngwriter
-    make -j 16 install
-fi
-
-
-#   ADIOS2
-# force usage of MPI and HDF5 and point directly to MPI headers and libraries
-if [ ! -d "$ADIOS2_ROOT" ]; then
-    cd $SOURCE_DIR
-    git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git \
-        $SOURCE_DIR/adios2
-        cd $SOURCE_DIR/adios2
-        sed -i 's|if (ADIOS2_HAVE_MPI_CLIENT_SERVER)|if (TRUE)|' cmake/DetectOptions.cmake
-    mkdir $SOURCE_DIR/adios2-build
-    cd $SOURCE_DIR/adios2-build
-    cmake $SOURCE_DIR/adios2 -DADIOS2_BUILD_EXAMPLES=OFF \
-        -DCMAKE_INSTALL_PREFIX=$ADIOS2_ROOT -DADIOS2_USE_Fortran=OFF \
-        -DADIOS2_USE_BZip2=OFF \
-        -DADIOS2_USE_MPI=ON -DADIOS2_USE_HDF5=ON \
-        -DMPI_CXX_COMPILER=$(which CC) -DMPI_C_COMPILER=$(which cc) \
-        -DMPI_CXX_HEADER_DIR=${MPICH_DIR}/include \
-        -DMPI_C_HEADER_DIR=${MPICH_DIR}/include \
-        -DMPI_mpi_gnu_123_LIBRARY=${MPICH_DIR}/lib/libmpi_gnu_123.so
-    make -j 16 && make install
-fi
-
-#   openPMD-api
-if [ ! -d "OPENPMD_ROOT" ]; then
-    cd $SOURCE_DIR
-    git clone -b 0.17.1 https://github.com/openPMD/openPMD-api.git \
-        $SOURCE_DIR/openpmd-api
-    mkdir $SOURCE_DIR/openpmd-api-build
-    cd $SOURCE_DIR/openpmd-api-build
-    cmake $SOURCE_DIR/openpmd-api \
-                -DopenPMD_USE_HDF5=ON  -DopenPMD_USE_ADIOS2=ON \
-        -DBUILD_EXAMPLES=OFF -DBUILD_TESTING=OFF \
-        -DMPI_CXX_COMPILER=$(which CC) -DMPI_C_COMPILER=$(which cc) \
-        -DMPI_CXX_HEADER_DIR=${MPICH_DIR}/include \
-        -DMPI_C_HEADER_DIR=${MPICH_DIR}/include \
-        -DMPI_mpi_gnu_123_LIBRARY=${MPICH_DIR}/lib/libmpi_gnu_123.so \
-        -DCMAKE_INSTALL_PREFIX="$OPENPMD_ROOT"
-    make -j 16 install
-fi
-
-
-# message to user
-echo ''
-echo 'edit user & email within picongpu.profile, e.g. via:'
-echo '    vim $PIC_PROFILE'
-echo 'delete temporary folder for library compilation'
-printf "    rm -rf %s\n" $SOURCE_DIR
+exec bash "$DEPS_INSTALLER" "$@"

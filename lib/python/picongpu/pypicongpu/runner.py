@@ -28,6 +28,7 @@ from pydantic import (
 from rocrate.rocrate import ROCrate
 
 from picongpu import core, rc_params
+from picongpu.dependencies import DependenciesConfig
 from picongpu.templates import path as tpath
 
 from .rendering import Renderer
@@ -307,10 +308,36 @@ class Runner(BaseModel):
         self.profile_path.parent.mkdir(parents=True, exist_ok=True)
         generate_bare_profile(self.profile_path)
 
+    def _deps_commands(self, rc_params=rc_params, env_only=False):
+        """
+        DRAFT: optional dependency installation (see picongpu.dependencies).
+
+        Disabled by default, so existing behaviour is unchanged. When
+        enabled, the build script installs the missing compiled C++
+        dependencies into a shared, toolchain-keyed cache and the
+        (build and run) scripts source the resulting environment.
+        """
+        deps = DependenciesConfig.from_rc_params(rc_params)
+        if not deps.enabled:
+            return []
+        if not deps.active:
+            # enabled, but the provider is not wired into the generated
+            # scripts yet: say so instead of being a silent no-op
+            return [
+                f"echo \"[picongpu-deps] WARNING: [dependencies].provider = '{deps.provider}' is not wired into the generated scripts yet; no dependencies are installed or loaded\"",
+            ]
+        install_root = Path(deps.prefix) if deps.prefix else self.setup_dir / "deps"
+        if env_only:
+            return deps.env_commands(install_root)
+        deps_script = self.setup_dir / "etc" / "picongpu" / "dependencies" / "picongpu-deps.sh"
+        if not deps_script.is_file():
+            deps_script = core.path("etc") / "picongpu" / "dependencies" / "picongpu-deps.sh"
+        return deps.install_commands(deps_script, install_root)
+
     def generate_build_command(self, rc_params=rc_params):
         self.build_script_path.parent.mkdir(parents=True, exist_ok=True)
         with self.build_script_path.open("w") as script:
-            script.write(script_content_with("pic-build $@", rc_params=rc_params))
+            script.write(script_content_with([*self._deps_commands(rc_params), "pic-build $@"], rc_params=rc_params))
             script.flush()
         chmod(self.build_script_path, 0o755)
 
@@ -321,6 +348,7 @@ class Runner(BaseModel):
                 script_content_with(
                     [
                         f'export PIC_PROFILE="{self.profile_path}"',
+                        *self._deps_commands(rc_params, env_only=True),
                         "tbg $@ . run_dir",
                     ],
                     rc_params=rc_params,
@@ -336,6 +364,7 @@ class Runner(BaseModel):
                 script_content_with(
                     [
                         "cp -r tbg_link tbg",
+                        *self._deps_commands(rc_params, env_only=True),
                         'submission_script="./tbg/submit.start"',
                         'submission_cmd="$1"',
                         # This step runs in isolation: its working directory is

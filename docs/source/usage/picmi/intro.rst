@@ -190,7 +190,55 @@ Parameters/Methods prefixed with ``picongpu_`` are PIConGPU-exclusive.
 
     If neither is set a warning is printed prompting for either of the options above.
 
-    
+  - **MultiSpecies**
+
+    Species are initialised **independently by default** (picmi-standard
+    semantics). To initialise several species *collectively* -- i.e. with
+    **identical in-cell positions** on the C++ level, as required for
+    charge-neutral setups -- group them in a
+    :class:`picongpu.picmi.MultiSpecies`.
+
+    All members of a ``MultiSpecies`` share one ``initial_distribution``. They
+    are placed with a single ``CreateDensity``; the remaining members are
+    derived (``ManipulateDerive<DensityWeighting>``), so all members occupy
+    exactly the same positions once. Each member's ``proportion`` maps to its
+    ``density_scale`` (i.e. its ``DensityRatio``) and is respected in the
+    weighting. Momentum/temperature differences between members do **not**
+    prevent collective initialisation (momentum is applied per species,
+    afterwards).
+
+    Members whose pseudo-random layouts differ in ``seed`` are deliberately
+    initialised **independently** (non-neutral on purpose) -- the ``seed`` of
+    :class:`picongpu.picmi.PseudoRandomLayout` is therefore a
+    force-independent discriminator.
+
+    .. warning::
+
+      The ``seed`` is a **grouping discriminator only**. It is never forwarded
+      to the C++ random number generator: for a *single* random layout it has no
+      runtime effect at all (a layout with ``seed`` renders byte-identically to
+      one without; positions are neither reproducible from the ``seed`` nor
+      disjoint from those of other species -- all random draws come from the same
+      externally-seeded device RNG stream). It only matters across species: two
+      equal-``ppc`` random layouts with different seeds are *not* merged, i.e.
+      the involved species are initialised independently.
+
+  **Migration note.** PIConGPU used to initialise two or more species
+  *collectively* (identical in-cell positions, e.g. charge-neutral electron/ion
+  setups) whenever they shared the same ``initial_distribution`` *and* the
+  same ``layout`` -- an implicit heuristic. With this release species are
+  initialised **independently by default**, so previously-colocated random-layout
+  species now draw their own random in-cell positions (no longer automatically
+  charge-neutral). PIConGPU issues a ``UserWarning`` when it detects species for
+  which the old implicit merging would have applied; to keep the previous
+  (collective, charge-neutral) behaviour, wrap those species in a
+  :class:`picongpu.picmi.MultiSpecies`. Collective initialisation (including the
+  fix for same-density/differing-momentum species, which keeps positions
+  charge-neutral) is **exclusively available through an explicit
+  ``MultiSpecies``** -- plain species are never grouped, no matter how similar
+  their distributions look.
+
+
 Ionization:
 ^^^^^^^^^^^
 The PIConGPU PICMI interface currently supports the configuration of ionization only through a picongpu specific PICMI extension, not the in the PICMI standard defined interface, due to the lack of standardization of ionization algorithm names in the PICMI standard.

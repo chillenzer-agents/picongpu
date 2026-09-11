@@ -34,6 +34,7 @@ from picongpu.picmi.species_requirements import (
     get_as_pypicongpu,
     resolving_add,
     run_construction,
+    warn_would_have_merged_species,
 )
 from picongpu.pypicongpu.output.openpmd_plugin import FieldDump as PyPIConGPUFieldDump
 from picongpu.pypicongpu.output.openpmd_plugin import OpenPMDPlugin
@@ -481,6 +482,10 @@ class Simulation(picmistandard.PICMI_Simulation):
 
 
 def organise_init_operations(operations):
+    # materialise -- the legacy-heuristic detection below consumes the (likely
+    # lazy) sequence once, and resolving_add is multi-pass as well
+    operations = list(operations)
+    warn_would_have_merged_species(operations)
     cleaned = []
     for op in operations:
         cleaned = resolving_add(op, cleaned)

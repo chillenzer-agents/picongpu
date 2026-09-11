@@ -23,7 +23,9 @@ from pydantic import (
     BaseModel,
     BeforeValidator,
     Field,
+    computed_field,
     field_serializer,
+    model_validator,
 )
 from rocrate.rocrate import ROCrate
 
@@ -185,9 +187,13 @@ class Runner(BaseModel):
 
     Where:
 
-    - run_dir: directory where data for an execution is stored
-    - setup_dir: directory where data is generated to and the simulation
-      executable is built
+    - run_dir: the single, user-facing run directory. It holds the
+      generated input (under ``input/``), the compiled binaries
+      (``input/bin``) and all results of the execution.
+    - setup_dir: *read-only*, computed as ``run_dir / "input"`` -- the
+      directory the setup (templates, ``etc``, ``workflow``, ``metadata``,
+      ...) is generated into. It is no longer a settable location; use
+      ``run_dir`` instead.
 
     These dirs are either copied from params or guessed.
     See __init__() for a detailed description.
@@ -215,13 +221,38 @@ class Runner(BaseModel):
     """
 
     template_dir: Annotated[Sequence[Path], AfterValidator(lambda t: tuple(p.absolute() for p in t))] = (tpath(),)
-    setup_dir: Annotated[Path, AfterValidator(Path.absolute)] = Field(
-        default_factory=lambda: Path(get_tmpdir_with_name("setup")).absolute()
-    )
     run_dir: Annotated[Path, AfterValidator(Path.absolute)] = Field(
         default_factory=lambda: Path(get_tmpdir_with_name("run")).absolute()
     )
     sim: Annotated[Simulation, BeforeValidator(lambda s: alt(lambda: s.get_as_pypicongpu(), s))]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_setup_dir(cls, data):
+        """
+        ``setup_dir`` is read-only (computed as ``run_dir / "input"``). A
+        supplied ``setup_dir`` is a leftover from the removed two-dir
+        model, so reject it loudly instead of silently ignoring it.
+        """
+        if isinstance(data, dict) and "setup_dir" in data and data["setup_dir"] is not None:
+            raise ValueError(
+                "setup_dir can no longer be set directly: it is derived from run_dir "
+                f"(run_dir / 'input'); pass run_dir instead (got setup_dir={data['setup_dir']!r})."
+            )
+        return data
+
+    @computed_field
+    @property
+    def setup_dir(self) -> Path:
+        """
+        The directory the setup is generated into: ``run_dir / "input"``.
+
+        Read-only: ``setup_dir`` is derived from ``run_dir`` and can no
+        longer be set directly. Assigning to it raises an error, and
+        passing ``setup_dir=...`` to the constructor raises a
+        ``ValueError``; set ``run_dir`` instead.
+        """
+        return self.run_dir / "input"
 
     def _log_dirs(self):
         """print human-readble list of paths to log"""
@@ -420,7 +451,7 @@ class Runner(BaseModel):
 
         if not exist_ok:
             assert not self.setup_dir.is_dir(), (
-                "setup directory must not exist before generation -- did you call generate() already?"
+                "input directory (run_dir/input) must not exist before generation -- did you call generate() already?"
             )
         preset = rc_params.preset_dir
         copytree(

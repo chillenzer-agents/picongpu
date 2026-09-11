@@ -8,6 +8,7 @@ License: GPLv3+
 from picongpu.picmi.copy_attributes import converts_to
 from picongpu.pypicongpu.species.operation.densityprofile.gaussian import Gaussian
 from ...pypicongpu import util
+from ...pypicongpu.validation import positive
 
 from .Distribution import Distribution
 
@@ -76,8 +77,7 @@ class GaussianDistribution(Distribution):
         util.unsupported("upper bound", self.upper_bound, (None, None, None))
         if self.center_rear < self.center_front:
             raise ValueError("center_front must be <= center_rear")
-        if self.density <= 0.0:
-            raise ValueError("density must be > 0")
+        positive(self.density, field="density")
 
     def __call__(self, x, y, z):
         if self.cell_size is None:

@@ -5,11 +5,11 @@ Authors: Hannes Troepgen, Brian Edward Marre
 License: GPLv3+
 """
 
-import re
 from pydantic import BaseModel, computed_field, field_validator
 from enum import Enum
 
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant
+from picongpu.pypicongpu.validation import validate_cpp_identifier
 
 from ..rendering import RenderedObject
 from .attribute import Attribute, Momentum, Position
@@ -155,14 +155,8 @@ class Species(RenderedObject, BaseModel):
         """
 
         # name c++ compatible
-        # quick excursion to re.[match, fullmatch, search]:
-        # - re.search: match *anywhere* in the string
-        # - re.match: match *full* string, but ignore trailing newline (WTF?)
-        #   -> "abc\n" would be accepted (despite "$" at the end)
-        # - re.fullmatch: match *actually* full string
-        #   -> "abc\n" is rejected
-        if not re.fullmatch(r"^[A-Za-z0-9_]+$", self.name):
-            raise ValueError("species names must be c++ compatible ([A-Za-z0-9_]+)")
+        # (a leading digit is allowed because the rendered name is prefixed with "species_")
+        validate_cpp_identifier(self.name, field="species name", prefix="species_")
 
         # position is mandatory attribute
         # position

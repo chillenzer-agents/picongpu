@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 from picongpu.picmi.copy_attributes import default_converts_to
 
 from ...pypicongpu.output.checkpoint import Checkpoint as PyPIConGPUCheckpoint
+from ...pypicongpu.validation import at_least_one_of
 from .timestepspec import TimeStepSpec
 
 
@@ -69,8 +70,10 @@ class Checkpoint(BaseModel):
 
     @model_validator(mode="after")
     def _validate(self):
-        if self.period is None and self.timePeriod is None:
-            raise ValueError("At least one of period or timePeriod must be provided")
+        at_least_one_of(
+            {"period": self.period is not None, "timePeriod": self.timePeriod is not None},
+            message="At least one of period or timePeriod must be provided",
+        )
         return self
 
     def check(self, *args, **kwargs):

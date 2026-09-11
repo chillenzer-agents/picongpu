@@ -15,6 +15,7 @@ from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species
 from picongpu.pypicongpu.output.phase_space import PhaseSpace as PyPIConGPUPhaseSpace
+from picongpu.pypicongpu.validation import less_than
 
 
 def _unfiltered_species(species: Species | FilteredSpecies) -> Species:
@@ -75,7 +76,6 @@ class PhaseSpace(BaseModel):
     max_momentum: float
 
     def check(self, *args, **kwargs):
-        if self.min_momentum >= self.max_momentum:
-            raise ValueError("min_momentum must be less than max_momentum")
+        less_than(self.min_momentum, self.max_momentum, lesser_field="min_momentum", greater_field="max_momentum")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

@@ -23,6 +23,7 @@ from picongpu.pypicongpu.output.radiation import (
 )
 from picongpu.pypicongpu.species.attribute.momentum_prev_1 import MomentumPrev1
 from picongpu.pypicongpu.species.attribute.radiation_mask import RadiationMask
+from picongpu.pypicongpu.validation import as_list
 
 
 class Radiation(RadiationPluginConfig):
@@ -32,7 +33,7 @@ class Radiation(RadiationPluginConfig):
     @field_validator("species", mode="before")
     @classmethod
     def _validate_species(cls, value):
-        return [value] if isinstance(value, Species) else value
+        return as_list(value, Species, field="species")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -7,11 +7,12 @@ License: GPLv3+
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
 from picongpu.pypicongpu.species import Species
+from picongpu.pypicongpu.validation import less_than
 
 
 class EnergyHistogram(BaseModel):
@@ -22,3 +23,8 @@ class EnergyHistogram(BaseModel):
     max_energy: float
 
     type_energyhistogram: Literal[True] = True
+
+    @model_validator(mode="after")
+    def check(self):
+        less_than(self.min_energy, self.max_energy, lesser_field="min_energy", greater_field="max_energy")
+        return self

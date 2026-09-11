@@ -33,18 +33,18 @@ namespace picongpu::fields::incidentField
         static constexpr float_X LASER_PHASE = {{{phase}}}; // unitless
 
         static constexpr float_64 propagation_direction[3u] = {
-                {{#propagation_direction}}
-                {{{component}}}{{^_last}},{{/_last}}
-                {{/propagation_direction}}
+                {{{propagation_direction.x}}},
+                {{{propagation_direction.y}}},
+                {{{propagation_direction.z}}}
             };
         static constexpr float_64 DIRECTION_X = propagation_direction[0];
         static constexpr float_64 DIRECTION_Y = propagation_direction[1];
         static constexpr float_64 DIRECTION_Z = propagation_direction[2];
 
         static constexpr float_64 focus_position[3u] = {
-                {{#focus_pos_si}}
-                {{{component}}}{{^_last}},{{/_last}}
-                {{/focus_pos_si}}
+                {{{focus_pos_si.x}}},
+                {{{focus_pos_si.y}}},
+                {{{focus_pos_si.z}}}
             };
         static constexpr float_64 FOCUS_POSITION_X_SI = focus_position[0];
         static constexpr float_64 FOCUS_POSITION_Y_SI = focus_position[1];
@@ -53,9 +53,9 @@ namespace picongpu::fields::incidentField
         static constexpr PolarisationType Polarisation = PolarisationType::{{{polarization_type}}};
 
         static constexpr float_64 polarisation_direction[3u] = {
-                {{#polarization_direction}}
-                {{{component}}}{{^_last}},{{/_last}}
-                {{/polarization_direction}}
+                {{{polarization_direction.x}}},
+                {{{polarization_direction.y}}},
+                {{{polarization_direction.z}}}
             };
         static constexpr float_64 POLARISATION_DIRECTION_X = polarisation_direction[0];
         static constexpr float_64 POLARISATION_DIRECTION_Y = polarisation_direction[1];
@@ -71,12 +71,12 @@ namespace picongpu::fields::incidentField
         static constexpr uint32_t numModes = {{{modenumber}}};
         static constexpr auto laguerreModes = floatN_X<numModes+1>(
             {{#laguerre_modes}}
-            {{{component}}}{{^_last}},{{/_last}}
+            {{{value}}}{{^_last}},{{/_last}}
             {{/laguerre_modes}}
             );
         static constexpr auto laguerrePhases = floatN_X<numModes+1>(
             {{#laguerre_phases}}
-            {{{component}}}{{^_last}},{{/_last}}
+            {{{value}}}{{^_last}},{{/_last}}
             {{/laguerre_phases}}
             );
     };
@@ -116,18 +116,18 @@ namespace picongpu::fields::incidentField
         static constexpr char const* propagationAxisOpenPMD = "{{{propagationAxisOpenPMD}}}";
 
         static constexpr float_64 propagation_direction[3u] = {
-                {{#propagation_direction}}
-                {{{component}}}{{^_last}},{{/_last}}
-                {{/propagation_direction}}
+                {{{propagation_direction.x}}},
+                {{{propagation_direction.y}}},
+                {{{propagation_direction.z}}}
             };
         static constexpr float_64 DIRECTION_X = propagation_direction[0];
         static constexpr float_64 DIRECTION_Y = propagation_direction[1];
         static constexpr float_64 DIRECTION_Z = propagation_direction[2];
 
         static constexpr float_64 polarisation_direction[3u] = {
-                {{#polarization_direction}}
-                {{{component}}}{{^_last}},{{/_last}}
-                {{/polarization_direction}}
+                {{{polarization_direction.x}}},
+                {{{polarization_direction.y}}},
+                {{{polarization_direction.z}}}
             };
         static constexpr float_64 POLARISATION_DIRECTION_X = polarisation_direction[0];
         static constexpr float_64 POLARISATION_DIRECTION_Y = polarisation_direction[1];

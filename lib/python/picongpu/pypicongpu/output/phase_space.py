@@ -12,6 +12,7 @@ from pydantic import BaseModel, model_validator
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
 from picongpu.pypicongpu.species import Species
+from picongpu.pypicongpu.validation import less_than
 
 
 class PhaseSpace(BaseModel):
@@ -26,9 +27,5 @@ class PhaseSpace(BaseModel):
 
     @model_validator(mode="after")
     def check(self):
-        if self.min_momentum >= self.max_momentum:
-            raise ValueError(
-                "PhaseSpace's min_momentum should be smaller than max_momentum. "
-                f"You gave: {self.min_momentum=} and {self.max_momentum=}."
-            )
+        less_than(self.min_momentum, self.max_momentum, lesser_field="min_momentum", greater_field="max_momentum")
         return self

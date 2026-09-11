@@ -5,28 +5,16 @@ Authors: Kristin Tippey, Brian Edward Marre
 License: GPLv3+
 """
 
+from functools import partial
 from math import sqrt
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, PlainSerializer, model_validator
+
+from ....validation import component_vector, radius_larger_than
+from ....vector import serialise_vec
 
 from .plasmaramp import AllPlasmaRamps, None_
-
-
-class _Component(BaseModel):
-    component: float
-
-    def __eq__(self, other):
-        if isinstance(other, float) or isinstance(other, int):
-            return self.component == other
-        return super().__eq__(other)
-
-
-def validate_component_vector(value):
-    try:
-        return [_Component(component=c) for c in value]
-    except Exception:
-        return value
 
 
 class Cylinder(BaseModel):
@@ -49,13 +37,21 @@ class Cylinder(BaseModel):
     density_si: float = Field(gt=0.0)
     """particle number density at at the foil plateau (m^-3)"""
 
-    center_position_si: Annotated[tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)]
+    center_position_si: Annotated[
+        tuple[float, float, float],
+        BeforeValidator(partial(component_vector, field="center_position_si")),
+        PlainSerializer(serialise_vec),
+    ]
     """center of the cylinder [x, y, z], [m]"""
 
     radius_si: float
     """cylinder radius, [m]"""
 
-    cylinder_axis: Annotated[tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)]
+    cylinder_axis: Annotated[
+        tuple[float, float, float],
+        BeforeValidator(partial(component_vector, field="cylinder_axis")),
+        PlainSerializer(serialise_vec),
+    ]
     """cylinder axis [x, y, z], [unitless]"""
 
     # This still relies on some magic to insert the typeID.
@@ -66,8 +62,9 @@ class Cylinder(BaseModel):
     @model_validator(mode="after")
     def check(self):
         min_radius = sqrt(2.0) * self.pre_plasma_ramp.PlasmaLength if type(self.pre_plasma_ramp) is not None_ else 0.0
-        if self.radius_si < min_radius:
-            raise ValueError(
-                f"radius must be > sqrt(2)*pre_plasma_length = {min_radius}, so that the reduced radius stays non negative. In case of no preplasma radius must be >= 0.0."
-            )
+        radius_larger_than(
+            self.radius_si,
+            min_radius,
+            field="radius_si",
+        )
         return self

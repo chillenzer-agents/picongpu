@@ -5,7 +5,12 @@ Authors: Hannes Troepgen, Brian Edward Marre
 License: GPLv3+
 """
 
-from pydantic import BaseModel
+from functools import partial
+from typing import Annotated
+
+from pydantic import AfterValidator, BaseModel
+
+from picongpu.pypicongpu.validation import validate_cpp_identifier
 
 
 class Attribute(BaseModel):
@@ -26,5 +31,5 @@ class Attribute(BaseModel):
     PIConGPU term: "particle attributes"
     """
 
-    picongpu_name: str
+    picongpu_name: Annotated[str, AfterValidator(partial(validate_cpp_identifier, field="picongpu_name"))]
     """C++ Code implementing this attribute"""

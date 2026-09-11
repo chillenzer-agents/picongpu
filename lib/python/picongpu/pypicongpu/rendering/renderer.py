@@ -58,21 +58,24 @@ class Renderer:
                 # tags do not need to be checked
                 return
             elif type(value) is list:
-                # may only contain dicts, unless it is a tag list
-                # note: this is not a strict mustache requirement, but only
-                # exists to prevent developer-screwups (in mustache, rendering
-                # mylist: [1, 2, 3] is performed by
-                # {{#mylist}}{{{.}}}{{/mylist}}, which is somewhat unintuitive)
-                not_dict = list(filter(lambda e: type(e) is not dict, value))
-                if 0 != len(not_dict):
-                    raise TypeError("lists may only contains dicts: {}.{}".format(path, key))
-                # check the children
-                for i in range(len(value)):
-                    Renderer.__check_rendering_context_recursive("{}[{}]".format(path, i), value[i])
+                # may contain dicts (recursed into) or leaves (numbers/strings);
+                # the latter covers arbitrary-length numeric sequences, which mustache
+                # iterates via {{#list}}{{{value}}}{{/list}}
+                for i, elem in enumerate(value):
+                    if type(elem) is dict:
+                        Renderer.__check_rendering_context_recursive("{}[{}]".format(path, i), elem)
+                    elif type(elem) in [str, bool, type(None), int, float]:
+                        if type(elem) in [int, float] and (math.isinf(elem) or math.isnan(elem)):
+                            raise ValueError("invalid value for leaf: {} at {}.{}".format(value, path, key))
+                    else:
+                        raise TypeError(
+                            "list entries may only be dict, str, bool, None or number; found: {} at {}.{}".format(
+                                type(elem), path, key
+                            )
+                        )
             else:
                 # leaf
-                invalid_floats = [math.inf, -math.inf, math.nan]
-                if value in invalid_floats:
+                if type(value) in [int, float] and (math.isinf(value) or math.isnan(value)):
                     raise ValueError("invalid value for leaf: {} at {}.{}".format(value, path, key))
 
                 allowed_types = [str, bool, type(None), int, float]
@@ -94,8 +97,9 @@ class Renderer:
         Performs if the given object is acceptable as rendering context:
         - is dict
         - leafs are string, boolean, None, int, or float (or empty list)
-        - child nodes are leaf, set or list
-        - list items must be dict
+        - child nodes are leaf or list
+        - list items are dicts or leaves (string, boolean, None, or number),
+          the latter covering arbitrary-length numeric sequences
         - keys are strings
         - keys do *not* contain dot (.)
         - keys do *not* begin with underscore (_) -> reserved for preprocessor
@@ -114,8 +118,15 @@ class Renderer:
 
         operates recursively
 
-        :param context: dictionary to be preprocessed
+        Note: a bare scalar (e.g. an element of a list of numbers or strings)
+        is converted on the spot: int/float to a C++-compatible string, anything
+        else passed through.
         """
+        if type(context) is not dict:
+            if type(context) in [int, float]:
+                return sympy.printing.ccode(sympy.sympify(context))
+            return context
+
         pp = {}
         for key, value in context.items():
             if type(value) is dict:
@@ -123,9 +134,14 @@ class Renderer:
                 pp[key] = Renderer.__get_context_preprocessed_recursive(value)
             elif type(value) is list and key != "tags":
                 # list: add _last, _first, unless it is a tag list
+                # (dict entries are used as their own context on iteration;
+                #  scalar entries -- e.g. arbitrary-length numeric sequences like
+                #  laguerre modes -- are wrapped with an extra "value" key)
                 new_list = []
                 for i in range(len(value)):
                     elem = Renderer.__get_context_preprocessed_recursive(value[i])
+                    if not isinstance(elem, dict):
+                        elem = {"value": elem}
                     elem["_first"] = 0 == i
                     elem["_last"] = len(value) - 1 == i
                     elem["_idx"] = i

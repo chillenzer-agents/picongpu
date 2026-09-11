@@ -10,6 +10,7 @@ import picmistandard
 from pydantic import AfterValidator, BeforeValidator, Field, computed_field
 
 from ..pypicongpu import grid, util
+from ..pypicongpu.validation import all_positive
 from .copy_attributes import converts_to
 
 
@@ -66,11 +67,7 @@ def _normalise_n_gpus(n_gpus) -> tuple[int, int, int]:
             f"You gave {picongpu_n_gpus} and we interpreted this as {n_gpus=}."
         )
 
-    if any(map(lambda x: x <= 0, n_gpus)):
-        raise ValueError(
-            f"Number of gpus must be positive integer(s). "
-            f"You gave {picongpu_n_gpus=} and we interpreted this as {n_gpus=}."
-        )
+    all_positive(n_gpus, field="n_gpus")
 
     return n_gpus
 
@@ -140,8 +137,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
 
         if self.picongpu_grid_dist is not None:
             for i in range(3):
-                if not all(n >= 1 for n in self.picongpu_grid_dist[i]):
-                    raise ValueError("All values in grid distribution must be greater than 0.")
+                all_positive(self.picongpu_grid_dist[i], field="grid distribution")
                 if sum(self.picongpu_grid_dist[i]) != self.number_of_cells[i]:
                     raise ValueError(f"sum of grid distribution in dimension {i} must match number of cells")
                 if len(self.picongpu_grid_dist[i]) != self.picongpu_n_gpus[i]:

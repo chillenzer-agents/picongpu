@@ -17,6 +17,7 @@ from picongpu.pypicongpu.collisions import CollisionFunctor
 from picongpu.pypicongpu.collisions import CollisionNumericsConfig as CollisionNumericsConfig
 from picongpu.pypicongpu.collisions import ConstLogCollision as ConstLogCollision
 from picongpu.pypicongpu.collisions import DynamicLogCollision as DynamicLogCollision
+from picongpu.pypicongpu.validation import as_list
 
 
 class Collision(BaseModel):
@@ -63,9 +64,7 @@ class CollisionalPhysicsSetup(BaseModel):
     @field_validator("collisions", mode="before")
     @classmethod
     def _validate_collisions(cls, value):
-        if isinstance(value, Collision):
-            return [value]
-        return value
+        return as_list(value, Collision, field="collisions")
 
     @model_validator(mode="after")
     def _validate(self):

@@ -6,9 +6,10 @@ License: GPLv3+
 """
 
 import json
-from typing import Any, Literal
+from functools import partial
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, computed_field, field_serializer
+from pydantic import AfterValidator, BaseModel, Field, computed_field, field_serializer
 
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
 from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecies
@@ -16,6 +17,7 @@ from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFuncto
 from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_from_cpp_type
 from picongpu.pypicongpu.rendering.renderedobject import RenderedObject
 from picongpu.pypicongpu.species import Species
+from picongpu.pypicongpu.validation import validate_cpp_identifier
 
 
 class BinSpec(RenderedObject, BaseModel):
@@ -26,7 +28,9 @@ class BinSpec(RenderedObject, BaseModel):
 
 
 class BinningAxis(RenderedObject, BaseModel):
-    axis_name: str = Field(alias="name")
+    axis_name: Annotated[str, AfterValidator(partial(validate_cpp_identifier, field="axis_name", prefix="axis_"))] = (
+        Field(alias="name")
+    )
     bin_spec_raw: BinSpec = Field(exclude=True)
     axis_functor: ParticleFunctor = Field(alias="functor")
     use_overflow_bins: bool
@@ -42,7 +46,9 @@ class BinningAxis(RenderedObject, BaseModel):
 
 
 class Binning(BaseModel):
-    binner_name: str = Field(alias="name")
+    binner_name: Annotated[str, AfterValidator(partial(validate_cpp_identifier, field="binner_name"))] = Field(
+        alias="name"
+    )
     deposition_functor: ParticleFunctor
     axes: list[BinningAxis]
     species: list[Species | FilteredSpecies]

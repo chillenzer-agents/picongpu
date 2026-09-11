@@ -7,6 +7,7 @@ License: GPLv3+
 
 from ...pypicongpu import species
 from ...pypicongpu import util
+from ...pypicongpu.validation import positive, radius_larger_than
 import numpy as np
 
 from .Distribution import Distribution
@@ -57,18 +58,14 @@ class CylindricalDistribution(Distribution):
         self.cell_size = grid.picongpu_cell_size
         util.unsupported("fill in not active", self.fill_in, True)
 
-        if self.density <= 0.0:
-            raise ValueError("density must be > 0")
+        positive(self.density, field="density")
 
         min_radius = (
             math.sqrt(2.0) * self.exponential_pre_plasma_length
             if self.exponential_pre_plasma_length is not None
             else 0.0
         )
-        if self.radius < min_radius:
-            raise ValueError(
-                f"radius must be > sqrt(2)*pre_plasma_length = {min_radius}, so that the reduced radius stays non negative. In case of no preplasma radius must be >= 0.0., {self.exponential_pre_plasma_length}, {self.radius}"
-            )
+        radius_larger_than(self.radius, min_radius, field="radius")
 
         # create prePlasma ramp if indicated by settings
         prePlasma: bool = (self.exponential_pre_plasma_cutoff is not None) and (

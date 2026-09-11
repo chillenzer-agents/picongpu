@@ -5,15 +5,13 @@ Authors: Hannes Troepgen, Brian Edward Marre
 License: GPLv3+
 """
 
-from functools import partial
-from operator import gt, le
-
 import numpy as np
 import picmistandard
 from pydantic import BaseModel, Field, computed_field, field_validator
 
 from ..pypicongpu.species.operation.layout import OnePosition as PyPIConGPU_OnePosition
 from ..pypicongpu.species.operation.layout import Quiet, Random
+from ..pypicongpu.validation import in_unit_interval
 
 
 class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
@@ -51,9 +49,7 @@ class OnePositionLayout(BaseModel):
     @field_validator("in_cell_offset", mode="after")
     @classmethod
     def _validate_in_cell_offset(cls, in_cell_offset):
-        if not (all(map(partial(le, 0.0), in_cell_offset)) and all(map(partial(gt, 1.0), in_cell_offset))):
-            raise ValueError(f"All of in_cell_offset must be between 0 and 1. You gave: {in_cell_offset=}.")
-        return in_cell_offset
+        return in_unit_interval(in_cell_offset, field="in_cell_offset")
 
     def get_as_pypicongpu(self):
         return PyPIConGPU_OnePosition(ppc=self.n_macroparticles_per_cell, in_cell_offset=self.in_cell_offset)

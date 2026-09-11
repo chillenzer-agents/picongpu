@@ -16,6 +16,7 @@ from picongpu.picmi.species import Species
 from picongpu.pypicongpu.output.binning import Binning as PyPIConGPUBinning
 from picongpu.pypicongpu.output.binning import BinningAxis as PyPIConGPUBinningAxis
 from picongpu.pypicongpu.output.binning import BinSpec as PyPIConGPUBinSpec
+from picongpu.pypicongpu.validation import as_list
 
 from ..copy_attributes import default_converts_to
 from .timestepspec import TimeStepSpec
@@ -65,9 +66,7 @@ class Binning(BaseModel):
     @field_validator("species", mode="before")
     @classmethod
     def _normalise_species_to_list(cls, species):
-        if isinstance(species, Species) or isinstance(species, FilteredSpecies):
-            return [species]
-        return species
+        return as_list(species, (Species, FilteredSpecies), field="species")
 
     @model_validator(mode="after")
     def _set_default_period(self):

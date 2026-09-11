@@ -6,17 +6,16 @@ License: GPLv3+
 """
 
 import logging
+from functools import partial
 from typing import Annotated
 
 import numpy as np
-from pydantic import BeforeValidator
+from pydantic import AfterValidator
 
 from .. import constants
+from ...pypicongpu.validation import positive, unit_vector
 
-PositiveFloat = Annotated[
-    float,
-    BeforeValidator(lambda v: float(v) if (float(v) > 0) else (_ for _ in ()).throw(ValueError("value must be > 0"))),
-]
+PositiveFloat = Annotated[float, AfterValidator(partial(positive, field="PositiveFloat"))]
 """float that must be strictly > 0"""
 
 
@@ -85,17 +84,8 @@ class BaseLaser:
     def _validate_common_properties(self):
         """Common validation logic for all lasers"""
 
-        if not np.allclose(n := np.linalg.norm(self.polarization_direction), 1):
-            raise ValueError(
-                "The polarization direction vector must be normalized. "
-                f"You gave {self.polarization_direction=} with norm {n}."
-            )
-
-        if not np.allclose(n := np.linalg.norm(self.propagation_direction), 1):
-            raise ValueError(
-                "The propagation direction vector must be normalized. "
-                f"You gave {self.propagation_direction=} with norm {n}."
-            )
+        unit_vector(self.polarization_direction, field="polarization_direction")
+        unit_vector(self.propagation_direction, field="propagation_direction")
 
         if scalarProduct(self.propagation_direction, [0.0, 1.0, 0.0]) <= 0.0:
             raise ValueError(

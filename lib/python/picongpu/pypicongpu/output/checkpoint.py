@@ -11,6 +11,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, model_validator
 
 from .timestepspec import TimeStepSpec
+from ..validation import at_least_one_of
 
 
 class Checkpoint(BaseModel):
@@ -31,6 +32,8 @@ class Checkpoint(BaseModel):
 
     @model_validator(mode="after")
     def check(self):
-        if self.period is None and self.timePeriod is None:
-            raise ValueError("At least one of period or timePeriod must be provided")
+        at_least_one_of(
+            {"period": self.period is not None, "timePeriod": self.timePeriod is not None},
+            message="At least one of period or timePeriod must be provided",
+        )
         return self

@@ -8,11 +8,12 @@ License: GPLv3+
 import math
 from typing import Annotated
 
-import numpy as np
-from pydantic import AfterValidator, BaseModel, Field, PlainSerializer
+from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, PlainSerializer
 from scipy import constants
 
 from ....rendering import RenderedObject
+from ....validation import unit_vector
+from ....vector import deserialise_vec, serialise_vec
 
 # Note to the future maintainer:
 # If you want to add another way to specify the drift, please turn
@@ -20,20 +21,12 @@ from ....rendering import RenderedObject
 # method.
 
 
-def serialise_vec(value) -> dict:
-    return dict(zip("xyz", value))
-
-
-def validate_unit_vec(value):
-    epsilon = 1.0e-5
-    if any(np.isinf(value)) or any(np.isnan(value)):
-        raise ValueError(f"{value=} must not contain infs or nans.")
-    if np.abs((vector_length := np.sqrt(sum(map(lambda n: n**2, value)))) - 1.0) > epsilon:
-        raise ValueError(f"Expected unit vector but {value=} has {vector_length=}.")
-    return value
-
-
-Vec3_float = Annotated[tuple[float, float, float], PlainSerializer(serialise_vec), AfterValidator(validate_unit_vec)]
+Vec3_float = Annotated[
+    tuple[float, float, float],
+    BeforeValidator(deserialise_vec),
+    AfterValidator(unit_vector),
+    PlainSerializer(serialise_vec),
+]
 
 
 class Drift(RenderedObject, BaseModel):

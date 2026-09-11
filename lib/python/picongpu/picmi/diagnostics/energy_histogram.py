@@ -13,6 +13,7 @@ from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species
 from picongpu.pypicongpu.output.energy_histogram import EnergyHistogram as PyPIConGPUEnergyHistogram
+from picongpu.pypicongpu.validation import less_than, positive
 
 
 @default_converts_to(
@@ -57,10 +58,8 @@ class EnergyHistogram(BaseModel):
     """
 
     def check(self, *args, **kwargs):
-        if self.min_energy >= self.max_energy:
-            raise ValueError("min_energy must be less than max_energy")
-        if self.bin_count <= 0:
-            raise ValueError("bin_count must be > 0")
+        less_than(self.min_energy, self.max_energy, lesser_field="min_energy", greater_field="max_energy")
+        positive(self.bin_count, field="bin_count")
 
     species: Species | FilteredSpecies
     period: TimeStepSpec

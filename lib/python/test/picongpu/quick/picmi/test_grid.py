@@ -46,7 +46,7 @@ class TestCartesian3DGrid(TestCase):
     def test_n_gpus_wrong_numbers(self):
         """test negativ numbers or zero as number of gpus"""
         for not_ngpus_dist in [[0], [1, 1, 0], [-1], [-1, 1, 1], [-7]]:
-            with pytest.raises(Exception, match=".*picongpu_n_gpus.*|.*Number of gpus must be positive integer.*"):
+            with pytest.raises(Exception, match=".*picongpu_n_gpus.*|.*n_gpus.*greater than 0.*"):
                 picmi.Cartesian3DGrid(
                     number_of_cells=[192, 2048, 12],
                     picongpu_n_gpus=not_ngpus_dist,
@@ -109,7 +109,7 @@ class TestCartesian3DGrid(TestCase):
             picongpu_grid_dist=([192], [2048], [0]),
             **self.COMMON_KWARGS,
         )
-        with pytest.raises(Exception, match=".*All values in grid distribution must be greater than 0.*"):
+        with pytest.raises(Exception, match=".*grid distribution.*greater than 0.*"):
             grid.get_as_pypicongpu()
 
     def test_grid_dist_sum_mismatch(self):

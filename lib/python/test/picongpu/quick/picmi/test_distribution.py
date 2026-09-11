@@ -304,7 +304,7 @@ class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
     def test_density_zero(self):
         """density set to zero is not accepted"""
         gaussian = self._get_distribution(density=0.0)
-        with pytest.raises(ValueError, match=".*density must be > 0.*"):
+        with pytest.raises(ValueError, match=".*density must be greater than 0.*"):
             gaussian.get_as_pypicongpu(ARBITRARY_GRID)
 
     def test_front_rear_swapped(self):
@@ -383,7 +383,7 @@ class TestPicmiCylindricalDistribution(TestCase, HelperTestPicmiBoundaries):
     def test_density_zero(self):
         """density set to zero is not accepted"""
         dist = self._get_distribution(density=0.0)
-        with pytest.raises(ValueError, match=".*density must be > 0.*"):
+        with pytest.raises(ValueError, match=".*density must be greater than 0.*"):
             dist.get_as_pypicongpu(ARBITRARY_GRID).get_rendering_context()
 
     def test_radius_zero(self):
@@ -393,7 +393,7 @@ class TestPicmiCylindricalDistribution(TestCase, HelperTestPicmiBoundaries):
             exponential_pre_plasma_length=0.1,
             exponential_pre_plasma_cutoff=0.2,
         )
-        with pytest.raises(ValueError, match=".*radius must be > sqrt(2)*"):
+        with pytest.raises(ValueError, match=".*radius must be >=.*reduced radius stays non negative.*"):
             dist.get_as_pypicongpu(ARBITRARY_GRID).get_rendering_context()
 
     def test_cutoff_zero(self):

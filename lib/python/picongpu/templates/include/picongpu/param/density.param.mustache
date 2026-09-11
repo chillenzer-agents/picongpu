@@ -150,14 +150,14 @@ namespace picongpu
             struct init_{{{placed_species_initial.typename}}}_CylindricalParam
             {
                 static constexpr float3_64  centerPosition_SI{
-                    {{{profile.center_position_si.0.component}}},
-                    {{{profile.center_position_si.1.component}}},
-                    {{{profile.center_position_si.2.component}}}
+                    {{{profile.center_position_si.x}}},
+                    {{{profile.center_position_si.y}}},
+                    {{{profile.center_position_si.z}}}
                 };
                 static constexpr float3_X jetAxis{
-                    {{{profile.cylinder_axis.0.component}}}_X,
-                    {{{profile.cylinder_axis.1.component}}}_X,
-                    {{{profile.cylinder_axis.2.component}}}_X
+                    {{{profile.cylinder_axis.x}}}_X,
+                    {{{profile.cylinder_axis.y}}}_X,
+                    {{{profile.cylinder_axis.z}}}_X
                 };
                 static constexpr float_64 radius_SI = {{{profile.radius_si}}};
                 static constexpr float_X densityFactor

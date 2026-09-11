@@ -7,9 +7,11 @@ License: GPLv3+
 
 from typing import Annotated
 
-from pydantic import BaseModel, Field, PlainSerializer, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, PlainSerializer, model_validator
 
 from ....rendering import RenderedObject
+from ....validation import exactly_one
+from ....vector import deserialise_vec, serialise_vec
 
 # Note to the future maintainer:
 # If you want to add another way to specify the temperature, please turn
@@ -18,11 +20,11 @@ from ....rendering import RenderedObject
 # supported, so such a structure would be overkill.)
 
 
-def serialise_vec(value) -> dict:
-    return dict(zip("xyz", value))
-
-
-Vec3_float_temperature = Annotated[tuple[float, float, float], PlainSerializer(serialise_vec)]
+Vec3_float_temperature = Annotated[
+    tuple[float, float, float],
+    BeforeValidator(deserialise_vec),
+    PlainSerializer(serialise_vec),
+]
 
 
 class Temperature(RenderedObject, BaseModel):
@@ -41,8 +43,11 @@ class Temperature(RenderedObject, BaseModel):
 
     @model_validator(mode="after")
     def _validate_exactly_one(self):
-        scalar_set = self.temperature_kev is not None
-        directional_set = self.temperature_kev_directional is not None
-        if scalar_set == directional_set:
-            raise ValueError("Exactly one of temperature_kev or temperature_kev_directional must be set")
+        exactly_one(
+            {
+                "temperature_kev": self.temperature_kev is not None,
+                "temperature_kev_directional": self.temperature_kev_directional is not None,
+            },
+            message="Exactly one of temperature_kev or temperature_kev_directional must be set",
+        )
         return self

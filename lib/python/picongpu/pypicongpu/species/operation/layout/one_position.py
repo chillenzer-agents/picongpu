@@ -8,29 +8,17 @@ License: GPLv3+
 from functools import partial
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, Field, PlainSerializer
+from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, PlainSerializer
 
-
-def serialise_vec(value) -> dict:
-    return dict(zip("xyz", value))
-
-
-def broadcast_validation(values, condition, message="Condition not met."):
-    if not all(condition(value) for value in values):
-        raise ValueError(f"{message} You gave: {values}.")
-    return values
+from ....validation import in_unit_interval
+from ....vector import deserialise_vec, serialise_vec
 
 
 Vec3_float = Annotated[
     tuple[float, float, float],
+    BeforeValidator(deserialise_vec),
+    AfterValidator(partial(in_unit_interval, field="in_cell_offset")),
     PlainSerializer(serialise_vec),
-    AfterValidator(
-        partial(
-            broadcast_validation,
-            condition=lambda v: v >= 0 and v < 1,
-            message="All of in_cell_offset must be between 0 and 1.",
-        )
-    ),
 ]
 
 

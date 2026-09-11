@@ -11,6 +11,7 @@ from typing import Annotated
 from pydantic import BaseModel, PlainSerializer, field_validator
 
 from .rendering import RenderedObject
+from .validation import positive
 
 
 def serialise_timedelta(value):
@@ -31,6 +32,5 @@ class Walltime(RenderedObject, BaseModel):
     @field_validator("walltime", mode="after")
     @classmethod
     def check(cls, value) -> None:
-        if value.total_seconds() <= 0.0:
-            raise ValueError("walltime must be > 0.")
+        positive(value.total_seconds(), field="walltime")
         return value

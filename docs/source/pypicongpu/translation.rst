@@ -280,24 +280,23 @@ used for Mustache as rendering context, in particular:
    -  int or float
    -  string
 
--  list items must be dictionaries This is due to the nature of Mustache
-   list processing (loops): The loop header for Mustache ``{{#list}}``
-   does enter the context of the list items, e.g. for
-   ``[{"num": 1"}, {"num": 2}]`` ``num`` is now defined after the loop
-   header. This *entering the context* is not possible if the item is
-   not a dict, e.g. for ``[1, 2]`` it is not clear to which variable
-   name the value is bound after the loop header. Such simpe lists
-   **can’t be handled by Mustache** and hence are caught during this
-   check.
+-  list items must be dictionaries, unless they are plain leaves (numbers,
+   strings, ...). The loop header for Mustache ``{{#list}}`` enters the
+   context of the list items, e.g. for ``[{"num": 1}, {"num": 2}]`` ``num``
+   is now defined after the loop header. For *scalar* items (e.g. an
+   arbitrary-length numeric sequence) the JSON preprocessor binds the item
+   to a ``value`` key, so such a list is rendered as
+   ``{{#list}}{{{value}}}{{/list}}``.
 
 Simply put, this check ensures that the given dict can be represented as
 JSON and can be processed by mustache. It is **independent** from the
 origin of the dict.
 
-   Notably native mustache actually *can*, in fact, handle plain lists.
-   The syntax is not straight-forward though, hence we forbid it here.
-   (For details see `mustache spec, “Implicit
-   Iterators” <https://github.com/mustache/spec/blob/master/specs/sections.yml#L179>`__)
+   Plain lists of scalars (see above) are rendered using Mustache’s
+   “Implicit Iterators” (see `mustache spec,
+   “Implicit
+   Iterators” <https://github.com/mustache/spec/blob/master/specs/sections.yml#L179>`__),
+   with the preprocessor binding each item to a ``value`` key.
 
 Schema Check
 ~~~~~~~~~~~~

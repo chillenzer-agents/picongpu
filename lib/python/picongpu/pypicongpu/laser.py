@@ -5,8 +5,8 @@ Authors: Hannes Troepgen, Brian Edward Marre, Alexander Debus, Julian Lenz
 License: GPLv3+
 """
 
-import logging
 from enum import Enum
+from functools import partial
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -18,6 +18,9 @@ from pydantic import (
     model_validator,
 )
 
+from .validation import component_vector, same_length
+from .vector import deserialise_huygens, serialise_huygens, serialise_vec
+
 
 class PolarizationType(Enum):
     """represents a polarization of a laser (for PIConGPU)"""
@@ -26,38 +29,8 @@ class PolarizationType(Enum):
     CIRCULAR = "Circular"
 
 
-def _get_huygens_surface_serialized(huygens_surface_positions) -> dict:
-    """Serialize huygens surface positions for all laser types"""
-    return {
-        "row_x": {
-            "negative": huygens_surface_positions[0][0],
-            "positive": huygens_surface_positions[0][1],
-        },
-        "row_y": {
-            "negative": huygens_surface_positions[1][0],
-            "positive": huygens_surface_positions[1][1],
-        },
-        "row_z": {
-            "negative": huygens_surface_positions[2][0],
-            "positive": huygens_surface_positions[2][1],
-        },
-    }
-
-
-class _Component(BaseModel):
-    component: float
-
-    def __eq__(self, other):
-        if isinstance(other, float) or isinstance(other, int):
-            return self.component == other
-        return super().__eq__(other)
-
-
-def validate_component_vector(value):
-    try:
-        return [_Component(component=c) for c in value]
-    except Exception:
-        return value
+def _component_vector_field(field: str):
+    return partial(component_vector, field=field)
 
 
 class _BaseLaser(BaseModel):
@@ -65,11 +38,15 @@ class _BaseLaser(BaseModel):
 
     # Common properties for all lasers
     propagation_direction: Annotated[
-        tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)
+        tuple[float, float, float],
+        BeforeValidator(_component_vector_field("propagation_direction")),
+        PlainSerializer(serialise_vec),
     ]
     """propagation direction (normalized vector)"""
     polarization_direction: Annotated[
-        tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)
+        tuple[float, float, float],
+        BeforeValidator(_component_vector_field("polarization_direction")),
+        PlainSerializer(serialise_vec),
     ]
     """direction of polarization (normalized vector)"""
     polarization_type: PolarizationType
@@ -78,9 +55,11 @@ class _BaseLaser(BaseModel):
     """wave length in m"""
     pulse_duration_si: float = Field(alias="duration", gt=0.0)
     """duration in s (1 sigma of a standard gaussian for the intensity (E^2))"""
-    focus_pos_si: Annotated[tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)] = (
-        Field(alias="focal_position")
-    )
+    focus_pos_si: Annotated[
+        tuple[float, float, float],
+        BeforeValidator(_component_vector_field("focus_pos_si")),
+        PlainSerializer(serialise_vec),
+    ] = Field(alias="focal_position")
     """focus position vector in m"""
     phase: float = Field(alias="phi0")
     """phi0 in rad, periodic in 2*pi"""
@@ -90,23 +69,17 @@ class _BaseLaser(BaseModel):
     """laser will be initialized pulse_init times of duration (unitless)"""
 
     # Huygens surface position (common to all lasers)
-    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
+    huygens_surface_positions: Annotated[
+        list[list[int]],
+        BeforeValidator(deserialise_huygens),
+        PlainSerializer(serialise_huygens),
+    ]
     """Position in cells of the Huygens surface relative to start/
        edge(negative numbers) of the total domain"""
 
     def _get_common_serialized_fields(self) -> dict:
         """Get all common serialized fields for lasers"""
         return self.model_dump(mode="json")
-
-
-def all_ge(values, than_value):
-    if any(wrong := [x < than_value for x in values]):
-        logging.warning(f"All {values=} should be greater or equal {than_value=}. The following are {wrong=}.")
-    return values
-
-
-def serialise_laguerre(values, suffix):
-    return [{f"single_laguerre_{suffix}": x} for x in values]
 
 
 class GaussianLaser(_BaseLaser):
@@ -120,9 +93,9 @@ class GaussianLaser(_BaseLaser):
 
     waist_si: float = Field(alias="waist", gt=0.0)
     """beam waist in m"""
-    laguerre_modes: Annotated[list[_Component], BeforeValidator(validate_component_vector)] = Field(min_length=1)
+    laguerre_modes: list[float] = Field(min_length=1)
     """array containing the magnitudes of radial Laguerre-modes"""
-    laguerre_phases: Annotated[list[_Component], BeforeValidator(validate_component_vector)] = Field(min_length=1)
+    laguerre_phases: list[float] = Field(min_length=1)
     """array containing the phases of radial Laguerre-modes"""
 
     @computed_field
@@ -131,8 +104,12 @@ class GaussianLaser(_BaseLaser):
 
     @model_validator(mode="after")
     def check(self):
-        if len(self.laguerre_phases) != len(self.laguerre_modes):
-            raise ValueError("Laguerre modes and Laguerre phases MUST BE arrays of equal length.")
+        same_length(
+            self.laguerre_phases,
+            self.laguerre_modes,
+            a_field="laguerre_phases",
+            b_field="laguerre_modes",
+        )
         return self
 
 
@@ -181,11 +158,15 @@ class FromOpenPMDPulseLaser(BaseModel):
     type_fromOpenPMDPulse: Literal[True] = True
 
     propagation_direction: Annotated[
-        tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)
+        tuple[float, float, float],
+        BeforeValidator(_component_vector_field("propagation_direction")),
+        PlainSerializer(serialise_vec),
     ]
     """propagation direction (normalized vector)"""
     polarization_direction: Annotated[
-        tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)
+        tuple[float, float, float],
+        BeforeValidator(_component_vector_field("polarization_direction")),
+        PlainSerializer(serialise_vec),
     ]
     """direction of polarization (normalized vector)"""
     file_path: str
@@ -202,7 +183,11 @@ class FromOpenPMDPulseLaser(BaseModel):
     """Polarization axis name in the OpenPMD file"""
     propagationAxisOpenPMD: str
     """Propagation axis name in the OpenPMD file"""
-    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
+    huygens_surface_positions: Annotated[
+        list[list[int]],
+        BeforeValidator(deserialise_huygens),
+        PlainSerializer(serialise_huygens),
+    ]
     """Position in cells of the Huygens surface relative to start/
        edge(negative numbers) of the total domain"""
 
@@ -241,7 +226,11 @@ class TWTSLaser(_BaseLaser):
     """Final time step number [#] after gradually switching off the laser using a Blackman-Nuttall window"""
     windowLength: float
     """Denotes the respective switching duration by half a Blackman-Nuttall window in number of time steps unit [#]"""
-    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
+    huygens_surface_positions: Annotated[
+        list[list[int]],
+        BeforeValidator(deserialise_huygens),
+        PlainSerializer(serialise_huygens),
+    ]
     """Position in cells of the Huygens surface relative to start/
        edge(negative numbers) of the total domain"""
 

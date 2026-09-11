@@ -5,10 +5,11 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+from functools import partial
 from typing import Annotated, Literal
 from uuid import uuid4 as uuid
 
-from pydantic import BaseModel, BeforeValidator, computed_field, model_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, computed_field, model_validator
 
 from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_to_cpp_type
 from picongpu.pypicongpu.particle_functor.rng_info import RNGInfo
@@ -16,6 +17,7 @@ from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.rendering.renderedobject import RenderedObject
 from picongpu.pypicongpu.util import alt
+from picongpu.pypicongpu.validation import non_negative, validate_cpp_identifier
 
 
 def by_bracket(attribute):
@@ -87,8 +89,7 @@ FILTER_ACCESSORS = (
 
 def random_number_command(**kwargs):
     scale = kwargs.get("scale", 1)
-    if scale < 0:
-        raise ValueError(f"{scale=} must be >= 0.")
+    non_negative(scale, field="scale")
     return f"random_number(rng, static_cast<typename RNGType::result_type>({kwargs.get('loc', 0)}), static_cast<typename RNGType::result_type>({scale}))"
 
 
@@ -128,7 +129,7 @@ class _PreambleStatement(BaseModel):
 
 
 class ParticleFunctor(RenderedObject, BaseModel):
-    name: str
+    name: Annotated[str, AfterValidator(partial(validate_cpp_identifier, field="functor name"))]
     functor_expression: Annotated[str, BeforeValidator(PMAccPrinter().doprint)]
     functor_preamble: list[_PreambleStatement]
     return_type: Annotated[str, BeforeValidator(translate_to_cpp_type)]

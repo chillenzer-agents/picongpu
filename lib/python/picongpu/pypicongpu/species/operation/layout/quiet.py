@@ -8,29 +8,17 @@ License: GPLv3+
 from functools import partial
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, Field, PlainSerializer
+from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, PlainSerializer
 
-
-def serialise_vec(value) -> dict:
-    return dict(zip("xyz", value))
-
-
-def broadcast_validation(values, condition, message="Condition not met."):
-    if not all(condition(value) for value in values):
-        raise ValueError(f"{message} You gave: {values}.")
-    return values
+from ....validation import all_positive
+from ....vector import deserialise_vec, serialise_vec
 
 
 Vec3_int = Annotated[
     tuple[int, int, int],
+    BeforeValidator(deserialise_vec),
+    AfterValidator(partial(all_positive, field="n_points")),
     PlainSerializer(serialise_vec),
-    AfterValidator(
-        partial(
-            broadcast_validation,
-            condition=lambda v: v > 0,
-            message="Number of points must be greater than 0 in each direction.",
-        )
-    ),
 ]
 
 

@@ -12,6 +12,7 @@ from picmistandard import PICMI_GaussianLaser
 from pydantic import Field, computed_field, model_validator
 
 from ...pypicongpu import laser, util
+from ...pypicongpu.validation import same_length
 from ..copy_attributes import default_converts_to
 from .base_laser import BaseLaser
 from .polarization_type import PolarizationType
@@ -119,12 +120,12 @@ class GaussianLaser(PICMI_GaussianLaser, BaseLaser):
 
     @model_validator(mode="after")
     def _validate(self):
-        if len(self.picongpu_laguerre_modes) != len(self.picongpu_laguerre_phases):
-            raise ValueError(
-                "Your setup specifies a different number of Laguerre modes and phases. "
-                "Please be explicit about both and use the same length. "
-                f"You gave: {self.picongpu_laguerre_modes=} and {self.picongpu_laguerre_phases=}."
-            )
+        same_length(
+            self.picongpu_laguerre_modes,
+            self.picongpu_laguerre_phases,
+            a_field="picongpu_laguerre_modes",
+            b_field="picongpu_laguerre_phases",
+        )
         self._validate_common_properties()
 
         assert self._propagation_connects_centroid_and_focus(), (

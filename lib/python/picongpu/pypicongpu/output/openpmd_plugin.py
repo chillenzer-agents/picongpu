@@ -5,7 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from functools import reduce
+from functools import partial, reduce
 from hashlib import sha256
 from os import PathLike
 from pathlib import Path
@@ -28,6 +28,7 @@ from picongpu.pypicongpu.particle_functor.filtered_species import FilteredSpecie
 from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFunctor
 from picongpu.pypicongpu.species.species import Species
 from picongpu.pypicongpu.util import unique
+from picongpu.pypicongpu.validation import validate_cpp_identifier
 
 NATIVE_FIELDS = ["E", "B", "J"]
 
@@ -96,7 +97,7 @@ def to_string(timestepspec: TimeStepSpec):
 class FieldDump(BaseModel):
     name: str
     functor: ParticleFunctor | None = None
-    filtername: None | str
+    filtername: None | Annotated[str, AfterValidator(partial(validate_cpp_identifier, field="filtername"))]
 
     def get_rendering_context(self) -> dict:
         return self.model_dump(mode="json")

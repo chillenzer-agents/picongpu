@@ -141,9 +141,18 @@ namespace picongpu
 
         namespace traits
         {
-            /* if needed for generic "free" filters,
-             * place `SpeciesEligibleForSolver` traits for filters here
-             */
+{{#particle_filters}}
+            /* Restrict filter {{{name}}} to species carrying the particle attributes
+             * the filter accesses, so it (and any derived field combining it) is not
+             * instantiated for species that lack a required attribute. */
+            template<typename T_Species>
+            struct SpeciesEligibleForSolver<T_Species, filter::{{{name}}}>
+            {
+                using FrameType = typename T_Species::FrameType;
+
+                using type = pmacc::mp_and<{{{identifier_requirement_cpp}}}, {{{flag_requirement_cpp}}}>;
+            };
+{{/particle_filters}}
         } // namespace traits
     } // namespace particles
 } // namespace picongpu

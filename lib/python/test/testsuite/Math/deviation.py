@@ -70,9 +70,7 @@ def getMaxDifference(theory, simulation):
     out : The maximum in the deviation
     """
 
-    difference = np.abs(theory - simulation)
-
-    return max(difference)
+    return np.max(np.abs(theory - simulation))
 
 
 def getMinDifference(theory, simulation):
@@ -102,9 +100,7 @@ def getMinDifference(theory, simulation):
     out : The minimum in the deviation
     """
 
-    difference = np.abs(min(theory - simulation))
-
-    return difference
+    return float(np.min(np.abs(theory - simulation)))
 
 
 def getDifference(theory, simulation):
@@ -142,11 +138,12 @@ def getDifference(theory, simulation):
 def getDifferenceInPercentage(theory, simulation):
     """
     calculates the difference between the theory value and
-    the simulation's maximum value in percentage
+    the simulation's maximum value in percentage,
+    relative to the theory value
 
     Calculates:
     --------
-    (theory - max(simulation)) / simulation * 100
+    (theory - max(simulation)) / theory * 100
 
     Input:
     -------
@@ -169,7 +166,7 @@ def getDifferenceInPercentage(theory, simulation):
 
     """
 
-    simMax = max(simulation)
+    simMax = np.max(simulation)
     return (theory - simMax) / theory * 100
 
 

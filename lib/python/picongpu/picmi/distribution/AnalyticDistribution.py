@@ -8,15 +8,14 @@ License: GPLv3+
 import logging
 import traceback
 from collections.abc import Callable
-from typing import Literal
 
 import numpy as np
-from picmistandard import PICMI_Extension
-from pydantic import ConfigDict, Field, PrivateAttr, computed_field, model_validator
+from picmistandard import PICMI_AnalyticDistribution
+from pydantic import ConfigDict, PrivateAttr, model_validator
 from sympy import Expr, Symbol, lambdify, symbols, sympify
 
 from picongpu.pypicongpu import species
-from picongpu.pypicongpu.util import decorating_class
+from picongpu.pypicongpu.util import decorating_class, unsupported
 
 """
 note on rms_velocity:
@@ -41,19 +40,25 @@ this method returns None.
 
 
 @decorating_class("density_function", keyword_construction=True)
-class AnalyticDistribution(PICMI_Extension):
+class AnalyticDistribution(PICMI_AnalyticDistribution):
     """
     This class represents a plasma with a density defined by an analytic expression.
 
-    The function must be constructed using sympy functions
-    to enable code generation and manipulation.
-    This is a slight deviation from the PICMI standard.
-    Furthermore, we don't implement substitution of variables
-    as suggested in the PICMI standard.
-    Instead we propose that you write your function
-    with further variables as keyword arguments
-    and substitute them yourself before handing it over to AnalyticDistribution.
-    See the end-to-end tests for examples of this.
+    It implements the standard ``PICMI_AnalyticDistribution`` interface (``density_expression``,
+    ``momentum_expressions``, ``momentum_spread_expressions``, ``lower_bound``/``upper_bound``,
+    ``rms_velocity``, ``directed_velocity``, ``fill_in`` and the automatic ``user_defined_kw``
+    parameter substitution).
+
+    PIConGPU-specific extension: in addition to the standard ``density_expression: str`` you may
+    provide a sympy based ``density_function`` callable (or the equivalent ``@AnalyticDistribution``
+    decorator) instead of a string. Exactly one of ``density_function`` / ``density_expression``
+    must be given.
+
+    The standard's ``momentum_expressions`` (analytic ``gamma * velocity`` per axis [m/s]) and
+    ``momentum_spread_expressions`` (Gaussian thermal spread sigma per axis [m/s]) are supported in
+    their **constant** form only and are rendered to the constant pypicongpu ``Drift`` and
+    ``Temperature`` operations. Position-dependent (function of ``x``/``y``/``z``) momentum and
+    spread expressions are not implemented yet.
 
     Writing such functions (or rather writing sympy in general)
     comes with a few pitfalls but also advantages as listed below.
@@ -63,7 +68,7 @@ class AnalyticDistribution(PICMI_Extension):
     - The sympy language is closer to mathematical language than to coding
       which might make it more natural to use for some physicists.
     - You can extract the exact distribution
-      that was used from the member `density_expression`
+      that was used from the member `density_function`
       and use it any way you'd use any sympy expression.
       In particular, you can print it to various formats,
       say, LaTeX for automated inclusion in papers.
@@ -124,15 +129,18 @@ class AnalyticDistribution(PICMI_Extension):
             Provide exactly one of `density_function` or `density_expression`.
         directed_velocity (3-tuple of float):
             A collective velocity for the particle distribution.
-            (currently untested)
+            Used for any axis whose momentum expression is not supplied.
     """
 
+    # The standard makes this required; PIConGPU additionally allows a sympy based
+    # density_function, so make it optional and enforce exactly-one in a validator.
+    density_expression: str | None = None
     density_function: Callable[[Symbol, Symbol, Symbol], Expr]
-    rms_velocity: Literal[(0.0, 0.0, 0.0)] = (0.0, 0.0, 0.0)
-    directed_velocity: list[float] = Field(default_factory=lambda: [0, 0, 0])
     _warned_about_lambdify_failure: bool = PrivateAttr(False)
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True, populate_by_name=True, extra="forbid", validate_assignment=True
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -145,42 +153,83 @@ class AnalyticDistribution(PICMI_Extension):
             raise ValueError("exactly one of density_function or density_expression must be provided")
         if has_expression:
             # Normalise like the PICMI standard does, then sympify into the
-            # equivalent callable so the computed density_expression is identical.
+            # equivalent callable so the rendered density is identical.
             sx, sy, sz = symbols("x,y,z")
             parsed = sympify(f"{data['density_expression']}".replace("\n", ""))
-            del data["density_expression"]
             data["density_function"] = lambda x, y, z: parsed.subs({sx: x, sy: y, sz: z})
         return data
 
-    @computed_field
-    def density_expression(self) -> Expr:
+    def _constant_expression(self, field: str, expression: str) -> float:
+        """
+        Evaluate a constant momentum/spread expression (after substituting user_defined_kw)
+        to a plain float. Position-dependent expressions (still referencing x/y/z) are
+        rejected, and so are expressions whose parameters were never supplied.
+        """
         x, y, z = symbols("x,y,z")
-        return self.density_function(x, y, z) + (0 * x * y * z)
+        resolved = sympify(expression).subs(self.user_defined_kw)
+        if not resolved.free_symbols <= {x, y, z}:
+            missing = sorted(sym.name for sym in resolved.free_symbols - {x, y, z})
+            raise ValueError(f"{field} must be constant, but {expression!r} is missing a value for {missing}.")
+        if resolved.free_symbols:
+            unsupported(f"position-dependent {field}", expression)
+        return float(resolved)
+
+    def _constant_gamma_velocity(self) -> tuple[float, float, float] | None:
+        """
+        Evaluate the constant momentum_expressions (gamma * velocity per axis [m/s]) into a
+        3-tuple. Any axis whose expression is None contributes zero (the directed_velocity is
+        handled separately, using plain velocity semantics).
+
+        Returns None if every resolved axis is zero (no drift).
+        """
+        gamma_velocity = [
+            0.0 if expression is None else self._constant_expression("momentum_expressions", expression)
+            for expression in self.momentum_expressions
+        ]
+        if np.allclose(gamma_velocity, 0.0):
+            return None
+        return tuple(gamma_velocity)  # type: ignore[return-value]
+
+    def _constant_momentum_spread_si(self) -> tuple[float, float, float]:
+        """
+        Evaluate the constant momentum_spread_expressions (Gaussian sigma per axis [m/s]).
+        Any axis whose expression is None contributes zero.
+        """
+        return tuple(
+            0.0 if expression is None else self._constant_expression("momentum_spread_expressions", expression)
+            for expression in self.momentum_spread_expressions
+        )
 
     def get_as_pypicongpu(self, _):
-        return species.operation.densityprofile.FreeFormula(density_expression=self.density_expression)
+        unsupported("fill in", self.fill_in)
+        unsupported("lower bound", self.lower_bound, [None, None, None])
+        unsupported("upper bound", self.upper_bound, [None, None, None])
+        return species.operation.densityprofile.FreeFormula(density_expression=self._density_expression())
 
     def picongpu_get_rms_velocity_si(self) -> tuple[float, float, float]:
-        return self.rms_velocity
+        rms_velocity = [float(v) for v in self.rms_velocity]
+        return tuple(map(lambda r, s: max(r, s), rms_velocity, self._constant_momentum_spread_si()))
 
     def get_picongpu_drift(self) -> species.operation.momentum.Drift | None:
         """
         Get drift for pypicongpu
         :return: pypicongpu drift object or None
         """
-        if all(v == 0 for v in self.directed_velocity):
+        # The legacy directed_velocity is a plain velocity (from_velocity); the standard
+        # momentum_expressions are gamma * velocity (from_gamma_velocity).
+        if any(v != 0 for v in self.directed_velocity):
+            return species.operation.momentum.Drift.from_velocity(tuple(self.directed_velocity))  # type: ignore[arg-type]
+        gamma_velocity = self._constant_gamma_velocity()
+        if gamma_velocity is None:
             return None
-
-        return species.operation.momentum.Drift.from_velocity(
-            self.directed_velocity  # type: ignore[arg-type]
-        )
+        return species.operation.momentum.Drift.from_gamma_velocity(gamma_velocity)
 
     def __call__(self, *args, **kwargs):
         args = tuple(np.asarray(a) for a in args)
         try:
             # This produces faster code but the code generation is not perfect.
             # There are cases where the generated code can't handle broadcasting properly.
-            return lambdify(symbols("x,y,z"), self.density_expression, "numpy")(*args, **kwargs)
+            return lambdify(symbols("x,y,z"), self._density_expression(), "numpy")(*args, **kwargs)
         # We explicitly want this to be as broad as possible
         # because we have a second shot.
         # There should be no instances of this being dangerous during idiomatic use of this functionality.
@@ -197,4 +246,15 @@ class AnalyticDistribution(PICMI_Extension):
                 self._warned_about_lambdify_failure = True
         # This basically calls the original function in a big loop.
         # Slower but more reliable in some cases of difficult broadcasting.
-        return np.vectorize(self.density_function)(*args, **kwargs)
+        return np.vectorize(self._density_function())(*args, **kwargs)
+
+    def _density_function(self) -> Callable[[Symbol, Symbol, Symbol], Expr]:
+        """The density function with any user_defined_kw parameters substituted."""
+        density_function = self.density_function
+        if not self.user_defined_kw:
+            return density_function
+        return lambda x, y, z: density_function(x, y, z).subs(self.user_defined_kw)
+
+    def _density_expression(self) -> Expr:
+        x, y, z = symbols("x,y,z")
+        return self._density_function()(x, y, z) + (0 * x * y * z)

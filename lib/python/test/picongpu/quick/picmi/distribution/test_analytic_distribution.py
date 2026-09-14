@@ -6,12 +6,16 @@ License: GPLv3+
 """
 
 from unittest import TestCase
+import math
 import numpy as np
 
 from scipy.constants import c
-from sympy import Piecewise, exp, sin, symbols
+from sympy import Piecewise, exp, sin, symbols, sympify
 
 from picongpu.picmi import AnalyticDistribution
+from picongpu.picmi.species import Species
+from picongpu.picmi.species_requirements import SimpleMomentumOperation, run_construction
+from picongpu.pypicongpu.util import UnsupportedFeatureError
 import pytest
 
 # allow numpy broadcasting (see https://numpy.org/doc/stable/user/basics.broadcasting.html)
@@ -103,7 +107,8 @@ class TestAnalyticDistributionFromExpression(TestCase):
                 callable_dist = AnalyticDistribution(callable_density)
                 x, y, z = symbols("x, y, z")
                 self.assertEqual(string_dist.density_function(x, y, z), callable_dist.density_function(x, y, z))
-                self.assertEqual(string_dist.density_expression, callable_dist.density_expression)
+                # the standard string field round-trips to the equivalent sympy expression
+                self.assertEqual(sympify(string_dist.density_expression), callable_dist.density_function(x, y, z))
 
     def test_rendered_cpp_matches_equivalent_callable(self):
         for expression, callable_density in self.CASES:
@@ -128,3 +133,112 @@ class TestAnalyticDistributionFromExpression(TestCase):
     def test_string_density_is_callable(self):
         string_dist = AnalyticDistribution(density_expression="x*y*z")
         np.testing.assert_allclose(np.asarray(string_dist(1, 2, 3)), np.asarray(6))
+
+
+def _momentum_of(distribution):
+    """translate the drift/temperature of an AnalyticDistribution through a real species"""
+    species = Species(name="e", particle_type="electron", initial_distribution=distribution)
+    return run_construction(SimpleMomentumOperation(species))
+
+
+class TestAnalyticDistributionFullSurface(TestCase):
+    """
+    The standard surface of PICMI_AnalyticDistribution: constant momentum /
+    momentum_spread expressions rendered to the pypicongpu Drift/Temperature ops,
+    the automatic user_defined_kw parameter substitution, and the PIConGPU
+    density_function callable extension (kept alongside density_expression).
+    """
+
+    def test_constant_momentum_expressions_render_to_drift(self):
+        # a constant gamma*velocity per axis becomes a Drift via from_gamma_velocity
+        distribution = AnalyticDistribution(density_expression="1", momentum_expressions=[None, "vx", None], vx=3.0e7)
+        drift = distribution.get_picongpu_drift()
+        self.assertIsNotNone(drift)
+        self.assertLess(math.sqrt(1 + (3.0e7 / c) ** 2) - drift.gamma, 1e-9)
+        self.assertEqual(drift.direction_normalized, (0.0, 1.0, 0.0))
+        # and through a full species, the drift op is attached
+        self.assertEqual(_momentum_of(distribution).drift, drift)
+
+    def test_constant_momentum_expressions_literal(self):
+        distribution = AnalyticDistribution(density_expression="1", momentum_expressions=[None, None, "2e7"])
+        drift = distribution.get_picongpu_drift()
+        self.assertLess(math.sqrt(1 + (2.0e7 / c) ** 2) - drift.gamma, 1e-9)
+        self.assertEqual(drift.direction_normalized, (0.0, 0.0, 1.0))
+
+    def test_no_momentum_expressions_keeps_directed_velocity_semantics(self):
+        # the legacy directed_velocity is a plain velocity (from_velocity), not gamma*velocity
+        drift = 1.0e7 * np.array([3.0, 4.0, 5.0])
+        distribution = AnalyticDistribution(lambda x, y, z: x + y + z, directed_velocity=drift)
+        result = distribution.get_picongpu_drift()
+        np.testing.assert_allclose(
+            np.sqrt(c**2 * (1.0 - 1.0 / result.gamma**2)) * np.asarray(result.direction_normalized), drift
+        )
+
+    def test_zero_momentum_expressions_give_no_drift(self):
+        self.assertIsNone(
+            AnalyticDistribution(density_expression="1", momentum_expressions=[0, 0, 0]).get_picongpu_drift()
+        )
+
+    def test_constant_momentum_spread_render_to_temperature(self):
+        # a constant Gaussian sigma per axis becomes a (directional) Temperature
+        distribution = AnalyticDistribution(density_expression="1", momentum_spread_expressions=[None, None, 1.0e5])
+        self.assertEqual(distribution.picongpu_get_rms_velocity_si(), (0.0, 0.0, 1.0e5))
+        temperature = _momentum_of(distribution).temperature
+        self.assertIsNotNone(temperature)
+        self.assertEqual(temperature.temperature_kev, None)
+        self.assertEqual(temperature.temperature_kev_directional[2], 5.685630111285689e-05)
+
+    def test_constant_momentum_spread_isotropic(self):
+        distribution = AnalyticDistribution(density_expression="1", momentum_spread_expressions=[1.0e5, 1.0e5, 1.0e5])
+        temperature = _momentum_of(distribution).temperature
+        self.assertIsNotNone(temperature)
+        self.assertEqual(temperature.temperature_kev_directional, None)
+        self.assertEqual(temperature.temperature_kev, 5.685630111285689e-05)
+
+    def test_position_dependent_momentum_rejected(self):
+        with self.assertRaises(UnsupportedFeatureError):
+            AnalyticDistribution(density_expression="1", momentum_expressions=["x", None, None]).get_picongpu_drift()
+        with self.assertRaises(UnsupportedFeatureError):
+            AnalyticDistribution(
+                density_expression="1", momentum_spread_expressions=[None, None, "z"]
+            ).picongpu_get_rms_velocity_si()
+
+    def test_unresolved_momentum_parameter_rejected(self):
+        # a momentum expression referencing a kwarg that was never supplied raises
+        with self.assertRaises(ValueError):
+            AnalyticDistribution(density_expression="1", momentum_expressions=["v", None, None]).get_picongpu_drift()
+
+    def test_user_defined_kw_substituted_in_rendered_density(self):
+        distribution = AnalyticDistribution(density_expression="n0 * x", n0=2.0)
+        self.assertEqual(distribution.user_defined_kw, {"n0": 2.0})
+        # the collected constant is substituted into the rendered density
+        self.assertIn("2.0*x", distribution.get_as_pypicongpu(None).function_body)
+        # and the callable evaluates the substituted constant
+        np.testing.assert_allclose(np.asarray(distribution(3, 0, 0)), np.asarray(6.0))
+
+    def test_user_defined_kw_in_momentum_expression(self):
+        distribution = AnalyticDistribution(density_expression="1", momentum_expressions=[None, "vx", None], vx=3.0e7)
+        self.assertEqual(distribution.user_defined_kw, {"vx": 3.0e7})
+        self.assertLess(math.sqrt(1 + (3.0e7 / c) ** 2) - distribution.get_picongpu_drift().gamma, 1e-9)
+
+    def test_exactly_one_density_input_rule(self):
+        with self.assertRaises(Exception):
+            AnalyticDistribution()
+        with self.assertRaises(Exception):
+            AnalyticDistribution(density_expression="x", density_function=lambda x, y, z: x)
+
+    def test_callable_path_still_works(self):
+        # keyword construction
+        keyword = AnalyticDistribution(density_function=lambda x, y, z: x * y * z)
+        np.testing.assert_allclose(np.asarray(keyword(2, 3, 4)), np.asarray(24))
+
+        # the decorator form (function passed positionally)
+        @AnalyticDistribution
+        def density(x, y, z):
+            return x + y + z
+
+        np.testing.assert_allclose(np.asarray(density(1, 2, 3)), np.asarray(6))
+        # positional function + keyword drift
+        positional = AnalyticDistribution(lambda x, y, z: x + y + z, directed_velocity=(1.0, 2.0, 3.0))
+        self.assertEqual(positional.directed_velocity, [1.0, 2.0, 3.0])
+        self.assertIsNotNone(positional.get_picongpu_drift())

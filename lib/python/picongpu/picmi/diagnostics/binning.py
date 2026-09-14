@@ -17,7 +17,7 @@ from picongpu.pypicongpu.output.binning import Binning as PyPIConGPUBinning
 from picongpu.pypicongpu.output.binning import BinningAxis as PyPIConGPUBinningAxis
 from picongpu.pypicongpu.output.binning import BinSpec as PyPIConGPUBinSpec
 
-from ..copy_attributes import default_converts_to
+from .._copy_attributes import default_converts_to
 from .timestepspec import TimeStepSpec
 
 

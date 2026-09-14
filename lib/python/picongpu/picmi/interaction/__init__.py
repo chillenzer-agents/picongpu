@@ -1,15 +1,8 @@
-from . import ionization
-from .synchrotron import Synchrotron
-from .collision import Collision, CollisionalPhysicsSetup, ConstLogCollision, DynamicLogCollision
+from . import ionization as ionization
+from .collision import Collision as Collision
+from .collision import CollisionalPhysicsSetup as CollisionalPhysicsSetup
+from .collision import ConstLogCollision as ConstLogCollision
+from .collision import DynamicLogCollision as DynamicLogCollision
+from .synchrotron import Synchrotron as Synchrotron
 
 Interaction = ionization.IonizationModel | Synchrotron | Collision | CollisionalPhysicsSetup
-
-__all__ = [
-    "Interaction",
-    "ionization",
-    "Synchrotron",
-    "Collision",
-    "ConstLogCollision",
-    "DynamicLogCollision",
-    "CollisionalPhysicsSetup",
-]

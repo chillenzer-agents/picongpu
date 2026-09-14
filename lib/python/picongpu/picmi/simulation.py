@@ -28,7 +28,7 @@ from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
 from picongpu.picmi.layout import AnyLayout
 from picongpu.picmi.species import Species
-from picongpu.picmi.species_requirements import (
+from picongpu.picmi._species_requirements import (
     SimpleDensityOperation,
     SimpleMomentumOperation,
     get_as_pypicongpu,

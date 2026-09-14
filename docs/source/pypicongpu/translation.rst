@@ -338,7 +338,7 @@ E.g. the Yee Solver class’ schema is defined as:
 .. code:: json
 
    {
-       "$id": "https://registry.hzdr.de/crp/picongpu/schema/pypicongpu.solver.YeeSolver",
+       "$id": "https://registry.hzdr.de/crp/picongpu/schema/pypicongpu.field_solver.Yee",
        "type": "object",
        "properties": {
            "name": {
@@ -356,8 +356,8 @@ which is fullfilled by it serialization:
    {"name": "Yee"}
 
 The URL
-(``https://registry.hzdr.de/crp/picongpu/schema/pypicongpu.solver.YeeSolver``)
-can be used to refer to a serialized YeeSolver, e.g. by the PyPIConGPU
+(``https://registry.hzdr.de/crp/picongpu/schema/pypicongpu.field_solver.Yee``)
+can be used to refer to a serialized YeeSolver, e.g. by the PyPIConGPU
 Simulation schema.
 
 For all schema files, the following is checked:

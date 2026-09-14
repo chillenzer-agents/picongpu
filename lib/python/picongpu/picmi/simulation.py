@@ -165,7 +165,8 @@ class Simulation(picmistandard.PICMI_Simulation):
     particle_shape: str | None = Field(
         default=None,
         description="Default particle shape for species added to this simulation. "
-        "One of 'NGP', 'linear', 'quadratic', 'cubic' or a PIConGPU 'other:' extension. "
+        "One of 'NGP', 'linear', 'quadratic', 'cubic' or a PIConGPU 'other:' extension "
+        "(unlike the PICMI standard, integer interpolation orders are not accepted). "
         "Species without their own particle_shape inherit this value; if it is unset "
         "they fall back to the PIConGPU default 'quadratic' (TSC).",
     )

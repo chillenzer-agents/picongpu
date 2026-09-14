@@ -116,8 +116,11 @@ class AnalyticDistribution(PICMI_Extension):
             Provide exactly one of `density_function` or `density_expression`.
         density_expression (str):
             A sympy-parseable string expression of the density in terms of
-            `x`, `y` and `z` (e.g. `"x*y*z"`). It is parsed with
-            `sympy.sympify` and is equivalent to the matching `density_function`.
+            `x`, `y` and `z` (e.g. `"x*y*z"`). It is string-normalised (mirroring
+            the PICMI standard) and then parsed with `sympy.sympify`, so
+            non-string inputs are coerced to their string form (e.g. a bare number
+            yields a constant density) rather than rejected. It is equivalent to
+            the matching `density_function`.
             Provide exactly one of `density_function` or `density_expression`.
         directed_velocity (3-tuple of float):
             A collective velocity for the particle distribution.

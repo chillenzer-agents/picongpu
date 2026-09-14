@@ -17,9 +17,7 @@ from .keldysh import Keldysh
 # ionization models are exposed here; electronic-collisional-equilibrium models
 # (e.g. ThomasFermi) belong to a different group and are not part of the
 # standard field ionization interface.
-_FIELD_IONIZATION_MODELS = {
-    model.model_fields["MODEL_NAME"].default.lower(): model for model in (ADK, BSI, Keldysh)
-}
+_FIELD_IONIZATION_MODELS = {model.model_fields["MODEL_NAME"].default.lower(): model for model in (ADK, BSI, Keldysh)}
 
 
 class PICMI_FieldIonization(_PICMIStandardFieldIonization):

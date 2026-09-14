@@ -23,33 +23,51 @@ class Gaussian(BaseModel):
     - for y < gasCenterFront;   density * exp(gasFactor * (abs( (y - gasCenterFront) / gasSigmaFront))^gasPower)
     - for gasCenterFront >= y >= gasCenterRear; density
     - for gasCenterRear < y;    density * exp(gasFactor * (abs( (y - gasCenterRear) / gasSigmaRear))^gasPower)
+
+    C++ counterpart: the gaussian profile template in
+    include/picongpu/param/density.param.
+
+    Units policy: SI (m^-3 for densities, m for positions/sigmas).
     """
 
     type_gaussian: Literal[True] = True
+    """discriminator for the AnyDensityProfile union."""
 
-    gas_center_front: float = Field(ge=0.0, alias="center_front")
-    """position of the front edge of the constant middle of the density profile, [m]"""
+    gas_center_front: Annotated[float, Field(ge=0.0, alias="center_front")]
+    """position of the front edge of the constant middle of the density profile, [m]; must be >= 0.
+    C++ name: gasCenterFront."""
 
-    gas_center_rear: float = Field(ge=0.0, alias="center_rear")
-    """position of the rear edge of the constant middle of the density profile, [m]"""
+    gas_center_rear: Annotated[float, Field(ge=0.0, alias="center_rear")]
+    """position of the rear edge of the constant middle of the density profile, [m]; must be >= 0 and
+    >= gas_center_front.
+    C++ name: gasCenterRear."""
 
-    gas_sigma_front: Annotated[float, AfterValidator(neq_0)] = Field(alias="sigma_front")
-    """distance from gasCenterFront until the gas density decreases to its 1/e-th part, [m]"""
+    gas_sigma_front: Annotated[float, AfterValidator(neq_0), Field(alias="sigma_front")]
+    """distance from gasCenterFront until the gas density decreases to its 1/e-th part, [m]; must be != 0
+    (the sign is irrelevant, the profile uses abs()).
+    C++ name: gasSigmaFront."""
 
-    gas_sigma_rear: Annotated[float, AfterValidator(neq_0)] = Field(alias="sigma_rear")
-    """distance from gasCenterRear until the gas density decreases to its 1/e-th part, [m]"""
+    gas_sigma_rear: Annotated[float, AfterValidator(neq_0), Field(alias="sigma_rear")]
+    """distance from gasCenterRear until the gas density decreases to its 1/e-th part, [m]; must be != 0
+    (the sign is irrelevant, the profile uses abs()).
+    C++ name: gasSigmaRear."""
 
-    gas_factor: float = Field(lt=0.0, alias="factor")
-    """exponential scaling factor, see formula above"""
+    gas_factor: Annotated[float, Field(lt=0.0, alias="factor")]
+    """exponential scaling factor, see formula above, [dimensionless]; must be < 0 so that the density
+    decays away from the plateau.
+    C++ name: gasFactor."""
 
-    gas_power: Annotated[float, AfterValidator(neq_0)] = Field(alias="power")
-    """power-exponent in exponent of density function"""
+    gas_power: Annotated[float, AfterValidator(neq_0), Field(alias="power")]
+    """power-exponent in exponent of density function, [dimensionless]; must be != 0.
+    C++ name: gasPower."""
 
-    vacuum_cells_front: int = Field(ge=0)
-    """number of vacuum cells in front of foil for laser init"""
+    vacuum_cells_front: Annotated[int, Field(ge=0)]
+    """number of vacuum cells in front of foil for laser init, [cells]; must be >= 0.
+    C++ name: vacuumFront."""
 
-    density: float = Field(gt=0.0)
-    """particle number density in m^-3"""
+    density: Annotated[float, Field(gt=0.0)]
+    """particle number density, [m^-3]; must be > 0.
+    C++ name: density."""
 
     @model_validator(mode="after")
     def check(self):

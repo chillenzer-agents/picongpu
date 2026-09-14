@@ -28,17 +28,22 @@ class SimpleDensity(BaseModel):
     - profile: density profile to use
     - species: species to be placed with the given profile
       note that their density ratios will be respected
+
+    C++ counterpart: the species initialization blocks in
+    include/picongpu/param/speciesInitialization.param.
     """
 
     profile: AnyDensityProfile
     """density profile to use, describes the actual density"""
 
     species: list[Species] = Field(exclude=True)
-    """species to be placed"""
+    """species to be placed (sorted by density ratio); excluded from serialization"""
 
     layout: AnyLayout
+    """layout (macroparticle placement) to use for the species"""
 
     type_simpledensity: Literal[True] = True
+    """discriminator for the AnyOperation union."""
 
     @field_validator("species", mode="before")
     @classmethod

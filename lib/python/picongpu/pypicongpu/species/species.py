@@ -5,14 +5,16 @@ Authors: Hannes Troepgen, Brian Edward Marre
 License: GPLv3+
 """
 
-import re
-from pydantic import BaseModel, computed_field, field_validator
+from pydantic import BaseModel, computed_field, field_validator, model_validator
 from enum import Enum
 
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant
+from picongpu.pypicongpu.validation import validate_cpp_identifier
 
 from ..rendering import RenderedObject
-from .attribute import Attribute, Momentum, Position
+from .attribute import Attribute, BoundElectrons, Momentum, Position, Weighting
+from .attribute.momentum_prev_1 import MomentumPrev1
+from .attribute.radiation_mask import RadiationMask
 from .constant import (
     Charge,
     Constant,
@@ -24,6 +26,8 @@ from .constant import (
 
 
 class Shape(Enum):
+    """particle shape (charge/current deposition scheme) of a species"""
+
     NGP = "NGP"
     linear = "CIC"
     quadratic = "TSC"
@@ -33,6 +37,8 @@ class Shape(Enum):
 
 
 class Pusher(Enum):
+    """particle pusher (equation of motion integrator) of a species"""
+
     # supported by standard and PIConGPU
     Boris = "Boris"
     Vay = "Vay"
@@ -47,12 +53,32 @@ class Pusher(Enum):
 
 
 class Constants(BaseModel):
+    """
+    the set of constants ("particle flags") of a species
+
+    Each constant may be present at most once; the set is rendered into
+    include/picongpu/param/speciesDefinition.param as the ParticleFlags.
+
+    Units policy: see the individual constants (SI).
+    """
+
     mass: Mass | None
+    """mass of the species, [kg] (None if the species has no mass constant)"""
+
     charge: Charge | None
+    """charge of the species, [C] (None if the species has no charge constant)"""
+
     density_ratio: DensityRatio | None
+    """density ratio relative to the base density, [dimensionless]"""
+
     element_properties: ElementProperties | None
+    """chemical element properties (atomic number, ionization energies)"""
+
     ground_state_ionization: GroundStateIonization | None
+    """ground state ionization models (None if not ionizing)"""
+
     synchrotron: SynchrotronConstant | None
+    """synchrotron radiation constant marking the photon species"""
 
 
 def has_constant_of_type(constants, needle_type: type[Constant]) -> bool:
@@ -91,6 +117,18 @@ def get_constant_by_type(constants, needle_type: type[Constant]) -> Constant:
     raise RuntimeError("no constant of requested type available: {}".format(needle_type))
 
 
+# concrete attribute classes by their (default) picongpu_name, used to
+# reconstruct the concrete class from the serialised form (round-trip safety)
+_ATTRIBUTE_CLASSES_BY_NAME = {
+    "position<position_pic>": Position,
+    "weighting": Weighting,
+    "momentum": Momentum,
+    "boundElectrons": BoundElectrons,
+    "momentumPrev1": MomentumPrev1,
+    "radiationMask": RadiationMask,
+}
+
+
 class Species(RenderedObject, BaseModel):
     """
     PyPIConGPU species definition
@@ -105,20 +143,29 @@ class Species(RenderedObject, BaseModel):
 
     Note that some of the species attributes or constants are considered
     mandatory. Each species constant or attribute may only be defined once.
+
+    C++ counterpart: include/picongpu/param/speciesDefinition.param
+    (one particle typedef per species).
+
+    Units policy: SI (see the individual constants/attributes).
     """
 
     constants: Constants
-    """PIConGPU particle flags"""
+    """PIConGPU particle flags (constants of the species)"""
 
     attributes: list[Attribute]
-    """PIConGPU particle attributes"""
+    """PIConGPU particle attributes of the species; must contain position and momentum,
+    each at most once"""
 
     pusher: Pusher = Pusher["Boris"]
+    """particle pusher (equation of motion integrator)"""
 
     name: str
-    """name of the species"""
+    """name of the species; must be a valid C++ identifier ([A-Za-z0-9_]+),
+    it renders into the particle typedef (species_<name>) and the PMACC_CSTRING name."""
 
     shape: Shape = Shape("TSC")
+    """particle shape (charge/current deposition scheme)"""
 
     @computed_field
     def species_name(self) -> str:
@@ -143,56 +190,59 @@ class Species(RenderedObject, BaseModel):
         # species must be uniquely defined by name
         return hash(self.name)
 
-    def check(self) -> None:
-        """
-        sanity-check self, if ok pass silently
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, name: str) -> str:
+        # The name renders into the C++ typedef `species_<name>`; the
+        # "species_" prefix makes even a leading digit acceptable.
+        return validate_cpp_identifier(name, field="species name", prefix="species_")
 
-        Ensure that:
+    @field_validator("attributes", mode="before")
+    @classmethod
+    def _reconstruct_attributes(cls, attributes):
+        # reconstruct the concrete attribute class from its serialised form
+        # (a dict holding the picongpu_name) so that model_dump(mode="json")
+        # output can be validated again (round-trip safety); the base
+        # Attribute type is not discriminable from the serialised form alone
+        if isinstance(attributes, list):
+            return [
+                _ATTRIBUTE_CLASSES_BY_NAME[elem["picongpu_name"]](**elem)
+                if isinstance(elem, dict) and elem.get("picongpu_name") in _ATTRIBUTE_CLASSES_BY_NAME
+                else elem
+                for elem in attributes
+            ]
+        return attributes
 
-        - species has valid name
-        - constants have unique types
-        - attributes have unique types
-        """
-
-        # name c++ compatible
-        # quick excursion to re.[match, fullmatch, search]:
-        # - re.search: match *anywhere* in the string
-        # - re.match: match *full* string, but ignore trailing newline (WTF?)
-        #   -> "abc\n" would be accepted (despite "$" at the end)
-        # - re.fullmatch: match *actually* full string
-        #   -> "abc\n" is rejected
-        if not re.fullmatch(r"^[A-Za-z0-9_]+$", self.name):
-            raise ValueError("species names must be c++ compatible ([A-Za-z0-9_]+)")
-
+    @model_validator(mode="after")
+    def _validate_attributes(self):
         # position is mandatory attribute
-        # position
         if Position not in [type(a) for a in self.attributes]:
             raise ValueError("Each species must have the position attribute!")
         # momentum, @todo really necessary?, Brian Marre, 2024
         if Momentum not in [type(a) for a in self.attributes]:
             raise ValueError("Each species must have the momentum attribute!")
 
-        # each constant type can only be used once
-        const_types = list(map(type, self.constants))
-        non_unique_constants = set([c for c in const_types if const_types.count(c) > 1])
-        if 0 != len(non_unique_constants):
-            raise ValueError(
-                "constant names must be unique per species, offending: {}".format(
-                    ", ".join(map(str, non_unique_constants))
-                )
-            )
-
         # each attribute (-name) can only be used once
         attr_names = list(map(lambda attr: attr.picongpu_name, self.attributes))
         non_unique_attributes = set([c for c in attr_names if attr_names.count(c) > 1])
         if 0 != len(non_unique_attributes):
             raise ValueError(
-                "attribute names must be unique per species, offending: {}".format(", ".join(non_unique_attributes))
+                "attribute names must be unique per species, offending: {}".format(
+                    ", ".join(map(str, non_unique_attributes))
+                )
             )
+        return self
 
     @field_validator("constants", mode="before")
     @classmethod
     def constants_context(cls, value):
+        # accept the serialised form (dict of constant_name -> constant dict)
+        # in addition to the native list-of-constants form, so that
+        # model_dump(mode="json") output can be validated again (round-trip
+        # safety); the serialised keys are exactly the Constants field names
+        if isinstance(value, dict):
+            return Constants(**value)
+
         constant_names_by_type = {
             "mass": Mass,
             "charge": Charge,

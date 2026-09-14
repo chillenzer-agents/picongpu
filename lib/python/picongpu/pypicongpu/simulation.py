@@ -5,10 +5,12 @@ Authors: Hannes Troepgen, Brian Edward Marre, Julian Lenz
 License: GPLv3+
 """
 
+import warnings
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
+from typing_extensions import Self
 
 from picongpu.pypicongpu.collisions import CollisionalPhysicsSetup
 from picongpu.pypicongpu.output.radiation import RadiationPlugin
@@ -21,7 +23,7 @@ from picongpu.pypicongpu.species.species import Species
 from .customuserinput import CustomUserInput
 from .field_solver import AnySolver
 from .grid import Grid3D
-from .laser import AnyLaser
+from .laser import AnyLaser, PlaneWaveLaser, TWTSLaser
 from .movingwindow import MovingWindow
 from .output import AnyPlugin, OpenPMDPlugin
 from .rendering import RenderedObject
@@ -32,59 +34,77 @@ class Simulation(RenderedObject, BaseModel):
     """
     Represents all parameters required to build & run a PIConGPU simulation.
 
+    C++ counterpart: include/picongpu/param/simulation.param (and the
+    per-subsystem .param/.cfg templates rendered from the respective sub-objects).
+
+    Units policy: all physical quantities are given in SI units;
+    dimensionless quantities are marked as such in their docstring.
+
     Most of the individual parameters are delegated to other objects held as
     attributes.
 
     To run a Simulation object pass it to the Runner (for details see there).
     """
 
-    base_density: float
-    """value to normalise densities"""
+    base_density: Annotated[float, Field(gt=0.0)]
+    """reference number density for normalising density profiles, [m^-3]; must be > 0.
+    C++ name: SI::BASE_DENSITY_SI (simulation.param)."""
 
-    delta_t_si: float
-    """Width of a single timestep, given in seconds."""
+    delta_t_si: Annotated[float, Field(gt=0.0)]
+    """width of a single timestep, [s]; must be > 0.
+    C++ name: SI::DELTA_T_SI (simulation.param)."""
 
-    time_steps: int
-    """Total number of time steps to be executed."""
+    time_steps: Annotated[int, Field(ge=0)]
+    """total number of time steps to execute, [dimensionless]; must be >= 0.
+    C++ name: TBG_steps (etc/picongpu/N.cfg)."""
 
     grid: Grid3D
-    """Used grid Object"""
+    """used grid object; cell sizes and cell counts in SI/m and cells"""
 
     laser: list[AnyLaser] | None
-    """List of laser objects to use in the simulation, or None to disable lasers"""
+    """list of laser objects to use in the simulation, or None to disable lasers"""
 
     solver: AnySolver
-    """Used Solver"""
+    """used field solver"""
 
-    typical_ppc: int
-    """
-    typical number of macro particles spawned per cell, >=1
-
-    used for normalization of units
-    """
+    typical_ppc: Annotated[int, Field(ge=1)]
+    """typical number of macro particles per cell, [dimensionless]; must be >= 1.
+    Used for normalization of units.
+    C++ name: TYPICAL_PARTICLES_PER_CELL (simulation.param)."""
 
     customuserinput: list[CustomUserInput] | None
     """
-    object that contains additional user specified input parameters to be used in custom templates
+    objects containing additional user-specified input parameters to be used in custom templates
 
     @attention custom user input is global to the simulation
     """
 
     moving_window: MovingWindow | None
-    """used moving Window, set to None to disable"""
+    """used moving window, set to None to disable"""
 
     walltime: Walltime
     """time limit of the simulation run"""
 
     binomial_current_interpolation: bool
-    """switch on a binomial current interpolation"""
+    """switch on a binomial current interpolation, [dimensionless flag]"""
 
     output: list[AnyPlugin] | None
+    """plugins to write output, or None"""
+
     species: list[Species]
+    """species present in the simulation"""
+
     init_operations: list[AnyOperation]
+    """operations that initialize species attributes"""
+
     synchrotron_params: SynchrotronParams = SynchrotronParams()
+    """parameters for the synchrotron radiation plugin"""
+
     collisional_physics: CollisionalPhysicsSetup = CollisionalPhysicsSetup()
+    """collisional physics setup (collisions, screening species, numerics)"""
+
     particle_filters: list[ParticleFunctor] = Field(default_factory=list)
+    """particle filters made globally available to the simulation"""
 
     @field_validator("output", mode="after")
     @classmethod
@@ -103,6 +123,47 @@ class Simulation(RenderedObject, BaseModel):
         if not any(isinstance(o, RadiationPlugin) for o in outputs):
             return outputs + default
         return outputs
+
+    @model_validator(mode="after")
+    def _check_laser_fits_in_run(self) -> Self:
+        # Technical (soft) invariant, hence a warning rather than an error:
+        # PIConGPU happily simulates a laser pulse that extends beyond the end
+        # of the run (the pulse is simply truncated), but it is usually a
+        # sign of inconsistent parameters.
+        #
+        # This is a heuristic that models the temporal extent of
+        # _BaseLaser-style pulses (Gaussian / dispersive) as
+        # pulse_duration_si * pulse_init. It is type-specific:
+        #   - TWTSLaser's extent is its on/off window, approximated by
+        #     windowEnd * delta_t_si (an inactive window keeps the laser on
+        #     for the whole run, so nothing is truncated);
+        #   - PlaneWaveLaser is a continuous wave, so it is never truncated;
+        #   - FromOpenPMDPulseLaser carries its extent in the input file,
+        #     which is not known here.
+        run_time = self.delta_t_si * self.time_steps
+        for laser in self.laser or []:
+            if isinstance(laser, TWTSLaser):
+                pulse_end = laser.windowEnd * self.delta_t_si
+                if pulse_end > run_time:
+                    warnings.warn(
+                        f"TWTSLaser window end (windowEnd * delta_t_si = {pulse_end} s) "
+                        f"exceeds the simulation time {run_time} s (delta_t_si * time_steps). "
+                        "The laser will be truncated at the end of the run."
+                    )
+                continue
+            if isinstance(laser, PlaneWaveLaser):
+                # continuous wave: present for the whole run, never truncated
+                continue
+            pulse_length = getattr(laser, "pulse_duration_si", None)
+            pulse_length = getattr(laser, "pulse_init", 1.0) * pulse_length if pulse_length is not None else None
+            if pulse_length is not None and pulse_length > run_time:
+                warnings.warn(
+                    f"Laser {type(laser).__name__} pulse length {pulse_length} s "
+                    f"(pulse_duration_si * pulse_init) exceeds the simulation time "
+                    f"{run_time} s (delta_t_si * time_steps). "
+                    "The pulse will be truncated at the end of the run."
+                )
+        return self
 
     @field_serializer("customuserinput")
     def _render_custom_user_input_list(self, value) -> dict[str, Any] | None:

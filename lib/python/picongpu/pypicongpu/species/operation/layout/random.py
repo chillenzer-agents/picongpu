@@ -5,12 +5,22 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
 
 class Random(BaseModel):
+    """
+    place macroparticles at random positions inside each cell
+
+    C++ counterpart: the random layout in include/picongpu/param/particle.param.
+
+    Units policy: ppc is a count (dimensionless).
+    """
+
     type_random: Literal[True] = True
-    ppc: int = Field(gt=0)
-    """particles per cell (random layout), >0"""
+    """discriminator for the AnyLayout union."""
+
+    ppc: Annotated[int, Field(gt=0)]
+    """particles per cell (random layout), [dimensionless count]; must be > 0."""

@@ -27,6 +27,11 @@
   script:
     - echo "CI_CONTAINER_NAME -> $CI_CONTAINER_NAME"
     - echo "PYTHON_VERSION -> $PYTHON_VERSION"
+    # respect the shared `ci:` flag machinery: `ci: no-compile`/`CI:no-compile`
+    # (and the finer-grained `ci: no-python-compile`) skip all Python-layer
+    # compilation, i.e. the compiling- and end-to-end tests
+    - source $CI_PROJECT_DIR/share/ci/ci_flags.sh
+    - if [ "$CI_NO_COMPILE" = "1" ]; then echo "ci: no-compile -> skip pypicongpu compile/end-to-end tests"; exit 0; fi
     - apt update
     - apt install -y curl libjpeg-dev
     - source $CI_PROJECT_DIR/share/ci/install/cmake.sh

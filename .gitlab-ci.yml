@@ -20,6 +20,14 @@ variables:
     - apt install -y curl
     - apt install -y git
     - pip3 install allpairspy
+    # Evaluate the `ci:` flags BEFORE `git_merge.sh`: `git_merge` creates a
+    # merge commit whose message would mask the `ci:` commands, so reading the
+    # flags after it would silently break commit-based (as opposed to
+    # label-based) flag control. `ci_flags.sh` computes the flags exactly once
+    # per shell, so `generate_reduced_matrix.sh` below re-sources it and still
+    # sees the pre-merge (pull-request head) values -- same semantics as the
+    # Python-layer jobs (`share/ci/pypicongpu.yml`).
+    - source $CI_PROJECT_DIR/share/ci/ci_flags.sh
     - $CI_PROJECT_DIR/share/ci/git_merge.sh
     - $CI_PROJECT_DIR/share/ci/generate_reduced_matrix.sh -n ${TEST_TUPLE_NUM_ELEM} -j 15 > compile.yml
     - cat compile.yml
@@ -201,3 +209,15 @@ pypicongpu-compiling-test:
     CMAKE_VERSION: '3.28'
     BOOST_VERSION: '1.75.0'
     PYTHON_COMPILING_TEST: 'ON'
+
+pypicongpu-end-to-end-test:
+  stage: test
+  extends: .base_pypicongpu_compile_test
+  variables:
+    PIP_BREAK_SYSTEM_PACKAGES: 1
+    CI_CONTAINER_NAME: "ubuntu24.04"
+    PYTHON_VERSION: "3.11.*"
+    CXX_VERSION: "g++-13"
+    CMAKE_VERSION: "3.28"
+    BOOST_VERSION: "1.75.0"
+    PYTHON_END_TO_END_TEST: "ON"

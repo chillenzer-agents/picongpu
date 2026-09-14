@@ -18,6 +18,7 @@ from .keldysh import Keldysh
 # (e.g. ThomasFermi) belong to a different group and are not part of the
 # standard field ionization interface.
 _FIELD_IONIZATION_MODELS = {model.model_fields["MODEL_NAME"].default.lower(): model for model in (ADK, BSI, Keldysh)}
+_FIELD_IONIZATION_MODEL_NAMES = [model.model_fields["MODEL_NAME"].default for model in (ADK, BSI, Keldysh)]
 
 
 class PICMI_FieldIonization(_PICMIStandardFieldIonization):
@@ -87,7 +88,7 @@ class PICMI_FieldIonization(_PICMIStandardFieldIonization):
         try:
             return _FIELD_IONIZATION_MODELS[model_name]
         except KeyError:
-            supported = ", ".join(model.model_fields["MODEL_NAME"].default for model in (ADK, BSI, Keldysh))
+            supported = ", ".join(_FIELD_IONIZATION_MODEL_NAMES)
             raise ValueError(
                 f"Unsupported field ionization model {self.model!r}. Supported models: {supported}."
             ) from None

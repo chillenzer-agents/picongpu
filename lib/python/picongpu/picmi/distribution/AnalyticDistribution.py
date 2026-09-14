@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 import logging
+import re
 import traceback
 from collections.abc import Callable
 
@@ -128,8 +129,10 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
             the matching `density_function`.
             Provide exactly one of `density_function` or `density_expression`.
         directed_velocity (3-tuple of float):
-            A collective velocity for the particle distribution.
-            Used for any axis whose momentum expression is not supplied.
+            A collective velocity for the particle distribution, interpreted as a plain velocity.
+            Mutually exclusive with ``momentum_expressions``: if either a non-zero
+            ``directed_velocity`` and a non-``None`` ``momentum_expressions`` entry are both
+            supplied, construction raises.
     """
 
     # The standard makes this required; PIConGPU additionally allows a sympy based
@@ -157,7 +160,50 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
             sx, sy, sz = symbols("x,y,z")
             parsed = sympify(f"{data['density_expression']}".replace("\n", ""))
             data["density_function"] = lambda x, y, z: parsed.subs({sx: x, sy: y, sz: z})
+        cls._collect_spread_user_defined_kw(data)
+        cls._reject_conflicting_drift(data)
         return data
+
+    @classmethod
+    def _reject_conflicting_drift(cls, data):
+        # directed_velocity (plain velocity) and momentum_expressions (gamma * velocity) are
+        # two different, mutually exclusive ways of setting a drift. A non-zero directed_velocity
+        # combined with a non-None momentum expression was previously silently discarded; reject
+        # the ambiguous combination so the two can't silently override each other.
+        directed_velocity = data.get("directed_velocity")
+        if directed_velocity is None:
+            directed_velocity = (0.0, 0.0, 0.0)
+        momentum_expressions = data.get("momentum_expressions")
+        if momentum_expressions is None:
+            momentum_expressions = [None, None, None]
+        has_directed = any(float(v) != 0.0 for v in directed_velocity)
+        has_momentum = any(e is not None for e in momentum_expressions)
+        if has_directed and has_momentum:
+            raise ValueError(
+                "directed_velocity and momentum_expressions are mutually exclusive; "
+                "provide exactly one of them to set the drift."
+            )
+
+    @classmethod
+    def _collect_spread_user_defined_kw(cls, data):
+        # The standard's collector scans only density_expression + momentum_expressions.
+        # PIConGPU additionally renders momentum_spread_expressions, so constants referenced
+        # *only* there must be collected here (before the standard's collector runs), or the
+        # extra="forbid" config would reject them as extra inputs.
+        spread_expressions = data.get("momentum_spread_expressions") or [None, None, None]
+        spread_expressions = [None if e is None else f"{e}".replace("\n", "") for e in spread_expressions]
+        known = set()
+        for fname, finfo in cls.model_fields.items():
+            known.add(fname)
+            if finfo.alias:
+                known.add(finfo.alias)
+        user_defined_kw = dict(data.get("user_defined_kw", {}))
+        for k in list(data.keys()):
+            if k in known or k in user_defined_kw:
+                continue
+            if any(e is not None and re.search(r"\b%s\b" % re.escape(k), e) for e in spread_expressions):
+                user_defined_kw[k] = data.pop(k)
+        data["user_defined_kw"] = user_defined_kw
 
     def _constant_expression(self, field: str, expression: str) -> float:
         """

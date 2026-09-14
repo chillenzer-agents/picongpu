@@ -221,6 +221,38 @@ class TestAnalyticDistributionFullSurface(TestCase):
         self.assertEqual(distribution.user_defined_kw, {"vx": 3.0e7})
         self.assertLess(math.sqrt(1 + (3.0e7 / c) ** 2) - distribution.get_picongpu_drift().gamma, 1e-9)
 
+    def test_user_defined_kw_in_momentum_spread_expression(self):
+        # a constant referenced *only* in a momentum_spread_expression is collected and substituted
+        distribution = AnalyticDistribution(
+            density_expression="1", momentum_spread_expressions=[None, None, "sigma"], sigma=1.0e5
+        )
+        self.assertEqual(distribution.user_defined_kw, {"sigma": 1.0e5})
+        self.assertEqual(distribution.picongpu_get_rms_velocity_si(), (0.0, 0.0, 1.0e5))
+        temperature = _momentum_of(distribution).temperature
+        self.assertEqual(temperature.temperature_kev_directional[2], 5.685630111285689e-05)
+
+    def test_user_defined_kw_shared_between_density_and_spread(self):
+        # a single constant used in both the density and a spread expression is collected once
+        distribution = AnalyticDistribution(
+            density_expression="a", momentum_spread_expressions=[None, "a", None], a=2.0e5
+        )
+        self.assertEqual(distribution.user_defined_kw, {"a": 2.0e5})
+        self.assertEqual(distribution.picongpu_get_rms_velocity_si(), (0.0, 2.0e5, 0.0))
+
+    def test_directed_velocity_and_momentum_expressions_conflict_rejected(self):
+        # the two mutually-exclusive drift setters must not silently override each other
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            AnalyticDistribution(
+                density_expression="1", directed_velocity=(1.0e7, 0.0, 0.0), momentum_expressions=[None, 3.0e7, None]
+            )
+        # each on its own (with the other at its default) remains valid
+        self.assertIsNotNone(
+            AnalyticDistribution(density_expression="1", directed_velocity=(1.0e7, 0.0, 0.0)).get_picongpu_drift()
+        )
+        self.assertIsNotNone(
+            AnalyticDistribution(density_expression="1", momentum_expressions=[None, 3.0e7, None]).get_picongpu_drift()
+        )
+
     def test_exactly_one_density_input_rule(self):
         with self.assertRaises(Exception):
             AnalyticDistribution()

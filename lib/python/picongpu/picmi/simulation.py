@@ -29,6 +29,7 @@ from picongpu.picmi.distribution.AnalyticDistribution import AnalyticDistributio
 from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid, AnyGrid
 from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
+from picongpu.picmi.interaction.ionization.fieldionization import PICMI_FieldIonization
 from picongpu.picmi.layout import AnyLayout
 from picongpu.picmi.species import Species
 from picongpu.picmi.species_requirements import (
@@ -363,9 +364,19 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.picongpu_custom_user_input = (self.picongpu_custom_user_input or []) + [custom_user_input]
 
     def add_interaction(self, interaction) -> None:
-        pypicongpu.util.unsupported(
-            "PICMI standard interactions are not supported by PIConGPU, use the picongpu specific Interaction object instead"
-        )
+        """
+        Add an interaction to the simulation.
+
+        Accepts both the standard `PICMI_FieldIonization` (which is converted to
+        the matching PIConGPU concrete ionization model at add time) and
+        PIConGPU's own `Interaction` types. The standard object is converted so
+        that the single `picongpu_interaction` pipeline is preserved.
+        """
+        if isinstance(interaction, PICMI_FieldIonization):
+            interaction = interaction.get_concrete()
+        elif not isinstance(interaction, Interaction):
+            pypicongpu.util.unsupported("This PICMI interaction type is not supported by PIConGPU", interaction)
+        self.picongpu_interaction = (self.picongpu_interaction or []) + [interaction]
 
     # @todo add refactor once restarts are supported by the Runner, Brian Marre, 2024
     def step(self, nsteps: int = 1, **flags):

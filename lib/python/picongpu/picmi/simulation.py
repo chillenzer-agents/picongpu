@@ -17,7 +17,16 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import picmistandard
-from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import (
+    AfterValidator,
+    BeforeValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 from sympy import Symbol
 
 from picongpu import pypicongpu, templates
@@ -30,7 +39,7 @@ from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid, AnyGrid
 from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
 from picongpu.picmi.layout import AnyLayout
-from picongpu.picmi.species import Species
+from picongpu.picmi.species import _STANDARD_SHAPES, Species
 from picongpu.picmi.species_requirements import (
     SimpleDensityOperation,
     SimpleMomentumOperation,
@@ -152,6 +161,29 @@ class Simulation(picmistandard.PICMI_Simulation):
     please refer to the PICMI documentation for the spec
     https://picmi-standard.github.io/standard/simulation.html
     """
+
+    # Override the standard's particle_shape (default "linear") to default to None:
+    # an unset Simulation-level shape lets each species fall back to the PIConGPU
+    # default ('quadratic'/TSC), while a set value is inherited by species that
+    # don't specify their own shape. The accepted values match Species.particle_shape
+    # (the PICMI-standard names plus PIConGPU 'other:' extensions).
+    particle_shape: str | None = Field(
+        default=None,
+        description="Default particle shape for species added to this simulation. "
+        "One of 'NGP', 'linear', 'quadratic', 'cubic' or a PIConGPU 'other:' extension. "
+        "Species without their own particle_shape inherit this value; if it is unset "
+        "they fall back to the PIConGPU default 'quadratic' (TSC).",
+    )
+
+    @field_validator("particle_shape")
+    @classmethod
+    def _validate_particle_shape(cls, value):
+        if value is not None and value not in _STANDARD_SHAPES and not value.startswith("other:"):
+            raise ValueError(
+                f"Unsupported particle shape {value!r}. Must be one of "
+                f"{', '.join(_STANDARD_SHAPES)} or be prefixed with 'other:'."
+            )
+        return value
 
     # Excluded from model dumps because it is passed through to the pypicongpu
     # Simulation as-is (single owner is the pypicongpu model) and because
@@ -412,7 +444,9 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     def _check_compatibility(self):
         pypicongpu.util.unsupported("verbose", self.verbose)
-        pypicongpu.util.unsupported("particle shape", self.particle_shape, "linear")
+        # particle_shape is supported: it is validated by _validate_particle_shape
+        # above and, when set, inherited by species that do not specify their own
+        # shape (see Species._resolved_particle_shape).
         pypicongpu.util.unsupported("gamma boost", self.gamma_boost)
         if len(self.laser_injection_methods) != self.laser_injection_methods.count(None):
             pypicongpu.util.unsupported("laser injection method", self.laser_injection_methods, [])
@@ -556,6 +590,12 @@ class Simulation(picmistandard.PICMI_Simulation):
         return self._runner
 
     def _picongpu_add_species(self, species, layout):
+        # Back-reference the owning Simulation so an unset ``particle_shape``
+        # resolves to the Simulation-level fallback at translation time. This is
+        # the single funnel for every species added to a Simulation, so the
+        # reference is available uniformly across all species-conversion sites
+        # (Simulation, Binning, Radiation, Collision).
+        species._simulation = self
         self.species.append(species)
         self.layouts.append(layout)
         if species.density_scale is not None and (layout is None and species.initial_distribution is None):

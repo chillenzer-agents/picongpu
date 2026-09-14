@@ -11,7 +11,7 @@ from .....pypicongpu.species.constant import ionizationmodel
 
 
 class Keldysh(FieldIonization):
-    """Barrier Suppression Ioniztion model"""
+    """Keldysh ionization model"""
 
     MODEL_NAME: str = "Keldysh"
 

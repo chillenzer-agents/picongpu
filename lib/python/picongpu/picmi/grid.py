@@ -24,6 +24,19 @@ PICONGPU_BOUNDARY_CONDITION_BY_PICMI_ID = {
 }
 
 
+# PICMI-standard particle boundary conditions (per axis) mapped to the
+# PIConGPU ``--<species>_boundary`` command-line token used per axis.
+# The field-boundary tokens ("periodic"/"open") map to the same kinds, so a
+# particle axis that merely inherits its field boundary stays consistent.
+PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID = {
+    "periodic": "periodic",
+    "open": "absorbing",
+    "absorbing": "absorbing",
+    "reflect": "reflecting",
+    "thermal": "thermal",
+}
+
+
 def _reject_bool_n_gpus(n_gpus):
     # bool is an int subclass, so without this explicit check pydantic's lax
     # int coercion would silently turn True/False into 1/0 GPUs.
@@ -89,16 +102,6 @@ def _reject_unsupported_cartesian_grid_features(self):
     util.unsupported("refined regions", self.refined_regions, [])
     util.unsupported("lower bound (particles)", self.lower_bound_particles, self.lower_bound)
     util.unsupported("upper bound (particles)", self.upper_bound_particles, self.upper_bound)
-    util.unsupported(
-        "lower boundary conditions (particles)",
-        self.lower_boundary_conditions_particles,
-        self.lower_boundary_conditions,
-    )
-    util.unsupported(
-        "upper boundary conditions (particles)",
-        self.upper_boundary_conditions_particles,
-        self.upper_boundary_conditions,
-    )
     util.unsupported("pml cells", self.pml_cells)
 
 
@@ -216,8 +219,38 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
                 )
         return self
 
+    def _check_particle_boundary_conditions(self):
+        # Unset particle BCs are inherited from the field BCs by the standard's
+        # ``_resolve_grid``; here we validate what was actually set (inherited or
+        # explicit) and keep it per-axis, mirroring the field-boundary rule that
+        # the lower and upper conditions must agree (PIConGPU chooses by axis,
+        # not by direction).
+        for dim, name in enumerate(["x", "y", "z"]):
+            lower = self.lower_boundary_conditions_particles[dim]
+            upper = self.upper_boundary_conditions_particles[dim]
+            if lower != upper:
+                raise ValueError(
+                    f"{name}: lower and upper particle boundary conditions must be equal "
+                    f"(can only be chosen by axis, not by direction). You gave {lower=}, {upper=}."
+                )
+            if lower not in PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID:
+                raise ValueError(f"{name}: particle boundary condition not supported. You gave {lower!r}.")
+
     def check(self):
         _check_cartesian_grid(self, ["x", "y", "z"])
+        self._check_particle_boundary_conditions()
+
+    def picongpu_particle_boundary_conditions(self) -> tuple[str, str, str]:
+        """Resolved per-axis particle boundary conditions (lower==upper, validated).
+
+        These are the *grid defaults* for particle boundaries: when a species does not
+        set its own ``picongpu_particle_boundary``, it inherits this grid's setting per
+        axis. Values are the PICMI-standard names
+        (``periodic``/``absorbing``/``reflect``/``thermal``); see
+        :data:`PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID` for the mapping to the
+        PIConGPU ``--<species>_boundary`` tokens.
+        """
+        return tuple(self.lower_boundary_conditions_particles)
 
     def to_2d(self) -> "Cartesian2DGrid":
         """Reduce this 3D grid to a 2D (2D3V) grid, dropping the z (third) component.

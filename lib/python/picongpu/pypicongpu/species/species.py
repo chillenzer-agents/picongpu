@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 import re
-from pydantic import BaseModel, computed_field, field_validator
+from pydantic import BaseModel, computed_field, field_validator, model_validator
 from enum import Enum
 
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant
@@ -191,15 +191,17 @@ class Species(RenderedObject, BaseModel):
         # species must be uniquely defined by name
         return hash(self.name)
 
-    def check(self) -> None:
+    @model_validator(mode="after")
+    def check(self):
         """
         sanity-check self, if ok pass silently
 
         Ensure that:
 
         - species has valid name
+        - position and momentum attributes are present
         - constants have unique types
-        - attributes have unique types
+        - attributes have unique names
         """
 
         # name c++ compatible
@@ -239,6 +241,8 @@ class Species(RenderedObject, BaseModel):
             raise ValueError(
                 "attribute names must be unique per species, offending: {}".format(", ".join(non_unique_attributes))
             )
+
+        return self
 
     @field_validator("constants", mode="before")
     @classmethod

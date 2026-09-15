@@ -7,7 +7,7 @@ License: GPLv3+
 
 from pydantic import BaseModel, model_validator
 
-from picongpu.picmi.mutation_switch import INIT_MUTATION_ENABLED
+from picongpu.picmi import mutation_switch
 from picongpu.picmi.species import DependsOn, Species
 from picongpu.picmi.species_requirements import (
     GroundStateIonizationConstruction,
@@ -52,7 +52,7 @@ class IonizationModel(BaseModel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not INIT_MUTATION_ENABLED:
+        if not mutation_switch.INIT_MUTATION_ENABLED:
             # Reachability-driven translation (picmi.translate) derives these
             # constraints from the (reachable) model at translation time, so the
             # eager __init__ registration is skipped. This is what fixes upstream

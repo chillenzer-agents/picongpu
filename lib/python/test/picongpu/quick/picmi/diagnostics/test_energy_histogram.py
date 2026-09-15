@@ -12,6 +12,18 @@ from unittest import TestCase
 from picongpu import picmi
 from picongpu.picmi import constants
 from picongpu.picmi.diagnostics import EnergyHistogram, TimeStepSpec
+from picongpu.picmi.grid import Cartesian3DGrid
+from picongpu.picmi.species import particle_boundary_translation_context
+
+# Converting a species (e.g. nested in an EnergyHistogram) now requires a grid context.
+_GRID = Cartesian3DGrid(
+    number_of_cells=[1, 1, 1],
+    lower_bound=[0, 0, 0],
+    upper_bound=[1, 1, 1],
+    lower_boundary_conditions=["periodic", "periodic", "periodic"],
+    upper_boundary_conditions=["periodic", "periodic", "periodic"],
+    picongpu_super_cell_size=(1, 1, 1),
+)
 
 
 class TestEnergyHistogram(TestCase):
@@ -32,7 +44,8 @@ class TestEnergyHistogram(TestCase):
         # energies are given in SI (joule) and must be passed to the backend in keV
         histogram = self.__get_histogram(self.__get_species(), max_energy_keV=42.0)
 
-        converted = histogram.get_as_pypicongpu(time_step_size=1, num_steps=17)
+        with particle_boundary_translation_context(_GRID):
+            converted = histogram.get_as_pypicongpu(time_step_size=1, num_steps=17)
 
         assert converted.type_energyhistogram is True
         assert converted.min_energy + converted.max_energy - 42.0 < 1e-14
@@ -47,7 +60,8 @@ class TestEnergyHistogram(TestCase):
             max_energy=42.0 * constants.keV,
         )
 
-        converted = histogram.get_as_pypicongpu(time_step_size=1, num_steps=17)
+        with particle_boundary_translation_context(_GRID):
+            converted = histogram.get_as_pypicongpu(time_step_size=1, num_steps=17)
 
         assert abs(converted.min_energy - 7.0) < 1e-14
         assert abs(converted.max_energy - 42.0) < 1e-14

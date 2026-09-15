@@ -11,6 +11,7 @@ import pytest
 from picongpu import picmi
 from picongpu.picmi.grid import Cartesian3DGrid
 from picongpu.picmi.species import Species
+from picongpu.picmi.species import particle_boundary_translation_context
 from picongpu.picmi.species_requirements import SimpleMomentumOperation, run_construction
 from picongpu.pypicongpu import species
 from picongpu.pypicongpu.util import UnsupportedFeatureError
@@ -20,6 +21,8 @@ ARBITRARY_GRID = Cartesian3DGrid(
     lower_bound=[0, 0, 0],
     upper_bound=[1, 1, 1],
     number_of_cells=[1, 1, 1],
+    # 1 cell per axis -> the super cell must be 1 to keep the grid valid
+    picongpu_super_cell_size=(1, 1, 1),
     lower_boundary_conditions=["periodic", "periodic", "periodic"],
     upper_boundary_conditions=["periodic", "periodic", "periodic"],
 )
@@ -482,7 +485,10 @@ def _gaussian_distribution(rms_velocity):
 def _momentum_of(rms_velocity):
     """translate the temperature of a distribution with the given rms_velocity"""
     species = Species(name="e", particle_type="electron", initial_distribution=_gaussian_distribution(rms_velocity))
-    return run_construction(SimpleMomentumOperation(species)).temperature
+    # The momentum operation converts the species, which now requires a grid
+    # context to resolve the particle boundary.
+    with particle_boundary_translation_context(ARBITRARY_GRID):
+        return run_construction(SimpleMomentumOperation(species)).temperature
 
 
 class TestDirectionalTemperature(TestCase):

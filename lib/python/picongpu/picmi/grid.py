@@ -5,16 +5,15 @@ Authors: Hannes Troepgen, Brian Edward Marre, Richard Pausch, Julian Lenz
 License: GPLv3+
 """
 
-from typing import TYPE_CHECKING, Annotated, Sequence
+from typing import Annotated, Sequence
 import picmistandard
 from pydantic import AfterValidator, BeforeValidator, Field, computed_field
 
 from ..pypicongpu import grid, util
 from ..pypicongpu.species.species_boundary import SpeciesParticleBoundary
 from .copy_attributes import converts_to
-
-if TYPE_CHECKING:
-    from .particle_boundary import ParticleBoundary
+from . import particle_boundary
+from .particle_boundary import PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID, ParticleBoundary
 
 
 def _normalise_type(kw, key, t):
@@ -25,19 +24,6 @@ def _normalise_type(kw, key, t):
 PICONGPU_BOUNDARY_CONDITION_BY_PICMI_ID = {
     "open": grid.BoundaryCondition.ABSORBING,
     "periodic": grid.BoundaryCondition.PERIODIC,
-}
-
-
-# PICMI-standard particle boundary conditions (per axis) mapped to the
-# PIConGPU ``--<species>_boundary`` command-line token used per axis.
-# The field-boundary tokens ("periodic"/"open") map to the same kinds, so a
-# particle axis that merely inherits its field boundary stays consistent.
-PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID = {
-    "periodic": "periodic",
-    "open": "absorbing",
-    "absorbing": "absorbing",
-    "reflect": "reflecting",
-    "thermal": "thermal",
 }
 
 
@@ -226,10 +212,6 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         on absorbing-field axes; periodic only on periodic-field axes; periodic
         requires a 0 offset) are enforced here, at translation time.
         """
-        # Imported here to avoid a circular import (particle_boundary imports the
-        # BC mapping tables from this module).
-        from . import particle_boundary
-
         return particle_boundary.resolve_species_particle_boundary(
             name=name,
             field_boundary_conditions=self.lower_boundary_conditions,

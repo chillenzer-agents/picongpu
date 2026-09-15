@@ -42,7 +42,7 @@ class TestGridParticleBoundaryFields(TestCase):
     def test_unset_inherits_field_bcs(self):
         # Unset particle BCs inherit the field BCs (open/open/periodic).
         grid = _grid()
-        assert grid.picongpu_particle_boundary_conditions() == ("open", "open", "periodic")
+        assert grid.picongpu_particle_boundary_conditions == ("open", "open", "periodic")
         # ... and they translate (map open -> absorbing) without error.
         grid.get_as_pypicongpu()
 
@@ -51,7 +51,7 @@ class TestGridParticleBoundaryFields(TestCase):
             lower_boundary_conditions_particles=["absorbing", "reflect", "periodic"],
             upper_boundary_conditions_particles=["absorbing", "reflect", "periodic"],
         )
-        assert grid.picongpu_particle_boundary_conditions() == ("absorbing", "reflect", "periodic")
+        assert grid.picongpu_particle_boundary_conditions == ("absorbing", "reflect", "periodic")
         grid.get_as_pypicongpu()
 
     def test_per_axis_form_accepted(self):
@@ -63,8 +63,15 @@ class TestGridParticleBoundaryFields(TestCase):
             bc_ymax_particles="reflect",
             bc_zmax_particles="periodic",
         )
-        assert grid.picongpu_particle_boundary_conditions() == ("absorbing", "reflect", "periodic")
+        assert grid.picongpu_particle_boundary_conditions == ("absorbing", "reflect", "periodic")
         grid.get_as_pypicongpu()
+
+    def test_is_computed_field_in_model_dump(self):
+        # picongpu_particle_boundary_conditions is a pydantic computed_field, so
+        # it must show up in model_dump().
+        grid = _grid()
+        dumped = grid.model_dump()
+        assert tuple(dumped["picongpu_particle_boundary_conditions"]) == ("open", "open", "periodic")
 
     def test_lower_upper_must_agree_per_axis(self):
         # The particle-BC consistency check is a model validator, so it runs at
@@ -132,7 +139,7 @@ class TestSpeciesOverride(TestCase):
             lower_boundary_conditions_particles=["reflect", "thermal", "periodic"],
             upper_boundary_conditions_particles=["reflect", "thermal", "periodic"],
         )
-        assert grid.picongpu_particle_boundary_conditions() == ("reflect", "thermal", "periodic")
+        assert grid.picongpu_particle_boundary_conditions == ("reflect", "thermal", "periodic")
         grid.get_as_pypicongpu()
 
 

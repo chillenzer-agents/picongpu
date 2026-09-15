@@ -408,14 +408,14 @@ class Simulation(picmistandard.PICMI_Simulation):
             )
         self.picongpu_run(**flags)
 
-    def _generate_openpmd_plugins(self, diagnostics, num_steps):
+    def _generate_openpmd_plugins(self, diagnostics, num_steps, default_particle_shape=None):
         diagnostics = list(diagnostics)
         return [
             OpenPMDPlugin(
                 sources=[
                     (
                         diagnostic.period.get_as_pypicongpu(time_step_size=self.time_step_size, num_steps=num_steps),
-                        diagnostic.species.get_as_pypicongpu()
+                        diagnostic.species.get_as_pypicongpu(default_particle_shape=default_particle_shape)
                         if isinstance(diagnostic, ParticleDump)
                         else PyPIConGPUFieldDump(
                             name=diagnostic.fieldname,
@@ -433,21 +433,21 @@ class Simulation(picmistandard.PICMI_Simulation):
             for options in unique(map(lambda x: x.options, diagnostics))
         ]
 
-    def _generate_plugins(self, num_steps):
+    def _generate_plugins(self, num_steps, default_particle_shape=None):
         return [
             entry.get_as_pypicongpu(
                 time_step_size=self.time_step_size,
                 num_steps=num_steps,
+                default_particle_shape=default_particle_shape,
             )
             for entry in self.diagnostics
             if not handled_via_openpmd(entry)
-        ] + self._generate_openpmd_plugins(filter(handled_via_openpmd, self.diagnostics), num_steps)
+        ] + self._generate_openpmd_plugins(
+            filter(handled_via_openpmd, self.diagnostics), num_steps, default_particle_shape
+        )
 
     def _check_compatibility(self):
         pypicongpu.util.unsupported("verbose", self.verbose)
-        # particle_shape is supported: it is validated by _validate_particle_shape
-        # above and, when set, inherited by species that do not specify their own
-        # shape (see Species._resolved_particle_shape).
         pypicongpu.util.unsupported("gamma boost", self.gamma_boost)
         if len(self.laser_injection_methods) != self.laser_injection_methods.count(None):
             pypicongpu.util.unsupported("laser injection method", self.laser_injection_methods, [])
@@ -546,7 +546,9 @@ class Simulation(picmistandard.PICMI_Simulation):
         ]
 
         return pypicongpu.simulation.Simulation(
-            species=map(get_as_pypicongpu, sorted(self.species)),
+            species=map(
+                lambda s: s.get_as_pypicongpu(default_particle_shape=self.particle_shape), sorted(self.species)
+            ),
             init_operations=init_operations,
             typical_ppc=typical_ppc,
             delta_t_si=self.time_step_size,
@@ -558,11 +560,11 @@ class Simulation(picmistandard.PICMI_Simulation):
             walltime=walltime or Walltime(walltime=datetime.timedelta(hours=1)),
             time_steps=time_steps,
             laser=[ll.get_as_pypicongpu() for ll in self.lasers] or None,
-            output=self._generate_plugins(time_steps),
+            output=self._generate_plugins(time_steps, self.particle_shape),
             particle_filters=self._collect_particle_filters(),
             base_density=self._get_base_density(),
             synchrotron_params=synchrotron_params[0],
-            collisional_physics=collisions[0].get_as_pypicongpu(),
+            collisional_physics=collisions[0].get_as_pypicongpu(default_particle_shape=self.particle_shape),
             precision=self.picongpu_precision,
             precision_overrides=self.picongpu_precision_config.get_as_pypicongpu(),
             memory_config=self.picongpu_memory_config.get_as_pypicongpu(),
@@ -591,12 +593,6 @@ class Simulation(picmistandard.PICMI_Simulation):
         return self._runner
 
     def _picongpu_add_species(self, species, layout):
-        # Back-reference the owning Simulation so an unset ``particle_shape``
-        # resolves to the Simulation-level fallback at translation time. This is
-        # the single funnel for every species added to a Simulation, so the
-        # reference is available uniformly across all species-conversion sites
-        # (Simulation, Binning, Radiation, Collision).
-        species._simulation = self
         self.species.append(species)
         self.layouts.append(layout)
         if species.density_scale is not None and (layout is None and species.initial_distribution is None):

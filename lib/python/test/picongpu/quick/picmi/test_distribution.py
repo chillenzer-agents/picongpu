@@ -336,15 +336,25 @@ class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
 
     def test_bounded_matches_native_profile(self):
         """the bounded analytic form reproduces the native y-only Gaussian exactly (cell-centre corrected)"""
-        bounded = self._get_distribution(lower_bound=[0, 0, 0], upper_bound=[1, 1, 1])
-        native = self._get_distribution()
+        # vacuum_front is lowered to 1.0 (below the sampled range) so the vacuum boundary
+        # y = int(1.0/cell_size_y) - 0.5*cell_size_y = 0.5 sits inside the sampling window:
+        # with the class default (vacuum_front=50 -> boundary at 49.5) the profile is 0.0
+        # everywhere over y in [0, 10) and the comparison below would pass vacuously.
+        bounded = self._get_distribution(lower_bound=[0, 0, 0], upper_bound=[1, 1, 1], vacuum_front=1.0)
+        native = self._get_distribution(vacuum_front=1.0)
         bounded.get_as_pypicongpu(ARBITRARY_GRID)
         native.get_as_pypicongpu(ARBITRARY_GRID)
 
         y = np.arange(0.0, 10.0, 0.05)
         x = np.full_like(y, 0.5)
         z = np.full_like(y, 0.5)
-        np.testing.assert_allclose(bounded(x, y, z), native(x, y, z), rtol=1e-9, atol=1e-30)
+        bounded_profile = bounded(x, y, z)
+        native_profile = native(x, y, z)
+        # guard: the comparison must be non-vacuous, i.e. it must cover the vacuum region
+        # (exact zeros), the front/rear ramps, and the plateau (full density)
+        assert bounded_profile.min() == 0.0
+        assert np.isclose(bounded_profile.max(), self.values["density"])
+        np.testing.assert_allclose(bounded_profile, native_profile, rtol=1e-9, atol=1e-30)
 
     def test_bounded_density_zero(self):
         """bounded form also rejects a non-positive density"""

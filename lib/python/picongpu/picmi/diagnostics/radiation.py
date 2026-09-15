@@ -7,6 +7,7 @@ License: GPLv3+
 
 from pydantic import ConfigDict, field_validator
 
+from picongpu.picmi import mutation_switch
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 from picongpu.picmi.species import Species
 from picongpu.pypicongpu.output.radiation import (
@@ -36,6 +37,9 @@ class Radiation(RadiationPluginConfig):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not mutation_switch.INIT_MUTATION_ENABLED:
+            # Derived from the (reachable) diagnostic by picmi.translate instead.
+            return
         for s in self.species:
             s.register_requirements(
                 [MomentumPrev1()] + ([RadiationMask()] if self.gamma_filter_threshold is not None else [])

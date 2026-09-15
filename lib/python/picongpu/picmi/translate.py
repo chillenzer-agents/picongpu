@@ -13,29 +13,34 @@ does not:
 * Purity: the input `picmi.Simulation` (and every member) is never mutated. The
   translation works on a fresh, internally-owned copy that is discarded when the
   function returns.
-* Reachability: only objects reachable from `sim` contribute constraints. This is
-  what fixes upstream #5727 (an `IonizationModel` that is constructed but never
-  added to `picongpu_interaction` must not pollute the ion species) once the
-  `__init__`-level registration switch (see `INIT_MUTATION_ENABLED` below) is off.
+* Reachability: only objects reachable from `sim` contribute constraints. This
+  fixes upstream #5727 by itself: an `IonizationModel` that is constructed but
+  never added to `picongpu_interaction` is not reachable, so `translate` derives
+  no ionization onto its species -- whether or not the incumbent `__init__`
+  polluted the source object. `translate` is therefore independent of the
+  `__init__`-level registration switch (`INIT_MUTATION_ENABLED`).
 
 Design (per the resolved spec in #107):
 1. Walk the reachable PICMI object graph from `sim` (BFS over pydantic fields,
-   visited by `id`). A constraint is *observed* from a reference, not *registered*
-   at construction.
-2. Each cross-object constraint is an immutable data object (`Constraint`).
-3. The dependency graph (edge "A references B => B resolves before A") is ordered
-   with `graphlib.TopologicalSorter`.
-4. Constraints are resolved bottom-up into a fresh internal context, reusing the
-   *conflict/uniqueness semantics* of `species_requirements` so the new engine
-   reproduces current species behaviour.
-5. The `pypicongpu.Simulation` tree is constructed from the resolved context by
+   visited by `id`).
+2. Order the reachable objects so that referenced objects come before their
+   referrers, using `graphlib.TopologicalSorter` (this also surfaces reference
+   cycles as `graphlib.CycleError`).
+3. Resolve bottom-up over that order: for each reachable species, discard the
+   cross-object requirements the incumbent `__init__` may have pre-registered,
+   then re-derive them from the reachable cross-object objects (interactions,
+   diagnostics) via `_apply_cross_object_constraints`. This is what makes the
+   output depend on reachability alone, and it makes the topological order
+   load-bearing: a referrer's re-derivation must run after its referenced species
+   has been reset.
+4. The `pypicongpu.Simulation` tree is constructed from the resolved copy by
    reusing the incumbent per-class `get_as_pypicongpu` methods (kept as the
-   reference path, Q4) against the resolved copy.
+   reference path, Q4). Conflict/uniqueness semantics are those of the incumbent
+   `species_requirements.resolving_add`/`check_for_conflict` (see `translate`).
 """
 
 import graphlib
 from collections import deque
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterator
 
@@ -43,79 +48,22 @@ import numpy as np
 
 from pydantic import BaseModel
 
+from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
+from picongpu.pypicongpu.species.attribute.momentum_prev_1 import MomentumPrev1
+from picongpu.pypicongpu.species.attribute.radiation_mask import RadiationMask
+from picongpu.pypicongpu.species.constant.elementproperties import ElementProperties
+
+from .diagnostics.radiation import Radiation
+from .interaction.ionization.ionizationmodel import IonizationModel
+from .interaction.synchrotron import Synchrotron
 from .species import DependsOn
-from .species_requirements import DelayedConstruction
-
-
-class ConstraintKind(str, Enum):
-    """Abstract relationship categories (issue #107 spec, section 'Categorized')."""
-
-    ONE_TO_ONE = "one_to_one"
-    HAS_PROPERTY = "has_property"
-    HAS_PROPERTY_OF_VALUE = "has_property_of_value"
-    ORDERING = "ordering"
-
-
-@dataclass(frozen=True)
-class Constraint:
-    """An immutable, declarative cross-object constraint.
-
-    This is the "re-expressed as data" form of a requirement: instead of the
-    mutable, pydantic-wrapped-lambda `DelayedConstruction` machinery, a constraint
-    records *what* it needs (slot, value) and *from where* (source), plus the kind
-    of relationship it encodes.
-    """
-
-    kind: ConstraintKind
-    slot: str
-    value: Any
-    source: str  # type name of the constraining object
-    target: str  # type name of the object the constraint applies to
-    unique: bool = False  # a "unique" slot rejects duplicates (conflict semantics)
-
-    def conflicts_with(self, other: "Constraint") -> bool:
-        """Two constraints on the same unique slot conflict unless they agree."""
-        if self.slot != other.slot or not (self.unique or other.unique):
-            return False
-        try:
-            agree = self.value == other.value
-        except Exception:  # apples and oranges: treat as agreement (non-conflict)
-            return False
-        return not agree
-
-
-class ConstraintSet:
-    """Accumulator of constraints on one target, with conflict/uniqueness semantics.
-
-    Re-expresses the *idea* of `resolving_add`/`check_for_conflict`/`must_be_unique`
-    as immutable data rather than in-place mutation of lambdas: adding a
-    constraint checks for conflicts, and a unique slot rejects a second,
-    disagreeing constraint.
-    """
-
-    def __init__(self):
-        self._by_slot: dict[str, list[Constraint]] = {}
-
-    def add(self, constraint: Constraint) -> None:
-        existing = self._by_slot.get(constraint.slot, [])
-        for other in existing:
-            if other.conflicts_with(constraint):
-                raise ValueError(
-                    f"Conflicting constraints on slot {constraint.slot!r}: {constraint.source} vs {other.source}."
-                )
-            if other.unique and self._is_same(other, constraint):
-                return  # unique slot: the identical constraint is already present
-        self._by_slot.setdefault(constraint.slot, []).append(constraint)
-
-    @staticmethod
-    def _is_same(a: Constraint, b: Constraint) -> bool:
-        try:
-            return a.kind == b.kind and a.value == b.value and a.source == b.source
-        except Exception:
-            return False
-
-    def get(self, slot: str) -> list[Constraint]:
-        return list(self._by_slot.get(slot, []))
+from .species import Species as PICMI_Species
+from .species_requirements import (
+    DelayedConstruction,
+    GroundStateIonizationConstruction,
+    SetChargeStateOperation,
+    SynchrotronConstantConstruction,
+)
 
 
 class Walk:
@@ -274,72 +222,125 @@ def topological_order(sim) -> list[BaseModel]:
     return [by_id[node] for node in sorter.static_order()]
 
 
+def _redrive_ionization(obj: IonizationModel) -> None:
+    ion = obj.ion_species
+    ion.register_requirements(
+        [
+            DependsOn(species=obj.ionization_electron_species),
+            GroundStateIonizationConstruction(ionization_model=obj),
+            SetChargeStateOperation(species=ion),
+            BoundElectrons(),
+        ]
+    )
+    ion.register_requirements(obj.get_constants())
+
+
+def _redrive_synchrotron(obj: Synchrotron) -> None:
+    obj.electron_species.register_requirements(
+        [
+            DependsOn(species=obj.photon_species),
+            SynchrotronConstantConstruction(photon_species=obj.photon_species),
+        ]
+    )
+
+
+def _redrive_radiation(obj: Radiation) -> None:
+    for species in obj.species:
+        species.register_requirements(
+            [MomentumPrev1()] + ([RadiationMask()] if obj.gamma_filter_threshold is not None else [])
+        )
+
+
+# The re-derivation table (issue #107, Q1 extension point): a declarative list of
+# (cross-object object type, re-deriver) pairs. Every cross-object constraint that
+# the incumbent path registers eagerly in `__init__` is re-derived from the
+# reachable object here instead, so adding a fourth cross-object constraint is a
+# one-line addition to this table (plus a matching entry in
+# `_CROSS_OBJECT_REQUIREMENTS` below).
+_CROSS_OBJECT_REDERIVERS: tuple[tuple[type, Any], ...] = (
+    (IonizationModel, _redrive_ionization),
+    (Synchrotron, _redrive_synchrotron),
+    (Radiation, _redrive_radiation),
+)
+
+
 def _apply_cross_object_constraints(obj: BaseModel) -> None:
     """(Re)apply the cross-object constraints that `obj` imposes on other objects.
 
-    This is the reachability-gated, declarative form of the registration that the
-    incumbent path performs eagerly in `__init__`. It applies *exactly* the same
-    constraints, but only to the copy (never the input) and only because `obj` is
-    reachable from the simulation. Applying it on top of an already-registered
-    copy (incumbent path, `INIT_MUTATION_ENABLED`) is idempotent, so `translate`
-    gives identical output whether the switch is on or off; turning the switch
-    off simply removes the `__init__` pollution of objects that are *not* added to
-    the simulation (the #5727 bug).
+    Data-driven over `_CROSS_OBJECT_REDERIVERS`: the re-derivation is a
+    declarative table of (detector type, re-deriver) pairs, so a fourth
+    cross-object constraint is a one-line addition. It applies *exactly* the
+    constraints the incumbent `__init__` registers, but only to the copy (never
+    the input) and only because `obj` is reachable from the simulation. All
+    other constraints (one-to-one rendering and per-class value constraints) are
+    reproduced by the incumbent per-class `get_as_pypicongpu` against the copy.
     """
-    from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
-    from picongpu.pypicongpu.species.attribute.momentum_prev_1 import MomentumPrev1
-    from picongpu.pypicongpu.species.attribute.radiation_mask import RadiationMask
+    for detector, redrive in _CROSS_OBJECT_REDERIVERS:
+        if isinstance(obj, detector):
+            redrive(obj)
+            return
 
-    from .diagnostics.radiation import Radiation
-    from .interaction.ionization.ionizationmodel import IonizationModel
-    from .interaction.synchrotron import Synchrotron
-    from .species_requirements import (
-        GroundStateIonizationConstruction,
-        SetChargeStateOperation,
-        SynchrotronConstantConstruction,
-    )
 
-    if isinstance(obj, IonizationModel):
-        ion = obj.ion_species
-        ion.register_requirements(
-            [
-                DependsOn(species=obj.ionization_electron_species),
-                GroundStateIonizationConstruction(ionization_model=obj),
-                SetChargeStateOperation(species=ion),
-                BoundElectrons(),
-            ]
-        )
-        ion.register_requirements(obj.get_constants())
-    elif isinstance(obj, Synchrotron):
-        obj.electron_species.register_requirements(
-            [
-                DependsOn(species=obj.photon_species),
-                SynchrotronConstantConstruction(photon_species=obj.photon_species),
-            ]
-        )
-    elif isinstance(obj, Radiation):
-        for species in obj.species:
-            species.register_requirements(
-                [MomentumPrev1()] + ([RadiationMask()] if obj.gamma_filter_threshold is not None else [])
-            )
+# The cross-object requirements that the incumbent path registers eagerly in
+# `__init__` (behind `INIT_MUTATION_ENABLED`) and that `_apply_cross_object_
+# constraints` re-derives from reachable objects. These are exactly the types the
+# switch-gated `__init__` methods add, and nothing else.
+_CROSS_OBJECT_REQUIREMENTS = (
+    DependsOn,
+    GroundStateIonizationConstruction,
+    SetChargeStateOperation,
+    BoundElectrons,
+    SynchrotronConstantConstruction,
+    ElementProperties,
+    MomentumPrev1,
+    RadiationMask,
+)
+
+
+def _reset_cross_object_requirements(species: PICMI_Species) -> None:
+    """Strip the incumbent-registered cross-object requirements from a species copy.
+
+    `translate` discards these (which may include incumbent `__init__` pollution
+    carried into the copy) and re-derives them from reachability alone via
+    `_apply_cross_object_constraints`. This is what makes the output independent
+    of `INIT_MUTATION_ENABLED` and fixes #5727.
+    """
+    species._requirements = [
+        requirement for requirement in species._requirements if not isinstance(requirement, _CROSS_OBJECT_REQUIREMENTS)
+    ]
 
 
 def translate(sim):
-    """Pure, general constraint-resolution translation of a PICMI `Simulation`.
+    """Pure, reachability-driven PICMI -> PyPIConGPU translation of `sim`.
 
     Returns the `pypicongpu.Simulation` produced by a fresh, internally-owned
     copy of `sim` resolved bottom-up (topological order), and never mutates `sim`
-    or any of its members. For every well-formed `sim`, the result matches
-    `sim.get_as_pypicongpu()` under normalisation (see the Q2 equality test);
-    `translate` is written to remain correct with or without `__init__`-level
-    registration (see `picmi.mutation_switch.INIT_MUTATION_ENABLED`).
+    or any of its members. For every well-formed `sim` built through the incumbent
+    path (`INIT_MUTATION_ENABLED` on), the result matches
+    `sim.get_as_pypicongpu()` under normalisation (see the Q2 equality test).
+
+    Cross-object requirements are discarded from every reachable species and
+    re-derived from the reachable cross-object objects, so the output depends on
+    reachability alone and is independent of `INIT_MUTATION_ENABLED` (this is
+    what fixes #5727). The topological order is load-bearing: a species must be
+    reset before any reachable referrer re-derives onto it.
+
+    Conflict/uniqueness semantics are those of the incumbent
+    `species_requirements.resolving_add`/`check_for_conflict`: `translate` routes
+    every requirement through `Species.register_requirements`, so a genuinely
+    conflicting requirement (e.g. two disagreeing `Mass`/`Charge`/attribute
+    constants) raises `RequirementConflict` rather than being silently merged.
     """
     context = {}
     resolved = deep_copy(sim, context)
     # Resolve bottom-up: referenced objects (grid, solver, species, layouts,
     # distributions, ...) before their referrers (interactions, diagnostics).
-    # Also surfaces any accidental reference cycle via graphlib.CycleError.
+    # Reset each reachable species, then re-derive its cross-object requirements
+    # from reachability. Also surfaces any reference cycle via
+    # graphlib.CycleError (topological_order).
     for obj in topological_order(resolved):
+        if isinstance(obj, PICMI_Species):
+            _reset_cross_object_requirements(obj)
         _apply_cross_object_constraints(obj)
     return resolved.get_as_pypicongpu()
 

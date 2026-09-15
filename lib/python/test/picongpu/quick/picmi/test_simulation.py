@@ -28,6 +28,9 @@ def get_grid(delta_x: float, delta_y: float, delta_z: float, n: int):
         # required, otherwise won't spawn
         lower_boundary_conditions=["open", "open", "periodic"],
         upper_boundary_conditions=["open", "open", "periodic"],
+        # n is arbitrary (e.g. 100), so keep the super cell at 1 to stay valid
+        # regardless of how the grid is validated
+        picongpu_super_cell_size=(1, 1, 1),
     )
 
 

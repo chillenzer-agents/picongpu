@@ -67,13 +67,13 @@ class TestGridParticleBoundaryFields(TestCase):
         grid.get_as_pypicongpu()
 
     def test_lower_upper_must_agree_per_axis(self):
-        grid = _grid(
-            lower_boundary_conditions_particles=["absorbing", "reflect", "periodic"],
-            upper_boundary_conditions_particles=["thermal", "reflect", "periodic"],
-        )
-        # The check runs at translation time (the converts_to preamble).
+        # The particle-BC consistency check is a model validator, so it runs at
+        # construction time.
         with pytest.raises(ValueError, match="lower and upper particle boundary conditions must be equal"):
-            grid.get_as_pypicongpu()
+            _grid(
+                lower_boundary_conditions_particles=["absorbing", "reflect", "periodic"],
+                upper_boundary_conditions_particles=["thermal", "reflect", "periodic"],
+            )
 
 
 class _SimBuilder:

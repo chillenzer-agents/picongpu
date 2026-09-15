@@ -134,9 +134,7 @@ def _species(name, cell, velocity, boundary, offset=None, temperature=None):
         name=name,
         particle_type="electron",
         method="free-streaming",
-        initial_distribution=AnalyticDistribution(
-            lambda x, y, z: _slab(x, y, z, *cell), directed_velocity=velocity
-        ),
+        initial_distribution=AnalyticDistribution(lambda x, y, z: _slab(x, y, z, *cell), directed_velocity=velocity),
         picongpu_particle_boundary=ParticleBoundary(**pb_kwargs),
     )
 

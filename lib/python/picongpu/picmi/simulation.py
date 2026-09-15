@@ -18,12 +18,15 @@ from typing import Annotated
 
 import picmistandard
 from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from sympy import Symbol
 
 from picongpu import pypicongpu, templates
 from picongpu.picmi import constants
 from picongpu.picmi.diagnostics.field_dump import NativeFieldDump, _FieldDump
 from picongpu.picmi.diagnostics.particle_dump import ParticleDump
-from picongpu.picmi.grid import Cartesian3DGrid
+from picongpu.picmi.diagnostics.phase_space import PhaseSpace
+from picongpu.picmi.distribution.AnalyticDistribution import AnalyticDistribution
+from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid, AnyGrid
 from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
 from picongpu.picmi.layout import AnyLayout
@@ -47,7 +50,7 @@ from picongpu.pypicongpu.walltime import Walltime
 
 class _DensityImpl(BaseModel):
     layout: AnyLayout
-    grid: Cartesian3DGrid
+    grid: AnyGrid
     species: Species
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -215,7 +218,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         if (
             self.solver is not None
             and self.solver.method in ["Yee", "Lehe"]
-            and isinstance(self.solver.grid, Cartesian3DGrid)
+            and isinstance(self.solver.grid, (Cartesian3DGrid, Cartesian2DGrid))
         ):
             self.__yee_compute_cfl_or_delta_t()
         return self
@@ -227,7 +230,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         needs grid parameters for computation
         Only works if method is Yee or Lehe.
 
-        :throw AssertionError: if grid (of solver) is not 3D cartesian grid
+        :throw AssertionError: if grid (of solver) is not a cartesian grid
         :throw AssertionError: if solver is None
         :throw AssertionError: if solver is not "Yee"
         :throw ValueError: if both cfl & delta_t are set, and they don't match
@@ -248,23 +251,21 @@ class Simulation(picmistandard.PICMI_Simulation):
         """
         assert self.solver is not None
         assert self.solver.method in ["Yee", "Lehe"]
-        assert isinstance(self.solver.grid, Cartesian3DGrid)
+        assert isinstance(self.solver.grid, (Cartesian3DGrid, Cartesian2DGrid))
 
-        delta_x = (
-            self.solver.grid.upper_bound[0] - self.solver.grid.lower_bound[0]
-        ) / self.solver.grid.number_of_cells[0]
-        delta_y = (
-            self.solver.grid.upper_bound[1] - self.solver.grid.lower_bound[1]
-        ) / self.solver.grid.number_of_cells[1]
-        delta_z = (
-            self.solver.grid.upper_bound[2] - self.solver.grid.lower_bound[2]
-        ) / self.solver.grid.number_of_cells[2]
+        # The CFL factor is sqrt(sum over the spatial dimensions of 1/delta_i^2).
+        # In 2D the z term is dropped, so a square 2D grid yields a factor of sqrt(2)
+        # (not sqrt(3) as in 3D).
+        grid = self.solver.grid
+        delta_i = [
+            (grid.upper_bound[i] - grid.lower_bound[i]) / grid.number_of_cells[i]
+            for i in range(grid.number_of_dimensions)
+        ]
+        cfl_factor = math.sqrt(sum(1.0 / delta**2 for delta in delta_i))
 
         if self.time_step_size is not None and self.solver.cfl is not None:
             # both cfl & delta_t given -> check their compatibility
-            delta_t_from_cfl = self.solver.cfl / (
-                constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
-            )
+            delta_t_from_cfl = self.solver.cfl / (constants.c * cfl_factor)
 
             if delta_t_from_cfl != self.time_step_size:
                 raise ValueError(
@@ -275,14 +276,10 @@ class Simulation(picmistandard.PICMI_Simulation):
         else:
             if self.time_step_size is not None:
                 # calculate cfl
-                self.solver.cfl = self.time_step_size * (
-                    constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
-                )
+                self.solver.cfl = self.time_step_size * (constants.c * cfl_factor)
             elif self.solver.cfl is not None:
                 # calculate delta_t
-                self.time_step_size = self.solver.cfl / (
-                    constants.c * math.sqrt(1 / delta_x**2 + 1 / delta_y**2 + 1 / delta_z**2)
-                )
+                self.time_step_size = self.solver.cfl / (constants.c * cfl_factor)
 
             # if neither delta_t nor cfl are given simply silently pass
             # (might change in the future)
@@ -363,6 +360,21 @@ class Simulation(picmistandard.PICMI_Simulation):
             pypicongpu.util.unsupported("laser injection method", self.laser_injection_methods, [])
         if self.max_steps is None and self.max_time is None:
             raise ValueError("runtime not specified (neither as step count nor max time)")
+        if isinstance(self.solver.grid, Cartesian2DGrid):
+            # 2D3V: there is no spatial z coordinate (momentum still has all three components).
+            for diagnostic in filter(lambda d: isinstance(d, PhaseSpace), self.diagnostics):
+                if diagnostic.spatial_coordinate == "z":
+                    raise ValueError(
+                        "A phase-space diagnostic with spatial coordinate 'z' is not supported in 2D. "
+                        f"You gave {diagnostic.spatial_coordinate=} on a 2D grid."
+                    )
+            for species in self.species:
+                if isinstance(species.initial_distribution, AnalyticDistribution):
+                    if Symbol("z") in species.initial_distribution.density_expression.free_symbols:
+                        raise ValueError(
+                            "A z-dependent AnalyticDistribution density is not supported on a 2D grid. "
+                            f"You gave a density formula depending on 'z' for species {species.name!r} on a 2D grid."
+                        )
 
     def _collect_particle_filters(self):
         # This does not necessarily work on Binning plugin

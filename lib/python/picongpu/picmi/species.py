@@ -34,6 +34,7 @@ from picongpu.pypicongpu.species.species import Species as PyPIConGPUSpecies
 
 from .. import pypicongpu
 from ..pypicongpu.species.util.element import Element
+from .particle_boundary import ParticleBoundary
 from .predefinedparticletypeproperties import PredefinedParticleTypeProperties
 
 
@@ -98,6 +99,19 @@ class Species(PICMI_Species):
     picongpu_fixed_charge: bool = False
     particle_shape: str | None = "quadratic"
     method: str | None = "Boris"
+
+    picongpu_particle_boundary: ParticleBoundary | None = None
+    """
+    PIConGPU extension: per-species particle boundary condition.
+
+    Per-axis kind (``periodic``/``absorbing``/``reflect``/``thermal``) with optional
+    ``boundary_offset`` (int, >= 0) and ``boundary_temperature`` (float, >= 0, keV).
+
+    The grid's particle boundary conditions are the *default*; this field, if set,
+    *overrides* the grid's per-axis value for this species. If unset, the grid's
+    particle BC applies to this species. See
+    :mod:`picongpu.picmi.particle_boundary`.
+    """
 
     # Theoretically, Position(), Momentum() and Weighting() are also requirements imposed from the outside,
     # e.g., by the current deposition, pusher, ..., but these concepts are not separately modelled in PICMI

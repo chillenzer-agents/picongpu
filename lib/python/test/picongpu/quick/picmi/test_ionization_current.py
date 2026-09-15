@@ -16,7 +16,7 @@ from picongpu.picmi.interaction.ionization.fieldionization.ionizationcurrent imp
     EnergyConservation,
     IonizationCurrent,
 )
-from picongpu.picmi.species import Species
+from picongpu.picmi.species import Species, particle_boundary_translation_context
 from picongpu.pypicongpu.rendering import Renderer
 from picongpu.pypicongpu.species.constant.ionizationcurrent import None_
 from picongpu.pypicongpu.species.constant.ionizationmodel import ADKLinearPolarization
@@ -124,16 +124,19 @@ def test_none_byte_identical():
     e = Species(name="e", particle_type="electron")
     ion = Species(name="hydrogen", particle_type="H", charge_state=+1)
 
-    via_bridge = ADK(
-        ADK_variant=ADKVariant.LinearPolarization,
-        ionization_current=None,
-        ion_species=ion,
-        ionization_electron_species=e,
-    ).get_as_pypicongpu()
-    via_hardcoded = ADKLinearPolarization(
-        ionization_current=None_(),
-        ionization_electron_species=e.get_as_pypicongpu(),
-    )
+    # Converting a species to pypicongpu requires a grid context; this test does
+    # the conversion directly (not via a Simulation), so install one.
+    with particle_boundary_translation_context(get_grid()):
+        via_bridge = ADK(
+            ADK_variant=ADKVariant.LinearPolarization,
+            ionization_current=None,
+            ion_species=ion,
+            ionization_electron_species=e,
+        ).get_as_pypicongpu()
+        via_hardcoded = ADKLinearPolarization(
+            ionization_current=None_(),
+            ionization_electron_species=e.get_as_pypicongpu(),
+        )
 
     assert via_bridge.get_rendering_context() == via_hardcoded.get_rendering_context()
     assert Renderer.get_rendered_template(via_bridge.get_rendering_context(), _CURRENT_TEMPLATE) == (

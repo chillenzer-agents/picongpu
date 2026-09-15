@@ -27,7 +27,7 @@ from picongpu.picmi.grid import Cartesian3DGrid
 from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
 from picongpu.picmi.layout import AnyLayout
-from picongpu.picmi.species import Species
+from picongpu.picmi.species import Species, particle_boundary_translation_context
 from picongpu.picmi.species_requirements import (
     SimpleDensityOperation,
     SimpleMomentumOperation,
@@ -383,6 +383,13 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     def get_as_pypicongpu(self) -> pypicongpu.simulation.Simulation:
         """translate to PyPIConGPU object"""
+        # Every species converted during this translation (the main species list,
+        # the species nested in diagnostics, interactions and init operations)
+        # resolves its per-species particle boundary against the simulation grid.
+        with particle_boundary_translation_context(self.solver.grid):
+            return self._build_pypicongpu_simulation()
+
+    def _build_pypicongpu_simulation(self) -> pypicongpu.simulation.Simulation:
         self._check_compatibility()
 
         init_operations = organise_init_operations(
@@ -445,18 +452,16 @@ class Simulation(picmistandard.PICMI_Simulation):
     def _convert_species(self, species) -> "pypicongpu.species.species.Species":
         """Convert a PICMI species to its pypicongpu counterpart.
 
-        Also resolves the species' particle boundary: the grid's per-axis particle
-        BC is the default, overridden per axis by the species' optional
-        ``picongpu_particle_boundary``. The C++ core's compatibility constraints are
-        enforced here (at translation time) by the grid's
+        The per-species particle boundary is resolved inside
+        :meth:`Species.get_as_pypicongpu` against the simulation grid (the
+        ``particle_boundary_translation_context`` installed by
+        :meth:`get_as_pypicongpu`): the grid's per-axis particle BC is the default,
+        overridden per axis by the species' optional
+        ``picongpu_particle_boundary``. The C++ core's compatibility constraints
+        are enforced there, at translation time, by the grid's
         :meth:`Cartesian3DGrid.get_particle_boundary`.
         """
-        converted = get_as_pypicongpu(species)
-        converted.particle_boundary = self.solver.grid.get_particle_boundary(
-            name=species.name,
-            picongpu_particle_boundary=species.picongpu_particle_boundary,
-        )
-        return converted
+        return get_as_pypicongpu(species)
 
     def _get_base_density(self) -> float:
         return self.picongpu_base_density or 1.0e25

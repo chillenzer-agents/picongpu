@@ -36,13 +36,12 @@ class TestCartesian3DGrid(TestCase):
     def test_n_gpus_asserts(self):
         """test too many GPUs for grid"""
         for not_ngpus_dist in [[1, 1, 2], [5, 1, 1], [1, 512, 1]]:
-            grid = picmi.Cartesian3DGrid(
-                number_of_cells=[192, 2048, 12],
-                picongpu_n_gpus=not_ngpus_dist,
-                **self.COMMON_KWARGS,
-            )
             with pytest.raises(Exception, match=".*GPU- and/or super-cell-distribution.*"):
-                grid.get_as_pypicongpu()
+                picmi.Cartesian3DGrid(
+                    number_of_cells=[192, 2048, 12],
+                    picongpu_n_gpus=not_ngpus_dist,
+                    **self.COMMON_KWARGS,
+                )
 
     def test_n_gpus_wrong_numbers(self):
         """test negativ numbers or zero as number of gpus"""
@@ -66,73 +65,66 @@ class TestCartesian3DGrid(TestCase):
         assert g.super_cell_size == (8, 8, 4), "supercell should be [8,8,4]"
 
     def test_super_cell_mismatch_no_dist(self):
-        grid = picmi.Cartesian3DGrid(
-            number_of_cells=[192, 2048, 12],
-            picongpu_super_cell_size=(7, 8, 4),
-            **self.COMMON_KWARGS,
-        )
         with pytest.raises(Exception, match=".*GPU- and/or super-cell-distribution.*"):
-            grid.get_as_pypicongpu()
+            picmi.Cartesian3DGrid(
+                number_of_cells=[192, 2048, 12],
+                picongpu_super_cell_size=(7, 8, 4),
+                **self.COMMON_KWARGS,
+            )
 
     def test_super_cell_mismatch_with_dist(self):
-        grid = picmi.Cartesian3DGrid(
-            number_of_cells=[192, 2048, 12],
-            picongpu_n_gpus=[2, 1, 1],
-            picongpu_super_cell_size=(7, 8, 4),
-            picongpu_grid_dist=([12, 180], [2048], [12]),
-            **self.COMMON_KWARGS,
-        )
         with pytest.raises(Exception, match=".*grid distribution in x dimension must be multiple.*"):
-            grid.get_as_pypicongpu()
+            picmi.Cartesian3DGrid(
+                number_of_cells=[192, 2048, 12],
+                picongpu_n_gpus=[2, 1, 1],
+                picongpu_super_cell_size=(7, 8, 4),
+                picongpu_grid_dist=([12, 180], [2048], [12]),
+                **self.COMMON_KWARGS,
+            )
 
     def test_super_cell_size_zero(self):
-        grid = picmi.Cartesian3DGrid(
-            number_of_cells=[192, 2048, 12],
-            picongpu_super_cell_size=(0, 8, 4),
-            **self.COMMON_KWARGS,
-        )
         with pytest.raises(Exception, match=".*super cell size must be a positive integer.*"):
-            grid.get_as_pypicongpu()
+            picmi.Cartesian3DGrid(
+                number_of_cells=[192, 2048, 12],
+                picongpu_super_cell_size=(0, 8, 4),
+                **self.COMMON_KWARGS,
+            )
 
     def test_super_cell_size_negative(self):
-        grid = picmi.Cartesian3DGrid(
-            number_of_cells=[192, 2048, 12],
-            picongpu_super_cell_size=(8, -8, 4),
-            **self.COMMON_KWARGS,
-        )
         with pytest.raises(Exception, match=".*super cell size must be a positive integer.*"):
-            grid.get_as_pypicongpu()
+            picmi.Cartesian3DGrid(
+                number_of_cells=[192, 2048, 12],
+                picongpu_super_cell_size=(8, -8, 4),
+                **self.COMMON_KWARGS,
+            )
 
     def test_grid_dist_values_lt_one(self):
-        grid = picmi.Cartesian3DGrid(
-            number_of_cells=[192, 2048, 12],
-            picongpu_n_gpus=[1, 1, 1],
-            picongpu_grid_dist=([192], [2048], [0]),
-            **self.COMMON_KWARGS,
-        )
         with pytest.raises(Exception, match=".*All values in grid distribution must be greater than 0.*"):
-            grid.get_as_pypicongpu()
+            picmi.Cartesian3DGrid(
+                number_of_cells=[192, 2048, 12],
+                picongpu_n_gpus=[1, 1, 1],
+                picongpu_grid_dist=([192], [2048], [0]),
+                **self.COMMON_KWARGS,
+            )
 
     def test_grid_dist_sum_mismatch(self):
-        grid = picmi.Cartesian3DGrid(
-            number_of_cells=[192, 2048, 12],
-            picongpu_n_gpus=[2, 1, 1],
-            picongpu_grid_dist=([100, 64], [2048], [12]),
-            **self.COMMON_KWARGS,
-        )
         with pytest.raises(Exception, match=".*sum of grid distribution.*must match number of cells.*"):
-            grid.get_as_pypicongpu()
+            picmi.Cartesian3DGrid(
+                number_of_cells=[192, 2048, 12],
+                picongpu_n_gpus=[2, 1, 1],
+                picongpu_grid_dist=([100, 64], [2048], [12]),
+                **self.COMMON_KWARGS,
+            )
 
     def test_grid_dist_length_mismatch(self):
-        grid = picmi.Cartesian3DGrid(
-            number_of_cells=[192, 2048, 12],
-            picongpu_n_gpus=[1, 1, 1],
-            # length 2 in x but n_gpus=1
-            picongpu_grid_dist=([96, 96], [2048], [12]),  # length 2 in x but n_gpus=1
-            **self.COMMON_KWARGS,
-        )
         with pytest.raises(Exception, match=".*number of grid distributions.*must match number of gpus.*"):
-            grid.get_as_pypicongpu()
+            picmi.Cartesian3DGrid(
+                number_of_cells=[192, 2048, 12],
+                picongpu_n_gpus=[1, 1, 1],
+                # length 2 in x but n_gpus=1
+                picongpu_grid_dist=([96, 96], [2048], [12]),  # length 2 in x but n_gpus=1
+                **self.COMMON_KWARGS,
+            )
 
     def test_grid_dist_correct(self):
         grid = picmi.Cartesian3DGrid(
@@ -190,10 +182,9 @@ class TestCartesian3DGrid(TestCase):
 
     def test_super_cell_message_positive_integer(self):
         """the super-cell error message reads 'positive integer' (matches the < 1 check)"""
-        grid = picmi.Cartesian3DGrid(
-            number_of_cells=[192, 2048, 12],
-            picongpu_super_cell_size=(0, 8, 4),
-            **self.COMMON_KWARGS,
-        )
         with pytest.raises(Exception, match=".*super cell size must be a positive integer.*"):
-            grid.get_as_pypicongpu()
+            picmi.Cartesian3DGrid(
+                number_of_cells=[192, 2048, 12],
+                picongpu_super_cell_size=(0, 8, 4),
+                **self.COMMON_KWARGS,
+            )

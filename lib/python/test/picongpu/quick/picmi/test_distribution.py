@@ -20,6 +20,8 @@ ARBITRARY_GRID = Cartesian3DGrid(
     lower_bound=[0, 0, 0],
     upper_bound=[1, 1, 1],
     number_of_cells=[1, 1, 1],
+    # 1 cell per axis -> the super cell must be 1 to keep the grid valid
+    picongpu_super_cell_size=(1, 1, 1),
     lower_boundary_conditions=["periodic", "periodic", "periodic"],
     upper_boundary_conditions=["periodic", "periodic", "periodic"],
 )

@@ -161,12 +161,36 @@ def get_available_presets() -> list[str]:
 
 
 def _preset_path(preset) -> Path:
-    # The `or` enables the following feature:
-    # `preset = "bash" is first matched against `bash/` and uniquely determines `bash/bash_picongpu.profile.example`
-    # without the first option in the `or` it would be ambiguous because `bash-devServer-hzdr/...` would match as well.
-    candidates = list(filter(lambda p: f"{preset}/" in str(p), get_available_presets())) or list(
-        filter(lambda p: preset in str(p), get_available_presets())
+    presets = get_available_presets()
+    # Legacy behaviour, kept for every selection it already made unique:
+    # first match "<preset>/" in the preset path, else "<preset>" anywhere in
+    # it. This is why `preset = "bash"` is not confused with
+    # `bash-devServer-hzdr/...`.
+    candidates = list(filter(lambda p: f"{preset}/" in str(p), presets)) or list(
+        filter(lambda p: preset in str(p), presets)
     )
+    if len(candidates) != 1:
+        # Ambiguous (or no match). Break the tie with the most specific tier
+        # that yields a unique result:
+        # 1. the exact preset path, e.g. `preset = "bash/bash_picongpu.profile.example"`,
+        # 2. a full preset directory, e.g. `preset = "jupiter-jsc"` matches
+        #    `jupiter-jsc/...` but not `efp-jupiter-jsc/...`,
+        # 3. a path prefix, e.g. `preset = "jupiter"` or `preset = "jupiter-jsc/gh200"`,
+        # 4. a queue/file prefix, e.g. `preset = "gh200"` matches
+        #    `jupiter-jsc/gh200_picongpu.profile.example`.
+        # A bare substring occurrence is deliberately not a tie-breaker, so a
+        # fragment happening to sit inside several names (e.g. "ef" in
+        # "defq_picongpu" and "efp_...") stays ambiguous.
+        for match in (
+            lambda p: p == preset,
+            lambda p: p.startswith(f"{preset}/"),
+            lambda p: p.startswith(preset),
+            lambda p: any(segment.startswith(preset) for segment in p.split("/")),
+        ):
+            specific = list(filter(match, candidates))
+            if len(specific) == 1:
+                candidates = specific
+                break
     if len(candidates) > 1:
         raise ValueError(f"The given {preset=} is ambiguous ({candidates=}). Please be more specific!")
     if len(candidates) == 0:
@@ -258,7 +282,14 @@ def _path_to_str(value):
 
 
 _RETAINED_CONTENT = {"dirty_reset_policy": "raise", "missing_variable_policy": "raise"}
-_DEFAULT_CONTENT = _RETAINED_CONTENT | {"required_information": tuple(), "pic_src_path": core.path()}
+_DEFAULT_CONTENT = _RETAINED_CONTENT | {
+    "required_information": tuple(),
+    "pic_src_path": core.path(),
+    # Workflow backend used by the runner: "cwl" (default, cwltool pipeline on
+    # the laptop) or "lexis" (emit a LEXIS Workflow Definition and submit via
+    # Py4Lexis to the EFP). See pypicongpu/lexis_workflow.py.
+    "workflow_backend": "cwl",
+}
 
 
 def _read_picongpurc(path):
@@ -629,13 +660,30 @@ def search_in_user_config():
     return None
 
 
+def _search_rc_file_in_parents(start_path):
+    """Find picongpurc.toml (or a dot-prefixed variant) in start_path or its parents.
+
+    The plain name matches the canonical file used by the XDG config and
+    PIC_RC lookups, so a picongpurc.toml next to the PICMI script is
+    discovered just like a .picongpurc.toml would be.
+    """
+    start_path = Path(start_path).absolute()
+    for directory in [start_path, *start_path.parents]:
+        for pattern in ("picongpurc.toml", "[.]*picongpurc.toml"):
+            try:
+                return next(directory.glob(pattern))
+            except StopIteration:
+                pass
+    return None
+
+
 _DEFAULT_PICONGPURC_PATH = None
 
 
 def generate_default_rc_params():
     picongpurc_path = (
         search_in_environment_variables()
-        or search_for_in_parents("[.]*picongpurc.toml", Path())
+        or _search_rc_file_in_parents(Path())
         or search_in_user_config()
         or _DEFAULT_PICONGPURC_PATH
     )

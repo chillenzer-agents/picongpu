@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 
 from moosetash import MissingVariable
 from picongpu import DirtyResetError, core, rc_params
-from picongpu._rc_params import search_for_in_parents
+from picongpu._rc_params import generate_default_rc_params, search_for_in_parents
 from pytest import fixture, raises, warns
 
 
@@ -216,3 +216,40 @@ def test_search_for_file_in_parent_directory(any_content, arbitrary_filename):
 def test_search_for_file_returns_none_if_not_found(arbitrary_filename):
     with TemporaryDirectory() as d1:
         assert search_for_in_parents(filename=arbitrary_filename, start_path=d1) is None
+
+
+def test_default_rc_params_finds_plain_picongpurc_toml_in_cwd(tmp_path, monkeypatch):
+    # the documented primary route: picongpurc.toml next to the PICMI script
+    rc_file = tmp_path / "picongpurc.toml"
+    rc_file.write_text('preset = "bash"\n')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PIC_RC", raising=False)
+    assert generate_default_rc_params()["picongpurc_path"] == rc_file
+
+
+def test_default_rc_params_still_finds_dotfile_in_cwd(tmp_path, monkeypatch):
+    rc_file = tmp_path / ".picongpurc.toml"
+    rc_file.write_text('preset = "bash"\n')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PIC_RC", raising=False)
+    assert generate_default_rc_params()["picongpurc_path"] == rc_file
+
+
+def test_default_rc_params_finds_rc_file_in_parent_directory(tmp_path, monkeypatch):
+    rc_file = tmp_path / "picongpurc.toml"
+    rc_file.write_text('preset = "bash"\n')
+    sub = tmp_path / "sim"
+    sub.mkdir()
+    monkeypatch.chdir(sub)
+    monkeypatch.delenv("PIC_RC", raising=False)
+    assert generate_default_rc_params()["picongpurc_path"] == rc_file
+
+
+def test_default_rc_params_plain_file_wins_over_dotfile_in_same_directory(tmp_path, monkeypatch):
+    plain = tmp_path / "picongpurc.toml"
+    plain.write_text('preset = "bash"\n')
+    dotted = tmp_path / ".picongpurc.toml"
+    dotted.write_text('preset = "zsh"\n')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PIC_RC", raising=False)
+    assert generate_default_rc_params()["picongpurc_path"] == plain

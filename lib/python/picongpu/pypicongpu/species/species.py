@@ -121,7 +121,7 @@ class Species(RenderedObject, BaseModel):
 
     shape: Shape = Shape("TSC")
 
-    particle_boundary: SpeciesParticleBoundary | None = None
+    particle_boundary: SpeciesParticleBoundary
     """resolved particle-boundary description (PIConGPU per-species options)"""
 
     @computed_field

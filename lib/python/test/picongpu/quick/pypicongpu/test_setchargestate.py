@@ -16,7 +16,13 @@ from picongpu.pypicongpu.species.constant.elementproperties import ElementProper
 from picongpu.pypicongpu.species.constant.mass import Mass
 from picongpu.pypicongpu.species.operation.setchargestate import SetChargeState
 from picongpu.pypicongpu.species.species import Species
+from picongpu.pypicongpu.species.species_boundary import SpeciesParticleBoundary
 from picongpu.pypicongpu.species.util.element import Element
+
+# The pypicongpu Species requires an explicit resolved particle boundary; these
+# tests exercise charge-state handling and do not care about the boundary, so a
+# neutral absorbing-on-all-axes value is sufficient.
+_BOUNDARY = SpeciesParticleBoundary(boundary="absorbing absorbing absorbing")
 
 
 def _element_species(symbol):
@@ -24,6 +30,7 @@ def _element_species(symbol):
         name="ion",
         constants=[ElementProperties(element=Element(symbol)), Mass(mass_si=1.0), Charge(charge_si=1.0)],
         attributes=[Position(), Momentum(), Weighting()],
+        particle_boundary=_BOUNDARY,
     )
 
 
@@ -32,6 +39,7 @@ def _custom_species():
         name="custom",
         constants=[Mass(mass_si=1.0), Charge(charge_si=1.0)],
         attributes=[Position(), Momentum(), Weighting()],
+        particle_boundary=_BOUNDARY,
     )
 
 

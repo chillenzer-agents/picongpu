@@ -19,10 +19,13 @@ Covers:
 from unittest import TestCase
 
 import pytest
+from pydantic import ValidationError
 
 from picongpu import picmi, templates
 from picongpu.picmi.particle_boundary import ParticleBoundary
 from picongpu.pypicongpu.rendering import Renderer
+from picongpu.pypicongpu.species.species import Species as PyPIConGPUSpecies
+from picongpu.pypicongpu.species.species_boundary import SpeciesParticleBoundary
 
 _GRID_KWARGS = dict(
     number_of_cells=[192, 2048, 12],
@@ -201,6 +204,24 @@ class TestConstraintViolations(TestCase):
         )
         with pytest.raises(ValueError, match="requires a 0 offset"):
             builder.sim.get_as_pypicongpu()
+
+
+class TestPypicongpuBoundaryRequired(TestCase):
+    def test_pypicongpu_species_requires_particle_boundary(self):
+        # At the pypicongpu level the resolved particle boundary is mandatory
+        # (nothing may be left to a default); the PICMI layer always supplies it.
+        kwargs = dict(
+            name="e",
+            constants=[],
+            attributes=[],
+        )
+        with pytest.raises(ValidationError, match="particle_boundary"):
+            PyPIConGPUSpecies(**kwargs)
+        # Providing it explicitly is accepted.
+        sp = PyPIConGPUSpecies(
+            **kwargs, particle_boundary=SpeciesParticleBoundary(boundary="absorbing absorbing periodic")
+        )
+        assert sp.particle_boundary.boundary == "absorbing absorbing periodic"
 
 
 class TestNcfgEmission(TestCase):

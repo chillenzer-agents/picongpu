@@ -3,9 +3,7 @@ This file is part of PIConGPU.
 Copyright 2026 PIConGPU contributors
 Authors: Julian Lenz
 License: GPLv3+
-"""
 
-"""
 Pure, graphlib-based PICMI -> PyPIConGPU translation (issue #107).
 
 `translate(sim)` reproduces what `Simulation.get_as_pypicongpu()` produces while
@@ -103,8 +101,7 @@ class ConstraintSet:
         for other in existing:
             if other.conflicts_with(constraint):
                 raise ValueError(
-                    f"Conflicting constraints on slot {constraint.slot!r}: "
-                    f"{constraint.source} vs {other.source}."
+                    f"Conflicting constraints on slot {constraint.slot!r}: {constraint.source} vs {other.source}."
                 )
             if other.unique and self._is_same(other, constraint):
                 return  # unique slot: the identical constraint is already present

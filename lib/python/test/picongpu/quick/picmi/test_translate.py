@@ -3,9 +3,7 @@ This file is part of PIConGPU.
 Copyright 2026 PIConGPU contributors
 Authors: Julian Lenz
 License: GPLv3+
-"""
 
-"""
 Quick tests for the pure, graphlib-based PICMI -> PyPIConGPU translation
 (`picmi.translate.translate`), per issue #107.
 
@@ -255,10 +253,7 @@ _IONIZATION_REQUIREMENT_TYPES = {
 
 
 def _has_ionization_requirement(species):
-    return any(
-        type(requirement).__name__ in _IONIZATION_REQUIREMENT_TYPES
-        for requirement in species._requirements
-    )
+    return any(type(requirement).__name__ in _IONIZATION_REQUIREMENT_TYPES for requirement in species._requirements)
 
 
 @contextmanager

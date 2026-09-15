@@ -41,6 +41,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterator
 
+import numpy as np
+
 from pydantic import BaseModel
 
 from .species import DependsOn
@@ -174,19 +176,62 @@ def _iter_refs(value) -> Iterator[Any]:
             yield from _iter_refs(item)
 
 
+# Pydantic keeps these slots outside `__dict__`; they must be carried over for a
+# copy to render correctly.
+_PYDANTIC_SLOTS = (
+    "__pydantic_private__",
+    "__pydantic_fields_set__",
+    "__pydantic_extra__",
+    "__pydantic_extra_info__",
+    "__pydantic_computed_fields__",
+)
+
+
+def _shallow_copy(model: BaseModel) -> BaseModel:
+    """Shallow copy of a pydantic model.
+
+    Uses `model_copy(deep=False)`, but falls back to rebuilding the instance via
+    `object.__new__` when the class customises `__new__` (e.g. the
+    `@decorating_class` functors such as `ParticleFunctor` and
+    `AnalyticDistribution`), where `model_copy`'s zero-argument reconstruction is
+    hijacked by the decorator's `__new__` and returns a decorator-caller instead
+    of an instance. Either way the private-attribute dict is replaced by a fresh
+    (shallow) dict so that deepening the copy never mutates the source.
+    """
+    new = model.model_copy(deep=False)
+    if type(new) is not type(model):
+        new = object.__new__(type(model))
+        new.__dict__ = dict(vars(model))
+        for name in _PYDANTIC_SLOTS:
+            try:
+                value = object.__getattribute__(model, name)
+            except AttributeError:
+                continue
+            try:
+                object.__setattr__(new, name, value)
+            except Exception:
+                continue
+    try:
+        private = object.__getattribute__(new, "__pydantic_private__")
+    except AttributeError:
+        private = None
+    if private is not None:
+        object.__setattr__(new, "__pydantic_private__", dict(private))
+    return new
+
+
 def deep_copy(obj, seen: dict[int, BaseModel]) -> Any:
     """Pure, memoised, structure-preserving deep copy of a PICMI object graph.
 
-    Uses `model_copy(deep=False)` plus manual recursion so that nested
-    `BaseModel`s (including those buried in private attributes and in the
+    Nested `BaseModel`s (including those buried in private attributes and in the
     `metadata` of requirement objects) are all re-copied while staying
-    referentially consistent. Scalars are shared; the result is a disjoint copy
-    that can be mutated without affecting the input.
+    referentially consistent. Scalars and callables are shared; the result is a
+    disjoint copy that can be mutated without affecting the input.
     """
     if isinstance(obj, BaseModel):
         if (existing := seen.get(id(obj))) is not None:
             return existing
-        new = obj.model_copy(deep=False)
+        new = _shallow_copy(obj)
         seen[id(obj)] = new
         for key, value in list(new.__dict__.items()):
             new.__dict__[key] = deep_copy(value, seen)
@@ -230,3 +275,108 @@ def topological_order(sim) -> list[BaseModel]:
     for obj in Walk(sim):
         sorter.add(id(obj), *(adjacency[id(obj)]))
     return [by_id[node] for node in sorter.static_order()]
+
+
+def _apply_cross_object_constraints(obj: BaseModel) -> None:
+    """(Re)apply the cross-object constraints that `obj` imposes on other objects.
+
+    This is the reachability-gated, declarative form of the registration that the
+    incumbent path performs eagerly in `__init__`. It applies *exactly* the same
+    constraints, but only to the copy (never the input) and only because `obj` is
+    reachable from the simulation. Applying it on top of an already-registered
+    copy (incumbent path, `INIT_MUTATION_ENABLED`) is idempotent, so `translate`
+    gives identical output whether the switch is on or off; turning the switch
+    off simply removes the `__init__` pollution of objects that are *not* added to
+    the simulation (the #5727 bug).
+    """
+    from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
+    from picongpu.pypicongpu.species.attribute.momentum_prev_1 import MomentumPrev1
+    from picongpu.pypicongpu.species.attribute.radiation_mask import RadiationMask
+
+    from .diagnostics.radiation import Radiation
+    from .interaction.ionization.ionizationmodel import IonizationModel
+    from .interaction.synchrotron import Synchrotron
+    from .species_requirements import (
+        GroundStateIonizationConstruction,
+        SetChargeStateOperation,
+        SynchrotronConstantConstruction,
+    )
+
+    if isinstance(obj, IonizationModel):
+        ion = obj.ion_species
+        ion.register_requirements(
+            [
+                DependsOn(species=obj.ionization_electron_species),
+                GroundStateIonizationConstruction(ionization_model=obj),
+                SetChargeStateOperation(species=ion),
+                BoundElectrons(),
+            ]
+        )
+        ion.register_requirements(obj.get_constants())
+    elif isinstance(obj, Synchrotron):
+        obj.electron_species.register_requirements(
+            [
+                DependsOn(species=obj.photon_species),
+                SynchrotronConstantConstruction(photon_species=obj.photon_species),
+            ]
+        )
+    elif isinstance(obj, Radiation):
+        for species in obj.species:
+            species.register_requirements(
+                [MomentumPrev1()] + ([RadiationMask()] if obj.gamma_filter_threshold is not None else [])
+            )
+
+
+def translate(sim):
+    """Pure, general constraint-resolution translation of a PICMI `Simulation`.
+
+    Returns the `pypicongpu.Simulation` produced by a fresh, internally-owned
+    copy of `sim` resolved bottom-up (topological order), and never mutates `sim`
+    or any of its members. For every well-formed `sim`, the result matches
+    `sim.get_as_pypicongpu()` under normalisation (see the Q2 equality test);
+    `translate` is written to remain correct with or without `__init__`-level
+    registration (see `picmi.mutation_switch.INIT_MUTATION_ENABLED`).
+    """
+    context = {}
+    resolved = deep_copy(sim, context)
+    # Resolve bottom-up: referenced objects (grid, solver, species, layouts,
+    # distributions, ...) before their referrers (interactions, diagnostics).
+    # Also surfaces any accidental reference cycle via graphlib.CycleError.
+    for obj in topological_order(resolved):
+        _apply_cross_object_constraints(obj)
+    return resolved.get_as_pypicongpu()
+
+
+def normalize(model):
+    """Return a normalised, plain-Python structural view of a pypicongpu object.
+
+    Recurses over the *declared* fields of every pydantic model, so computed
+    fields (notably the uuid-derived `ParticleFunctor.typename`) and private state
+    are excluded by construction, and no custom `model_serializer` (which can have
+    filesystem side effects) is invoked. Leaves are canonicalised: enums to their
+    value, callables to a placeholder, and anything non-trivial (e.g. a sympy
+    expression) to its `repr`. The result is a hash-free, side-effect-free
+    structure suitable for the Q2 `==` comparison.
+    """
+    return _normalize_value(model)
+
+
+def _normalize_value(value):
+    if isinstance(value, BaseModel):
+        data = value.__dict__
+        return {name: _normalize_value(data[name]) for name in type(value).model_fields if name in data}
+    if isinstance(value, dict):
+        return {key: _normalize_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return tuple(_normalize_value(item) for item in value)
+    if isinstance(value, set):
+        return {_normalize_value(item) for item in value}
+    if isinstance(value, Enum):
+        return value.value
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, np.generic):
+        return value.item()
+    if callable(value):
+        return "<callable>"
+    return repr(value)

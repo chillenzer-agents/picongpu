@@ -7,13 +7,22 @@ License: GPLv3+
 Quick tests for the pure, graphlib-based PICMI -> PyPIConGPU translation
 (`picmi.translate.translate`), per issue #107.
 
-- Test A (equality, Q2): for a representative set of well-formed `Simulation`s,
-  the pure `translate` reproduces the incumbent `get_as_pypicongpu` under
-  normalisation (and leaves the input unmutated, Q3).
+- Test A (equality, Q2 + purity, Q3): for a representative set of well-formed
+  `Simulation`s, the pure `translate` reproduces the incumbent
+  `get_as_pypicongpu` under normalisation and leaves the *entire* reachable input
+  graph unmutated (snapshot of every reachable object, not just species).
 - Test B (upstream #5727, Q6): with the `__init__`-level registration switch off,
   an `IonizationModel` that is constructed but never added to
   `picongpu_interaction` no longer mutates the ion species; with the switch on,
-  the incumbent behaviour holds.
+  the incumbent behaviour holds. `translate`'s output is shown to be independent
+  of the switch (an added model always yields ionization; an unadded one never
+  does, in either switch state).
+- Conflict/uniqueness semantics (Q4/`species_requirements`): a genuinely
+  conflicting requirement raises `RequirementConflict`; an agreeing one is
+  deduplicated, matching the incumbent path that `translate` routes through.
+- Topological order: applying the re-derivation in referenced-before-referrer
+  order preserves the incumbent output, while reversed order does not, so the
+  graphlib sort is load-bearing.
 """
 
 import os
@@ -28,10 +37,25 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 import picongpu.picmi as picmi  # noqa: E402
 from picongpu.picmi import mutation_switch  # noqa: E402
 from picongpu.picmi.diagnostics import Checkpoint, TimeStepSpec  # noqa: E402
+from picongpu.picmi.diagnostics.radiation import Radiation, RadiationObserverConfiguration  # noqa: E402
 from picongpu.picmi.interaction.ionization.fieldionization.ionizationcurrent.energyconservation import (  # noqa: E402
     EnergyConservation,
 )
-from picongpu.picmi.translate import normalize, translate  # noqa: E402
+from picongpu.picmi.species import Species as PICMI_Species  # noqa: E402
+from picongpu.picmi.species_requirements import RequirementConflict  # noqa: E402
+from picongpu.picmi.translate import (  # noqa: E402
+    _apply_cross_object_constraints,
+    _reset_cross_object_requirements,
+    deep_copy,
+    normalize,
+    translate,
+    topological_order,
+    Walk,
+)
+from picongpu.pypicongpu.species.constant.charge import Charge  # noqa: E402
+
+import sympy  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
 NUMBER_OF_CELLS = [64, 64, 32]
 UPPER_BOUNDARY = [64.0, 66.0, 74.0]
@@ -192,6 +216,38 @@ def _sim_synchrotron():
     return sim
 
 
+def _sim_radiation(gamma_filter_threshold=None):
+    # Exercises the third re-derivation branch (`Radiation` -> MomentumPrev1 /
+    # RadiationMask). max_steps must be > 0 so the period resolves against the
+    # step count.
+    sim = picmi.Simulation(
+        max_steps=100,
+        solver=picmi.ElectromagneticSolver(method="Yee", cfl=1.0, grid=_grid()),
+    )
+    electron = _basic_species("electron")
+    sim.add_species(electron, picmi.PseudoRandomLayout(n_macroparticles_per_cell=1))
+    n_observer = 4
+    radiation = Radiation(
+        species=electron,
+        period=TimeStepSpec[10::10],
+        gamma_filter_threshold=gamma_filter_threshold,
+        observer=RadiationObserverConfiguration(
+            N_observer=n_observer,
+            index_to_direction=lambda i: [
+                sympy.sin(2 * sympy.pi / n_observer * i),
+                sympy.cos(2 * sympy.pi / n_observer * i),
+                0,
+            ],
+        ),
+    )
+    sim.diagnostics = [radiation]
+    return sim
+
+
+def _sim_radiation_masked():
+    return _sim_radiation(gamma_filter_threshold=1.5)
+
+
 SIM_BUILDERS = [
     ("minimal", _sim_minimal),
     ("single_species", _sim_single_species),
@@ -200,6 +256,8 @@ SIM_BUILDERS = [
     ("diagnostics", _sim_diagnostics),
     ("ionization", _sim_ionization),
     ("synchrotron", _sim_synchrotron),
+    ("radiation", _sim_radiation),
+    ("radiation_masked", _sim_radiation_masked),
 ]
 
 
@@ -208,35 +266,75 @@ SIM_BUILDERS = [
 # ---------------------------------------------------------------------------
 
 
+def _canon(value):
+    """Canonical, comparable view of an arbitrary field value.
+
+    Nested models are captured *by identity* (a replaced object shows up as a
+    changed id); sequences/dicts recurse; simple scalars compare by value; and
+    anything non-trivial (numpy arrays, callables, sympy exprs) is captured by
+    its repr so the comparison stays elementwise-free and side-effect-free.
+    """
+    if isinstance(value, BaseModel):
+        return ("model", id(value))
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return ("seq", tuple(_canon(item) for item in value))
+    if isinstance(value, dict):
+        return ("dict", tuple((key, _canon(item)) for key, item in sorted(value.items(), key=str)))
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return ("scalar", value)
+    return ("scalar", repr(value))
+
+
+def _object_state(obj):
+    """The state of a reachable PICMI object: its public and private attributes."""
+    state = [(key, _canon(value)) for key, value in sorted(vars(obj).items(), key=str)]
+    private = getattr(obj, "__pydantic_private__", None) or {}
+    state += [(f"private:{key}", _canon(value)) for key, value in sorted(private.items(), key=str)]
+    return tuple(state)
+
+
+def _reachable_snapshot(root):
+    """Snapshot the full reachable PICMI object graph, keyed by object id."""
+    return {id(obj): _object_state(obj) for obj in Walk(root)}
+
+
 class TestTranslateEquality(TestCase):
     def test_translate_matches_incumbent(self):
-        """normalize(translate(sim)) == normalize(sim.get_as_pypicongpu()), and
-        translate() does not mutate the input (Q3)."""
+        """normalize(translate(sim)) == normalize(sim.get_as_pypicongpu()) for a
+        representative set of well-formed Simulations (Q2)."""
         for name, builder in SIM_BUILDERS:
             with self.subTest(sim=name):
                 sim = builder()
-                requirements_before = {id(species): species._requirements for species in sim.species}
-                diagnostics_before = list(sim.diagnostics)
-
                 self.assertEqual(
                     normalize(sim.get_as_pypicongpu()),
                     normalize(translate(sim)),
                     msg=f"translate() diverged from get_as_pypicongpu() for {name!r}",
                 )
 
-                for species in sim.species:
-                    before = requirements_before[id(species)]
-                    self.assertIs(
-                        species._requirements,
-                        before,
-                        msg=f"translate() replaced {species.name!r}._requirements (Q3)",
-                    )
+    def test_translate_does_not_mutate_input(self):
+        """translate() leaves the *entire* reachable input graph unmutated (Q3):
+        every reachable object's public and private attributes are unchanged, and
+        no reachable object is added or dropped. This is checked in isolation
+        (only translate is called) because the incumbent get_as_pypicongpu is
+        itself impure (e.g. it sets a distribution's cell_size), so the purity
+        assertion cannot share a simulation state with a get_as_pypicongpu call."""
+        for name, builder in SIM_BUILDERS:
+            with self.subTest(sim=name):
+                sim = builder()
+                snapshot_before = _reachable_snapshot(sim)
+                translate(sim)
+                snapshot_after = _reachable_snapshot(sim)
+                self.assertEqual(
+                    set(snapshot_before),
+                    set(snapshot_after),
+                    msg=f"translate() added/dropped reachable objects for {name!r} (Q3)",
+                )
+                for obj_id in snapshot_before:
                     self.assertEqual(
-                        list(species._requirements),
-                        list(before),
-                        msg=f"translate() mutated {species.name!r}._requirements (Q3)",
+                        snapshot_after[obj_id],
+                        snapshot_before[obj_id],
+                        msg=f"translate() mutated a reachable object (id {obj_id}) for {name!r} (Q3)",
                     )
-                self.assertEqual(list(sim.diagnostics), diagnostics_before)
 
 
 # ---------------------------------------------------------------------------
@@ -316,3 +414,93 @@ class TestIonizationRegistrationSwitch(TestCase):
             sim, ion, _ = self._make(added=True)
             ion_pypicongpu = next(s for s in translate(sim).species if s.name == "ion")
             self.assertIsNotNone(ion_pypicongpu.constants.ground_state_ionization)
+
+    def test_translate_is_switch_independent(self):
+        """translate()'s output depends on reachability alone, not on
+        INIT_MUTATION_ENABLED: an *added* model yields ionization with the switch
+        on OR off; an *unadded* model yields none with the switch on OR off.
+        (Before the reset-then-re-derive fix, switch ON polluted the reachable ion
+        and translate reproduced it, so the unadded case diverged by switch state.)"""
+        for added in (True, False):
+            expected = "SET" if added else "None"
+            with self.subTest(added=added):
+                for switch in (True, False):
+                    with self.subTest(switch=switch), _init_mutation(switch):
+                        sim, ion, _ = self._make(added=added)
+                        ion_pypicongpu = next(s for s in translate(sim).species if s.name == "ion")
+                        is_set = ion_pypicongpu.constants.ground_state_ionization is not None
+                        self.assertEqual(
+                            "SET" if is_set else "None",
+                            expected,
+                            msg=f"translate() output changed with the switch (added={added}, switch={switch})",
+                        )
+
+
+# ---------------------------------------------------------------------------
+# Conflict/uniqueness semantics are delegated to the incumbent (QA #1)
+# ---------------------------------------------------------------------------
+
+
+class TestConflictSemantics(TestCase):
+    def test_conflicting_requirement_is_caught(self):
+        """A genuinely conflicting requirement (a second, disagreeing `Charge` on
+        the same species) is rejected by the incumbent `resolving_add`/
+        `check_for_conflict` that `translate` routes through. The conflict is
+        raised at `register_requirements` time, which is shared by both
+        `get_as_pypicongpu` and `translate`."""
+        sim = _base_sim()
+        electron = _basic_species("electron")
+        sim.add_species(electron, picmi.PseudoRandomLayout(n_macroparticles_per_cell=1))
+        with self.assertRaises(RequirementConflict):
+            electron.register_requirements([Charge(charge_si=9.0)])
+
+    def test_agreeing_unique_requirement_is_deduped_not_conflicted(self):
+        """The same requirement registered twice is deduplicated (uniqueness), not
+        treated as a conflict -- the incumbent bag-merge semantics."""
+        sim = _base_sim()
+        electron = _basic_species("electron")
+        sim.add_species(electron, picmi.PseudoRandomLayout(n_macroparticles_per_cell=1))
+        existing = next(req for req in electron._requirements if isinstance(req, Charge))
+        before = len(electron._requirements)
+        electron.register_requirements([Charge(charge_si=existing.charge_si)])
+        self.assertEqual(len(electron._requirements), before)
+
+
+# ---------------------------------------------------------------------------
+# The topological order is load-bearing, not cosmetic (QA #3)
+# ---------------------------------------------------------------------------
+
+
+def _reset_and_apply(resolved, order):
+    """Reset cross-object requirements on each reachable species, then re-derive,
+    in the given order (mirrors `translate` minus the graphlib sort)."""
+    for obj in order:
+        if isinstance(obj, PICMI_Species):
+            _reset_cross_object_requirements(obj)
+        _apply_cross_object_constraints(obj)
+
+
+class TestTopologicalOrderLoadBearing(TestCase):
+    def test_referenced_before_referrer_is_required(self):
+        """Applying constraints in topological (referenced-before-referrer) order
+        preserves the ionization the incumbent produces; reversing the order
+        drops it, because a referrer's re-derivation must run after its
+        referenced species has been reset. This is what makes the graphlib sort
+        load-bearing rather than decorative."""
+        with _init_mutation(False):
+            sim, ion, _ = TestIonizationRegistrationSwitch()._make(added=True)
+            ref = normalize(translate(sim))
+
+            ctx = {}
+            resolved = deep_copy(sim, ctx)
+            _reset_and_apply(resolved, topological_order(resolved))
+            self.assertEqual(normalize(resolved.get_as_pypicongpu()), ref)
+
+            ctx = {}
+            resolved = deep_copy(sim, ctx)
+            _reset_and_apply(resolved, list(reversed(topological_order(resolved))))
+            self.assertNotEqual(
+                normalize(resolved.get_as_pypicongpu()),
+                ref,
+                msg="reversed order unexpectedly matched -- the topo order would be cosmetic",
+            )

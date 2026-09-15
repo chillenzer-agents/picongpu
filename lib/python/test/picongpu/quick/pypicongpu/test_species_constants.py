@@ -7,6 +7,8 @@ License: GPLv3+
 
 from unittest import TestCase
 
+from pydantic import ValidationError
+
 from picongpu.pypicongpu.species.attribute.momentum import Momentum
 from picongpu.pypicongpu.species.attribute.position import Position
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
@@ -53,3 +55,49 @@ class TestSpeciesConstantsNormalization(TestCase):
         )
         # Sanity-check should not trip the (previously always-firing) unique-constant check.
         species.check()
+
+
+class TestSpeciesCheckRewired(TestCase):
+    """check() is a @model_validator(mode="after"), so the invariants must be
+    enforced at direct pypicongpu construction time, not just via an explicit
+    .check() call (previously dead code on the direct path)."""
+
+    def test_valid_species_constructs(self):
+        species = Species(
+            name="electron",
+            constants={"mass": Mass(mass_si=9.109e-31), "charge": Charge(charge_si=1.602e-19)},
+            attributes=_attributes(),
+        )
+        self.assertIsNotNone(species)
+
+    def test_rejects_invalid_name(self):
+        with self.assertRaises(ValidationError):
+            Species(
+                name="bad-name",
+                constants={"mass": Mass(mass_si=9.109e-31)},
+                attributes=_attributes(),
+            )
+
+    def test_rejects_missing_position(self):
+        with self.assertRaises(ValidationError):
+            Species(
+                name="electron",
+                constants={"mass": Mass(mass_si=9.109e-31)},
+                attributes=[Momentum(), Weighting()],
+            )
+
+    def test_rejects_missing_momentum(self):
+        with self.assertRaises(ValidationError):
+            Species(
+                name="electron",
+                constants={"mass": Mass(mass_si=9.109e-31)},
+                attributes=[Position(), Weighting()],
+            )
+
+    def test_rejects_duplicate_attribute_names(self):
+        with self.assertRaises(ValidationError):
+            Species(
+                name="electron",
+                constants={"mass": Mass(mass_si=9.109e-31)},
+                attributes=[Position(), Momentum(), Position()],
+            )

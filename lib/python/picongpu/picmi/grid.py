@@ -405,8 +405,60 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
                 )
         return self
 
+    @model_validator(mode="after")
+    def _check_particle_boundary_conditions(self):
+        # 2D3V drops the z axis, so the standard exposes per-axis particle BCs on
+        # only x and y; mirror the 3D construction-time validation over those axes.
+        if (
+            self.lower_bound_particles is None
+            or self.upper_bound_particles is None
+            or self.lower_boundary_conditions_particles is None
+            or self.upper_boundary_conditions_particles is None
+        ):
+            return self
+        for dim, name in enumerate(["x", "y"]):
+            lower = self.lower_boundary_conditions_particles[dim]
+            upper = self.upper_boundary_conditions_particles[dim]
+            if lower != upper:
+                raise ValueError(
+                    f"{name}: lower and upper particle boundary conditions must be equal "
+                    f"(can only be chosen by axis, not by direction). You gave {lower=}, {upper=}."
+                )
+            if lower not in PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID:
+                raise ValueError(f"{name}: particle boundary condition not supported. You gave {lower!r}.")
+        return self
+
     def check(self):
         _check_cartesian_grid(self, ["x", "y"])
+        self._check_particle_boundary_conditions()
+
+    @computed_field
+    @property
+    def picongpu_particle_boundary_conditions(self) -> tuple[str, str]:
+        """Resolved per-axis (x, y) particle boundary conditions (lower==upper, validated).
+
+        The grid defaults for particle boundaries in 2D3V: a species without its own
+        ``picongpu_particle_boundary`` inherits this grid's per-axis setting. See the
+        3D counterpart for the mapping to the PIConGPU ``--<species>_boundary`` tokens.
+        """
+        return tuple(self.lower_boundary_conditions_particles)
+
+    def get_particle_boundary(
+        self,
+        name: str,
+        picongpu_particle_boundary: "ParticleBoundary | None" = None,
+    ) -> SpeciesParticleBoundary:
+        """Resolve this grid's per-axis (x, y) particle BC with an optional species override.
+
+        Mirrors :meth:`Cartesian3DGrid.get_particle_boundary` over the 2D3V axes; the
+        species' 3-axis ``picongpu_particle_boundary`` is truncated to the grid's axes.
+        """
+        return particle_boundary.resolve_species_particle_boundary(
+            name=name,
+            field_boundary_conditions=self.lower_boundary_conditions,
+            grid_particle_boundary_conditions=self.picongpu_particle_boundary_conditions,
+            override=picongpu_particle_boundary,
+        )
 
 
 AnyGrid = Cartesian3DGrid | Cartesian2DGrid

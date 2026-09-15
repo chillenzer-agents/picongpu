@@ -142,6 +142,10 @@ def resolve_species_particle_boundary(
     :param grid_particle_boundary_conditions: the grid's resolved per-axis **particle** BC (PICMI names)
     :param override: the species' optional :class:`ParticleBoundary`, or None to use the grid default
     """
+    # The number of spatial axes is set by the grid (3 in 3D, 2 in 2D3V: the z
+    # axis is dropped, so a species' 3-axis override is truncated to the grid's
+    # axes). The C++ core sizes its per-species boundary token vectors by simDim.
+    naxes = len(field_boundary_conditions)
     # Whether the *field* boundary on each axis is absorbing (i.e. `--periodic 0`).
     # The C++ core sets the base particle kind from this: field periodic -> Periodic,
     # field open -> Absorbing. The only valid PICMI field BCs are "periodic" and
@@ -154,9 +158,9 @@ def resolve_species_particle_boundary(
         offset = None
         temperature = None
     else:
-        tokens = [PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID[k] for k in override.boundary]
-        offset = override.boundary_offset
-        temperature = override.boundary_temperature
+        tokens = [PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID[k] for k in override.boundary[:naxes]]
+        offset = override.boundary_offset[:naxes] if override.boundary_offset is not None else None
+        temperature = override.boundary_temperature[:naxes] if override.boundary_temperature is not None else None
 
     _check_constraints(name, tokens, base_absorbing, field_boundary_conditions, offset)
 
@@ -174,7 +178,7 @@ def resolve_species_particle_boundary(
 
 def _check_constraints(name, tokens, base_absorbing, field_boundary_conditions, offset):
     """Enforce the C++ core's compatibility rules (see the module docstring)."""
-    for axis in range(3):
+    for axis in range(len(tokens)):
         token = tokens[axis]
         absorbing = base_absorbing[axis]
         field_bc = field_boundary_conditions[axis]

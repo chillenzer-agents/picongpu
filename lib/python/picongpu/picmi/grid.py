@@ -209,7 +209,23 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
                 )
         return self
 
+    @model_validator(mode="after")
     def _check_particle_boundary_conditions(self):
+        # The standard's ``_resolve_grid`` (an after-validator of a base class)
+        # fills in the derived fields while validating this model; with
+        # ``validate_assignment`` enabled each such assignment re-triggers the
+        # after-validators, so this runs on every intermediate state. The four
+        # particle-derived fields below are the *last* ones ``_resolve_grid``
+        # resolves, and in the fully-resolved model they are always non-None
+        # (each inherits the field bound / condition when unset). Gating on them
+        # means we validate exactly once, on the final state.
+        if (
+            self.lower_bound_particles is None
+            or self.upper_bound_particles is None
+            or self.lower_boundary_conditions_particles is None
+            or self.upper_boundary_conditions_particles is None
+        ):
+            return self
         # Unset particle BCs are inherited from the field BCs by the standard's
         # ``_resolve_grid``; here we validate what was actually set (inherited or
         # explicit) and keep it per-axis, mirroring the field-boundary rule that
@@ -225,6 +241,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
                 )
             if lower not in PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID:
                 raise ValueError(f"{name}: particle boundary condition not supported. You gave {lower!r}.")
+        return self
 
     def check(self):
         _check_cartesian_grid(self, ["x", "y", "z"])

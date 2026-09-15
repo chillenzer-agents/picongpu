@@ -35,22 +35,36 @@ with that base. So:
 we never emit a configuration the C++ binary would reject.
 """
 
+from types import MappingProxyType
 from typing import Sequence
 
 from pydantic import BaseModel, field_validator
 
-from picongpu.pypicongpu import grid as pypicongpu_grid
 from picongpu.pypicongpu.species.species_boundary import (
     SpeciesParticleBoundary as ResolvedSpeciesParticleBoundary,
 )
 
-from .grid import PICONGPU_BOUNDARY_CONDITION_BY_PICMI_ID, PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID
+# PICMI-standard particle boundary conditions (per axis) mapped to the
+# PIConGPU ``--<species>_boundary`` command-line token used per axis.
+# The field-boundary tokens ("periodic"/"open") map to the same kinds, so a
+# particle axis that merely inherits its field boundary stays consistent.
+# Kept here (not in ``grid.py``) so that module can import it without a
+# circular dependency; exposed as an immutable ``MappingProxyType``.
+PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID = MappingProxyType(
+    {
+        "periodic": "periodic",
+        "open": "absorbing",
+        "absorbing": "absorbing",
+        "reflect": "reflecting",
+        "thermal": "thermal",
+    }
+)
 
 # PICMI particle-boundary names accepted on the (user-facing) species field. The
 # values are the PICMI-standard names; they map to the PIConGPU C++ tokens via
 # PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID at translation time.
 _PARTICLE_BC_NAMES = frozenset(PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID)
-_AXES = "xyz"
+_AXES = ("x", "y", "z")
 
 
 class ParticleBoundary(BaseModel):
@@ -130,11 +144,9 @@ def resolve_species_particle_boundary(
     """
     # Whether the *field* boundary on each axis is absorbing (i.e. `--periodic 0`).
     # The C++ core sets the base particle kind from this: field periodic -> Periodic,
-    # field open -> Absorbing.
-    base_absorbing = [
-        PICONGPU_BOUNDARY_CONDITION_BY_PICMI_ID[b] == pypicongpu_grid.BoundaryCondition.ABSORBING
-        for b in field_boundary_conditions
-    ]
+    # field open -> Absorbing. The only valid PICMI field BCs are "periodic" and
+    # "open", so "open" <=> absorbing.
+    base_absorbing = [b == "open" for b in field_boundary_conditions]
 
     if override is None:
         # Grid default: the resolved grid particle BC (already per-axis PICMI names).

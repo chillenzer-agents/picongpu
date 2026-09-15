@@ -236,6 +236,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         :data:`PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID` for the mapping to the
         PIConGPU ``--<species>_boundary`` tokens.
         """
+        # lower == upper on every axis, guaranteed by _check_particle_boundary_conditions.
         return tuple(self.lower_boundary_conditions_particles)
 
     def get_particle_boundary(

@@ -32,6 +32,15 @@ class Gaussian:
             "free_form": picmi.AnalyticDistribution(
                 lambda x, y, z: self.free_form(y, cell_size_y=CELL_SIZE[1], **self.parameters)
             ),
+            # The sub-volume bounded form: a GaussianDistribution given lower/upper bounds
+            # instantiates the bounded AnalyticDistribution (free-formula) instead of the
+            # native Gaussian. It must reproduce the native (full) profile exactly, so it is
+            # verified against `predefined`/`free_form` below.
+            "bounded": picmi.GaussianDistribution(
+                **self.parameters,
+                lower_bound=[0.0, 0.0, 0.0],
+                upper_bound=[64.0, 66.0, 74.0],
+            ),
         }
 
     @staticmethod

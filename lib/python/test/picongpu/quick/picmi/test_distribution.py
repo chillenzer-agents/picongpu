@@ -7,8 +7,10 @@ License: GPLv3+
 
 from unittest import TestCase
 
+import numpy as np
 import pytest
 from picongpu import picmi
+from picongpu.picmi.distribution.GaussianDistribution import BoundedGaussianDistribution
 from picongpu.picmi.grid import Cartesian3DGrid
 from picongpu.picmi.species import Species
 from picongpu.picmi.species_requirements import SimpleMomentumOperation, run_construction
@@ -299,7 +301,65 @@ class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
         assert pypic.gas_factor == self.values["factor"]
         assert pypic.vacuum_cells_front == self.values["vacuum_front"]
 
-        # @todo repect bounding boxes, Brian Marre, 2024
+        # @todo respect bounding boxes, Brian Marre, 2024
+
+    def test_bounded_routed_to_analytic(self):
+        """giving sub-volume bounds instantiates the bounded analytic form, not the native Gaussian"""
+        bounded = self._get_distribution(lower_bound=[0, 0, 0], upper_bound=[1, 1, 1])
+        assert isinstance(bounded, BoundedGaussianDistribution)
+        assert isinstance(bounded, picmi.AnalyticDistribution)
+        assert not isinstance(bounded, picmi.GaussianDistribution)
+        # the full 3-vector bounds are carried through
+        assert list(bounded.lower_bound) == [0.0, 0.0, 0.0]
+        assert list(bounded.upper_bound) == [1.0, 1.0, 1.0]
+        # a single-sided bound also routes
+        assert isinstance(self._get_distribution(lower_bound=[0, 0, 0]), BoundedGaussianDistribution)
+        assert isinstance(self._get_distribution(upper_bound=[1, 1, 1]), BoundedGaussianDistribution)
+
+    def test_unbounded_stays_native(self):
+        """no bounds keeps the native Gaussian (and the native pypicongpu profile)"""
+        native = self._get_distribution()
+        assert isinstance(native, picmi.GaussianDistribution)
+        assert not isinstance(native, picmi.AnalyticDistribution)
+        pypic = native.get_as_pypicongpu(ARBITRARY_GRID)
+        assert isinstance(pypic, species.operation.densityprofile.Gaussian)
+
+    def test_bounded_renders_free_formula(self):
+        """the bounded form builds a free-formula (sympy Piecewise) profile with the cell-centre correction"""
+        bounded = self._get_distribution(lower_bound=[0, 0, 0], upper_bound=[1, 1, 1])
+        pypic = bounded.get_as_pypicongpu(ARBITRARY_GRID)
+        assert isinstance(pypic, species.operation.densityprofile.FreeFormula)
+        # the native Gaussian profile, as a C++ Piecewise (front/plateau/rear ramps + vacuum front)
+        assert "pmacc::math::exp" in pypic.function_body
+        assert "pmacc::math::pow" in pypic.function_body
+        assert "pmacc::math::abs" in pypic.function_body
+
+    def test_bounded_matches_native_profile(self):
+        """the bounded analytic form reproduces the native y-only Gaussian exactly (cell-centre corrected)"""
+        bounded = self._get_distribution(lower_bound=[0, 0, 0], upper_bound=[1, 1, 1])
+        native = self._get_distribution()
+        bounded.get_as_pypicongpu(ARBITRARY_GRID)
+        native.get_as_pypicongpu(ARBITRARY_GRID)
+
+        y = np.arange(0.0, 10.0, 0.05)
+        x = np.full_like(y, 0.5)
+        z = np.full_like(y, 0.5)
+        np.testing.assert_allclose(bounded(x, y, z), native(x, y, z), rtol=1e-9, atol=1e-30)
+
+    def test_bounded_density_zero(self):
+        """bounded form also rejects a non-positive density"""
+        with pytest.raises(ValueError, match=".*density must be > 0.*"):
+            self._get_distribution(density=0.0, lower_bound=[0, 0, 0], upper_bound=[1, 1, 1])
+
+    def test_bounded_front_rear_swapped(self):
+        """bounded form also rejects a front behind the rear"""
+        with pytest.raises(ValueError, match=".*center_front must be <= center_rear.*"):
+            self._get_distribution(
+                center_front=self.values["center_rear"],
+                center_rear=self.values["center_front"],
+                lower_bound=[0, 0, 0],
+                upper_bound=[1, 1, 1],
+            )
 
     def test_density_zero(self):
         """density set to zero is not accepted"""

@@ -193,12 +193,18 @@ def _make_sim(**kwargs):
 
 
 class TestSpeciesShapeInheritsFromSimulation(TestCase):
+    def _converted(self, sim, index=0):
+        # Translation of the Simulation is where the owning Simulation's shape is
+        # threaded to its species (there is no back-reference), so the converted
+        # pypicongpu species is what exposes the inherited shape.
+        return sim.get_as_pypicongpu().species[index]
+
     def test_unset_species_unset_simulation_is_quadratic(self):
         # Neither set: behaviour is preserved -> PIConGPU default quadratic/TSC.
         sim = _make_sim()
         sp = picmi.Species(particle_type="electron")
         sim.add_species(sp, None)
-        self.assertIs(sp.get_as_pypicongpu().shape, Shape.quadratic)
+        self.assertIs(self._converted(sim).shape, Shape.quadratic)
 
     def test_unset_species_inherits_simulation_shape(self):
         for sim_shape, expected in {
@@ -213,26 +219,26 @@ class TestSpeciesShapeInheritsFromSimulation(TestCase):
                 sim = _make_sim(particle_shape=sim_shape)
                 sp = picmi.Species(particle_type="electron")
                 sim.add_species(sp, None)
-                self.assertIs(sp.get_as_pypicongpu().shape, expected)
+                self.assertIs(self._converted(sim).shape, expected)
 
     def test_explicit_species_shape_overrides_simulation(self):
         sim = _make_sim(particle_shape="cubic")
         sp = picmi.Species(particle_type="electron", particle_shape="linear")
         sim.add_species(sp, None)
-        self.assertIs(sp.get_as_pypicongpu().shape, Shape.linear)
+        self.assertIs(self._converted(sim).shape, Shape.linear)
 
     def test_method_unset_is_boris(self):
         sim = _make_sim()
         sp = picmi.Species(particle_type="electron")
         sim.add_species(sp, None)
-        self.assertIs(sp.get_as_pypicongpu().pusher, Pusher.Boris)
+        self.assertIs(self._converted(sim).pusher, Pusher.Boris)
 
     def test_unset_species_unset_simulation_still_renders_quadratic_and_boris(self):
         # End-to-end translation preserves the historical default (both unset).
         sim = _make_sim()
         sp = picmi.Species(particle_type="electron")
         sim.add_species(sp, None)
-        converted = sp.get_as_pypicongpu()
+        converted = self._converted(sim)
         self.assertIs(converted.shape, Shape.quadratic)
         self.assertIs(converted.pusher, Pusher.Boris)
 
@@ -251,11 +257,13 @@ class TestSpeciesShapeInheritsFromSimulation(TestCase):
     def test_species_not_added_to_simulation_is_standalone_quadratic(self):
         # No back-reference: an unset shape on a species never attached to a
         # simulation resolves to the quadratic/TSC code default.
-        self.assertIs(picmi.Species(particle_type="electron").get_as_pypicongpu().shape, Shape.quadratic)
+        sp = picmi.Species(particle_type="electron")
+        self.assertIs(sp.get_as_pypicongpu().shape, Shape.quadratic)
 
     def test_inheritance_applies_across_conversion_sites(self):
         # Binning and other diagnostics reuse the same species object, so an
-        # unset shape there must inherit the Simulation-level shape too.
+        # unset shape there must inherit the Simulation-level shape that the
+        # Simulation threads to the species at translation time.
         from picongpu.picmi.diagnostics.binning import BinSpec, Binning, BinningAxis
         from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
         from picongpu.picmi.particle_functor import ParticleFunctor
@@ -276,4 +284,5 @@ class TestSpeciesShapeInheritsFromSimulation(TestCase):
             species=sp,
             period=TimeStepSpec[:],
         )
-        self.assertIs(binner.get_as_pypicongpu(time_step_size=1.0, num_steps=4).species[0].shape, Shape.linear)
+        converted = binner.get_as_pypicongpu(time_step_size=1.0, num_steps=4, default_particle_shape=sim.particle_shape)
+        self.assertIs(converted.species[0].shape, Shape.linear)

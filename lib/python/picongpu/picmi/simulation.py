@@ -370,6 +370,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         # But that's fine because the Binning plugin uses it's own mechanism
         # and we don't need their filters to register
         # unless they are used somewhere else as well.
+        # Note: the UnpackChain traversal is list-aware, so it also picks up
+        # the filters of species lists of other diagnostics such as Radiation (task 04).
         return unique(
             map(
                 get_as_pypicongpu,

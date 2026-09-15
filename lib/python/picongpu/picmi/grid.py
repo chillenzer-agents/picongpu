@@ -5,12 +5,16 @@ Authors: Hannes Troepgen, Brian Edward Marre, Richard Pausch, Julian Lenz
 License: GPLv3+
 """
 
-from typing import Annotated, Sequence
+from typing import TYPE_CHECKING, Annotated, Sequence
 import picmistandard
 from pydantic import AfterValidator, BeforeValidator, Field, computed_field, model_validator
 
 from ..pypicongpu import grid, util
+from ..pypicongpu.species.species_boundary import SpeciesParticleBoundary
 from .copy_attributes import converts_to
+
+if TYPE_CHECKING:
+    from .particle_boundary import ParticleBoundary
 
 
 def _normalise_type(kw, key, t):
@@ -298,6 +302,34 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         grid_2d = Cartesian2DGrid(**kwargs)
         grid_2d.check()
         return grid_2d
+
+    def get_particle_boundary(
+        self,
+        name: str,
+        picongpu_particle_boundary: "ParticleBoundary | None" = None,
+    ) -> SpeciesParticleBoundary:
+        """Resolve this grid's per-axis particle BC with an optional species override.
+
+        The grid particle-BC is the **default**; the species'
+        ``picongpu_particle_boundary`` (if given) **overrides** the grid's per-axis
+        value. Returns a resolved :class:`pypicongpu...SpeciesParticleBoundary` that
+        maps to the per-species command-line options (``--<species>_boundary`` and
+        friends).
+
+        The C++ core's compatibility constraints (reflecting/thermal only
+        on absorbing-field axes; periodic only on periodic-field axes; periodic
+        requires a 0 offset) are enforced here, at translation time.
+        """
+        # Imported here to avoid a circular import (particle_boundary imports the
+        # BC mapping tables from this module).
+        from . import particle_boundary
+
+        return particle_boundary.resolve_species_particle_boundary(
+            name=name,
+            field_boundary_conditions=self.lower_boundary_conditions,
+            grid_particle_boundary_conditions=self.picongpu_particle_boundary_conditions(),
+            override=picongpu_particle_boundary,
+        )
 
 
 @converts_to(

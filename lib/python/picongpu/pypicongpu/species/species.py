@@ -13,6 +13,7 @@ from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant
 
 from ..rendering import RenderedObject
 from .attribute import Attribute, Momentum, Position
+from .species_boundary import SpeciesParticleBoundary
 from .constant import (
     Charge,
     Constant,
@@ -167,6 +168,9 @@ class Species(RenderedObject, BaseModel):
     """name of the species"""
 
     shape: Shape = Shape("TSC")
+
+    particle_boundary: SpeciesParticleBoundary | None = None
+    """resolved particle-boundary description (PIConGPU per-species options)"""
 
     @computed_field
     def species_name(self) -> str:

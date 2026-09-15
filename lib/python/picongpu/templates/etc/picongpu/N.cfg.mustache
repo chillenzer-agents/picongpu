@@ -211,6 +211,22 @@ TBG_pypicongpu_output=$(sed -z 's/\n/ /g' <<< "$pypicongpu_output_with_newlines"
 
 TBG_plugins="!TBG_pypicongpu_output"
 
+# per-species particle boundaries (grid default combined with any per-species
+# override); each species emits --<species>_boundary and, only when set,
+# --<species>_boundaryOffset / --<species>_boundaryTemperature
+pypicongpu_species_boundary_with_newlines="
+  {{#species}}
+    {{#particle_boundary}}
+      --{{{species_name}}}_boundary {{{boundary}}}
+      {{#offset}}--{{{species_name}}}_boundaryOffset {{{offset}}}{{/offset}}
+      {{#temperature}}--{{{species_name}}}_boundaryTemperature {{{temperature}}}{{/temperature}}
+    {{/particle_boundary}}
+  {{/species}}
+"
+
+# remove newlines
+TBG_speciesBoundary=$(sed -z 's/\n/ /g' <<< "$pypicongpu_species_boundary_with_newlines")
+
 
 
 #################################
@@ -220,14 +236,15 @@ TBG_plugins="!TBG_pypicongpu_output"
 TBG_deviceDist="!TBG_devices_x !TBG_devices_y !TBG_devices_z"
 
 TBG_programParams="-d !TBG_deviceDist   \
-                   -g !TBG_gridSize     \
-                   -s !TBG_steps        \
-                   {{#grid.grid_dist}}
-                    !TBG_gridDist       \
-                   {{/grid.grid_dist}}
-                   !TBG_periodic        \
-           !TBG_currentInterpolation   \
-                   !TBG_plugins         \
+                    -g !TBG_gridSize     \
+                    -s !TBG_steps        \
+                    {{#grid.grid_dist}}
+                     !TBG_gridDist       \
+                    {{/grid.grid_dist}}
+                    !TBG_periodic        \
+            !TBG_currentInterpolation   \
+                    !TBG_speciesBoundary \
+                    !TBG_plugins         \
                    {{#moving_window}}
                     !TBG_movingWindow    \
                     !TBG_windowMovePoint \

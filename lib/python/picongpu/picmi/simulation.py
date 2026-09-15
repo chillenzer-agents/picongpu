@@ -511,7 +511,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         ]
 
         return pypicongpu.simulation.Simulation(
-            species=map(get_as_pypicongpu, sorted(self.species)),
+            species=[self._convert_species(species) for species in sorted(self.species)],
             init_operations=init_operations,
             typical_ppc=typical_ppc,
             delta_t_si=self.time_step_size,
@@ -532,6 +532,22 @@ class Simulation(picmistandard.PICMI_Simulation):
             precision_overrides=self.picongpu_precision_config.get_as_pypicongpu(),
             memory_config=self.picongpu_memory_config.get_as_pypicongpu(),
         )
+
+    def _convert_species(self, species) -> "pypicongpu.species.species.Species":
+        """Convert a PICMI species to its pypicongpu counterpart.
+
+        Also resolves the species' particle boundary: the grid's per-axis particle
+        BC is the default, overridden per axis by the species' optional
+        ``picongpu_particle_boundary``. The C++ core's compatibility constraints are
+        enforced here (at translation time) by the grid's
+        :meth:`Cartesian3DGrid.get_particle_boundary`.
+        """
+        converted = get_as_pypicongpu(species)
+        converted.particle_boundary = self.solver.grid.get_particle_boundary(
+            name=species.name,
+            picongpu_particle_boundary=species.picongpu_particle_boundary,
+        )
+        return converted
 
     def _get_base_density(self) -> float:
         return self.picongpu_base_density or 1.0e25

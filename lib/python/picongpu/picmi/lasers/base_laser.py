@@ -66,14 +66,50 @@ class BaseLaser:
         """
         return self.duration
 
+    def _entry_axis(self) -> int:
+        """Axis index (0/1/2) of the dominant propagation-direction component.
+
+        The laser enters the simulation box through the coordinate face whose normal
+        is this axis: a positive dominant component means entry from the ``Min`` face
+        (low side) and a negative one from the ``Max`` face (high side).
+
+        The dominant component is ``argmax(abs(direction))``, which resolves exact
+        magnitude ties to the *first* axis in x, y, z order (no tolerance). A
+        genuinely-ambiguous 45° diagonal is therefore assigned to the lowest-index
+        tied axis by convention, not by physics; near-ties are decided by the larger
+        component and are unambiguous.
+        """
+        direction = np.asarray(self.propagation_direction, dtype=float)
+        axis = int(np.argmax(np.abs(direction)))
+        if direction[axis] == 0.0:
+            raise ValueError(
+                "The laser propagation direction has no dominant (largest-magnitude) "
+                "component, so the face through which it enters the simulation box "
+                f"cannot be determined. You gave {self.propagation_direction=}."
+            )
+        return axis
+
+    def _entry_face(self) -> str:
+        """Name of the coordinate face the laser enters through (e.g. ``YMin``)."""
+        axis = self._entry_axis()
+        suffix = "Min" if self.propagation_direction[axis] > 0 else "Max"
+        return "xyz"[axis].upper() + suffix
+
     def _compute_pulse_init(self):
+        # Time (in units of the pulse duration, 1 sigma of the intensity) for the
+        # pulse peak -- located at centroid_position at t=0 -- to travel along the
+        # full propagation direction to the entry face. This is the beam-axis
+        # distance from the centroid to the origin, i.e. the dot product of
+        # centroid_position with the normalized propagation direction, divided by
+        # the speed of light; it mirrors the C++ getTminusXoverC() time offset.
+        # For propagation along +y it reduces to the original
+        # -2 * centroid_y / (c * sigma) expression.
         pulse_init = (
             -2.0
-            * self.centroid_position[1]
-            / (self.propagation_direction[1] * constants.c)
+            * scalarProduct(self.centroid_position, self.propagation_direction)
+            / constants.c
             / self._pulse_duration_sigma_si()
-        )  # unit: multiple of the laser pulse duration (1 sigma of the intensity)
-        # @todo extend this to other propagation directions than +y
+        )
         if pulse_init < 3.0:
             logging.warning(
                 "set centroid_position and propagation_direction indicate that laser "
@@ -97,17 +133,16 @@ class BaseLaser:
                 f"You gave {self.propagation_direction=} with norm {n}."
             )
 
-        if scalarProduct(self.propagation_direction, [0.0, 1.0, 0.0]) <= 0.0:
+        axis = self._entry_axis()
+        entry_axis_name = "xyz"[axis]
+        if self.centroid_position[axis] * self.propagation_direction[axis] > 0.0:
             raise ValueError(
-                "Laser propagation parallel to the y-plane or pointing outside "
-                "from the inside of the simulation box is not supported by this "
-                f"laser in PICMI. You gave {self.propagation_direction=}."
-            )
-
-        if self.centroid_position[1] > 0:
-            raise ValueError(
-                "The laser maximum must be outside of the "
-                "simulation box, otherwise it is impossible to correctly initialize"
-                "it using a huygens surface in the box, centroid_y <= 0. "
-                f"You gave {self.centroid_position=}."
+                "The laser maximum (centroid) must be located outside of the "
+                "simulation box on the entry side, otherwise it is impossible to "
+                "correctly initialize it using a huygens surface in the box. The "
+                f"laser enters through the {self._entry_face()} face, so the "
+                f"{entry_axis_name}-component of the centroid must not point along "
+                f"the propagation direction (centroid_{entry_axis_name} * "
+                f"direction_{entry_axis_name} <= 0). You gave "
+                f"{self.centroid_position=} and {self.propagation_direction=}."
             )

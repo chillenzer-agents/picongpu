@@ -224,6 +224,8 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
                         f"grid distribution in {dim_name[dim]} dimension must be multiple of super cell size"
                     )
 
+    @computed_field
+    @property
     def picongpu_particle_boundary_conditions(self) -> tuple[str, str, str]:
         """Resolved per-axis particle boundary conditions (lower==upper, validated).
 
@@ -254,6 +256,6 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         return particle_boundary.resolve_species_particle_boundary(
             name=name,
             field_boundary_conditions=self.lower_boundary_conditions,
-            grid_particle_boundary_conditions=self.picongpu_particle_boundary_conditions(),
+            grid_particle_boundary_conditions=self.picongpu_particle_boundary_conditions,
             override=picongpu_particle_boundary,
         )

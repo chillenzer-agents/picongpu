@@ -41,6 +41,7 @@ from picongpu.pypicongpu.runner import Runner
 from picongpu.pypicongpu.species.attribute.momentum import Momentum
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
+from picongpu.pypicongpu.species.species import Species as PyPIConGPUSpecies
 from picongpu.pypicongpu.util import UnpackChain, unique
 from picongpu.pypicongpu.walltime import Walltime
 
@@ -449,7 +450,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             collisional_physics=collisions[0].get_as_pypicongpu(),
         )
 
-    def _convert_species(self, species) -> "pypicongpu.species.species.Species":
+    def _convert_species(self, species) -> PyPIConGPUSpecies:
         """Convert a PICMI species to its pypicongpu counterpart.
 
         The per-species particle boundary is resolved inside

@@ -21,6 +21,8 @@
 #pragma once
 
 #include <pmacc/meta/conversion/MakeSeq.hpp>
+#include <pmacc/traits/HasFlag.hpp>
+#include <pmacc/traits/HasIdentifiers.hpp>
 
 /* some forward declarations we need */
 #include "picongpu/fields/Fields.def"
@@ -38,13 +40,12 @@ namespace picongpu
     struct {{{typename}}} {
          HDINLINE float1_64 getUnit() const
          {
-             return 1.;
+             return {{{get_unit_cpp}}};
          }
 
          HINLINE std::vector<float_64> getUnitDimension() const
          {
-             std::vector<float_64> unitDimension(7, 0.0);
-             return unitDimension;
+             return std::vector<float_64>{{{unit_dimension_cpp}}};
          }
 
          HINLINE static std::string getName()
@@ -67,6 +68,25 @@ namespace picongpu
     struct IsWeighted<{{{typename}}}> : std::true_type {};
 {{/functor}} {{/derived_fields}} {{/type_openPMD}} {{/output}}
     }
+
+{{#output}} {{#type_openPMD}} {{#derived_fields}} {{#functor}}
+    namespace particles::traits {
+        /* Restrict derived attribute {{{typename}}} to species carrying the particle
+         * attributes the functor accesses, so `CreateEligible_t` (via `mp_copy_if`)
+         * does not instantiate it for species that lack a required attribute. The
+         * `FilteredDerivedAttribute` overload forwards the attribute part here. */
+        template<typename T_Species>
+        struct SpeciesEligibleForSolver<
+            T_Species,
+            particleToGrid::derivedAttributes::{{{typename}}}>
+        {
+            using FrameType = typename T_Species::FrameType;
+
+            using type = pmacc::mp_and<{{{identifier_requirement_cpp}}}, {{{flag_requirement_cpp}}}>;
+        };
+    }
+
+{{/functor}} {{/derived_fields}} {{/type_openPMD}} {{/output}}
 
 {{#output}} {{#type_openPMD}} {{#derived_fields}} {{#functor}}
     using {{{typename}}}_Seq

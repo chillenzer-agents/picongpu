@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 from .... import pypicongpu
-from ....picmi.mutation_switch import INIT_MUTATION_ENABLED
+from ....picmi import mutation_switch
 from .ionizationmodel import IonizationModel
 
 
@@ -16,7 +16,7 @@ class GroundStateIonizationModel(IonizationModel):
         # When the switch is off, `IonizationModel.__init__` already returned early,
         # so the base class did not register anything; mirror that here so the
         # model's element-properties constant is not registered eagerly either.
-        if not INIT_MUTATION_ENABLED:
+        if not mutation_switch.INIT_MUTATION_ENABLED:
             return
         self.ion_species.register_requirements(self.get_constants())
 

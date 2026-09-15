@@ -8,6 +8,7 @@ License: GPLv3+
 from pydantic import ConfigDict, field_validator
 
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
+from picongpu.picmi.mutation_switch import INIT_MUTATION_ENABLED
 from picongpu.picmi.species import Species
 from picongpu.pypicongpu.output.radiation import (
     FormFactorConfiguration as FormFactorConfiguration,

@@ -5,14 +5,19 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
-from .ionizationmodel import IonizationModel
-
 from .... import pypicongpu
+from ....picmi.mutation_switch import INIT_MUTATION_ENABLED
+from .ionizationmodel import IonizationModel
 
 
 class GroundStateIonizationModel(IonizationModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # When the switch is off, `IonizationModel.__init__` already returned early,
+        # so the base class did not register anything; mirror that here so the
+        # model's element-properties constant is not registered eagerly either.
+        if not INIT_MUTATION_ENABLED:
+            return
         self.ion_species.register_requirements(self.get_constants())
 
     def get_constants(self) -> list[pypicongpu.species.constant.Constant]:

@@ -7,7 +7,7 @@ License: GPLv3+
 
 from itertools import combinations, combinations_with_replacement
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from picongpu.picmi.species import Species
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
@@ -20,8 +20,23 @@ from picongpu.pypicongpu.collisions import DynamicLogCollision as DynamicLogColl
 
 
 class Collision(BaseModel):
+    """
+    one collision interaction between species pairs (user-facing wrapper)
+
+    Thin PICMI-layer bridge: holds the PICMI species until conversion and
+    delegates the model semantics (validation, serialisation, rendering) to
+    the pypicongpu model `picongpu.pypicongpu.collisions.Collision`; the
+    single source of truth (see it for the C++ counterpart and the units
+    policy).
+    """
+
     species_pairs: list[tuple[Species | FilteredSpecies, Species | FilteredSpecies]]
+    """the interacting species pairs (PICMI species; see pypicongpu
+    `Collision.species_pairs` for the invariants)"""
+
     functor: CollisionFunctor
+    """the collision functor (constant or dynamic Coulomb logarithm;
+    defined by pypicongpu)"""
 
     @classmethod
     def construct_from_pairs(cls, species_pairs, **kwargs):
@@ -47,9 +62,25 @@ class Collision(BaseModel):
 
 
 class CollisionalPhysicsSetup(BaseModel):
+    """
+    the collisional physics setup (user-facing wrapper)
+
+    Thin PICMI-layer bridge: holds the PICMI species until conversion and
+    delegates the model semantics (validation, serialisation, rendering) to
+    the pypicongpu model `picongpu.pypicongpu.collisions.CollisionalPhysicsSetup`
+    (the single source of truth; see it for the C++ counterpart and the
+    invariants, e.g. that a dynamic-log collision requires screening species;
+    that check now runs when the setup is converted to pypicongpu).
+    """
+
     collisions: list[Collision] = Field(default_factory=list)
+    """the collisions (a single Collision is accepted and wrapped in a list)"""
+
     screening_species: list[Species | FilteredSpecies] = Field(default_factory=list)
+    """the species contributing to the Debye screening length"""
+
     numerics_config: CollisionNumericsConfig = CollisionNumericsConfig()
+    """the numerics configuration of the collision plugin (defined by pypicongpu)"""
 
     def __init__(self, *args, **kwargs):
         if len(args) == 1:
@@ -66,21 +97,6 @@ class CollisionalPhysicsSetup(BaseModel):
         if isinstance(value, Collision):
             return [value]
         return value
-
-    @model_validator(mode="after")
-    def _validate(self):
-        if (
-            any(isinstance(collision.functor, DynamicLogCollision) for collision in self.collisions)
-            and len(self.screening_species) == 0
-        ):
-            message = (
-                "Your collisional physics setup is inconsistent: "
-                "You requested a dynamic log for some of your collisions "
-                "but didn't give any screening species to compute this from. "
-                f"You gave:\n{self.collisions=}\nand\n{self.screening_species=}."
-            )
-            raise ValueError(message)
-        return self
 
     def get_as_pypicongpu(self):
         return PyPIConGPUCollisionalPhysicsSetup(

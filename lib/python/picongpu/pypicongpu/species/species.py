@@ -26,7 +26,13 @@ from .constant import (
 
 
 class Shape(Enum):
-    """particle shape (charge/current deposition scheme) of a species"""
+    """particle shape (charge/current deposition scheme) of a species
+
+    The values are rendered verbatim as `particles::shapes::<value>` in
+    speciesDefinition.param, so each value must stay a valid C++ identifier
+    (e.g. shapes/TSC.hpp, shapes/Counter.hpp). The member names are the
+    Python-level PICMI shape identifiers.
+    """
 
     NGP = "NGP"
     linear = "CIC"
@@ -37,12 +43,24 @@ class Shape(Enum):
 
 
 class Pusher(Enum):
-    """particle pusher (equation of motion integrator) of a species"""
+    """particle pusher (equation of motion integrator) of a species
+
+    The member names mirror the C++ struct names declared in
+    include/picongpu/param/pusher.param (namespace particles::pusher) and
+    the values are rendered verbatim as `particles::pusher::<value>` in
+    speciesDefinition.param, so both must stay valid C++ identifiers.
+
+    Note: the `particles::pusher::Axel` struct declaration is currently
+    missing in pusher.param (only the particlePusherAxel parameter namespace
+    and the species.param documentation remain); using Axel therefore renders
+    C++ that will not compile until the declaration is restored on the C++
+    side.
+    """
 
     # supported by standard and PIConGPU
     Boris = "Boris"
     Vay = "Vay"
-    Higuera = "Higuera-Cary"
+    HigueraCary = "HigueraCary"
     Free = "Free"
     # not supported by standard
     ReducedLandauLifshitz = "ReducedLandauLifshitz"

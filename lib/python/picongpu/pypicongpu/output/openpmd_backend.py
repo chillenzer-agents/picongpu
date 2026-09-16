@@ -62,7 +62,12 @@ class Adios2Engine(BaseModel):
     # Opaque engine parameters forwarded verbatim to ``adios2::IO::SetParameters``;
     # openPMD coerces string/number/boolean values via ``asStringDynamic``.
     parameters: Optional[dict[str, Any]] = None
-    preferred_flush_target: Optional[Literal["disk", "buffer", "new_step"]] = None
+    # openPMD also accepts the ``<value>_override`` variants (``disk_override``,
+    # ``buffer_override``, ``new_step_override``) which take precedence over the
+    # non-suffixed values on a per-``flush()`` basis.
+    preferred_flush_target: Optional[
+        Literal["disk", "buffer", "new_step", "disk_override", "buffer_override", "new_step_override"]
+    ] = None
 
 
 class Adios2Operator(BaseModel):

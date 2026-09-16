@@ -22,15 +22,19 @@ class SimpleMomentum(BaseModel):
 
     Both are optional. If both are missing, momentum **is still provided**, but
     left at 0 (default).
+
+    C++ counterpart: the momentum initialization block in
+    include/picongpu/param/speciesInitialization.param.
     """
 
     species: Species
     """species for which momentum will be set"""
 
     temperature: Temperature | None
-    """temperature of particles (if any)"""
+    """temperature of particles (if any), [keV]"""
 
     drift: Drift | None
-    """drift of particles (if any)"""
+    """drift of particles (if any), [dimensionless (gamma, direction)]"""
 
     type_simplemomentum: Literal[True] = True
+    """discriminator for the AnyOperation union."""

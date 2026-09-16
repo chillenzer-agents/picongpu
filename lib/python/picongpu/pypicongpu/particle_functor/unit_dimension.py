@@ -9,8 +9,23 @@ from pydantic import BaseModel, PrivateAttr, model_serializer, model_validator
 
 
 class UnitDimension(BaseModel):
+    """
+    the SI unit dimension of a particle functor's return value
+
+    C++ counterpart: the std::array<double, 7u> unit dimension rendered
+    into the binning setup (see
+    include/picongpu/plugins/binning/UnitConversion.hpp).
+
+    Units policy: the seven entries are the exponents of the SI base units
+    (dimensionless), in PIConGPU order: L (length), M (mass), T (time),
+    I (electric current), Theta (thermodynamic temperature), N (amount of
+    substance), J (luminous intensity).
+    """
+
     _num_unit_dimensions: int = PrivateAttr(7)
-    unit_dimension: list = _num_unit_dimensions.default * [0.0]
+    unit_dimension: list[float] = _num_unit_dimensions.default * [0.0]
+    """the seven SI base unit exponents, [dimensionless]; the vector length
+    must be exactly 7 (enforced by validation)"""
 
     @model_validator(mode="after")
     def check(self):

@@ -10,7 +10,10 @@ from .attribute import Attribute
 
 class Weighting(Attribute):
     """
-    Weighting of a macroparticle
+    Weighting of a macroparticle, [dimensionless]; the particle weight.
+
+    C++ name: weighting (speciesDefinition.param).
     """
 
     picongpu_name: str = "weighting"
+    """C++ type name of the weighting attribute."""

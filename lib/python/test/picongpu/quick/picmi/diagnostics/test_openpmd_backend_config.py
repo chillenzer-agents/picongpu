@@ -6,6 +6,7 @@ License: GPLv3+
 
 import json
 
+import pytest
 import tomli_w
 
 from picongpu.picmi.diagnostics.binning import Binning, BinningAxis, BinningFunctor, BinSpec
@@ -149,3 +150,17 @@ def test_resizable_is_a_top_level_dataset_option():
     assert "resizable" not in dumped["hdf5"]["dataset"]
     # And the (former) placement on Hdf5Dataset is gone.
     assert "resizable" not in Hdf5Dataset.model_fields
+
+
+@pytest.mark.parametrize(
+    "target", ["disk", "buffer", "new_step", "disk_override", "buffer_override", "new_step_override"]
+)
+def test_adios2_preferred_flush_target_accepts_override_variants(target):
+    """openPMD's ``flushTargetFromString`` accepts the ``<value>_override`` variants, which take
+    precedence over the non-suffixed values on a per-``flush()`` basis; the model must allow them."""
+    assert Adios2Engine(preferred_flush_target=target).preferred_flush_target == target
+
+
+def test_adios2_preferred_flush_target_rejects_unknown_value():
+    with pytest.raises(Exception):
+        Adios2Engine(preferred_flush_target="bogus")

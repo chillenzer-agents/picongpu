@@ -102,7 +102,6 @@ Hdf5Filter = Union[Hdf5FilterZlib, Hdf5FilterById]
 class Hdf5Dataset(BaseModel):
     chunks: Optional[Union[Literal["auto", "none"], List[int]]] = None
     permanent_filters: Optional[Union[Hdf5Filter, List[Hdf5Filter]]] = None
-    resizable: Optional[bool] = None
 
 
 class Hdf5Vfd(BaseModel):
@@ -165,6 +164,10 @@ with warnings.catch_warnings():
         hint_lazy_parsing_timeout: Optional[int] = None
         verify_homogeneous_extents: Optional[bool] = None
         rank_table: Optional[bool] = None
+        # Backend-independent dataset option: openPMD reads it as a top-level key of
+        # the (per-)dataset config (a sibling of ``hdf5``/``adios2``), not under any
+        # backend table (see ``HDF5IOHandler::parse_dataset_config``).
+        resizable: Optional[bool] = None
         dont_warn_unused_keys: Optional[List[str]] = None
         adios2: Optional[Adios2Config] = None
         hdf5: Optional[Hdf5Config] = None

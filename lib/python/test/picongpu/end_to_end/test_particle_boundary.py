@@ -9,10 +9,12 @@ End-to-end test for the per-species particle boundary conditions
 
 A single small simulation exercises all four PIConGPU particle-boundary
 kinds, one per species, so each kind's effect on the particles is observed
-directly from the dumped particle data. Each species is a single thin slab of
-macroparticles placed right at (or just inside) its active boundary and
-drifting into it at 0.5 c, so it crosses that boundary within the first few
-steps:
+directly from the dumped particle data (both the particle count and the
+positions, so the kind's spatial effect -- wrap / removal / bounce /
+re-momentum-sampling -- is asserted, not just that a count is preserved). Each
+species is a single thin slab of macroparticles placed right at (or just inside)
+its active boundary and drifting into it at 0.5 c, so it crosses that boundary
+within the first few steps:
 
 - **periodic** (species ``pbcPeriodic``): the x field is periodic, so the x
   particle boundary is periodic. The particle starts in the last x-column and
@@ -41,6 +43,14 @@ axis and is placed mid-domain on the other two axes, so exactly one boundary
 kind acts per species. All four distinct kinds are covered, which is the
 maximum possible (there are exactly four kinds).
 
+Each test first keeps the high-level count check (preserved / dropped), then
+asserts the precise spatial behaviour from the dumped particle positions:
+the periodic particle reappears on the opposite x-edge after wrapping; the
+absorbing particle is removed (so no particle may remain beyond the y
+boundary); the reflecting particle is bounced back into the z domain (never
+beyond the boundary); and the thermal particle is re-momentum-sampled and
+stays inside the domain on every axis.
+
 The grid uses the shared ``arbitrary_parameters`` values (non-square,
 non-isotropic, chosen to expose indexing bugs quickly): ``NUMBER_OF_CELLS``
 with ``CELL_SIZE = UPPER_BOUNDARY / NUMBER_OF_CELLS``. The open axes (y, z)
@@ -67,6 +77,7 @@ import logging
 from pathlib import Path
 from unittest import TestCase
 
+import numpy as np
 import openpmd_api as opmd
 import sympy
 from picongpu import rc_params
@@ -81,7 +92,14 @@ from picongpu.picmi import (
 from picongpu.picmi.diagnostics import ParticleDump, TimeStepSpec
 from picongpu.picmi.particle_boundary import ParticleBoundary
 
-from .arbitrary_parameters import LOWER_BOUNDARY, NUMBER_OF_CELLS, UPPER_BOUNDARY, directory_in_home, gather_results
+from .arbitrary_parameters import (
+    CELL_SIZE,
+    LOWER_BOUNDARY,
+    NUMBER_OF_CELLS,
+    UPPER_BOUNDARY,
+    directory_in_home,
+    gather_results,
+)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -224,7 +242,7 @@ class TestParticleBoundary(TestCase):
             self._result_path = Path(self.sim.picongpu_get_runner().run_dir)
         return self._result_path
 
-    def _count(self, step, name):
+    def _read_particles(self, step, name):
         # PIConGPU's openPMD output uses a file-based iteration layout where
         # each step is its own file and the iteration inside it is keyed by the
         # step number (not by position), so the final state is read via
@@ -233,11 +251,22 @@ class TestParticleBoundary(TestCase):
         path = self.result_path / "simOutput" / "openPMD" / f"simData_{step:06d}.bp5"
         series = opmd.Series(str(path), opmd.Access.read_only)
         try:
-            particles = series.iterations[step].particles[name]
-            count = int(len(particles["weighting"][""].load_chunk()))
+            return series.iterations[step].particles[name].to_df()
         finally:
             series.flush()
-        return count
+
+    def _count(self, step, name):
+        return int(len(self._read_particles(step, name)))
+
+    def _positions(self, step, name):
+        # openPMD particle positions are stored in SI (unit_SI == 1), so these
+        # are the SI coordinates.
+        df = self._read_particles(step, name)
+        return (
+            df["position_x"].to_numpy(),
+            df["position_y"].to_numpy(),
+            df["position_z"].to_numpy(),
+        )
 
     def test_periodic_preserves_particles(self):
         # particles crossing the periodic boundary wrap around and survive
@@ -245,6 +274,13 @@ class TestParticleBoundary(TestCase):
         final = self._count(MAX_STEPS, "pbcPeriodic")
         assert initial > 0, "no particles were created for the periodic species"
         assert final == initial, f"periodic boundary must preserve particles (initial={initial}, final={final})"
+        x0, _, _ = self._positions(0, "pbcPeriodic")
+        xf, _, _ = self._positions(MAX_STEPS, "pbcPeriodic")
+        # the particle starts up against the periodic x boundary it will cross
+        assert np.all(x0 > UPPER_BOUNDARY[0] - 2 * CELL_SIZE[0]), f"expected the start in the far x-edge, got {x0}"
+        # after wrapping around it reappears at the opposite x-edge, where no
+        # particle was at step 0
+        assert np.any(xf < 2 * CELL_SIZE[0]), f"expected a particle to wrap to the opposite x-edge, got {xf}"
 
     def test_absorbing_removes_particles(self):
         # particles crossing the absorbing boundary are removed
@@ -252,6 +288,10 @@ class TestParticleBoundary(TestCase):
         final = self._count(MAX_STEPS, "pbcAbsorbing")
         assert initial > 0, "no particles were created for the absorbing species"
         assert final < initial, f"absorbing boundary must remove particles (initial={initial}, final={final})"
+        _, y0, _ = self._positions(0, "pbcAbsorbing")
+        assert np.all(y0 >= 0.0), f"absorbing particle was not in the domain at step 0: {y0}"
+        _, yf, _ = self._positions(MAX_STEPS, "pbcAbsorbing")
+        assert np.all(yf >= 0.0), f"found a particle beyond the absorbing y boundary: {yf}"
 
     def test_reflecting_preserves_particles(self):
         # particles crossing the reflecting boundary bounce back and survive
@@ -259,6 +299,11 @@ class TestParticleBoundary(TestCase):
         final = self._count(MAX_STEPS, "pbcReflecting")
         assert initial > 0, "no particles were created for the reflecting species"
         assert final == initial, f"reflecting boundary must preserve particles (initial={initial}, final={final})"
+        _, _, zf = self._positions(MAX_STEPS, "pbcReflecting")
+        # a reflected particle is bounced back into the domain, so it never
+        # ends up beyond the reflecting z boundary
+        assert np.all(zf >= 0.0), f"found a particle beyond the reflecting z boundary: {zf}"
+        assert np.all(zf <= UPPER_BOUNDARY[2]), f"found a particle outside the z domain: {zf}"
 
     def test_thermal_preserves_particles(self):
         # particles crossing the thermal boundary are re-momentum-sampled and survive
@@ -266,3 +311,9 @@ class TestParticleBoundary(TestCase):
         final = self._count(MAX_STEPS, "pbcThermal")
         assert initial > 0, "no particles were created for the thermal species"
         assert final == initial, f"thermal boundary must preserve particles (initial={initial}, final={final})"
+        # a thermal-crossing particle is re-momentum-sampled back into the
+        # domain and survives, so it stays inside the domain on every axis
+        xf, yf, zf = self._positions(MAX_STEPS, "pbcThermal")
+        assert np.all((xf >= 0.0) & (xf <= UPPER_BOUNDARY[0])), f"thermal particle x outside the domain: {xf}"
+        assert np.all((yf >= 0.0) & (yf <= UPPER_BOUNDARY[1])), f"thermal particle y outside the domain: {yf}"
+        assert np.all((zf >= 0.0) & (zf <= UPPER_BOUNDARY[2])), f"thermal particle z outside the domain: {zf}"

@@ -34,6 +34,7 @@ getValue(parameter:str, direction:str = None)
 __all__ = ["DataReader"]
 
 import numpy as np
+
 from . import readFiles as rF
 
 
@@ -41,8 +42,8 @@ class DataReader(rF.ReadFiles):
     def __init__(
         self,
         fileExtension: str = r".dat",
-        direction: str = None,
-        directiontype: str = None,
+        direction: str | None = None,
+        directiontype: str | None = None,
     ):
         """
         constructor
@@ -149,15 +150,10 @@ class DataReader(rF.ReadFiles):
             )
 
         all_files = self.getAllFiles()
-        result = []
 
-        for file in all_files:
-            if parameter in self.allParamsinFile(self._direction + file):
-                result.append(file)
+        return [file for file in all_files if parameter in self.allParamsinFile(self._direction + file)]
 
-        return result
-
-    def getValue(self, parameter: str, step_direction: str = None, p_type: str = None):
+    def getValue(self, parameter: str, step_direction: str | None = None, p_type: str | None = None):
         """
         the function returns all data of the passed parameter as an array
         the function uses the names of the parameters in the .dat files
@@ -203,14 +199,14 @@ class DataReader(rF.ReadFiles):
         all_files = self.getDatwithParam(parameter)
 
         if step_direction is not None and step_direction not in all_files:
-            raise ValueError("{} is not in the direction".format(step_direction))
+            raise ValueError(f"{step_direction} is not in the direction")
 
         if len(all_files) >= 2 and p_type is None and "step" not in parameter:
             raise ValueError("The parameter could be found more than once. Please use the parameter p_type for this")
 
-        if "step" == parameter and step_direction is None:
+        if parameter == "step" and step_direction is None:
             result = np.loadtxt(self._direction + all_files[0])[:, 0]
-        elif "step" == parameter:
+        elif parameter == "step":
             result = np.loadtxt(self._direction + step_direction)[:, 0]
         elif len(all_files) == 1:
             params = self.allParamsinFile(self._direction + all_files[0])
@@ -230,7 +226,7 @@ class DataReader(rF.ReadFiles):
                 raise ValueError(
                     "More than one file containing the parameter"
                     " could be found. Therefore, a particle type"
-                    " must be passed."
-                )
+                    " must be passed.",
+                ) from None
 
         return result

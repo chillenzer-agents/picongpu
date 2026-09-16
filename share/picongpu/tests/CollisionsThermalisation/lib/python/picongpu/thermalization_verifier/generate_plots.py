@@ -9,6 +9,7 @@ License: GPLv3+
 
 import argparse
 import os
+
 from ThermalizationVerifier import ThermalizationVerifier
 
 smilei_import_error = None
@@ -18,7 +19,7 @@ except ImportError as import_error:
     smilei_import_error = import_error
 
     class SmileiThermalization:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *_args, **_kwargs):
             raise Exception(
                 "Smilei data import class could not be imported. "
                 "Check module requirements or run without the "
@@ -79,10 +80,7 @@ def main():
     verifier = ThermalizationVerifier(args.dir)
     verifier.calculate_temperatures(n_cells=args.n_cells)
     verifier.calculate_theretical_values(args.coulomb_log)
-    if args.smilei_dir is not None:
-        smilei_sim = SmileiThermalization(args.smilei_dir)
-    else:
-        smilei_sim = None
+    smilei_sim = SmileiThermalization(args.smilei_dir) if args.smilei_dir is not None else None
     if args.plot_main:
         verifier.plot(to_file=True, file_name=args.file, smilei_sim=smilei_sim)
     if args.plot_debug:

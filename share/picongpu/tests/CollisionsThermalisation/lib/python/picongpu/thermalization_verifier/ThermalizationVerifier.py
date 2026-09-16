@@ -7,22 +7,22 @@ Authors: Pawel Ordyna
 License: GPLv3+
 """
 
+import itertools
+import textwrap
 from os import path
 from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.constants as cs
 import openpmd_api as api
-import textwrap
+import scipy.constants as cs
 import seaborn as sns
-import itertools
 
 
 def _get_debug_data(sim_path, collider_id, pair_id):
     debug_file_path = Path(sim_path) / "simOutput" / f"debug_values_collider_{collider_id}_species_pair_{pair_id}.dat"
-    debug_data = None
-    with open(debug_file_path, "r") as f:
-        debug_data = np.loadtxt(
+    with open(debug_file_path) as f:
+        return np.loadtxt(
             f,
             dtype=[
                 ("iteration", np.uint32),
@@ -30,7 +30,6 @@ def _get_debug_data(sim_path, collider_id, pair_id):
                 ("s_param", np.float64),
             ],
         )
-    return debug_data
 
 
 class ThermalizationVerifier:
@@ -72,7 +71,7 @@ class ThermalizationVerifier:
         debug_file_path = Path(sim_output_path) / "simOutput" / "average_debye_length_for_collisions.dat"
         self.average_debye_present = True
         try:
-            with open(debug_file_path, "r") as f:
+            with open(debug_file_path) as f:
                 self.debug_values["all"] = np.loadtxt(f, dtype=[("iteration", np.uint32), ("debye_length", np.float64)])
         except FileNotFoundError:
             print("No average debye length output present")
@@ -103,7 +102,7 @@ class ThermalizationVerifier:
             self.i_T_std_mean[i] = self.i_T_std_dist[i] / np.sqrt(average_i_energy.size)
             self.e_T_std_mean[i] = self.e_T_std_dist[i] / np.sqrt(average_e_energy.size)
 
-    def _calc_coulomb_log(self, temp_e, temp_i):
+    def _calc_coulomb_log(self, temp_e, _temp_i):
         n_e_cgs = self.ELECTRON_DENSITY / 100**3
         return 24 - np.log(np.sqrt(n_e_cgs) / temp_e)
 
@@ -346,7 +345,7 @@ class ThermalizationVerifier:
             ax.legend()
             ax.set_xlabel(r"$t [fs]$")
 
-        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup", "r") as file:
+        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup") as file:
             f.suptitle(file.readline() + "\n" + textwrap.fill(file.readline(), 80))
         f.tight_layout()
         plt.subplots_adjust(top=0.90)
@@ -439,7 +438,7 @@ class ThermalizationVerifier:
             ax.legend()
             ax.set_xlabel(r"$t [fs]$")
 
-        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup", "r") as file:
+        with open(Path(self.sim_output_path) / "input/cmakeFlagsSetup") as file:
             f.suptitle(file.readline() + "\n" + textwrap.fill(file.readline(), 80))
         plt.tight_layout()
         if to_file:

@@ -7,10 +7,9 @@ License: GPLv3+
 """
 
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-import numpy as np
 
 from ..data import PhaseSpaceData
 from .base_visualizer import Visualizer as BaseVisualizer
@@ -77,15 +76,12 @@ class Visualizer(BaseVisualizer):
         # clear potentially occuring colorbars that are not from this object
         # i.e. the ax was used by a different object before
         for plt_obj in self.ax.images:
-            if self.plt_obj is not None:
-                if plt_obj not in self.plt_obj:
-                    # there is an image that comes from other visualizer
-                    if plt_obj.colorbar is not None:
-                        plt_obj.colorbar.remove()
-            else:
-                # we can delete since it is not from our object
-                if plt_obj.colorbar is not None:
-                    plt_obj.colorbar.remove()
+            # skip images owned by this visualizer
+            if self.plt_obj is not None and plt_obj in self.plt_obj:
+                continue
+            # we can delete since it is not from our object
+            if plt_obj.colorbar is not None:
+                plt_obj.colorbar.remove()
 
         # this removes all imshow images or previous plots
         # regardless if they were our own or from some other object
@@ -118,7 +114,6 @@ class Visualizer(BaseVisualizer):
         self.colorbars[idx].ax.clear()
         # deactivate the axis labels here so we don't have them as leftovers
         self.colorbars[idx].ax.axis("off")
-        # self.colorbars[idx].remove()
         self.colorbars[idx] = None
 
     def _remove_plt_obj(self, idx):
@@ -159,8 +154,8 @@ class Visualizer(BaseVisualizer):
             transform=self.colorbar_axes[idx].transAxes,
         )
 
-        self.ax.set_xlabel(r"${0}$ [${1}$]".format(meta.r, r"\mathrm{\mu m}"))
-        self.ax.set_ylabel(r"$p_{0}$ [$\beta\gamma$]".format(meta.p))
+        self.ax.set_xlabel(r"${}$ [${}$]".format(meta.r, r"\mathrm{\mu m}"))
+        self.ax.set_ylabel(rf"$p_{meta.p}$ [$\beta\gamma$]")
 
     def _update_plt_obj(self, idx):
         """
@@ -200,11 +195,11 @@ class Visualizer(BaseVisualizer):
         """
         super().visualize(**kwargs)
 
-    def adjust_plot(self, **kwargs):
+    def adjust_plot(self, **_kwargs):
         """Overridden from base."""
         # only for the first index that is not None we set the description
         # (which is the innermost colorbar)
-        idx = [i for i, cbar in enumerate(self.colorbars) if cbar is not None][0]
+        idx = next(i for i, cbar in enumerate(self.colorbars) if cbar is not None)
 
         self.colorbars[idx].ax.text(
             -1.2,
@@ -233,8 +228,8 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
 
         def usage():
             print("usage:")

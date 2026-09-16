@@ -6,13 +6,14 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-import matplotlib.pyplot as plt
 from warnings import warn
+
+import matplotlib.pyplot as plt
 
 from .utils import get_different_colors
 
 
-class Visualizer(object):
+class Visualizer:
     """
     Abstract base class for matplotlib visualizers that implements
     the visualization logic.
@@ -54,7 +55,7 @@ class Visualizer(object):
         self.reader_cls = reader_cls
 
         if ax is None:
-            warn("No axes was given, using plt.gca() instead!")
+            warn("No axes was given, using plt.gca() instead!", stacklevel=2)
             ax = plt.gca()
         self.ax = ax
 
@@ -136,11 +137,14 @@ class Visualizer(object):
             run_directories = [run_directories]
 
         if len(run_directories) < 1:
-            warn("Empty run_directories list was passed!")
+            warn("Empty run_directories list was passed!", stacklevel=2)
             return run_directories
 
         if isinstance(run_directories[0], str):
-            warn("First element is str. Assuming the same for all other elements. Will use enumeration for labeling!")
+            warn(
+                "First element is str. Assuming the same for all other elements. Will use enumeration for labeling!",
+                stacklevel=2,
+            )
             run_directories = list(enumerate(run_directories))
 
         return run_directories
@@ -193,12 +197,10 @@ class Visualizer(object):
         # we check time first.
         # Note: the readers might be capable of dealing with multiple
         # values but visualization is not.
-        if "time" in kwargs:
-            if isinstance(kwargs["time"], list):
-                raise ValueError("This class only supports single timestep visualization!")
-        if "iteration" in kwargs:
-            if isinstance(kwargs["iteration"], list):
-                raise ValueError("This class only supports single iteration visualization!")
+        if "time" in kwargs and isinstance(kwargs["time"], list):
+            raise ValueError("This class only supports single timestep visualization!")
+        if "iteration" in kwargs and isinstance(kwargs["iteration"], list):
+            raise ValueError("This class only supports single iteration visualization!")
 
         self.collect_data(**kwargs)
 
@@ -223,16 +225,16 @@ class Visualizer(object):
                 self.data[i] = None
 
     def remove_plots_without_data(self):
-        for i, (plt_obj, data) in enumerate(zip(self.plt_obj, self.data)):
+        for i, (plt_obj, data) in enumerate(zip(self.plt_obj, self.data, strict=False)):
             if data is None:
                 # no data for the current combination of kwargs
                 # so we should just omit the data from this input file
-                warn("Data from {} is None! Will omit!".format(self.sim_labels[i]))
+                warn(f"Data from {self.sim_labels[i]} is None! Will omit!", stacklevel=2)
                 if plt_obj is not None:
                     self._remove_plt_obj(i)
 
     def draw_data(self):
-        for i, (plt_obj, data) in enumerate(zip(self.plt_obj, self.data)):
+        for i, (plt_obj, data) in enumerate(zip(self.plt_obj, self.data, strict=False)):
             if data is not None:
                 # we have data and only decide about creating/updating
                 if plt_obj is None:
@@ -246,11 +248,9 @@ class Visualizer(object):
         """
         Executed after the plotting is done for adjusting legends etc...
         """
-        pass
 
     def clear_cbar(self):
         """
         Clear colorbars if present. Should be implemented
         in derived classes that use colorbars.
         """
-        pass

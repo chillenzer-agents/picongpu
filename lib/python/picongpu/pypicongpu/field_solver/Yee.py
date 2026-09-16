@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from pydantic import BaseModel, computed_field
+
 from ..rendering import RenderedObject
 
 

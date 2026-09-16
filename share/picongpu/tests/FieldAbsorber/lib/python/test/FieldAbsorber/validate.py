@@ -7,6 +7,7 @@ License: GPLv3+
 """
 
 import sys
+
 import numpy as np
 import openpmd_api as opmd
 
@@ -43,10 +44,10 @@ def main(dataPath):
     # The conductor is located in the center of simulation domain.
     # The offset is choosen such that the measurement point is located 2 cells
     # in front of the PML in the small volume.
-    offset_cells = int(18)
+    offset_cells = 18
     x_offset = -offset_cells
     y_offset = -offset_cells
-    z_offset = int(0)
+    z_offset = 0
 
     # Calculate absolute position of measurement point in the small volume.
     x_meas = Nx // 2 + x_offset
@@ -149,7 +150,7 @@ def main(dataPath):
     """
     qualityBound = 1.0e-4
 
-    retValue = int(0) if quality.max() <= qualityBound else int(1)
+    retValue = 0 if quality.max() <= qualityBound else 1
 
     sys.exit(retValue)
 
@@ -158,7 +159,7 @@ if __name__ == "__main__":
     try:
         arg = sys.argv[1]
     except IndexError:
-        raise SystemExit(f"Usage: {sys.argv[0]} <path_to_simulation_data>")
+        raise SystemExit(f"Usage: {sys.argv[0]} <path_to_simulation_data>") from None
     if len(sys.argv[1:]) > 1:
         raise SystemExit(f"Usage: {sys.argv[0]} <path_to_simulation_data>")
     main(sys.argv[1])

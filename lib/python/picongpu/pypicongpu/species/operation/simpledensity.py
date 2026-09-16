@@ -57,4 +57,4 @@ class SimpleDensity(BaseModel):
         return self.species[1:]
 
     def __init__(self, *args, **kwargs):
-        return BaseModel.__init__(self, *args, **kwargs)
+        BaseModel.__init__(self, *args, **kwargs)

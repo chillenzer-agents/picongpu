@@ -1,0 +1,254 @@
+# Ruff configuration for PIConGPU (single source of truth for lint and format).
+# The pre-commit hooks in .pre-commit-config.yaml rely on this file and pass
+# no rule arguments of their own.
+
+# Vendored external code is not ours to style; the rest are build output dirs.
+exclude = [
+    "thirdParty",
+    "build",
+    "dist",
+    "out",
+    "docs/build",
+    "docs/html",
+    "docs/xml",
+    ".venv",
+    "venv",
+    "*.egg-info",
+]
+
+line-length = 120
+target-version = "py311"
+
+[lint]
+# The complete stable rule set. Preview rules stay off (no `preview = true`):
+# they are unstable across ruff releases and the pre-commit rev is pinned, so
+# enabling them would shift the lint outcome on every ruff bump without a
+# corresponding code change.
+select = ["ALL"]
+ignore = [
+    # "Too many ..." (returns, branches, arguments, statements) and
+    # cyclomatic complexity: the functions in this codebase carry many
+    # simulation/physics parameters and cases, mirroring the C++ API and
+    # the openPMD plugin arguments. Splitting them up for the linter is
+    # out of scope and would obscure the physics logic.
+    "C901",
+    "PLR0911",
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+    # Magic-value-comparison: physics code is full of numeric thresholds,
+    # tolerances, and unit values; naming every compared literal as a
+    # constant would add noise without clarifying the intent.
+    "PLR2004",
+    # The quick test suite is written in a mix of unittest.TestCase style
+    # (assertDictEqual, assertRaises, subTest) and plain pytest style.
+    # The following pytest-idiom rules would force a migration of the
+    # TestCase-based tests to bare asserts / pytest.raises, changing
+    # failure diagnostics (diff output, subTest reporting) and, for
+    # PT011, pinning exception messages that are intentionally left open
+    # (e.g. "varies by distribution"). That is a test-quality refactor,
+    # out of scope for the lint-tightening pass.
+    "PT009",
+    "PT011",
+    "PT012",
+    "PT027",
+    # pydocstyle: the docstrings follow a mix of conventions (the
+    # "This file is part of PIConGPU" module headers, Google-style
+    # sections, and the project's @param/@detail style) and are also
+    # consumed by Sphinx; normalising the ~3,800 pydocstyle violations
+    # is a separate documentation project.
+    "D",
+    # flake8-annotations: ~2,500 missing type annotations would be a
+    # separate typing project; the public API boundaries are guarded at
+    # runtime with typeguard instead.
+    "ANN",
+    # flake8-try-except and flake8-errmsg: the codebase raises the
+    # built-in exceptions with descriptive inline messages and has no
+    # custom exception classes; introducing those is an API design
+    # change, and hoisting every message into a constant adds churn
+    # without user-visible benefit.
+    "TRY",
+    "EM",
+    # Missing trailing comma: ruff format's magic-trailing-comma
+    # behaviour owns this; COM812 would fight the formatter (the ruff
+    # docs recommend ignoring it when using ruff format).
+    "COM812",
+    # flake8-use-pathlib: the scripts, tools, and plugin code use
+    # os.path consistently; migrating the ~110 call sites to pathlib is
+    # a separate modernisation.
+    "PTH",
+    # flake8-boolean-trap: boolean flags in the public API mirror the
+    # C++ parameters (prePlasma, ...); restructuring them (keyword-only,
+    # dataclasses, flags) would be a breaking change.
+    "FBT",
+    # flake8-blind-except: the broad `except Exception` catches are
+    # deliberate compatibility/fallback points (optional backends,
+    # plugin loading, version differences); narrowing them changes
+    # behaviour.
+    "BLE001",
+    # flake8-tidy-imports: the package convention is relative imports
+    # within picmi/pypicongpu (TID251 sibling imports are clean);
+    # rewriting the 78 parent-package imports to absolute form is churn
+    # without benefit.
+    "TID252",
+    # flake8-todos and flake8-fixme: the TODO/XXX tags in the codebase
+    # predate the "TODO(username):" convention; inventing assignees for
+    # the linter would be noise.
+    "TD",
+    "FIX",
+]
+
+[lint.isort]
+known-first-party = ["picongpu"]
+
+# Naming conventions are deliberately deviated from in these areas.
+# Each entry needs to be justified per file group; prefer the smallest
+# set of rules that covers the intentional deviations.
+[lint.per-file-ignores]
+# picmi/pypicongpu is the public Python API: function, argument, and
+# attribute names mirror C++ parameters, the PICMI standard, and physics
+# quantities (E0, Z, ...). Renaming them would be a breaking change.
+"lib/python/picongpu/picmi/**" = ["N802", "N803", "N806", "N815", "N999"]
+"lib/python/picongpu/pypicongpu/**" = ["N802", "N803", "N806", "N815", "N999"]
+# _rc_params.py carries RO-Crate JSON-LD property names (datePublished,
+# mainEntity, ...) that must not be changed (N815); the cross-instance
+# _data access is internal state bookkeeping within the class (SLF001).
+"lib/python/picongpu/_rc_params.py" = ["N815", "SLF001"]
+# extra/ holds experimental add-ons, several of which are ported from
+# external projects (FLYonPIC rate calculations, bunchInit scripts);
+# the original naming is kept so the port stays recognisable. Most of it
+# is script/tool code that reports progress to the console (T201).
+"lib/python/picongpu/extra/**" = [
+    "N801",
+    "N802",
+    "N803",
+    "N805",
+    "N806",
+    "N813",
+    "N814",
+    "N816",
+    "N999",
+    "T201",
+]
+# testsuite is the legacy test framework, predating the current naming
+# convention (C++-mirrored reader/module names). It reads and writes
+# arbitrary config.py variables by evaluating "config.<name>" expressions,
+# which by design cannot be replaced with a safe literal evaluation.
+# (N802/N803/N806/N816 are covered by the broader lib/python/test/** entry.)
+"lib/python/test/testsuite/**" = ["N813", "N999", "S102", "S307"]
+# Test, example, and tool code uses conventional physics notation
+# (E, B, k, n_0, ...) and C++-derived names for simulation parameters.
+# assert is the idiomatic test primitive (S101); test helpers report
+# results to the console (T201). The test tree is collected by pytest on a
+# rootdir basis and is not a Python package, so no __init__.py is added
+# (INP001).
+# Tests may probe private state by design (SLF001).
+"lib/python/test/**" = ["N802", "N803", "N806", "N816", "S101", "T201", "INP001", "SLF001"]
+"lib/python/examples/**" = ["N802", "N816"]
+# synchrotronRadiationExtension is a standalone CLI tool (T201), not a
+# package (INP001).
+"lib/python/synchrotronRadiationExtension/**" = ["N802", "N803", "N806", "T201", "INP001"]
+# The plugin test suites, examples, and CI generators are standalone
+# scripts whose stdout is their output channel (T201) and are not Python
+# packages (INP001).
+"share/picongpu/tests/**" = ["N801", "N802", "N803", "N806", "N816", "N999", "T201", "INP001"]
+"share/picongpu/examples/**" = ["N802", "N803", "N806", "T201", "INP001"]
+"share/ci/**" = ["N806", "T201", "INP001"]
+# docs/ contains the Sphinx conf and example model scripts, parts of which
+# are ported from published research code that uses physics notation;
+# the example scripts print their output (T201). The docs tree is not a
+# Python package (INP001).
+"docs/**" = ["N802", "N803", "N806", "N816", "T201", "INP001"]
+# src/ holds only the user-facing analysis/plotting CLI tools (T201), not a
+# Python package (INP001).
+"src/**" = ["N802", "N803", "N806", "N807", "N816", "T201", "INP001"]
+
+# Builtin names are used deliberately as physics/domain terms
+# (range = wavelength/frequency range, type = plot or spectrum type,
+# format = file format, input = the bunch-input package,
+# copyright = mandatory Sphinx conf variable). Renaming them would
+# break the public API, the correspondence to C++/openPMD plugin
+# arguments, or the Sphinx build. doxygen is a documentation build
+# prerequisite resolved from PATH (S607).
+"docs/source/conf.py" = ["A001", "S607"]
+"lib/python/picongpu/extra/__init__.py" = ["A004"]
+"lib/python/picongpu/extra/input/parameters.py" = ["A002"]
+"lib/python/picongpu/extra/plugins/data/transitionradiation.py" = ["A001"]
+"lib/python/picongpu/extra/plugins/plot_mpl/transition_radiation_visualizer.py" = ["A001"]
+"lib/python/picongpu/extra/utils/param_parser.py" = ["A001"]
+"lib/python/test/picongpu/end_to_end/compare_particles.py" = ["A002"]
+# The commented-out functor variants in test_diagnostics.py document
+# diagnostics that are currently excluded (no eligible particles / wrong
+# factors) and a rejected naming implementation; they are kept so the cases
+# can be re-enabled once fixed (ERA001). The unstack/stack chain there is a
+# deliberate multi-index reshape; melt/pivot_table are not equivalent (PD010,
+# PD013).
+"lib/python/test/picongpu/end_to_end/test_diagnostics.py" = ["A002", "ERA001", "PD010", "PD013"]
+# The test helper asserts exact type equality of two model instances;
+# isinstance() would also accept subclasses and weaken the check (E721).
+"lib/python/test/picongpu/quick/picmi/test_copy_attributes.py" = ["E721"]
+"share/ci/n_wise_generator.py" = ["A002"]
+"src/tools/bin/printField.py" = ["A001"]
+
+# Bandit: the remaining findings are deliberate.
+# The runner generates user-facing build/prepare-submission shell scripts
+# that must be executable (S103). generate(printDirToConsole=True) is a
+# public API flag that explicitly requests console output (T201). The
+# temp-directory name carries a human-readable local timestamp (DTZ005).
+"lib/python/picongpu/pypicongpu/runner.py" = ["S103", "T201", "DTZ005"]
+# picrc_builder is an interactive questionary-based CLI wizard; its
+# stdout is the conversation with the user (T201).
+"lib/python/picongpu/picrc_builder.py" = ["T201"]
+# The plot_mpl visualizers are dual-purpose modules: the CLI imports in
+# their script-mode main() (getopt, sys, matplotlib.pyplot) stay inside the
+# function so that importing a visualizer as a library does not pull in
+# matplotlib.pyplot or CLI modules (PLC0415).
+"lib/python/picongpu/extra/plugins/plot_mpl/**" = ["PLC0415"]
+# The widget delegates the axis cleanup to its plot_mpl helper's private
+# method (SLF001); the axis label carries a human-readable local timestamp
+# (DTZ005).
+"lib/python/picongpu/extra/plugins/jupyter_widgets/base_widget.py" = ["DTZ005", "SLF001"]
+# matplotlib's LinearSegmentedColormap has no public API to force LUT
+# construction; _init() is the documented workaround (SLF001).
+"lib/python/picongpu/extra/plugins/plot_mpl/utils.py" = ["SLF001"]
+# The PMAcc printer extends pycxxcode's C++17 printer, which only exposes
+# the keyword-fragment table as the private _kf attribute (SLF001).
+"lib/python/picongpu/pypicongpu/rendering/pmaccprinter.py" = ["SLF001"]
+# The testsuite dispatcher imports the sub-package managers inside its broad
+# try/except, so that import failures are reported as a test failure
+# (exit 42) instead of breaking at module import time (PLC0415).
+"lib/python/test/testsuite/_manager.py" = ["PLC0415"]
+# These picmi modules are re-export hubs: the self-aliasing imports
+# (`X as X`) are the explicit re-export idiom. They mark the pypicongpu
+# types as intentionally re-exported into the picmi public namespace and
+# exempt the (in-file unused) names from F401. PLC0414's fix is
+# semantically safe, but would drop that re-export marker and re-trigger
+# F401.
+"lib/python/picongpu/picmi/diagnostics/radiation.py" = ["PLC0414"]
+"lib/python/picongpu/picmi/interaction/collision.py" = ["PLC0414"]
+# Template for new testsuite cases: the commented-out imports are an
+# intentional snippet users are told to uncomment when needed (ERA001).
+"lib/python/test/testsuite/Template/config.py" = ["ERA001"]
+# The e2e tests share a lazily built module-level SIM (building the
+# simulation is expensive; setUp assigns the module global, hence the
+# `global` statements) (PLW0603).
+"lib/python/test/picongpu/end_to_end/**" = ["PLW0603"]
+# The e2e harness queries the SLURM job state via `sacct` from PATH (S607)
+# and executes the `link_results.sh` script that the CWL workflow itself
+# generates (S603), not untrusted input.
+"lib/python/test/picongpu/end_to_end/arbitrary_parameters.py" = ["S603", "S607"]
+# These `#! @detail(s)` lines are documentation markers carried over from the
+# FLYonPIC port, not shebangs (EXE001/EXE003/EXE005).
+"lib/python/picongpu/extra/utils/FLYonPICRateCalculationReference/BoundBoundTransitions.py" = [
+    "EXE003",
+    "EXE005",
+]
+"share/picongpu/examples/AtomicPhysics/validation/EvaluationScript.py" = ["EXE001", "EXE003", "EXE005"]
+# The template `_date` is a human-readable local timestamp for display;
+# forcing UTC would change what the user sees (DTZ005). The other two
+# local-timestamp sites (widget axis label, temp-directory name) are
+# covered by the per-file entries above. The two `type()` comparisons
+# are deliberate *exact* type checks (see the "note on typechecks" in
+# that file); isinstance() would accept subclasses and change behaviour
+# (E721).
+"lib/python/picongpu/pypicongpu/rendering/renderer.py" = ["DTZ005", "E721"]

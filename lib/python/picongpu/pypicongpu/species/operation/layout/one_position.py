@@ -12,7 +12,7 @@ from pydantic import AfterValidator, BaseModel, Field, PlainSerializer
 
 
 def serialise_vec(value) -> dict:
-    return dict(zip("xyz", value))
+    return dict(zip("xyz", value, strict=False))
 
 
 def broadcast_validation(values, condition, message="Condition not met."):

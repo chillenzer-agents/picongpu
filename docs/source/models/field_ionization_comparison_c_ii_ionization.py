@@ -1,7 +1,6 @@
 import matplotlib as mpl
-from matplotlib import pyplot as plt
 import numpy as np
-
+from matplotlib import pyplot as plt
 
 params = {
     "font.size": 20,
@@ -29,12 +28,10 @@ def ADK_rate_simple(Z, E_i, F):
     n_eff = Z / ((2.0 * E_i) ** (1.0 / 2.0))  # effective principal quantum number
     D = ((4.0 * np.exp(1.0) * Z**3.0) / (F * n_eff**4.0)) ** n_eff  # some factor
 
-    # laser is circularly polarized
-    # pol_fac = 1.
-    # laser is lin. polarized
+    # for a circularly polarized laser, pol_fac would be 1; the laser is
+    # linearly polarized:
     pol_fac = ((3 * n_eff**3 * F) / (np.pi * Z**3)) ** (1.0 / 2)
-    I_rate = pol_fac * (F * D**2.0) / (8.0 * np.pi * Z) * np.exp(-(2.0 * Z**3.0) / (3.0 * n_eff**3.0 * F))
-    return I_rate
+    return pol_fac * (F * D**2.0) / (8.0 * np.pi * Z) * np.exp(-(2.0 * Z**3.0) / (3.0 * n_eff**3.0 * F))
 
 
 if __name__ == "__main__":
@@ -81,7 +78,7 @@ if __name__ == "__main__":
         E_H**2.0 / (4 * 1),
         ymin,
         ymax,
-        colors="{}".format(p_H[0].get_color()),
+        colors=f"{p_H[0].get_color()}",
         label=r"$F_\mathrm{BSI}$ H",
         linestyles="--",
     )
@@ -90,7 +87,7 @@ if __name__ == "__main__":
         E_C[1] ** 2.0 / (4 * 2),
         ymin,
         ymax,
-        colors="{}".format(p_Csimple[0].get_color()),
+        colors=f"{p_Csimple[0].get_color()}",
         label=r"$F_\mathrm{BSI}$ C",
         linestyles="--",
     )
@@ -98,7 +95,7 @@ if __name__ == "__main__":
         E_C[1] ** 2.0 / (4 * 3.136),
         ymin,
         ymax,
-        colors="{}".format(p_Ceff[0].get_color()),
+        colors=f"{p_Ceff[0].get_color()}",
         label=r"$F_\mathrm{BSI}$ C (eff)",
         linestyles="--",
     )

@@ -5,9 +5,8 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
-from .fieldionization import FieldIonization
-
 from .....pypicongpu.species.constant import ionizationmodel
+from .fieldionization import FieldIonization
 
 
 class Keldysh(FieldIonization):

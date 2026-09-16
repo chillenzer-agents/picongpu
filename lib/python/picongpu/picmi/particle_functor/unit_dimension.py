@@ -52,7 +52,8 @@ class UnitDimension:
         if other is not None:
             if len(kwargs) > 0:
                 raise ValueError(
-                    "Handing `other` and `kwargs` to `UnitDimension` is mutually exclusive. You gave {other=}, {kwargs=}."
+                    f"Handing `other` and `kwargs` to `UnitDimension` is mutually exclusive. "
+                    f"You gave {other=}, {kwargs=}."
                 )
             if isinstance(other, UnitDimension):
                 other = other.unit_vector

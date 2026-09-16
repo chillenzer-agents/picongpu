@@ -5,8 +5,8 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
-from .ionizationmodel import IonizationModel
 from ..ionizationcurrent import IonizationCurrent
+from .ionizationmodel import IonizationModel
 
 
 class BSIEffectiveZ(IonizationModel):

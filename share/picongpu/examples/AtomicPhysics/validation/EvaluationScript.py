@@ -17,8 +17,8 @@
 # If not, see <http://www.gnu.org/licenses/>.
 
 
-import openpmd_api as opmd
 import numpy as np
+import openpmd_api as opmd
 import typeguard
 
 

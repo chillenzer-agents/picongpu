@@ -16,9 +16,10 @@
 # along with PIConGPU.
 # If not, see <http://www.gnu.org/licenses/>.
 #
+import warnings
+
 import numpy as np
 import openpmd_api as opmd
-import warnings
 
 
 class RadiationData:
@@ -47,7 +48,7 @@ class RadiationData:
         # extract time step
         self.timestep = timestep
         if self.timestep not in self.rad_series.iterations:
-            raise Exception("The selected timestep {} ".format(self.timestep) + "is not available in the series.")
+            raise Exception(f"The selected timestep {self.timestep} " + "is not available in the series.")
         self.iteration = self.rad_series.iterations[self.timestep]
 
         # Amplitude
@@ -145,7 +146,7 @@ class RadiationData:
         try:
             h_distAmp = self.iteration.meshes["Amplitude_distributed"]
         except IndexError:
-            warnings.warn("Warning: no distributed amplitude available.")
+            warnings.warn("Warning: no distributed amplitude available.", stacklevel=2)
             return None
 
         # get shape of distributed amplitude
@@ -154,7 +155,7 @@ class RadiationData:
         shapeDistAmp.append(RadiationData.N_vec_components)
 
         # prepare data array (with NaN as wrongly set values)
-        distAmp = np.ones(shape=shapeDistAmp, dtype=np.complex128) * np.NaN
+        distAmp = np.ones(shape=shapeDistAmp, dtype=np.complex128) * np.nan
 
         # load data
         for i, direction in enumerate(["x", "y", "z"]):

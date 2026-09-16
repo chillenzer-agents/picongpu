@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from pydantic import Field
+
 from .constant import Constant
 
 

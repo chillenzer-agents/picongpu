@@ -22,7 +22,7 @@ import os
 import sys
 
 sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)) + "/../../")
-import testsuite as ts  # noqa
+import testsuite as ts
 
 # general information about the test
 title = "KHI Growthrate (2D ESKHI)"
@@ -51,7 +51,7 @@ plot_xaxis = None
 # for more values see the documentation (e.g. 2D plot needs zaxis and yaxis)
 
 
-def theory(gamma, **kwargs):
+def theory(gamma, **_kwargs):
     """
     this function indicates how the theoretical values
     can be calculated from the data. Please complete this
@@ -69,7 +69,7 @@ def theory(gamma, **kwargs):
     return 1 / ((8**0.5) * gamma)
 
 
-def simData(Bx, **kwargs):
+def simData(Bx, **_kwargs):
     """
     this function indicates how the values from the simulation
     can be calculated from the data. Please complete this
@@ -86,5 +86,4 @@ def simData(Bx, **kwargs):
     frequency = ts.Math.physics.plasmafrequence()
     time = ts.Math.physics.calculateTimeFreq(frequency, step_direction="fields_energy.dat")
 
-    sim_values = ts.Math.math.growthRate(Bx, time)
-    return sim_values
+    return ts.Math.math.growthRate(Bx, time)

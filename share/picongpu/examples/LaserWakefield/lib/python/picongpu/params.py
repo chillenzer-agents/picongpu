@@ -18,7 +18,6 @@ they need to be at least of class Parameter (or inherited).
 
 from picongpu.input.parameters import Parameter
 
-
 dt = 1.39e-16
 
 PARAMETERS = {
@@ -56,7 +55,7 @@ PARAMETERS = {
             default=1.0,
             range=(0.1, 10.0),
             pic_to_SI=lambda steps: steps * dt,
-            pic_from_SI=lambda time: int(round(time / dt)),
+            pic_from_SI=lambda time: round(time / dt),
             label="simulation time",
         )
     ],

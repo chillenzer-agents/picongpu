@@ -6,11 +6,12 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
+from warnings import warn
+
 import numpy as np
 
 from ..data import EnergyHistogramData
 from .base_visualizer import Visualizer as BaseVisualizer
-from warnings import warn
 
 
 class Visualizer(BaseVisualizer):
@@ -48,7 +49,7 @@ class Visualizer(BaseVisualizer):
         label = self.sim_labels[idx]
 
         if np.all(counts == 0.0):
-            warn("All counts were 0 for {}. ".format(label) + "No log-plot can be created!")
+            warn(f"All counts were 0 for {label}. " + "No log-plot can be created!", stacklevel=2)
             return
 
         self.plt_obj[idx] = self.ax.semilogy(bins, counts, nonpositive="clip", label=label, color=self.colors[idx])[0]
@@ -61,7 +62,7 @@ class Visualizer(BaseVisualizer):
         label = self.sim_labels[idx]
 
         if np.all(counts == 0.0):
-            warn("All counts were 0 for {}. ".format(label) + "Log-plot will not be updated!")
+            warn(f"All counts were 0 for {label}. " + "Log-plot will not be updated!", stacklevel=2)
             return
 
         self.plt_obj[idx].set_data(bins, counts)
@@ -106,7 +107,7 @@ class Visualizer(BaseVisualizer):
         # tied to the data readers index directly.
         handles = []
         labels = []
-        for plt_obj, lab in zip(self.plt_obj, self.sim_labels):
+        for plt_obj, lab in zip(self.plt_obj, self.sim_labels, strict=False):
             if plt_obj is not None:
                 handles.append(plt_obj)
                 labels.append(lab)
@@ -117,8 +118,9 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
+
         import matplotlib.pyplot as plt
 
         def usage():

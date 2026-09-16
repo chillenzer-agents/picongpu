@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from typing import Literal
+
 from pydantic import BaseModel, Field
 
 

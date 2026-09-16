@@ -3,11 +3,12 @@
 # generate a reduced test matrix based on the N-wise testing model
 # https://en.wikipedia.org/wiki/All-pairs_testing
 
-from allpairspy import AllPairs
 import argparse
-import sys
 import math
 import random
+import sys
+
+from allpairspy import AllPairs
 
 parser = argparse.ArgumentParser(description="Generate tesing pairs")
 parser.add_argument("-n", dest="n_pairs", default=1, action="store", help="number of tuple elements")
@@ -41,9 +42,7 @@ parser.add_argument(
 args = parser.parse_args()
 n_pairs = int(args.n_pairs)
 
-examples = []
-for i in sys.stdin:
-    examples.append(i.rstrip())
+examples = [line.rstrip() for line in sys.stdin]
 
 
 def get_version(tuple):
@@ -83,18 +82,18 @@ def is_valid_combination(row):
     if n >= 3:
         v_compiler = get_version(row[0])
 
-        is_clang_cuda = True if len(row[0]) == 3 and row[0][2] == "clangCuda" else False
-        is_clang = True if row[0][0] == "clang++" or is_clang_cuda else False
+        is_clang_cuda = bool(len(row[0]) == 3 and row[0][2] == "clangCuda")
+        is_clang = bool(row[0][0] == "clang++" or is_clang_cuda)
 
-        is_gnu = True if row[0][0] == "g++" else False
+        is_gnu = row[0][0] == "g++"
 
-        is_nvcc = True if len(row[0]) == 3 and row[0][2] == "nvcc" else False
-        is_cuda = True if row[1][0] == "cuda" else False
+        is_nvcc = bool(len(row[0]) == 3 and row[0][2] == "nvcc")
+        is_cuda = row[1][0] == "cuda"
         v_cuda = get_version(row[1])
 
         # hipcc
-        is_hipcc = True if len(row[0]) == 3 and row[0][2] == "hipcc" else False
-        is_hip = True if row[1][0] == "hip" else False
+        is_hipcc = bool(len(row[0]) == 3 and row[0][2] == "hipcc")
+        is_hip = row[1][0] == "hip"
         v_hip = get_version(row[1])
 
         os_name = row[2][0] if n >= 3 else ""
@@ -126,10 +125,9 @@ def is_valid_combination(row):
         # hipcc should not be used without the hip backend
         if is_hipcc:
             return False
-        else:
-            # install/clang.sh is currently not providing apt sources later than this clang version
-            if is_clang and v_compiler > 19:
-                return False
+        # install/clang.sh is currently not providing apt sources later than this clang version
+        if is_clang and v_compiler > 19:
+            return False
 
         # CUDA compiler requires backed `cuda`
         if (is_nvcc or is_clang_cuda) and not is_cuda:
@@ -146,9 +144,7 @@ def is_valid_combination(row):
                 return False
             if not is_cuda:
                 return False
-            if 12.0 <= v_cuda <= 12.3 and v_compiler == 18:
-                return True
-            return False
+            return bool(12.0 <= v_cuda <= 12.3 and v_compiler == 18)
 
         # nvcc compatibility
         if is_cuda and is_nvcc:
@@ -164,7 +160,7 @@ def is_valid_combination(row):
                 #   /usr/include/x86_64-linux-gnu/bits/floatn-common.h(214):
                 #   error: invalid combination of type specifiers
                 #     typedef float _Float32;
-                if 12.4 == v_cuda and v_compiler == 13:
+                if v_cuda == 12.4 and v_compiler == 13:
                     return False
                 # for C++20 add least gcc 10 is required
                 if v_compiler < 10:
@@ -196,15 +192,11 @@ def is_valid_combination(row):
             #        static constexpr unsigned fractional_width = {_S_fractional_width()};
             if v_compiler == 14:
                 return False
-            if os_name == "ubuntu" and os_version == 24.04 and v_compiler >= 14:
-                return True
-            return False
+            return bool(os_name == "ubuntu" and os_version == 24.04 and v_compiler >= 14)
 
         # g++ as host compiler
         if is_gnu:
-            if os_name == "ubuntu" and os_version == 24.04:
-                return True
-            return False
+            return bool(os_name == "ubuntu" and os_version == 24.04)
 
     return True
 
@@ -229,23 +221,15 @@ compilers = [clang_compiers, gnu_compilers]
 
 # generate clang cuda compiler list
 # add third component with the device compiler name
-cuda_clang_compilers = []
-for i in clang_compiers:
-    cuda_clang_compilers.append(i + ("clangCuda",))
+cuda_clang_compilers = [(*i, "clangCuda") for i in clang_compiers]
 compilers.append(cuda_clang_compilers)
 
 # nvcc compiler
-cuda_nvcc_compilers = []
-for i in clang_compiers:
-    cuda_nvcc_compilers.append(i + ("nvcc",))
-for i in gnu_compilers:
-    cuda_nvcc_compilers.append(i + ("nvcc",))
+cuda_nvcc_compilers = [(*i, "nvcc") for i in clang_compiers] + [(*i, "nvcc") for i in gnu_compilers]
 compilers.append(cuda_nvcc_compilers)
 
 # hipcc compiler
-hip_clang_compilers = []
-for i in clang_compiers:
-    hip_clang_compilers.append(i + ("hipcc",))
+hip_clang_compilers = [(*i, "hipcc") for i in clang_compiers]
 compilers.append(hip_clang_compilers)
 
 # PIConGPU backend list
@@ -286,11 +270,8 @@ boost_libs_all = [
 
 operating_system = [("ubuntu", 22.04), ("ubuntu", 24.04)]
 
-if args.limit_boost_versions:
-    # select each second but keep the order
-    boost_libs = boost_libs_all[-1::-2][::-1]
-else:
-    boost_libs = boost_libs_all
+# select each second but keep the order
+boost_libs = boost_libs_all[-1::-2][::-1] if args.limit_boost_versions else boost_libs_all
 
 rounds = 1
 # activate looping over the compiler categories to minimize the test matrix
@@ -313,8 +294,7 @@ for i in range(rounds):
 
     parameters = [used_compilers, backends, operating_system, boost_libs, examples]
 
-    for value in enumerate(AllPairs(parameters, filter_func=is_valid_combination, n=n_pairs)):
-        job_list.append(value)
+    job_list.extend(enumerate(AllPairs(parameters, filter_func=is_valid_combination, n=n_pairs)))
 
 # set seed to be deterministic in each CI run
 random.seed(42)
@@ -330,8 +310,8 @@ num_stages = math.ceil(num_jobs / num_jobs_per_stage)
 if not args.compact:
     print("stages:")
     for x in range(num_stages):
-        print("  - job_{}".format(x))
-    print("")
+        print(f"  - job_{x}")
+    print()
 
 # generate all jobs
 for stage in range(num_stages):
@@ -339,7 +319,7 @@ for stage in range(num_stages):
         print("---")
     for i, pairs in job_list[stage::num_stages]:
         if args.compact:
-            print("{:2d}: {}".format(i, pairs))
+            print(f"{i:2d}: {pairs}")
         else:
             compiler = pairs[0][0] + "-" + str(pairs[0][1])
             backend = pairs[1][0]
@@ -349,12 +329,12 @@ for stage in range(num_stages):
             v_cuda_hip_str = "" if v_cuda_hip == 0 else str(v_cuda_hip)
             os_name = pairs[2][0]
             os_version = get_version(pairs[2])
-            image_prefix = "_run" if folder == "pmacc" or folder == "unit" else "_compile"
+            image_prefix = "_run" if folder in {"pmacc", "unit"} else "_compile"
             job_name = (
                 compiler + "_" + backend + v_cuda_hip_str + "_boost" + boost_version + "_" + folder.replace("/", ".")
             )
             print(job_name + ":")
-            print("  stage: job_{}".format(stage))
+            print(f"  stage: job_{stage}")
             print("  variables:")
             print("    CI_CONTAINER_NAME: '" + os_name + str(os_version) + "'")
             if backend == "cuda":
@@ -367,7 +347,7 @@ for stage in range(num_stages):
             print("    CXX_VERSION: '" + compiler + "'")
             print("    CXX_PREFIX_PATH: '/usr/lib/x86_64-linux-gnu/openmpi'")
             print("    LDFLAGS: '-lopen-pal'")
-            if folder == "pmacc" or folder == "pmacc_header":
+            if folder in {"pmacc", "pmacc_header"}:
                 print("    DISABLE_OpenPMD: 'yes'")
             print("  before_script:")
             if backend == "hip":
@@ -382,4 +362,4 @@ for stage in range(num_stages):
             print("    - apt-get update -qq")
             print("    - apt-get install -y -qq libopenmpi-dev openmpi-bin openssh-server")
             print("  extends: " + get_base_image(pairs[0], pairs[1]) + image_prefix)
-            print("")
+            print()

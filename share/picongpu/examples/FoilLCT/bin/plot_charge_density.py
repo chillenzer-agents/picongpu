@@ -8,12 +8,13 @@ Authors: Axel Huebl
 License: GPLv3+
 """
 
-import matplotlib.pyplot as plt
-import h5py as h5
-import numpy as np
 import argparse
 import os
+import sys
 
+import h5py as h5
+import matplotlib.pyplot as plt
+import numpy as np
 
 parser = argparse.ArgumentParser(description="Compare the electron charge density of FoilLCT simulations")
 parser.add_argument(
@@ -34,7 +35,7 @@ args = parser.parse_args()
 
 if len(args.run_directory) > 4:
     print("Error: Can only compare up to 4 directories!")
-    exit(1)
+    sys.exit(1)
 
 sims = {}
 for D in args.run_directory:
@@ -57,8 +58,7 @@ axes = [ax1, ax2, ax3, ax4]
 
 def get_nZ(flds, species):
     r = flds[species + "_chargeDensity"]
-    d = r[()] * r.attrs["unitSI"] / 1.602e-19 * 1.0e-6  # elements / cm^3
-    return d
+    return r[()] * r.attrs["unitSI"] / 1.602e-19 * 1.0e-6  # elements / cm^3
 
 
 def plot_sim(ax, sim):
@@ -84,31 +84,28 @@ def plot_sim(ax, sim):
             vmax=3.0e22,
             extent=[0.0, dx * 1.0e6 * d.shape[0], 0.0, dx * 1.0e6 * d.shape[1]],
         )
-    else:
-        return ax.imshow(
-            np.abs(ne),
-            cmap="CMRmap_r",
-            origin="lower",
-            aspect="auto",
-            interpolation="nearest",
-            vmin=0.0,
-            vmax=5.0e23,
-            extent=[0.0, dx * 1.0e6 * ne.shape[0], 0.0, dx * 1.0e6 * ne.shape[1]],
-        )
+    return ax.imshow(
+        np.abs(ne),
+        cmap="CMRmap_r",
+        origin="lower",
+        aspect="auto",
+        interpolation="nearest",
+        vmin=0.0,
+        vmax=5.0e23,
+        extent=[0.0, dx * 1.0e6 * ne.shape[0], 0.0, dx * 1.0e6 * ne.shape[1]],
+    )
 
 
-i = 0
-for sim in sims:
+for i, sim in enumerate(sims):
     print(sim)
     im = plot_sim(axes[i], sim)
-    i += 1
 
 if args.sum:
     fig.colorbar(im, cax=cax, label=r"$n_{Z,\Sigma{e,H,C,N}}$ [$q_e \cdot$ cm$^{-3}$]")
 else:
     fig.colorbar(im, cax=cax, label=r"$n_e$ [$q_e \cdot$ cm$^{-3}$]")
 
-fig.suptitle("time = {:5.3f} fs".format(dt * step * 1.0e15))
+fig.suptitle(f"time = {dt * step * 1.0e15:5.3f} fs")
 ax3.set_xlabel(r"$x$ [$\mu$m]")
 ax4.set_xlabel(r"$x$ [$\mu$m]")
 ax1.set_ylabel(r"$y$ [$\mu$m]")

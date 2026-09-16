@@ -11,9 +11,10 @@ from subprocess import run
 from time import sleep
 
 import numpy as np
+from psutil import pid_exists
+
 from picongpu import rc_params
 from picongpu.pypicongpu.util import alt
-from psutil import pid_exists
 
 NUMBER_OF_CELLS = [64, 64, 32]
 LOWER_BOUNDARY = np.array([0.0, 0.0, 0.0])
@@ -69,15 +70,10 @@ def _make_wait_function_from(submission_information, submission_cmd="bash"):
             return lambda: not pid_exists(pid)
         case "slurm":
             return lambda: any(
-                map(
-                    lambda s: s.startswith(str(pid)) and _is_finished_slurm_status(s.split("|")[1]),
-                    # There are alternatives to running a subprocess ourselves but they aren't better at the time of writing:
-                    # - pyslurm: Links against slurm development libraries which are not necessarily installed on a cluster.
-                    # - simple_slurm: Just wraps the subprocess.run calls and doesn't have the full interface implemented.
-                    run(["sacct", "-S", "2026-01-01", "-XPno", "jobid,state"], capture_output=True)
-                    .stdout.decode()
-                    .split("\n"),
-                )
+                s.startswith(str(pid)) and _is_finished_slurm_status(s.split("|")[1])
+                for s in run(["sacct", "-S", "2026-01-01", "-XPno", "jobid,state"], capture_output=True, check=False)
+                .stdout.decode()
+                .split("\n")
             )
         case _:
             raise NotImplementedError("Only bash submission information can be parsed at this point.")
@@ -91,7 +87,7 @@ def gather_results(result_path: Path):
     # CWLtool has to copy over the files
     _wait_until(lambda: (result_path / "link_results.sh").exists())
 
-    run([result_path / "link_results.sh", result_path])
+    run([result_path / "link_results.sh", result_path], check=False)
 
 
 def directory_in(path, offset=0):

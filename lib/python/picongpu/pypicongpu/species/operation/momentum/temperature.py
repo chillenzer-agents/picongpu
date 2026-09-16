@@ -19,7 +19,7 @@ from ....rendering import RenderedObject
 
 
 def serialise_vec(value) -> dict:
-    return dict(zip("xyz", value))
+    return dict(zip("xyz", value, strict=False))
 
 
 Vec3_float_temperature = Annotated[tuple[float, float, float], PlainSerializer(serialise_vec)]

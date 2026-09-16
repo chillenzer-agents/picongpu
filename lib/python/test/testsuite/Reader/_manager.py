@@ -6,18 +6,19 @@ Authors: Mika Soren Voss
 License: GPLv3+
 """
 
-from . import dataReader
-from . import jsonReader
-from . import paramReader
-from . import cmakeFlagReader as cmakeReader
+import contextlib
+
 import testsuite._checkData as cD
+
+from . import cmakeFlagReader as cmakeReader
+from . import dataReader, jsonReader, paramReader
 
 
 def mainsearch(
-    dataDirection: str = None,
-    paramDirection: str = None,
-    jsonDirection: str = None,
-    cmakeDirection: str = None,
+    dataDirection: str | None = None,
+    paramDirection: str | None = None,
+    jsonDirection: str | None = None,
+    cmakeDirection: str | None = None,
 ):
     json = {}
     param = {}
@@ -38,10 +39,8 @@ def mainsearch(
         if cD.checkExistVariables(variable="cmakeDirection") or cmakeDirection is not None:
             cR = cmakeReader.CMAKEFlagReader(direction=cmakeDirection, directiontype="cmakeDirection")
             for parameter in params:
-                try:
+                with contextlib.suppress(Exception):
                     param[parameter] = cR.getValue(parameter)
-                except Exception:
-                    pass
 
         pR = paramReader.ParamReader(direction=paramDirection, directiontype="paramDirection")
         for parameter in params:

@@ -6,10 +6,11 @@ Authors: Sophie Rudat, Sebastian Starke
 License: GPLv3+
 """
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 from ..data import EmittanceData
 from .base_visualizer import Visualizer as BaseVisualizer
-import numpy as np
-import matplotlib.pyplot as plt
 
 
 class Visualizer(BaseVisualizer):
@@ -44,7 +45,7 @@ class Visualizer(BaseVisualizer):
         emit, y_slices, all_iterations, dt = self.data[idx]
         label = self.sim_labels[idx]
         np_data = np.zeros(len(all_iterations))
-        for index, ts in enumerate(all_iterations):
+        for index, _ in enumerate(all_iterations):
             np_data[index] = emit[index][0]
         ps = 1.0e12  # for conversion from s to ps
         # np_data * 1.e6 converts emittance to pi mm mrad
@@ -65,7 +66,7 @@ class Visualizer(BaseVisualizer):
         """
         emit, y_slices, all_iterations, dt = self.data[idx]
         np_data = np.zeros(len(all_iterations))
-        for index, ts in enumerate(all_iterations):
+        for index, _ in enumerate(all_iterations):
             np_data[index] = emit[index][0]
         if self.plt_lin:
             self.plt_lin.remove()
@@ -115,7 +116,7 @@ class Visualizer(BaseVisualizer):
         # tied to the data readers index directly.
         handles = []
         labels = []
-        for plt_obj, lab in zip(self.plt_obj, self.sim_labels):
+        for plt_obj, lab in zip(self.plt_obj, self.sim_labels, strict=False):
             if plt_obj is not None:
                 handles.append(plt_obj)
                 labels.append(lab)
@@ -125,8 +126,8 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
 
         def usage():
             print("usage:")

@@ -6,8 +6,11 @@ License: GPLv3+
 """
 
 from functools import partial
+
 import numpy as np
 import sympy
+from scipy.constants import speed_of_light
+
 from picongpu.picmi.diagnostics.binning import (
     Binning,
     BinningAxis,
@@ -15,7 +18,6 @@ from picongpu.picmi.diagnostics.binning import (
     BinSpec,
 )
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
-from scipy.constants import speed_of_light
 
 from .arbitrary_parameters import (
     ALL_ORIGINS_WITHOUT_GUARDS,
@@ -44,7 +46,7 @@ def origin_no_guards_check(particle):
     }
 
     all_combinations = tuple(
-        x for ps in positions.values() for a in ps.values() for b in ps.values() for x in zip(a, b)
+        x for ps in positions.values() for a in ps.values() for b in ps.values() for x in zip(a, b, strict=False)
     )
     return sum(sympy.Piecewise((1, sympy.Eq(*x)), (0, True)) for x in all_combinations) / len(all_combinations)
 
@@ -58,6 +60,7 @@ def _subtract_guards(position, unit, timestep):
 
     if unit == "pic":
         return position - NUMBER_OF_GUARD_CELLS * CELL_SIZE / (timestep * speed_of_light)
+    return None
 
 
 def origin_with_guards_check(particle, timestep):
@@ -73,10 +76,10 @@ def origin_with_guards_check(particle, timestep):
 
     all_combinations = sum(
         (
-            tuple(zip(p["local"], _subtract_guards(p["local_with_guards"], unit, timestep)))
+            tuple(zip(p["local"], _subtract_guards(p["local_with_guards"], unit, timestep), strict=False))
             for (_, unit), p in positions.items()
         ),
-        tuple(),
+        (),
     )
     return sum(sympy.Piecewise((1, sympy.Eq(*x)), (0, True)) for x in all_combinations) / len(all_combinations)
 
@@ -121,18 +124,18 @@ def position_binning_for(species, timestep):
     # The best I could come up with for debugging is cd'ing into the setup directory
     # and manually changing the generated C++ files.
     # That worked quite okay.
-    kwargs = dict(
-        axes=[
+    kwargs = {
+        "axes": [
             BinningAxis(
-                functor=BinningFunctor(name="dummy", functor=lambda x: 0, return_type=float),
+                functor=BinningFunctor(name="dummy", functor=lambda _x: 0, return_type=float),
                 bin_spec=BinSpec(kind="linear", start=-0.5, stop=0.5, nsteps=1),
             )
         ],
-        species=species,
-        period=TimeStepSpec[:],
-        openPMDBackendConfig={"hdf5": {"dataset": {"chunks": "auto"}}},
-        openPMDExt="h5",
-    )
+        "species": species,
+        "period": TimeStepSpec[:],
+        "openPMDBackendConfig": {"hdf5": {"dataset": {"chunks": "auto"}}},
+        "openPMDExt": "h5",
+    }
     return [
         Binning(
             name=f"origin_{species.name}",
@@ -197,4 +200,8 @@ def density_binning_for(species):
 
 
 def binning_diagnostics(all_species, timestep):
-    return sum((density_binning_for(species) + position_binning_for(species, timestep) for species in all_species), [])
+    return [
+        diag
+        for species in all_species
+        for diag in density_binning_for(species) + position_binning_for(species, timestep)
+    ]

@@ -5,7 +5,9 @@ Authors: Hannes Troepgen, Brian Edward Marre, Richard Pausch, Julian Lenz
 License: GPLv3+
 """
 
-from typing import Annotated, Sequence
+from collections.abc import Sequence
+from typing import Annotated
+
 import picmistandard
 from pydantic import AfterValidator, BeforeValidator, Field, computed_field, model_validator
 
@@ -66,7 +68,7 @@ def _normalise_n_gpus(n_gpus) -> tuple[int, int, int]:
             f"You gave {picongpu_n_gpus} and we interpreted this as {n_gpus=}."
         )
 
-    if any(map(lambda x: x <= 0, n_gpus)):
+    if any(x <= 0 for x in n_gpus):
         raise ValueError(
             f"Number of gpus must be positive integer(s). "
             f"You gave {picongpu_n_gpus=} and we interpreted this as {n_gpus=}."
@@ -178,13 +180,8 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
             if self.picongpu_grid_dist is None:
                 if cells[dim] % (self.picongpu_n_gpus[dim] * self.picongpu_super_cell_size[dim]) != 0:
                     raise ValueError(
-                        "GPU- and/or super-cell-distribution in {} dimension does not match grid size".format(
-                            dim_name[dim]
-                        )
+                        f"GPU- and/or super-cell-distribution in {dim_name[dim]} dimension does not match grid size"
                     )
-            else:
-                # any returns true if there is at least one non zero (True) element
-                if any([x % self.picongpu_super_cell_size[dim] for x in self.picongpu_grid_dist[dim]]):
-                    raise ValueError(
-                        f"grid distribution in {dim_name[dim]} dimension must be multiple of super cell size"
-                    )
+            # any returns true if there is at least one non zero (True) element
+            elif any(x % self.picongpu_super_cell_size[dim] for x in self.picongpu_grid_dist[dim]):
+                raise ValueError(f"grid distribution in {dim_name[dim]} dimension must be multiple of super cell size")

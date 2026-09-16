@@ -33,10 +33,9 @@ def unpack_dist_loc_scale(dist, return_type, **kwargs):
             raise ValueError(
                 f"PIConGPU does not support normal distributions of integral type. You gave: {return_type=}."
             )
-        else:
-            loc = kwargs.get("mean", 0.0)
-            scale = kwargs.get("std", 1.0)
-            distribution = norm
+        loc = kwargs.get("mean", 0.0)
+        scale = kwargs.get("std", 1.0)
+        distribution = norm
         if scale <= 0:
             raise ValueError(
                 f"std={scale} must be greater than 0 for drawing from a normal distribution. You gave std={scale}."
@@ -65,12 +64,12 @@ class RNGArg(BaseModel):
     def get(self, dist, return_type="float_X", shape=1, **kwargs):
         if self._dist_and_return_type is None:
             self._dist_and_return_type = (dist, return_type)
-        else:
-            if self._dist_and_return_type != (dist, return_type):
-                raise ValueError(
-                    "PIConGPU does not support drawing from multiple different distributions in one functor yet. "
-                    f"You're trying to draw from {(dist, return_type)=} but previously you've drawn from {self._dist_and_return_type}."
-                )
+        elif self._dist_and_return_type != (dist, return_type):
+            raise ValueError(
+                "PIConGPU does not support drawing from multiple different distributions in one functor yet. "
+                f"You're trying to draw from {(dist, return_type)=} but previously "
+                f"you've drawn from {self._dist_and_return_type}."
+            )
 
         my_symbols = []
         count = np.prod(shape)
@@ -95,6 +94,6 @@ def _is_integral(value):
     return isinstance(value, Integral) or (isinstance(value, str) and "int" in value)
 
 
-def _range_of(value):
+def _range_of(_value):
     # Should be extended to actually extract that information from the value.
     return (0, 2**32)

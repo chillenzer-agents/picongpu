@@ -6,9 +6,10 @@ Authors: Sophie Rudat, Sebastian Starke
 License: GPLv3+
 """
 
+import matplotlib.pyplot as plt
+
 from ..data import EmittanceData
 from .base_visualizer import Visualizer as BaseVisualizer
-import matplotlib.pyplot as plt
 
 
 class Visualizer(BaseVisualizer):
@@ -99,7 +100,7 @@ class Visualizer(BaseVisualizer):
         # tied to the data readers index directly.
         handles = []
         labels = []
-        for plt_obj, lab in zip(self.plt_obj, self.sim_labels):
+        for plt_obj, lab in zip(self.plt_obj, self.sim_labels, strict=False):
             if plt_obj is not None:
                 handles.append(plt_obj)
                 labels.append(lab)
@@ -109,8 +110,8 @@ class Visualizer(BaseVisualizer):
 if __name__ == "__main__":
 
     def main():
-        import sys
         import getopt
+        import sys
 
         def usage():
             print("usage:")

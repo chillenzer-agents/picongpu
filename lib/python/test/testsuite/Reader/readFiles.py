@@ -21,6 +21,7 @@ getAllFiles() -> List
 __all__ = ["ReadFiles"]
 
 import os
+
 import testsuite._checkData as cD
 
 
@@ -29,7 +30,7 @@ class ReadFiles:
     superclass for all Reader
     """
 
-    def __init__(self, fileExtension: str, direction: str = None, directiontype: str = None):
+    def __init__(self, fileExtension: str, direction: str | None = None, directiontype: str | None = None):
         """
         constructor
 
@@ -115,10 +116,7 @@ class ReadFiles:
 
         all_files = [_ for _ in os.listdir(self._direction) if _.endswith(self._fileExtension)]
 
-        if all_files:
-            return True
-        else:
-            return False
+        return bool(all_files)
 
     def getAllFiles(self) -> list:
         """

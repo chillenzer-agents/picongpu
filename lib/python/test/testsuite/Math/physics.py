@@ -39,15 +39,16 @@ plasmafrequence(density = None, gamma:float = None,
 """
 
 __all__ = [
-    "calculateV_O",
+    "calculateBeta",
     "calculateTime",
     "calculateTimeFreq",
+    "calculateV_O",
     "plasmafrequence",
-    "calculateBeta",
 ]
 
 import numpy as np
-from scipy.constants import c, epsilon_0, e, m_e
+from scipy.constants import c, e, epsilon_0, m_e
+
 from . import _searchData as sD
 
 
@@ -75,7 +76,7 @@ def calculateV_O(gamma=None):
     return np.sqrt((1 - 1 / gamma**2) * c**2)
 
 
-def calculateTimeFreq(frequency, steps=None, deltaT: float = None, **kwargs):
+def calculateTimeFreq(frequency, steps=None, deltaT: float | None = None, **kwargs):
     """
     calculate the time in [frequency ** -1]
 
@@ -106,7 +107,7 @@ def calculateTimeFreq(frequency, steps=None, deltaT: float = None, **kwargs):
     return steps * deltaT * frequency
 
 
-def calculateTime(steps=None, deltaT: float = None):
+def calculateTime(steps=None, deltaT: float | None = None):
     """
     calculate the time in s
 
@@ -174,7 +175,7 @@ def calculateBeta(v_0=None, gamma=None):
     return beta
 
 
-def plasmafrequence(density=None, gamma: float = None, relativistic: bool = True):
+def plasmafrequence(density=None, gamma: float | None = None, relativistic: bool = True):
     """
     calculate the plasmafrequency  using the formula
 
@@ -215,5 +216,4 @@ def plasmafrequence(density=None, gamma: float = None, relativistic: bool = True
         if gamma is None:
             gamma = sD.searchParameter("gamma", directiontype="param")
         return np.sqrt((density * e**2) / (epsilon_0 * gamma * m_e))
-    else:
-        return np.sqrt((density * e**2) / (epsilon_0 * m_e))
+    return np.sqrt((density * e**2) / (epsilon_0 * m_e))

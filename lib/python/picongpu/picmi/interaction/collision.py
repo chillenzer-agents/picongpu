@@ -7,16 +7,16 @@ License: GPLv3+
 
 from itertools import combinations, combinations_with_replacement
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from picongpu.picmi.species import Species
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
+from picongpu.picmi.species import Species
 from picongpu.pypicongpu.collisions import Collision as PyPIConGPUCollision
 from picongpu.pypicongpu.collisions import CollisionalPhysicsSetup as PyPIConGPUCollisionalPhysicsSetup
-from picongpu.pypicongpu.collisions import CollisionFunctor
-from picongpu.pypicongpu.collisions import CollisionNumericsConfig as CollisionNumericsConfig
+from picongpu.pypicongpu.collisions import CollisionFunctor, CollisionNumericsConfig, DynamicLogCollision
+
+# re-exported via picmi.interaction's __init__, so keep the self-alias
 from picongpu.pypicongpu.collisions import ConstLogCollision as ConstLogCollision
-from picongpu.pypicongpu.collisions import DynamicLogCollision as DynamicLogCollision
 
 
 class Collision(BaseModel):
@@ -55,10 +55,10 @@ class CollisionalPhysicsSetup(BaseModel):
         if len(args) == 1:
             if "collisions" not in kwargs:
                 kwargs["collisions"] = args[0]
-                args = tuple()
+                args = ()
             else:
                 raise ValueError(f"Duplicated collisions argument given: You gave {args=} and {kwargs=}.")
-        return super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     @field_validator("collisions", mode="before")
     @classmethod

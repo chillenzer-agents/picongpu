@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from functools import lru_cache
+
 from picongpu import core
 
 
@@ -18,6 +19,7 @@ def _parse_version():
         for key, s in zip(
             ("major", "minor", "patch", "label"),
             filter(lambda s: s.startswith("PICONGPU_VERSION_"), header_code.split("\n#define ")),
+            strict=False,
         )
     }
     return f"{version_dict['major']}.{version_dict['minor']}.{version_dict['patch']}" + (

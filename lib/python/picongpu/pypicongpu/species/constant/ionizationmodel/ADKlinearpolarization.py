@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 from .ionizationmodel import IonizationModel
-from ..ionizationcurrent import IonizationCurrent
+from ..ionizationcurrent import AnyIonizationCurrent
 
 
 class ADKLinearPolarization(IonizationModel):
@@ -24,5 +24,5 @@ class ADKLinearPolarization(IonizationModel):
     ionizer_picongpu_name: str = "ADKLinPol"
     """C++ Code type name of ionizer"""
 
-    ionization_current: IonizationCurrent
+    ionization_current: AnyIonizationCurrent
     """ionization current implementation to use"""

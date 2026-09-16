@@ -8,12 +8,12 @@ License: GPLv3+
 from typing import Annotated, Literal
 from uuid import uuid4 as uuid
 
-from pydantic import BaseModel, BeforeValidator, computed_field, field_validator, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, computed_field, field_validator, model_validator
 
 from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_to_cpp_type
 from picongpu.pypicongpu.particle_functor.rng_info import RNGInfo
 from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
-from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
+from picongpu.pypicongpu.rendering.pmaccprinter import serialise_expression
 from picongpu.pypicongpu.rendering.renderedobject import RenderedObject
 from picongpu.pypicongpu.util import alt
 from picongpu.pypicongpu.validation import validate_cpp_identifier
@@ -156,12 +156,12 @@ class ParticleFunctor(RenderedObject, BaseModel):
 
     name: str
     """name of the functor, [C++ identifier]; rendered as the C++ alias
-    `using {name} = ...` and the struct `{name}_{uuid}`, so it must be a
-    valid C++ identifier ([A-Za-z_][A-Za-z0-9_]*)"""
+    `using {name} = ...` and the struct `{name}_{typename_suffix}`, so it
+    must be a valid C++ identifier ([A-Za-z_][A-Za-z0-9_]*)"""
 
-    functor_expression: Annotated[str, BeforeValidator(PMAccPrinter().doprint)]
+    functor_expression: Annotated[str, BeforeValidator(serialise_expression)]
     """the return expression of the functor, given as a sympy expression
-    (converted to a C++ string during validation)"""
+    (converted to a C++ string during validation) or as a C++ string"""
 
     functor_preamble: list[_PreambleStatement]
     """local variable declarations executed before the return expression"""
@@ -184,9 +184,15 @@ class ParticleFunctor(RenderedObject, BaseModel):
     """the random number generator distribution used by the functor
     (uniform or normal); None if the functor is deterministic"""
 
+    typename_suffix: str = Field(default_factory=lambda: uuid().hex)
+    """stable per-instance identifier appended to the C++ type name
+    (`{name}_{typename_suffix}`); a fresh random value is drawn per instance,
+    but the value is part of the model state, so it round-trips through the
+    serialised form (the reconstructed functor keeps the same type name)"""
+
     @computed_field
     def typename(self) -> str:
-        return f"{self.name}_{uuid().hex}"
+        return f"{self.name}_{self.typename_suffix}"
 
     @model_validator(mode="after")
     def _validate(self):

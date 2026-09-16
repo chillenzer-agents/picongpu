@@ -153,6 +153,12 @@ class ParticleFunctor(RenderedObject, BaseModel):
     def typename(self) -> str:
         return f"{self.name}_{uuid().hex}"
 
+    @computed_field
+    def has_species(self) -> bool:
+        """Whether this functor is registered for at least one species (i.e. is a
+        reusable particle filter that can be narrowed by species)."""
+        return bool(self.species_names)
+
     @model_validator(mode="after")
     def _validate(self):
         if "int" in self.return_type:

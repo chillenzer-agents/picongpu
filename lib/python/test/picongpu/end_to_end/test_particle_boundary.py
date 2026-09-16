@@ -15,58 +15,52 @@ drifting into it at 0.5 c, so it crosses that boundary within the first few
 steps:
 
 - **periodic** (species ``pbcPeriodic``): the x field is periodic, so the x
-  particle boundary is periodic. Particles in the last x-column drift in +x;
-  they cross the periodic x boundary and wrap around to the far edge while
-  surviving -> the particle count is preserved.
+  particle boundary is periodic. The particle starts in the last x-column and
+  drifts in +x; it crosses the periodic x boundary and is wrapped around to
+  the opposite x-edge while surviving.
 - **absorbing** (species ``pbcAbsorbing``): the y field is open, so the y
-  particle boundary is absorbing. Particles in the first y-row (the internal
-  particle domain is the whole domain here, since the particle offset is 0)
-  drift in -y; they cross the absorbing y boundary and are removed -> the
-  particle count drops.
+  particle boundary is absorbing. The particle starts in the first y-row and
+  drifts in -y; it crosses the absorbing y boundary and is removed.
 - **reflecting** (species ``pbcReflecting``): the z field is open, so the z
-  particle boundary can be reflecting. Particles in the first z-column drift
-  in -z; they cross the reflecting z boundary and bounce back into the domain
-  while surviving -> the particle count is preserved.
+  particle boundary can be reflecting. The particle starts in the first
+  z-column and drifts in -z; it crosses the reflecting z boundary and is
+  bounced back into the domain while surviving.
 - **thermal** (species ``pbcThermal``): the z field is open, so the z
-  particle boundary can be thermal. Particles in the first internal z-column
-  (just inside the positive offset) drift in -z; they cross the thermal z
-  boundary and are re-momentum-sampled inward while surviving -> the particle
-  count is preserved. (A thermal boundary requires a positive offset in the
-  C++ core, so ``pbcThermal`` also carries ``boundary_offset`` /
-  ``boundary_temperature``.)
+  particle boundary can be thermal. The particle starts just inside the
+  positive z offset and drifts in -z; it crosses the thermal z boundary and is
+  re-momentum-sampled inward while surviving. (A thermal boundary re-samples
+  the particle's full momentum on every crossing, so it also carries
+  ``boundary_offset`` / ``boundary_temperature``.)
 
-Why all four fit in one simulation: the C++ per-axis constraint is
-"field periodic => particle periodic; field open => absorbing/reflect/
-thermal". The field boundary is per-axis, and there are only three axes. With
-field BCs ``[periodic, open, open]`` the x-axis is forced to periodic and the
-y/z-axes accept absorbing/reflect/thermal. Each species drifts only along its
-active axis and is placed mid-domain on the other two axes, so exactly one
-boundary kind acts per species. All four distinct kinds are covered, which is
-the maximum possible (there are exactly four kinds).
+Why all four fit in one simulation: the C++ per-axis constraint is "field
+periodic => particle periodic; field open => absorbing/reflect/thermal". The
+field boundary is per-axis, and there are only three axes. With field BCs
+``[periodic, open, open]`` the x-axis is forced to periodic and the y/z-axes
+accept absorbing/reflect/thermal. Each species drifts only along its active
+axis and is placed mid-domain on the other two axes, so exactly one boundary
+kind acts per species. All four distinct kinds are covered, which is the
+maximum possible (there are exactly four kinds).
 
-The thermal species' non-active boundaries are set to non-removing kinds
-(periodic on x, reflecting on y) rather than absorbing: the thermal boundary
-re-samples the particle's full momentum on every crossing, so the particle
-would otherwise drift at random and could be removed by an absorbing boundary,
-making the "count preserved" assertion flaky. With only non-removing
-boundaries the thermal particle can never be removed, so its count is
-deterministically preserved.
+The grid uses the shared ``arbitrary_parameters`` values (non-square,
+non-isotropic, chosen to expose indexing bugs quickly): ``NUMBER_OF_CELLS``
+with ``CELL_SIZE = UPPER_BOUNDARY / NUMBER_OF_CELLS``. The open axes (y, z)
+are still wide enough for the 12-cell PML field absorber to fit, so the
+configuration is valid.
 
-Grid sizing (driven by C++ runtime constraints, not Python): the C++ core's
-convolutional-PML field absorber (used for the "open" field boundaries,
-``--fieldAbsorber pml`` by default) is 12 cells thick on each open side
-(``fieldAbsorber.param`` ``NUM_CELLS``), and ``Pml::checkLocalThickness``
-throws if the PML size exceeds the local domain. So the two open axes (y, z)
-need at least 24 cells each; the periodic axis (x) needs no absorber and only
-guard cells. The grid is therefore ``[32, 32, 32]`` with a ``[2, 2, 2]``
-supercell: the open axes are wide enough for the PML to fit, and the whole
-grid is still small. The step count is tiny (5), so the run is fast;
-compilation (the heavy part) happens once for the single simulation object.
-The ``free-streaming`` pusher ignores the EM fields, so the particles move in
-straight lines and the boundary interactions are deterministic. The density is
-chosen so that each slab cell holds exactly ``MACRO_PER_CELL`` macroparticles
-with a per-particle weighting above ``MIN_WEIGHTING`` (see
-``particle.param``), giving a small, non-zero, deterministic initial count.
+Each species uses a deterministic ``GriddedLayout`` (one macroparticle per
+cell, at the cell centre), so the initial count and positions are fully
+reproducible: each slab holds exactly one macroparticle. The thermal species'
+non-active boundaries are set to non-removing kinds (periodic on x, reflecting
+on y) rather than absorbing: the thermal boundary re-samples the particle's
+full momentum on every crossing, so the particle would otherwise drift at
+random and could be removed by an absorbing boundary, making the "count
+preserved" assertion flaky. With only non-removing boundaries the thermal
+particle can never be removed, so its count is deterministically preserved.
+
+The step count is tiny, so the run is fast; compilation (the heavy part)
+happens once for the single simulation object. The ``free-streaming`` pusher
+ignores the EM fields, so the particles move in straight lines and the
+boundary interactions are deterministic.
 """
 
 import logging
@@ -80,48 +74,45 @@ from picongpu.picmi import (
     AnalyticDistribution,
     Cartesian3DGrid,
     ElectromagneticSolver,
-    PseudoRandomLayout,
+    GriddedLayout,
     Simulation,
     Species,
 )
 from picongpu.picmi.diagnostics import ParticleDump, TimeStepSpec
 from picongpu.picmi.particle_boundary import ParticleBoundary
 
-from .arbitrary_parameters import directory_in_home, gather_results
+from .arbitrary_parameters import LOWER_BOUNDARY, NUMBER_OF_CELLS, UPPER_BOUNDARY, directory_in_home, gather_results
 
 logging.basicConfig(level=logging.INFO)
 
 C = 299792458.0
+# Grid from the shared arbitrary_parameters (non-square, non-isotropic):
 # x is periodic (no PML, needs only guard cells), y/z are open (PML 12 cells/
-# side = 24 per axis, so they need >= 24 cells each). See the module docstring.
-NUMBER_OF_CELLS = [32, 32, 32]
-CELL_SIZE = 1.0
+# side = 24 per axis, so they need >= 24 cells each -- they have 64 and 32).
+# See the module docstring.
 SUPER_CELL = (2, 2, 2)
-# Minimal step budget: each particle is placed at (or within half a cell of)
-# its active boundary and drifts at 0.5 c (about 0.29 cells per step), so it
+# Each particle is placed at its active boundary and drifts at 0.5 c, so it
 # crosses its boundary within the first few steps; five steps leaves ample
 # margin beyond that.
 MAX_STEPS = 5
 VELOCITY = 0.5 * C
-# DENSITY * base_density * cell_volume == DENSITY macro-particles in the slab
-# cell; the layout keeps at most MACRO_PER_CELL of them, each with a weighting
-# of DENSITY / MACRO_PER_CELL. That weighting is >= MIN_WEIGHTING (10, see
-# particle.param), so the slab cell deterministically holds exactly
-# MACRO_PER_CELL particles.
+# The density inside the slab cell is DENSITY * base_density; the layout keeps
+# exactly one macroparticle in it, with a weighting of
+# DENSITY * base_density * cell_volume, which is well above MIN_WEIGHTING (see
+# particle.param), so each slab deterministically holds exactly one particle.
 DENSITY = 100.0
-MACRO_PER_CELL = 8
-
-LAYOUT = PseudoRandomLayout(n_macroparticles_per_cell=MACRO_PER_CELL)
+# Deterministic layout: one macroparticle per cell, at the cell centre.
+LAYOUT = GriddedLayout(n_macroparticles_per_cell=[1, 1, 1])
 
 
 def _slab(x, y, z, cx, cy, cz):
     # density DENSITY inside the single cell (cx, cy, cz), 0 everywhere else.
-    # The density expression is evaluated at the SI cell-center position, so a
-    # cell of size 1 occupies the interval [cx, cx + 1) on each axis.
-    return sympy.Piecewise(
-        (DENSITY, sympy.And(x >= cx, x < cx + 1, y >= cy, y < cy + 1, z >= cz, z < cz + 1)),
-        (0.0, True),
-    )
+    # The density expression is evaluated at the SI position, so the cell spans
+    # [i * CELL_SIZE, (i + 1) * CELL_SIZE) on each axis.
+    x0, x1 = float(cx * CELL_SIZE[0]), float((cx + 1) * CELL_SIZE[0])
+    y0, y1 = float(cy * CELL_SIZE[1]), float((cy + 1) * CELL_SIZE[1])
+    z0, z1 = float(cz * CELL_SIZE[2]), float((cz + 1) * CELL_SIZE[2])
+    return sympy.Piecewise((DENSITY, sympy.And(x >= x0, x < x1, y >= y0, y < y1, z >= z0, z < z1)), (0.0, True))
 
 
 def _species(name, cell, velocity, boundary, offset=None, temperature=None):
@@ -140,25 +131,24 @@ def _species(name, cell, velocity, boundary, offset=None, temperature=None):
 
 
 SPECIES = [
-    # periodic: drift +x from the last x-column -> crosses the periodic x boundary
-    # and wraps around to the far x-edge while surviving.
-    _species("pbcPeriodic", (31, 16, 16), [VELOCITY, 0.0, 0.0], ["periodic", "absorbing", "absorbing"]),
-    # absorbing: drift -y from the first y-row -> crosses the absorbing y boundary
-    # and is removed.
-    _species("pbcAbsorbing", (16, 0, 16), [0.0, -VELOCITY, 0.0], ["periodic", "absorbing", "absorbing"]),
+    # periodic: drift +x from the last x-column -> crosses the periodic x
+    # boundary and wraps around to the far x-edge while surviving.
+    _species("pbcPeriodic", (63, 32, 16), [VELOCITY, 0.0, 0.0], ["periodic", "absorbing", "absorbing"]),
+    # absorbing: drift -y from the first y-row -> crosses the absorbing y
+    # boundary and is removed.
+    _species("pbcAbsorbing", (32, 0, 16), [0.0, -VELOCITY, 0.0], ["periodic", "absorbing", "absorbing"]),
     # reflecting: drift -z from the first z-column -> crosses the reflecting z
     # boundary and bounces back into the domain while surviving.
-    _species("pbcReflecting", (16, 16, 0), [0.0, 0.0, -VELOCITY], ["periodic", "absorbing", "reflect"]),
-    # thermal: drift -z from the first internal z-column (just inside the positive
-    # offset) -> crosses the thermal z boundary and is re-momentum-sampled inward
-    # while surviving. A thermal boundary requires a positive offset, so it also
-    # carries an offset and a temperature. The non-active boundaries (x, y) are
-    # non-removing kinds (periodic, reflecting) so the re-momentum-sampled
-    # particle can never be removed, keeping the "count preserved" assertion
-    # deterministic.
+    _species("pbcReflecting", (32, 32, 0), [0.0, 0.0, -VELOCITY], ["periodic", "absorbing", "reflect"]),
+    # thermal: drift -z from the first internal z-column (just inside the
+    # positive offset) -> crosses the thermal z boundary and is
+    # re-momentum-sampled inward while surviving. The non-active boundaries
+    # (x, y) are non-removing kinds (periodic, reflecting) so the
+    # re-momentum-sampled particle can never be removed, keeping the "count
+    # preserved" assertion deterministic.
     _species(
         "pbcThermal",
-        (16, 16, 1),
+        (32, 32, 1),
         [0.0, 0.0, -VELOCITY],
         ["periodic", "reflect", "thermal"],
         offset=[0, 0, 1],
@@ -176,8 +166,8 @@ def basic_simulation():
             cfl=1.0,
             grid=Cartesian3DGrid(
                 number_of_cells=NUMBER_OF_CELLS,
-                lower_bound=[0.0, 0.0, 0.0],
-                upper_bound=[c * CELL_SIZE for c in NUMBER_OF_CELLS],
+                lower_bound=LOWER_BOUNDARY,
+                upper_bound=UPPER_BOUNDARY,
                 lower_boundary_conditions=["periodic", "open", "open"],
                 upper_boundary_conditions=["periodic", "open", "open"],
                 picongpu_super_cell_size=SUPER_CELL,

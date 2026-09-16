@@ -135,3 +135,17 @@ def test_binning_accepts_plain_dict():
     assert isinstance(b.openPMDBackendConfig, OpenPMDBackendConfig)
     serialized = b.get_as_pypicongpu(time_step_size=1.0, num_steps=1).model_dump()["openPMDBackendConfig"]
     assert json.loads(serialized) == {"hdf5": {"dataset": {"chunks": "auto"}}}
+
+
+def test_resizable_is_a_top_level_dataset_option():
+    """``resizable`` is a backend-independent option that openPMD reads as a top-level key of
+    the (per-)dataset config (a sibling of ``hdf5``), *not* nested under any backend table.
+    It must therefore live on the root model, not on ``Hdf5Dataset``."""
+    # It is accepted at the root and renders as a top-level key ...
+    model = OpenPMDBackendConfig(backend="hdf5", resizable=True, hdf5=Hdf5Config(dataset=Hdf5Dataset(chunks="auto")))
+    dumped = model.model_dump(mode="json")
+    assert dumped["resizable"] is True
+    # ... and is NOT emitted under the hdf5 dataset table (where the C++ does not read it).
+    assert "resizable" not in dumped["hdf5"]["dataset"]
+    # And the (former) placement on Hdf5Dataset is gone.
+    assert "resizable" not in Hdf5Dataset.model_fields

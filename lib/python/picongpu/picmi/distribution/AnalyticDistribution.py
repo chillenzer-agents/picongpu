@@ -146,9 +146,10 @@ class AnalyticDistribution(PICMI_Extension):
         if has_expression:
             # Normalise like the PICMI standard does, then sympify into the
             # equivalent callable so the computed density_expression is identical.
+            sx, sy, sz = symbols("x,y,z")
             parsed = sympify(f"{data['density_expression']}".replace("\n", ""))
             del data["density_expression"]
-            data["density_function"] = lambda x, y, z: parsed
+            data["density_function"] = lambda x, y, z: parsed.subs({sx: x, sy: y, sz: z})
         return data
 
     @computed_field

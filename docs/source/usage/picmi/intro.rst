@@ -249,9 +249,9 @@ This interface offers additional configuration options above and beyond the PICM
 To generate a PIConGPU setup from a PyPIConGPU simulation object use the following.
 
 .. code:: python
-  import picongpu
+  from picongpu import picmi
 
-  picongpu.picmi.Simulation().write_input_file(<path of setup to generate>, pypicongpu_simulation)
+  picmi.Simulation().write_input_file(<path of setup to generate>, pypicongpu_simulation)
 
 .. note::
 

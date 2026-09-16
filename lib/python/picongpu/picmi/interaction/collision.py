@@ -7,16 +7,20 @@ License: GPLv3+
 
 from itertools import combinations, combinations_with_replacement
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from picongpu.picmi.species import Species
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
-from picongpu.pypicongpu.collisions import Collision as PyPIConGPUCollision
-from picongpu.pypicongpu.collisions import CollisionalPhysicsSetup as PyPIConGPUCollisionalPhysicsSetup
-from picongpu.pypicongpu.collisions import CollisionFunctor
-from picongpu.pypicongpu.collisions import CollisionNumericsConfig as CollisionNumericsConfig
-from picongpu.pypicongpu.collisions import ConstLogCollision as ConstLogCollision
-from picongpu.pypicongpu.collisions import DynamicLogCollision as DynamicLogCollision
+from picongpu.picmi.species import Species
+from picongpu.pypicongpu.collision import Collision as PyPIConGPUCollision
+from picongpu.pypicongpu.collision import (
+    CollisionalPhysicsSetup as PyPIConGPUCollisionalPhysicsSetup,
+)
+from picongpu.pypicongpu.collision import CollisionFunctor
+from picongpu.pypicongpu.collision import (
+    CollisionNumericsConfig as CollisionNumericsConfig,
+)
+from picongpu.pypicongpu.collision import ConstLogCollision as ConstLogCollision
+from picongpu.pypicongpu.collision import DynamicLogCollision as DynamicLogCollision
 
 
 class Collision(BaseModel):

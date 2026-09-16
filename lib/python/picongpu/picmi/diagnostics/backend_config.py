@@ -7,6 +7,7 @@ License: GPLv3+
 
 from enum import Enum
 
+from picongpu.pypicongpu.output.openpmd_backend import OpenPMDBackendConfig
 from picongpu.pypicongpu.output.openpmd_plugin import OpenPMDConfig, RangeSpecEntry
 from picongpu.pypicongpu.output.openpmd_plugin import RangeSpec as PyPIConGPURangeSpec
 

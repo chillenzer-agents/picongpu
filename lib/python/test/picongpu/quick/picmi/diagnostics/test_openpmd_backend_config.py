@@ -18,6 +18,7 @@ from picongpu.pypicongpu.output.openpmd_backend import (
     Adios2Operator,
     Hdf5Config,
     Hdf5Dataset,
+    JsonTomlConfig,
     OpenPMDBackendConfig,
 )
 from picongpu.pypicongpu.output.openpmd_plugin import FieldDump, OpenPMDConfig, OpenPMDPlugin
@@ -164,3 +165,18 @@ def test_adios2_preferred_flush_target_accepts_override_variants(target):
 def test_adios2_preferred_flush_target_rejects_unknown_value():
     with pytest.raises(Exception):
         Adios2Engine(preferred_flush_target="bogus")
+
+
+@pytest.mark.parametrize(
+    "set_backend",
+    [
+        lambda: Adios2Config(dont_warn_unused_keys=["a"]),
+        lambda: Hdf5Config(dont_warn_unused_keys=["b"]),
+        lambda: JsonTomlConfig(dont_warn_unused_keys=["c"]),
+    ],
+)
+def test_dont_warn_unused_keys_is_acceptable_per_backend(set_backend):
+    """openPMD honours ``dont_warn_unused_keys`` at any (backend) node, and the documented
+    examples place it inside a backend table, so each per-backend config must accept it."""
+    backend = set_backend()
+    assert backend.model_dump(mode="json")["dont_warn_unused_keys"]

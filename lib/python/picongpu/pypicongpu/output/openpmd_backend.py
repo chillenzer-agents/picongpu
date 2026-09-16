@@ -84,6 +84,9 @@ class Adios2Config(BaseModel):
     dataset: Optional[Union[Adios2Dataset, List["DatasetOverride[Adios2Dataset]"]]] = None
     use_span_based_put: Optional[bool] = None
     attribute_writing_ranks: Optional[Union[int, List[int]]] = None
+    # openPMD honours ``dont_warn_unused_keys`` at any (backend) node, and the
+    # documented examples place it inside a backend table.
+    dont_warn_unused_keys: Optional[List[str]] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -120,6 +123,7 @@ class Hdf5Config(BaseModel):
     dataset: Optional[Union[Hdf5Dataset, List["DatasetOverride[Hdf5Dataset]"]]] = None
     vfd: Optional[Hdf5Vfd] = None
     independent_stores: Optional[bool] = None
+    dont_warn_unused_keys: Optional[List[str]] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -136,6 +140,7 @@ class JsonTomlAttribute(BaseModel):
 class JsonTomlConfig(BaseModel):
     dataset: Optional[JsonTomlDataset] = None
     attribute: Optional[JsonTomlAttribute] = None
+    dont_warn_unused_keys: Optional[List[str]] = None
 
 
 # --------------------------------------------------------------------------- #

@@ -216,6 +216,37 @@ For this the period is chosen that the output is generated (approx.) 100 times o
 
 To configure output you must :ref:`change the generated files <picmi-custom-generation>` by using use custom user input and custom templates.
 
+Background fields
+^^^^^^^^^^^^^^^^^
+
+PIConGPU supports the PICMI standard *applied fields* as **background fields** affecting the particles:
+
+- :class:`picongpu.picmi.ConstantAppliedField` and
+- :class:`picongpu.picmi.AnalyticAppliedField`.
+
+A configured applied field is added to the grid ``E`` and ``B`` fields for the particle push, so the particles feel it, while the field is not changed by the solver itself.
+The Python layer renders the field expressions into the C++ ``fieldBackground.param`` functors (see ``FieldBackground.hpp``).
+The expressions of an ``AnalyticAppliedField`` are functions of ``x``, ``y``, ``z`` (position in m) and ``t`` (time in s), and the field components are given in SI units (V/m for ``E``, T for ``B``).
+Named parameters used inside the expressions can be passed as additional keyword arguments.
+
+Example:
+
+.. code:: python
+
+    sim.add_applied_field(
+        picmi.AnalyticAppliedField(
+            Ex_expression="1e5 * sin(2 * pi * y / wl) * cos(2 * pi * t / T)",
+            wl=800e-9,
+            T=50e-15,
+        )
+    )
+
+Currently only the whole simulation domain is supported (``lower_bound``/``upper_bound`` must stay at their default ``None`` values).
+
+The expressions are evaluated on the cell **node** positions ``x = cellIdx.x() * cellSize.x()`` (and analogously ``y``, ``z``), not on the cell centers.
+As soon as *any* applied field is configured, the generated functors enable ``InfluenceParticlePusher`` for **both** the ``E`` and ``B`` contribution: a field-only background therefore still adds a zero ``B`` (and vice versa) during the push, which is harmless but slightly wasteful.
+Parameters whose names collide with ``x``/``y``/``z``/``t`` or with identifiers generated inside the C++ functors, or that are C++ keywords, are rejected with a ``ValueError``, as are expressions that reference undefined symbols.
+
 Unsupported Features
 ^^^^^^^^^^^^^^^^^^^^
 

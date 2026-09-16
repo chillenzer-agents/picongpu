@@ -5,7 +5,7 @@ Authors: Julian Lenz, Masoud Afshari
 License: GPLv3+
 """
 
-from .backend_config import BackendConfig, OpenPMDConfig
+from .backend_config import BackendConfig, OpenPMDConfig, OpenPMDBackendConfig
 from .binning import Binning, BinningAxis, BinSpec
 from .checkpoint import Checkpoint
 from .energy_histogram import EnergyHistogram
@@ -31,6 +31,7 @@ __all__ = [
     "AnyDiagnostic",
     "BackendConfig",
     "OpenPMDConfig",
+    "OpenPMDBackendConfig",
     "Binning",
     "BinningAxis",
     "BinSpec",

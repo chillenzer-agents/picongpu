@@ -14,7 +14,7 @@ from itertools import chain, groupby
 from os import PathLike
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import picmistandard
 from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, PrivateAttr, model_validator
@@ -133,7 +133,7 @@ def _validate_collisional_physics_setup(interactions):
     if "collision" in types:
         # We've found one or more bare collision flying around in the list,
         # so we've gotta merge them into one setup.
-        return list(types["other"]) + [CollisionalPhysicsSetup(collisions=list(types["collision"]))]
+        return list(types.get("other", [])) + [CollisionalPhysicsSetup(collisions=list(types["collision"]))]
 
     # No collisions whatsoever...
     return interactions
@@ -199,6 +199,14 @@ class Simulation(picmistandard.PICMI_Simulation):
     picongpu_base_density: float | None = Field(default=None)
     """value to normalise densities with"""
 
+    picongpu_precision: Literal[32, 64] = Field(default=32)
+    """
+    floating point precision of the simulation core (see ``precision.param``)
+
+    32 (single precision, default) or 64 (double precision). Controls the
+    ``precisionPIConGPU`` namespace in the generated ``precision.param``.
+    """
+
     picongpu_walltime: datetime.timedelta | None = Field(default=None)
     """time after which the cluster scheduler will stop the simulation"""
 
@@ -210,8 +218,7 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     @model_validator(mode="after")
     def _post_init(self):
-        # additional PICMI stuff checks, @todo move to picmistandard, Brian Marre, 2024
-        ## throw if both cfl & delta_t are set
+        # cross-check cfl against delta_t, deriving whichever is missing
         if (
             self.solver is not None
             and self.solver.method in ["Yee", "Lehe"]
@@ -315,6 +322,15 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     # @todo add refactor once restarts are supported by the Runner, Brian Marre, 2024
     def step(self, nsteps: int = 1, **flags):
+        """
+        Run the simulation for ``nsteps`` time steps.
+
+        PIConGPU runs the whole workflow for the full number of time steps in
+        one go, so ``nsteps`` must equal ``max_steps``. Note that this is
+        about time stepping, not about the workflow: selecting a subset of
+        the *workflow stages* (build/prepare/submit/collect) is done via
+        ``picongpu_run(up_to=..., from_=...)`` instead.
+        """
         if nsteps != self.max_steps:
             raise ValueError(
                 "PIConGPU does not support stepwise running. Invoke step() with max_steps (={})".format(self.max_steps)
@@ -333,6 +349,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                         else PyPIConGPUFieldDump(
                             name=diagnostic.fieldname,
                             filtername=diagnostic.filtername,
+                            species_name=None if isinstance(diagnostic, NativeFieldDump) else diagnostic.species_name,
                             functor=None
                             if isinstance(diagnostic, NativeFieldDump)
                             else diagnostic.functor.get_as_pypicongpu(mode="DerivedField"),
@@ -414,6 +431,9 @@ class Simulation(picmistandard.PICMI_Simulation):
             raise ValueError(
                 f"You have configured the Synchrotron extension multiple times with different arguments. This is not allowed! You gave {synchrotron_params[:-1]=}."
             )
+        # We need to make sure that bare collisions are merged into a setup,
+        # no matter if the interactions were assembled at construction time or later.
+        self.picongpu_interaction = _validate_collisional_physics_setup(self.picongpu_interaction)
         # We provide the default as last element and we'll only read the first element:
         collisions = [x for x in self.picongpu_interaction if isinstance(x, CollisionalPhysicsSetup)] + [
             CollisionalPhysicsSetup()
@@ -437,6 +457,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             base_density=self._get_base_density(),
             synchrotron_params=synchrotron_params[0],
             collisional_physics=collisions[0].get_as_pypicongpu(),
+            precision=self.picongpu_precision,
         )
 
     def _get_base_density(self) -> float:
@@ -445,11 +466,39 @@ class Simulation(picmistandard.PICMI_Simulation):
     def run(self, *args, **kwargs) -> None:
         return self.picongpu_run(*args, **kwargs)
 
-    def picongpu_run(self, setup_dir=None, run_dir=None, **flags) -> None:
-        """build and run PIConGPU simulation"""
+    def picongpu_run(self, setup_dir=None, run_dir=None, up_to=None, from_=None, **flags) -> None:
+        """
+        build and run PIConGPU simulation
+
+        By default the full pipeline (build, prepare, submit, collect) is
+        executed, as before. A subset of it can be selected with the stable
+        stage vocabulary (see ``picongpu.picmi.Stage``):
+
+        - ``up_to=Stage.build``: execute only the requested stage and the
+          stages before it (a prefix of the pipeline). The workflow is passed
+          to the cwltool runner (invoked in-process via its
+          WorkflowFactory) with that stage's outputs as targets, so cwltool
+          executes exactly the steps contributing to them and never runs the
+          stages after the requested one.
+        - ``from_=Stage.submit``: resume at the requested stage. The workflow
+          is run in full against the persistent cwltool job store
+          (``<run_dir>/.cwl_cache``): the earlier stages are served from the
+          store (their inputs are byte-identical) and only the requested
+          stage and everything after it recompute.
+
+        The cwltool job store is the only state; the runner itself records
+        none. To run everything from scratch, use a fresh setup/run directory
+        (or delete ``<run_dir>``).
+        """
         runner = self.picongpu_get_runner(setup_dir=setup_dir, run_dir=run_dir)
-        runner.generate(**flags)
-        runner.run()
+        if not runner.workflow_input_path.exists():
+            runner.generate(**flags)
+        elif flags:
+            raise ValueError(
+                "the setup was already generated, so workflow flags cannot be changed afterwards; "
+                "create a fresh setup (e.g. via write_input_file()) to run with different flags"
+            )
+        runner.run(up_to=up_to, from_=from_)
 
     def picongpu_get_runner(self, **kwargs) -> Runner:
         if self._runner is None:

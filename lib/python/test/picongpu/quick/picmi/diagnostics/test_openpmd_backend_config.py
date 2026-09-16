@@ -45,8 +45,12 @@ def test_backend_config_renders_nested_toml_table(tmp_path):
     [[backend_config.adios2.dataset]] override list."""
     (tmp_path / "etc").mkdir()
     plugin = OpenPMDPlugin(
-        sources=[(PyTimeStepSpec(specs=[Spec(start=0, stop=-1, step=1)]),
-                  FieldDump(name="E", functor=None, filtername=None, species_name=None))],
+        sources=[
+            (
+                PyTimeStepSpec(specs=[Spec(start=0, stop=-1, step=1)]),
+                FieldDump(name="E", functor=None, filtername=None, species_name=None),
+            )
+        ],
         config=OpenPMDConfig(file="simData", backend_config=_adios2_with_per_dataset_overrides()),
     )
     plugin.setup_dir = tmp_path
@@ -84,9 +88,7 @@ def test_explicit_empty_backend_config_is_absent():
 
 def test_empty_nested_models_are_stripped():
     """Sub-models whose leaves are all unset are dropped, but meaningful empty lists stay."""
-    model = OpenPMDBackendConfig(
-        adios2=Adios2Config(engine=Adios2Engine(), dataset=[{"cfg": {"operators": []}}])
-    )
+    model = OpenPMDBackendConfig(adios2=Adios2Config(engine=Adios2Engine(), dataset=[{"cfg": {"operators": []}}]))
     dumped = model.model_dump(mode="json")
     assert "engine" not in dumped["adios2"]
     # an explicit operators=[] (disabling compression) is preserved
@@ -114,16 +116,16 @@ def _binning(backend_config):
 def test_binning_backend_config_serialises_to_json_string():
     """Binning routes the shared model through its existing JSON-string transport
     (setOpenPMDBackendConfig), emitting the model's JSON for a populated config."""
-    serialized = _binning(_adios2_with_per_dataset_overrides()).get_as_pypicongpu(
-        time_step_size=1.0, num_steps=1
-    ).model_dump()["openPMDBackendConfig"]
+    serialized = (
+        _binning(_adios2_with_per_dataset_overrides())
+        .get_as_pypicongpu(time_step_size=1.0, num_steps=1)
+        .model_dump()["openPMDBackendConfig"]
+    )
     assert json.loads(serialized) == _adios2_with_per_dataset_overrides().model_dump(mode="json")
 
 
 def test_binning_none_backend_config_yields_no_transport():
-    serialized = _binning(None).get_as_pypicongpu(time_step_size=1.0, num_steps=1).model_dump()[
-        "openPMDBackendConfig"
-    ]
+    serialized = _binning(None).get_as_pypicongpu(time_step_size=1.0, num_steps=1).model_dump()["openPMDBackendConfig"]
     assert serialized is None
 
 

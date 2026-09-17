@@ -67,51 +67,59 @@ def _iter_leaf_simulations(items, parent=""):
             raise ValueError(f"Invalid group entry at {path}: expected a Simulation, group or dict, got {entry!r}.")
 
 
+def _child_step_and_outputs(group_dir: Path, name: str, kind: str) -> tuple[dict, dict]:
+    """
+    Return ``(step, child_outputs)`` for one top-level entry of the group.
+
+    A ``"simulation"`` child nests ``../<name>/workflow/workflow.cwl`` and is fed by the
+    self-contained inputs recorded in that sub-simulation's generated
+    ``workflow/input.yaml`` (so per-simulation build/run flags are honoured). A
+    ``"group"`` child nests the (self-contained, input-less) sub-group workflow and
+    bubbles up the outputs it already re-exposes. ``child_outputs`` maps each child
+    output name to its ``{"type", "label"}``.
+    """
+    if kind == "group":
+        child_workflow = f"../{name}/{_GROUP_MAIN_ENTITY}"
+        child_doc = f"Nests the sub-group workflow of {name}."
+        step_in: dict = {}
+        child_outputs = yaml.safe_load((group_dir / name / _GROUP_MAIN_ENTITY).read_text())["outputs"]
+    else:
+        child_workflow = f"../{name}/workflow/workflow.cwl"
+        child_doc = f"Nests the self-contained per-simulation workflow of {name}."
+        job = json.loads((group_dir / name / "workflow" / "input.yaml").read_text())
+        step_in = {key: {"default": value} for key, value in job.items()}
+        child_outputs = {
+            suffix: {"type": cwl_type, "label": label} for suffix, (cwl_type, label) in _GROUP_OUTPUT_DEFS.items()
+        }
+    step = {
+        "id": f"{name}_step",
+        "label": f"Build and run sub-simulation {name}",
+        "doc": child_doc,
+        "run": child_workflow,
+        "in": step_in,
+        "out": list(child_outputs),
+    }
+    return step, child_outputs
+
+
 def _generate_group_workflow(group_dir: Path, children: dict[str, str]) -> str:
     """
     Build the overarching group workflow as a plain dict and emit it as YAML.
 
     ``children`` maps each top-level entry name to ``"simulation"`` or ``"group"``.
-    A simulation child nests ``../<name>/workflow/workflow.cwl`` and is fed by the
-    self-contained inputs recorded in that sub-simulation's generated
-    ``workflow/input.yaml`` (so per-simulation build/run flags are honoured). A
-    group child nests the (self-contained, input-less) ``../<name>/workflow/group_workflow.cwl``.
     Each child's outputs are re-exposed under the ``<name>_<output>`` prefix.
     """
-    steps: dict = {}
-    outputs: dict = {}
-    for name, kind in children.items():
-        if kind == "group":
-            child_workflow = f"../{name}/{_GROUP_MAIN_ENTITY}"
-            child_doc = f"Nests the sub-group workflow of {name}."
-            # The sub-group workflow is self-contained (no inputs) and already
-            # re-exposes its leaf results, so it takes no step inputs and we just
-            # bubble up the outputs it declares.
-            step_in: dict = {}
-            child_outputs = yaml.safe_load((group_dir / name / _GROUP_MAIN_ENTITY).read_text())["outputs"]
-        else:
-            child_workflow = f"../{name}/workflow/workflow.cwl"
-            child_doc = f"Nests the self-contained per-simulation workflow of {name}."
-            job = json.loads((group_dir / name / "workflow" / "input.yaml").read_text())
-            step_in = {key: {"default": value} for key, value in job.items()}
-            child_outputs = {
-                suffix: {"type": cwl_type, "label": label} for suffix, (cwl_type, label) in _GROUP_OUTPUT_DEFS.items()
-            }
-        step_id = f"{name}_step"
-        steps[step_id] = {
-            "id": step_id,
-            "label": f"Build and run sub-simulation {name}",
-            "doc": child_doc,
-            "run": child_workflow,
-            "in": step_in,
-            "out": list(child_outputs),
+    children_steps = {name: _child_step_and_outputs(group_dir, name, kind) for name, kind in children.items()}
+    steps = {f"{name}_step": step for name, (step, _) in children_steps.items()}
+    outputs = {
+        f"{name}_{suffix}": {
+            "type": props["type"],
+            "outputSource": f"{name}_step/{suffix}",
+            "label": f"{name} {props['label']}",
         }
-        for suffix, props in child_outputs.items():
-            outputs[f"{name}_{suffix}"] = {
-                "type": props["type"],
-                "outputSource": f"{step_id}/{suffix}",
-                "label": f"{name} {props.get('label', suffix)}",
-            }
+        for name, (_, child_outputs) in children_steps.items()
+        for suffix, props in child_outputs.items()
+    }
     workflow = {
         "cwlVersion": "v1.2",
         "class": "Workflow",

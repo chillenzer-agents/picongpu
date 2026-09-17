@@ -5,6 +5,8 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
+from picmistandard.base import _PICMI_Extension
+
 from ..groundstateionizationmodel import GroundStateIonizationModel
 from .ionizationcurrent import IonizationCurrent
 
@@ -12,8 +14,13 @@ from .....pypicongpu.species.constant.ionizationcurrent import IonizationCurrent
 from .....pypicongpu.species.constant.ionizationcurrent import None_
 
 
-class FieldIonization(GroundStateIonizationModel):
-    """common interface of all field ionization models"""
+class FieldIonization(GroundStateIonizationModel, _PICMI_Extension):
+    """common interface of all field ionization models
+
+    inheriting from ``_PICMI_Extension`` makes the concrete field ionization
+    models (ADK, BSI, Keldysh) usable as PIConGPU PICMI extensions, alongside
+    the standard-facing :class:`PICMI_FieldIonization`.
+    """
 
     ionization_current: IonizationCurrent | None
     """ionization current for energy conservation of field ionization"""

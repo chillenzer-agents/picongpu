@@ -8,8 +8,9 @@ License: GPLv3+
 from unittest import TestCase
 
 import pytest
+from picongpu.picmi.grid import Cartesian3DGrid
 from picongpu.picmi.interaction.ionization.fieldionization import ADK, BSI
-from picongpu.picmi.species import Species
+from picongpu.picmi.species import Species, particle_boundary_translation_context
 from picongpu.picmi.species_requirements import RequirementConflict, SetChargeStateOperation, run_construction
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.species.constant.mass import Mass
@@ -21,9 +22,27 @@ def species(**kwargs):
     return Species(name="electron", particle_type="electron", **kwargs)
 
 
+# Converting a species to pypicongpu now requires the simulation grid (which
+# resolves the per-species particle boundary). Standalone conversion tests that
+# have no Simulation install a minimal grid through the translation context.
+_GRID = Cartesian3DGrid(
+    number_of_cells=[1, 1, 1],
+    lower_bound=[0, 0, 0],
+    upper_bound=[1, 1, 1],
+    lower_boundary_conditions=["periodic", "periodic", "periodic"],
+    upper_boundary_conditions=["periodic", "periodic", "periodic"],
+    picongpu_super_cell_size=(1, 1, 1),
+)
+
+
+def _convert(picmi_species):
+    with particle_boundary_translation_context(_GRID):
+        return picmi_species.get_as_pypicongpu()
+
+
 class TestSpeciesShapeAndMethod(TestCase):
     def _assert_converts(self, shape, method, expected_shape, expected_pusher):
-        pypicongpu_species = species(particle_shape=shape, method=method).get_as_pypicongpu()
+        pypicongpu_species = _convert(species(particle_shape=shape, method=method))
         self.assertIs(pypicongpu_species.shape, expected_shape)
         self.assertIs(pypicongpu_species.pusher, expected_pusher)
 
@@ -57,7 +76,7 @@ class TestSpeciesShapeAndMethod(TestCase):
     def test_method_explicitly_set_does_not_crash(self):
         # Regression: picmistandard's _validate_method used to raise
         # AttributeError for any explicit (non-default) method.
-        pypicongpu_species = species(method="Vay").get_as_pypicongpu()
+        pypicongpu_species = _convert(species(method="Vay"))
         self.assertIs(pypicongpu_species.pusher, Pusher.Vay)
 
     def test_standard_unimplemented_method_accepted_but_rejected_at_conversion(self):
@@ -65,7 +84,7 @@ class TestSpeciesShapeAndMethod(TestCase):
         construct = species(method="Li")
         self.assertEqual(construct.method, "Li")
         with self.assertRaises(ValueError, msg="Li must be rejected at conversion time"):
-            construct.get_as_pypicongpu()
+            _convert(construct)
 
     def test_unknown_other_accepted_but_rejected_at_conversion(self):
         for value in ("other:SomeUnknownPusher", "other:SomeUnknownShape"):
@@ -73,7 +92,7 @@ class TestSpeciesShapeAndMethod(TestCase):
                 field = "method" if value.startswith("other:SomeUnknownPusher") else "particle_shape"
                 construct = species(**{field: value})
                 with self.assertRaises(ValueError, msg=f"{value} must be rejected at conversion time"):
-                    construct.get_as_pypicongpu()
+                    _convert(construct)
 
 
 class TestSpeciesNameDefault(TestCase):
@@ -85,7 +104,7 @@ class TestSpeciesNameDefault(TestCase):
         # A None name used to slip through to pypicongpu and later surface as a
         # ValidationError at get_as_pypicongpu() (name: str rejects None); it must
         # now be a proper, C++-compatible name after conversion.
-        self.assertEqual(Species(particle_type="electron").get_as_pypicongpu().name, "electron")
+        self.assertEqual(_convert(Species(particle_type="electron")).name, "electron")
         self.assertEqual(Species(particle_type="H").name, "H")
 
     def test_explicit_name_is_kept(self):
@@ -121,7 +140,7 @@ class TestSpeciesNameDefault(TestCase):
         s.name = None
         self.assertIsNone(s.name)
         with self.assertRaises(ValueError):
-            s.get_as_pypicongpu()
+            _convert(s)
 
 
 def unique_in(elements, collection):
@@ -134,7 +153,7 @@ class TestSpeciesRequirementResolution(TestCase):
         species = Species(name="dummy")
         requirements = [Weighting()]
         species.register_requirements(2 * requirements)
-        assert all(unique_in(requirements, species.get_as_pypicongpu().attributes))
+        assert all(unique_in(requirements, _convert(species).attributes))
 
     def test_deduplicate_delayed_construction(self):
         species = Species(name="dummy", particle_type="H", charge_state=1)
@@ -148,7 +167,7 @@ class TestSpeciesRequirementResolution(TestCase):
         with pytest.raises(RequirementConflict):
             # Not yet decided which one should raise, but one of them definitely will.
             species.register_requirements(requirements)
-            species.get_as_pypicongpu()
+            _convert(species)
 
     def test_ionization(self):
         ion = Species(name="ion", particle_type="H", charge_state=1)
@@ -165,8 +184,9 @@ class TestSpeciesRequirementResolution(TestCase):
         # so the electron species gets defined before the ion species.
         assert electron < ion
 
-        set_charge_state_op = [
-            run_construction(op) for op in ion.get_operation_requirements() if op.metadata.Type == SetChargeState
-        ][0]
+        with particle_boundary_translation_context(_GRID):
+            set_charge_state_op = [
+                run_construction(op) for op in ion.get_operation_requirements() if op.metadata.Type == SetChargeState
+            ][0]
         assert set_charge_state_op.charge_state == ion.charge_state
-        assert len(ion.get_as_pypicongpu().constants.ground_state_ionization.ionization_model_list) == len(ionizations)
+        assert len(_convert(ion).constants.ground_state_ionization.ionization_model_list) == len(ionizations)

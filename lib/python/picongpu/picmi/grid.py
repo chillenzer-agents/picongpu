@@ -5,12 +5,15 @@ Authors: Hannes Troepgen, Brian Edward Marre, Richard Pausch, Julian Lenz
 License: GPLv3+
 """
 
-from typing import Annotated, Sequence
+from typing import Annotated, Sequence, Self
 import picmistandard
 from pydantic import AfterValidator, BeforeValidator, Field, computed_field, model_validator
 
 from ..pypicongpu import grid, util
+from ..pypicongpu.species.species_boundary import SpeciesParticleBoundary
 from .copy_attributes import converts_to
+from . import particle_boundary
+from .particle_boundary import PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID, ParticleBoundary
 
 
 def _normalise_type(kw, key, t):
@@ -77,7 +80,6 @@ def _normalise_n_gpus(n_gpus) -> tuple[int, int, int]:
 
 @converts_to(
     grid.Grid3D,
-    preamble=lambda self: self.check(),
     conversions={
         "boundary_condition": lambda self: tuple(
             PICONGPU_BOUNDARY_CONDITION_BY_PICMI_ID[x] for x in self.lower_boundary_conditions
@@ -122,49 +124,82 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
                 )
         return self
 
-    def check(self):
-        # todo check
+    @model_validator(mode="after")
+    def check(self) -> Self:
+        # The standard's ``_resolve_grid`` (an after-validator of a base class)
+        # fills in the derived fields while validating this model; with
+        # ``validate_assignment`` enabled each such assignment re-triggers the
+        # after-validators, so ``check`` runs again on every intermediate state.
+        # The four particle-derived fields below are the *last* ones
+        # ``_resolve_grid`` resolves, and in the fully-resolved model they are
+        # always non-None (each inherits the field bound / condition when unset).
+        # Gating on them means ``check`` validates exactly once, on the final
+        # state; the transient passes are skipped.
+        if (
+            self.lower_bound_particles is None
+            or self.upper_bound_particles is None
+            or self.lower_boundary_conditions_particles is None
+            or self.upper_boundary_conditions_particles is None
+        ):
+            return self
+
+        self._check_lower_bound()
+        self._check_field_bc_consistency()
+        self._check_particle_boundary_conditions()
+        self._check_grid_distribution()
+        self._check_super_cell_divisibility()
+        return self
+
+    def _check_lower_bound(self):
         if any(bound != 0.0 for bound in self.lower_bound):
             raise ValueError(
                 f"A lower bound different from 0,0,0 is not supported in PIConGPU. You gave {self.lower_bound}."
-            )
-        if self.lower_boundary_conditions != self.upper_boundary_conditions:
-            raise ValueError(
-                "upper and lower boundary conditions must be equal (can only be chosen by axis, not by direction)"
             )
         util.unsupported("moving window", self.moving_window_velocity)
         util.unsupported("refined regions", self.refined_regions, [])
         util.unsupported("lower bound (particles)", self.lower_bound_particles, self.lower_bound)
         util.unsupported("upper bound (particles)", self.upper_bound_particles, self.upper_bound)
-        util.unsupported(
-            "lower boundary conditions (particles)",
-            self.lower_boundary_conditions_particles,
-            self.lower_boundary_conditions,
-        )
-        util.unsupported(
-            "upper boundary conditions (particles)",
-            self.upper_boundary_conditions_particles,
-            self.upper_boundary_conditions,
-        )
         util.unsupported("guard cells", self.guard_cells)
         util.unsupported("pml cells", self.pml_cells)
 
-        if self.lower_boundary_conditions[0] not in PICONGPU_BOUNDARY_CONDITION_BY_PICMI_ID:
-            raise ValueError("X: boundary condition not supported")
-        if self.lower_boundary_conditions[1] not in PICONGPU_BOUNDARY_CONDITION_BY_PICMI_ID:
-            raise ValueError("Y: boundary condition not supported")
-        if self.lower_boundary_conditions[2] not in PICONGPU_BOUNDARY_CONDITION_BY_PICMI_ID:
-            raise ValueError("Z: boundary condition not supported")
+    def _check_field_bc_consistency(self):
+        if self.lower_boundary_conditions != self.upper_boundary_conditions:
+            raise ValueError(
+                "upper and lower boundary conditions must be equal (can only be chosen by axis, not by direction)"
+            )
+        for axis, bc in zip(["x", "y", "z"], self.lower_boundary_conditions):
+            if bc not in PICONGPU_BOUNDARY_CONDITION_BY_PICMI_ID:
+                raise ValueError(f"{axis.upper()}: boundary condition not supported")
 
-        if self.picongpu_grid_dist is not None:
-            for i in range(3):
-                if not all(n >= 1 for n in self.picongpu_grid_dist[i]):
-                    raise ValueError("All values in grid distribution must be greater than 0.")
-                if sum(self.picongpu_grid_dist[i]) != self.number_of_cells[i]:
-                    raise ValueError(f"sum of grid distribution in dimension {i} must match number of cells")
-                if len(self.picongpu_grid_dist[i]) != self.picongpu_n_gpus[i]:
-                    raise ValueError(f"number of grid distributions in dimension {i} must match number of gpus")
+    def _check_particle_boundary_conditions(self):
+        # Unset particle BCs are inherited from the field BCs by the standard's
+        # ``_resolve_grid``; here we validate what was actually set (inherited or
+        # explicit) and keep it per-axis, mirroring the field-boundary rule that
+        # the lower and upper conditions must agree (PIConGPU chooses by axis,
+        # not by direction).
+        for dim, name in enumerate(["x", "y", "z"]):
+            lower = self.lower_boundary_conditions_particles[dim]
+            upper = self.upper_boundary_conditions_particles[dim]
+            if lower != upper:
+                raise ValueError(
+                    f"{name}: lower and upper particle boundary conditions must be equal "
+                    f"(can only be chosen by axis, not by direction). You gave {lower=}, {upper=}."
+                )
+            if lower not in PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID:
+                raise ValueError(f"{name}: particle boundary condition not supported. You gave {lower!r}.")
 
+    def _check_grid_distribution(self):
+        if self.picongpu_grid_dist is None:
+            return
+        for i in range(3):
+            if not all(n >= 1 for n in self.picongpu_grid_dist[i]):
+                raise ValueError("All values in grid distribution must be greater than 0.")
+            if sum(self.picongpu_grid_dist[i]) != self.number_of_cells[i]:
+                raise ValueError(f"sum of grid distribution in dimension {i} must match number of cells")
+            if len(self.picongpu_grid_dist[i]) != self.picongpu_n_gpus[i]:
+                raise ValueError(f"number of grid distributions in dimension {i} must match number of gpus")
+
+    def _check_super_cell_divisibility(self):
         for i in range(3):
             if self.picongpu_super_cell_size[i] < 1:
                 raise ValueError("super cell size must be a positive integer")
@@ -188,3 +223,40 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
                     raise ValueError(
                         f"grid distribution in {dim_name[dim]} dimension must be multiple of super cell size"
                     )
+
+    @computed_field
+    @property
+    def picongpu_particle_boundary_conditions(self) -> tuple[str, str, str]:
+        """Resolved per-axis particle boundary conditions (lower==upper, validated).
+
+        These are the *grid defaults* for particle boundaries: when a species does not
+        set its own ``picongpu_particle_boundary``, it inherits this grid's setting per
+        axis. Values are the PICMI-standard names
+        (``periodic``/``absorbing``/``reflect``/``thermal``); see
+        :data:`PICONGPU_PARTICLE_BOUNDARY_CONDITION_BY_PICMI_ID` for the mapping to the
+        PIConGPU ``--<species>_boundary`` tokens.
+        """
+        # lower == upper on every axis, guaranteed by _check_particle_boundary_conditions.
+        return tuple(self.lower_boundary_conditions_particles)
+
+    def get_particle_boundary(
+        self,
+        name: str,
+        picongpu_particle_boundary: "ParticleBoundary | None" = None,
+    ) -> SpeciesParticleBoundary:
+        """Resolve this grid's per-axis particle BC with an optional species override.
+
+        The grid particle-BC is the **default**; the species'
+        ``picongpu_particle_boundary`` (if given) **overrides** the grid's per-axis
+        value. Returns a resolved :class:`pypicongpu...SpeciesParticleBoundary` that
+        maps to the per-species command-line options (``--<species>_boundary`` and
+        friends).         The C++ core's compatibility constraints (reflecting/thermal only
+        on absorbing-field axes; periodic only on periodic-field axes; periodic
+        requires a 0 offset) are enforced here, at translation time.
+        """
+        return particle_boundary.resolve_species_particle_boundary(
+            name=name,
+            field_boundary_conditions=self.lower_boundary_conditions,
+            grid_particle_boundary_conditions=self.picongpu_particle_boundary_conditions,
+            override=picongpu_particle_boundary,
+        )

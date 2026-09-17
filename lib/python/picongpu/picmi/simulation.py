@@ -27,7 +27,7 @@ from picongpu.picmi.grid import Cartesian3DGrid
 from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
 from picongpu.picmi.layout import AnyLayout
-from picongpu.picmi.species import Species
+from picongpu.picmi.species import Species, particle_boundary_translation_context
 from picongpu.picmi.species_requirements import (
     SimpleDensityOperation,
     SimpleMomentumOperation,
@@ -41,6 +41,7 @@ from picongpu.pypicongpu.runner import Runner
 from picongpu.pypicongpu.species.attribute.momentum import Momentum
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
+from picongpu.pypicongpu.species.species import Species as PyPIConGPUSpecies
 from picongpu.pypicongpu.util import UnpackChain, unique
 from picongpu.pypicongpu.walltime import Walltime
 
@@ -391,6 +392,13 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     def get_as_pypicongpu(self) -> pypicongpu.simulation.Simulation:
         """translate to PyPIConGPU object"""
+        # Every species converted during this translation (the main species list,
+        # the species nested in diagnostics, interactions and init operations)
+        # resolves its per-species particle boundary against the simulation grid.
+        with particle_boundary_translation_context(self.solver.grid):
+            return self._build_pypicongpu_simulation()
+
+    def _build_pypicongpu_simulation(self) -> pypicongpu.simulation.Simulation:
         self._check_compatibility()
 
         init_operations = organise_init_operations(
@@ -431,7 +439,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         ]
 
         return pypicongpu.simulation.Simulation(
-            species=map(get_as_pypicongpu, sorted(self.species)),
+            species=[self._convert_species(species) for species in sorted(self.species)],
             init_operations=init_operations,
             typical_ppc=typical_ppc,
             delta_t_si=self.time_step_size,
@@ -450,6 +458,20 @@ class Simulation(picmistandard.PICMI_Simulation):
             collisional_physics=collisions[0].get_as_pypicongpu(),
             precision=self.picongpu_precision,
         )
+
+    def _convert_species(self, species) -> PyPIConGPUSpecies:
+        """Convert a PICMI species to its pypicongpu counterpart.
+
+        The per-species particle boundary is resolved inside
+        :meth:`Species.get_as_pypicongpu` against the simulation grid (the
+        ``particle_boundary_translation_context`` installed by
+        :meth:`get_as_pypicongpu`): the grid's per-axis particle BC is the default,
+        overridden per axis by the species' optional
+        ``picongpu_particle_boundary``. The C++ core's compatibility constraints
+        are enforced there, at translation time, by the grid's
+        :meth:`Cartesian3DGrid.get_particle_boundary`.
+        """
+        return get_as_pypicongpu(species)
 
     def _get_base_density(self) -> float:
         return self.picongpu_base_density or 1.0e25

@@ -12,6 +12,7 @@ from .energy_histogram import EnergyHistogram
 from .field_dump import DerivedFieldDump, NativeFieldDump
 from .macro_particle_count import MacroParticleCount
 from .particle_dump import ParticleDump
+from .particle_energy import ParticleEnergy
 from .phase_space import PhaseSpace
 from .radiation import Radiation
 from .timestepspec import TimeStepSpec
@@ -24,6 +25,7 @@ AnyDiagnostic = (
     | NativeFieldDump
     | MacroParticleCount
     | ParticleDump
+    | ParticleEnergy
     | PhaseSpace
     | Radiation
 )
@@ -38,6 +40,7 @@ __all__ = [
     "EnergyHistogram",
     "MacroParticleCount",
     "ParticleDump",
+    "ParticleEnergy",
     "NativeFieldDump",
     "DerivedFieldDump",
     "TimeStepSpec",

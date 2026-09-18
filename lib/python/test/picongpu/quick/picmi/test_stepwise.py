@@ -181,7 +181,10 @@ class TestStepBookkeeping:
 
     def test_out_of_order_rejected(self, sim):
         s, _ = sim
-        s.step(nsteps=4)
+        # complete the full range via chunks (2+2), then a chunk that goes back
+        # overlaps the completed range.
+        s.step(nsteps=2)
+        s.step(nsteps=2)
         with raises(ValueError, match="overlap"):
             s.step(start=0, end=2)
 
@@ -197,6 +200,41 @@ class TestStepBookkeeping:
         s = Simulation(time_step_size=17, max_steps=None, solver=ElectromagneticSolver(method="Yee", grid=_grid()))
         with raises(ValueError, match="max_steps"):
             s.step(nsteps=1)
+
+    def test_full_run_is_legacy_batched_run(self, tmp_path, monkeypatch):
+        """A step() with nsteps == max_steps and no start/end is the legacy
+        "run all" batched run (picongpu_run), not a foreground chunk -- this
+        preserves the existing end-to-end tests that call step(0) with
+        max_steps=0."""
+        _stub_step_exec(monkeypatch)
+        s = _make_sim(tmp_path)
+        ran = {"full": False, "chunk": False}
+
+        def fake_picongpu_run(self, *a, **k):
+            ran["full"] = True
+            self._steps_completed = self.max_steps
+
+        def fake_run_chunk(self, start, end, *, need_checkpoint=True):
+            ran["chunk"] = True
+
+        monkeypatch.setattr(Simulation, "picongpu_run", fake_picongpu_run)
+        monkeypatch.setattr(Runner, "run_chunk", fake_run_chunk)
+
+        # nsteps == max_steps (4) and no explicit start/end -> legacy full run
+        assert s.step(nsteps=4) == (0, 4)
+        assert ran["full"] and not ran["chunk"]
+        # and a zero-step "run all" (the existing e2e pattern: step(0), max 0)
+        s0 = _make_sim(tmp_path, max_steps=0)
+        ran0 = {"full": False, "chunk": False}
+
+        def fake_picongpu_run0(self, *a, **k):
+            ran0["full"] = True
+            self._steps_completed = self.max_steps
+
+        monkeypatch.setattr(Simulation, "picongpu_run", fake_picongpu_run0)
+        monkeypatch.setattr(Runner, "run_chunk", fake_run_chunk)
+        assert s0.step(0) == (0, 0)
+        assert ran0["full"] and not ran0["chunk"]
 
 
 class TestCheckpointPlan:

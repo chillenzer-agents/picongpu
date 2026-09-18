@@ -8,6 +8,7 @@ License: GPLv3+
 import datetime
 import json
 import logging
+import re
 import tempfile
 from importlib.util import module_from_spec, spec_from_file_location
 from os import chmod
@@ -33,6 +34,113 @@ from picongpu.templates import path as tpath
 from .rendering import Renderer
 from .simulation import Simulation
 from .util import alt
+
+# --- Stepwise (chunked) execution helpers ---------------------------------
+#
+# `step()` runs the simulation in chunks [start, end). Each chunk re-uses the
+# already-compiled binary and the already-rendered base setup; only an
+# *additive* chunk config is written and a single chunk is executed. The C++
+# loop runs steps [start, end) when started with `-s <end>` (TBG_steps) plus a
+# restart block. See `run_chunk` / `render_chunk_config` below.
+
+
+def chunk_config_filename(start: int, end: int) -> str:
+    """Name of the additive chunk config for the step range [start, end)."""
+    return f"N-step-{int(start)}-{int(end)}.cfg"
+
+
+def _flag_present(text: str, flag: str) -> bool:
+    """True if ``flag`` appears as a whole command-line token (not a prefix)."""
+    return re.search(r"(^|\s)" + re.escape(flag) + r"(\s|$)", text) is not None
+
+
+def _flag_value(text: str, flag: str) -> str | None:
+    """The value following ``flag`` (first occurrence), or None."""
+    m = re.search(r"(^|\s)" + re.escape(flag) + r"\s+(\S+)", text)
+    return m.group(2) if m else None
+
+
+def _merge_checkpoint_period(text: str, spec: str) -> str:
+    """
+    Add ``spec`` to an existing ``--checkpoint.period`` spec list.
+
+    The PIConGPU CLI rejects a repeated ``--checkpoint.period`` (boost
+    ``multiple_values``), so the chunk's checkpoint step must be *merged* into
+    the user's period rather than appended as a second flag. Returns the text
+    unchanged if the spec is already present.
+    """
+    m = re.search(r"(--checkpoint\.period\s+)[\d:,]+", text)
+    if not m:
+        return text
+    existing = m.group(0).split(None, 1)[1]
+    if spec in existing.split(","):
+        return text
+    return text[: m.start()] + m.group(1) + existing + "," + spec + text[m.end() :]
+
+
+def chunk_config_text(
+    base_cfg_text: str,
+    end: int,
+    *,
+    checkpoint_directory: str = "checkpoints",
+    checkpoint_file: str = "checkpoint",
+    restart_step: int | None = None,
+    auto_checkpoint: int | None = None,
+) -> str:
+    """
+    Render an additive chunk config from the rendered base ``N.cfg`` text.
+
+    The base text is left as-is except that:
+
+    1. ``TBG_steps`` is overwritten to the chunk's *absolute* stop step
+       ``end`` (``-s <end>`` makes the C++ loop run exactly steps ``[start,
+       end)`` once ``--checkpoint.restart.step <start>`` is applied).
+    2. When ``auto_checkpoint`` is given, a checkpoint is scheduled at that
+       step (the chunk's final step) so the next chunk can resume. This is
+       *merged* into an existing user ``--checkpoint.period`` (never a second
+       flag, which the CLI rejects) or added as a new one. When ``auto_checkpoint``
+       is ``None`` the user's period (covering ``end``) is left untouched --
+       no forced double-write.
+    3. A restart block is appended (``--checkpoint.tryRestart`` [+
+       ``--checkpoint.restart.step <start>``] + the shared checkpoint
+       directory). ``tryRestart`` makes a fresh start (no prior checkpoint)
+       degrade cleanly to a fresh run (C++ ``TRY`` state, ``checkRestart``).
+
+    This never modifies the base file; it returns the chunk config text.
+    """
+    text = re.sub(r'^(\s*TBG_steps\s*=\s*)".*?"', rf'\g<1>"{int(end)}"', base_cfg_text, count=1, flags=re.M)
+
+    # 2. Auto-checkpoint at the chunk's final step (merged, not duplicated).
+    if auto_checkpoint is not None:
+        spec = f"{int(auto_checkpoint)}:{int(auto_checkpoint)}:1"
+        if _flag_present(text, "--checkpoint.period"):
+            text = _merge_checkpoint_period(text, spec)
+        else:
+            text = text.replace('--versionOnce"', f'--checkpoint.period {spec} --versionOnce"', 1)
+
+    # 3. Restart / checkpoint-directory block (only flags not already present).
+    flags = []
+    if not _flag_present(text, "--checkpoint.tryRestart"):
+        flags.append("--checkpoint.tryRestart")
+    if restart_step is not None and not _flag_present(text, "--checkpoint.restart.step"):
+        flags.append(f"--checkpoint.restart.step {int(restart_step)}")
+    # Reuse the user's checkpoint directory/file if given, else the defaults.
+    directory = _flag_value(text, "--checkpoint.directory") or checkpoint_directory
+    file = _flag_value(text, "--checkpoint.file") or checkpoint_file
+    if not _flag_present(text, "--checkpoint.directory"):
+        flags.append(f"--checkpoint.directory {directory}")
+    if not _flag_present(text, "--checkpoint.file"):
+        flags.append(f"--checkpoint.file {file}")
+    if not _flag_present(text, "--checkpoint.restart.directory"):
+        flags.append(f"--checkpoint.restart.directory {directory}")
+    if not _flag_present(text, "--checkpoint.restart.file"):
+        flags.append(f"--checkpoint.restart.file {file}")
+
+    if flags:
+        anchor = '--versionOnce"'
+        assert anchor in text, "cannot locate program-parameter anchor in rendered N.cfg"
+        text = text.replace(anchor, " ".join(flags) + " " + anchor, 1)
+    return text
 
 
 def script_content_with(commands, rc_params=rc_params):
@@ -223,6 +331,21 @@ class Runner(BaseModel):
     )
     sim: Annotated[Simulation, BeforeValidator(lambda s: alt(lambda: s.get_as_pypicongpu(), s))]
 
+    # Directory (relative to ``simOutput``) where checkpoints are written/read.
+    # Shared across all stepwise chunks so a later chunk can restart from an
+    # earlier chunk's checkpoint. Mirrors the C++ default ("checkpoints").
+    checkpoint_directory: str = "checkpoints"
+    # openPMD checkpoint file prefix (mirrors the C++ default "checkpoint").
+    checkpoint_file: str = "checkpoint"
+
+    # Whether the setup has been generated (base N.cfg rendered). Stepwise
+    # ``run_chunk`` calls must not re-render the base setup; the base ``N.cfg``
+    # stays as-is and each chunk only writes an additive chunk config.
+    _generated: bool = False
+    # Whether the PIConGPU binary has been built once for this runner. Build
+    # happens at most once; every stepwise chunk reuses it.
+    _built: bool = False
+
     def _log_dirs(self):
         """print human-readble list of paths to log"""
         logging.info(" template dir: {}".format(self.template_dir))
@@ -300,6 +423,14 @@ class Runner(BaseModel):
         return self.workflow_dir_path / "steps" / "run.cwl"
 
     @property
+    def run_chunk_step_path(self):
+        return self.workflow_dir_path / "steps" / "run_chunk.cwl"
+
+    @property
+    def run_chunk_script_path(self):
+        return self.workflow_scripts_path / "run_chunk.sh"
+
+    @property
     def cwl_cachedir(self):
         return self.run_dir / ".cwl_cache"
 
@@ -364,6 +495,98 @@ class Runner(BaseModel):
             )
             script.flush()
         chmod(self.submission_script_path, 0o755)
+
+    def generate_run_chunk_command(self, rc_params=rc_params):
+        """Generate the per-chunk foreground execution script used by ``run_chunk``.
+
+        The script re-uses the once-built binary and the additive chunk config
+        and runs a single chunk in the foreground, reusing the shared
+        ``simOutput``. Positional arguments (see ``run_chunk.cwl``):
+
+          1. submit_system (default ``bash``)
+          2. cfg_file        (the additive chunk config, e.g. ``etc/picongpu/N-step-0-2.cfg``)
+          3. project_path    (setup dir containing ``etc/`` and the chunk config)
+          4. bin_directory   (the once-built binaries)
+          5. dst_path        (shared run dir; ``simOutput`` accumulates here)
+          6. template_file   (the preset TBG template, e.g. ``etc/picongpu/<preset>/mpiexec.tpl``)
+
+        A stepwise chunk runs into the *shared* ``simOutput`` (results and
+        checkpoints accumulate across chunks) and re-uses the once-built
+        binary. The script therefore: stages the binary under
+        ``<dst_path>/input`` (the path the preset template expects), generates
+        ``submit.start`` via ``tbg`` into the shared ``dst_path`` (``-f``
+        overwrites the previous chunk's ``submit.start``), and runs
+        ``submit.start`` in the foreground. The preset template's
+        ``mkdir simOutput 2> /dev/null`` is idempotent, so the shared directory
+        is reused rather than wiped.
+        """
+        self.run_chunk_script_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.run_chunk_script_path.open("w") as script:
+            script.write(
+                script_content_with(
+                    [
+                        'export PIC_PROFILE="${PIC_PROFILE:-./picongpu.profile}"',
+                        # run_chunk.sh: $1 submit_system, $2 cfg_file, $3 project_path,
+                        #               $4 bin_directory, $5 dst_path, $6 template_file
+                        'SUBMIT_SYSTEM="$1"',
+                        'CFG_FILE="$2"',
+                        'PROJECT_PATH="$3"',
+                        'BIN_DIRECTORY="$4"',
+                        'DST_PATH="$5"',
+                        'TEMPLATE_FILE="$6"',
+                        'mkdir -p "$DST_PATH"',
+                        # Stage the once-built binary where the preset template
+                        # expects it ($TBG_dstPath/input/bin). BIN_DIRECTORY is
+                        # the build.cwl output (<run_dir>/bin).
+                        'if [ -d "$BIN_DIRECTORY" ]; then',
+                        '  mkdir -p "$DST_PATH/input"',
+                        '  rm -rf "$DST_PATH/input/bin"',
+                        '  cp -r "$BIN_DIRECTORY" "$DST_PATH/input/bin"',
+                        "fi",
+                        # Generate the chunk submission into the shared dst_path.
+                        # NOTE: tbg is called WITHOUT -s so it only *generates*
+                        # submit.start and does NOT auto-submit it; the explicit
+                        # foreground run below is the single execution of the
+                        # chunk (passing -s would make tbg submit a second time).
+                        # -f is required: every chunk reuses the same dst_path,
+                        # so a later chunk must overwrite the previous submit.start.
+                        'if [ -n "$TEMPLATE_FILE" ] && [ -f "$TEMPLATE_FILE" ]; then',
+                        '  tbg -c "$CFG_FILE" -t "$TEMPLATE_FILE" -f "$PROJECT_PATH" "$DST_PATH"',
+                        "else",
+                        '  tbg -c "$CFG_FILE" -f "$PROJECT_PATH" "$DST_PATH"',
+                        "fi",
+                        # Run the generated submission in the foreground (local
+                        # execution; batched submission is a follow-up). This is
+                        # the single execution of the chunk.
+                        'bash "$DST_PATH/tbg/submit.start" > "$DST_PATH/output.chunk" 2>&1',
+                    ],
+                    rc_params=rc_params,
+                )
+            )
+            script.flush()
+        chmod(self.run_chunk_script_path, 0o755)
+
+    def _preset_run_template(self):
+        """Return the (preset) TBG template that submits via ``bash``/mpi, or None.
+
+        A stepwise chunk reuses this template verbatim: the preset template's
+        ``mkdir simOutput 2> /dev/null`` is idempotent, so a later chunk runs
+        into the *shared* ``simOutput`` (results/checkpoints accumulate) instead
+        of wiping it. An empty ``preset_dir`` is the foreground default, which
+        uses the ``bash/`` submission templates.
+        """
+        preset = rc_params.preset_dir or "bash"
+        preset_dir = self.setup_dir / "etc" / "picongpu" / preset
+        if not preset_dir.is_dir():
+            return None
+        for name in ("mpiexec.tpl", "mpirun.tpl", "bash_mpiexec.tpl", "bash_mpirun.tpl"):
+            candidate = preset_dir / name
+            if candidate.is_file():
+                return candidate
+        for candidate in sorted(preset_dir.glob("*.tpl")):
+            if "mpi" in candidate.read_text(errors="ignore"):
+                return candidate
+        return None
 
     def generate_workflow_input(self, build_flags: PicBuildFlags, run_flags: TBGFlags):
         with (self.workflow_input_path).open("w") as file:
@@ -445,6 +668,7 @@ class Runner(BaseModel):
         self.generate_build_command()
         self.generate_prepare_submission_command()
         self.generate_submission_command()
+        self.generate_run_chunk_command()
 
         self._render_templates(exist_ok=exist_ok)
 
@@ -458,6 +682,7 @@ class Runner(BaseModel):
         self.store_metadata(rc_params.model_dump(mode="json"), filename="rc_params.json")
 
         self._write_rocrate()
+        self._generated = True
 
     def _write_rocrate(self):
         rc_params.rocrate_info.add_metadata_to(ROCrate(self.setup_dir, version="1.2", init=True)).metadata.write(
@@ -480,3 +705,173 @@ class Runner(BaseModel):
                     }
                 )
             ).make(str(self.workflow_definition_path))(**json.load(file))
+
+    # ------------------------------------------------------------------ #
+    # Stepwise (chunked) execution                                         #
+    # ------------------------------------------------------------------ #
+
+    def chunk_config_path(self, start: int, end: int) -> Path:
+        """Location of the additive chunk config for [start, end)."""
+        return self.setup_dir / "etc" / "picongpu" / chunk_config_filename(start, end)
+
+    def write_chunk_config(self, start: int, end: int, *, need_checkpoint: bool = True) -> Path:
+        """
+        Render and write the additive chunk config for [start, end).
+
+        Reads the *rendered* base ``N.cfg`` (never the ``.mustache`` template)
+        and produces ``N-step-<start>-<end>.cfg`` = base + ``TBG_steps = <end>``
+        + (when ``need_checkpoint``) a checkpoint at ``end`` + the restart
+        block. The base ``N.cfg`` is left as-is.
+        """
+        base_cfg = self.setup_dir / "etc" / "picongpu" / "N.cfg"
+        base_text = base_cfg.read_text()
+        restart_step = int(start) if start > 0 else None
+        text = chunk_config_text(
+            base_text,
+            end,
+            checkpoint_directory=self.checkpoint_directory,
+            checkpoint_file=self.checkpoint_file,
+            restart_step=restart_step,
+            auto_checkpoint=int(end) if need_checkpoint else None,
+        )
+        out = self.chunk_config_path(start, end)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text)
+        return out
+
+    def _resolve_checkpoint_directory(self) -> str:
+        """Checkpoint directory the chunks actually read/write.
+
+        A user ``Checkpoint(directory=...)`` is what ``chunk_config_text`` reuses
+        for the chunk's restart block and what the base ``N.cfg`` renders as
+        ``--checkpoint.directory <dir>``; restart discovery must look in the same
+        directory. It is resolved from the checkpoint output plugin on
+        ``self.sim`` (available before the base ``N.cfg`` is rendered), then from
+        the rendered base ``N.cfg``, then the C++ default.
+        """
+        from picongpu.pypicongpu.output.checkpoint import Checkpoint as CheckpointPlugin
+
+        for plugin in self.sim.output or []:
+            if isinstance(plugin, CheckpointPlugin) and plugin.directory is not None:
+                return str(plugin.directory)
+        base_cfg = self.setup_dir / "etc" / "picongpu" / "N.cfg"
+        if base_cfg.is_file():
+            directory = _flag_value(base_cfg.read_text(), "--checkpoint.directory")
+            if directory:
+                return directory
+        return self.checkpoint_directory
+
+    def detect_latest_checkpoint(self) -> int | None:
+        """Latest checkpoint step recorded under the shared ``simOutput`` dir.
+
+        Reads the C++ checkpoint master file (``checkpoints.txt``) from the
+        run's shared ``simOutput/<checkpoint_directory>`` and returns the last
+        step, or ``None`` when no checkpoint exists yet (fresh start). The
+        directory honors a user ``Checkpoint(directory=...)`` (see
+        ``_resolve_checkpoint_directory``).
+        """
+        master = self.run_dir / "simOutput" / self._resolve_checkpoint_directory() / "checkpoints.txt"
+        if not master.is_file():
+            return None
+        steps = []
+        for line in master.read_text().splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    steps.append(int(line))
+                except ValueError:
+                    continue
+        return max(steps) if steps else None
+
+    def build_once(self, **flags) -> None:
+        """
+        Build the PIConGPU binary exactly once for this runner (chunks re-use it).
+
+        Runs the ``build.cwl`` step a single time and stages the compiled
+        binaries under ``<run_dir>/bin`` (the location the TBG submission
+        expects, ``$TBG_dstPath/input/bin`` with ``TBG_dstPath=<run_dir>``).
+        Subsequent stepwise chunks skip the build entirely: ``TBG_steps`` is a
+        *runtime* TBG variable (``-s !TBG_steps``), not a compile-time
+        ``.param``, so stepping across chunks never rebuilds.
+        """
+        if self._built:
+            return
+        if not self._generated:
+            self.generate(**flags)
+        build_input = {
+            k: v for k, v in json.loads(self.workflow_input_path.read_text()).items() if k.startswith("build_")
+        }
+        WorkflowFactory(
+            runtime_context=RuntimeContext(
+                kwargs={
+                    "outdir": str(self.run_dir),
+                    "rm_tmpdir": False,
+                    "move_outputs": "copy",
+                    "cachedir": str(self.cwl_cachedir),
+                    "preserve_entire_environment": True,
+                }
+            )
+        ).make(str(self.build_step_path))(**build_input)
+        self._built = True
+
+    @property
+    def _bin_dir(self) -> Path:
+        """Shared per-run dir where the once-built binary is staged (``<run_dir>/bin``)."""
+        return self.run_dir / "bin"
+
+    def run_chunk(self, start: int, end: int, *, need_checkpoint: bool = True) -> None:
+        """
+        Execute a single stepwise chunk [start, end) into the shared run_dir.
+
+        1. Writes the additive chunk config (base ``N.cfg`` + ``TBG_steps = end``
+           + checkpoint/restart block). When ``need_checkpoint`` is set, a
+           checkpoint is also scheduled at ``end`` so the next chunk can resume.
+        2. Builds the binary once (``build.cwl``) if not already built.
+        3. Runs the dedicated, reusable ``run_chunk`` CWL step once for this
+           chunk.
+
+        The top-level ``workflow.cwl`` is *not* re-invoked per chunk (that would
+        re-run ``build`` and the single-shot submission). Every chunk shares the
+        same ``run_dir`` / ``simOutput`` (constant ``TBG_dstPath``) so results
+        accumulate next to each other with no per-chunk post-merge.
+        """
+        chunk_config = self.write_chunk_config(start, end, need_checkpoint=need_checkpoint)
+        self.build_once()
+
+        if not need_checkpoint:
+            logging.info(
+                "step() chunk [%s, %s): no checkpoint scheduled (add_checkpoint=False or "
+                "covered by a user Checkpoint). The next chunk must provide its own "
+                "restart point.",
+                start,
+                end,
+            )
+
+        with self.workflow_input_path.open("r") as file:
+            workflow_input = json.load(file)
+        preset_template = self._preset_run_template()
+        # The chunk step writes into the *real* shared run directory in place,
+        # so all directory inputs are passed as absolute string paths (not
+        # staged Directories). See run_chunk.cwl for the rationale.
+        chunk_input = {
+            "start_step": int(start),
+            "end_step": int(end),
+            "cfg_file": str(chunk_config),
+            "project_path": str(self.setup_dir),
+            "bin_directory": str(self._bin_dir),
+            "dst_path": str(self.run_dir),
+            "submit_system": workflow_input.get("run_submit_system") or "bash",
+            "template_file": str(preset_template) if preset_template is not None else "",
+            "script": {"class": "File", "location": str(self.run_chunk_script_path)},
+        }
+        WorkflowFactory(
+            runtime_context=RuntimeContext(
+                kwargs={
+                    "outdir": str(self.run_dir),
+                    "rm_tmpdir": False,
+                    "move_outputs": "copy",
+                    "cachedir": str(self.cwl_cachedir),
+                    "preserve_entire_environment": True,
+                }
+            )
+        ).make(str(self.run_chunk_step_path))(**chunk_input)

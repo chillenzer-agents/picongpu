@@ -32,6 +32,20 @@ def get_grid(delta_x: float, delta_y: float, delta_z: float, n: int):
     )
 
 
+def get_guard_grid(guard_cells, n: int = 32):
+    # a grid with an explicit per-axis guard_cells (in cells), a unit super cell
+    # so any non-negative guard count is a valid multiple, and a small cell size
+    return picmi.Cartesian3DGrid(
+        number_of_cells=[n, n, n],
+        picongpu_super_cell_size=(1, 1, 1),
+        guard_cells=list(guard_cells),
+        lower_bound=[0, 0, 0],
+        upper_bound=[n, n, n],
+        lower_boundary_conditions=["open", "open", "periodic"],
+        upper_boundary_conditions=["open", "open", "periodic"],
+    )
+
+
 def get_sim_cfl_helper(
     delta_t: float | None,
     cfl: float | None,
@@ -676,6 +690,61 @@ class TestPicmiSimulation(TestCase):
         # and the arbitrary-order FDTD needs one
         with pytest.raises(ValidationError):
             picmi.ElectromagneticSolver(method="other:ArbitraryOrderFDTD", grid=grid)
+
+    def test_guard_cells_vs_solver_stencil(self):
+        """each axis needs guard cells to hold the solver's half-stencil (in cells)"""
+        # arbitrary-order FDTD order 4 -> 2 neighbors: needs >= 2 guard cells per axis
+        with pytest.raises(
+            ValidationError,
+            match=".*guard cells in x dimension must be at least the arbitrary-order FDTD half-stencil of 2 cells.*",
+        ):
+            picmi.ElectromagneticSolver(
+                method="other:ArbitraryOrderFDTD",
+                grid=get_guard_grid([1, 1, 1]),
+                stencil_order=[4, 4, 4],
+            )
+        # enough guard cells per axis (>= neighbors) is accepted
+        assert (
+            picmi.ElectromagneticSolver(
+                method="other:ArbitraryOrderFDTD",
+                grid=get_guard_grid([2, 2, 2]),
+                stencil_order=[4, 4, 4],
+            ).method
+            == "other:ArbitraryOrderFDTD"
+        )
+        # a shortfall in any single axis is rejected
+        for bad in ([2, 2, 1], [1, 2, 2], [2, 1, 2]):
+            with pytest.raises(ValidationError, match=".*guard cells.*must be at least the arbitrary-order FDTD.*"):
+                picmi.ElectromagneticSolver(
+                    method="other:ArbitraryOrderFDTD",
+                    grid=get_guard_grid(bad),
+                    stencil_order=[4, 4, 4],
+                )
+
+    def test_guard_cells_vs_fixed_order_solver(self):
+        """Yee / Lehe / CKC advance the field one cell wide and need >= 1 guard cell per axis"""
+        for method in ("Yee", "Lehe", "CKC"):
+            # the currently-accepted zero-guard config is now rejected
+            with pytest.raises(
+                ValidationError, match=f".*guard cells in x dimension must be at least 1 for the {method} solver.*"
+            ):
+                picmi.ElectromagneticSolver(method=method, grid=get_guard_grid([0, 0, 0]))
+            # a positive guard count is accepted
+            assert picmi.ElectromagneticSolver(method=method, grid=get_guard_grid([8, 8, 4])).method == method
+
+    def test_guard_cells_default_and_none_solver(self):
+        """an unset guard_cells (None) and the 'other:None' solver both skip the check"""
+        # guard_cells=None (PIConGPU default) is accepted for every guard-gated method
+        for method in ("Yee", "Lehe", "CKC"):
+            assert picmi.ElectromagneticSolver(method=method, grid=get_grid(1, 1, 1, 32)).method == method
+        assert (
+            picmi.ElectromagneticSolver(
+                method="other:ArbitraryOrderFDTD", grid=get_grid(1, 1, 1, 32), stencil_order=[4, 4, 4]
+            ).method
+            == "other:ArbitraryOrderFDTD"
+        )
+        # "other:None" is exempt even with zero guard cells
+        assert picmi.ElectromagneticSolver(method="other:None", grid=get_guard_grid([0, 0, 0])).method == "other:None"
 
     def test_none_solver_stays_out_of_cfl_gate(self):
         """the None solver has no CFL limit: cfl/delta_t are left untouched"""

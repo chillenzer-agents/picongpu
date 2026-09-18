@@ -8,6 +8,7 @@ License: GPLv3+
 import datetime
 import json
 import logging
+import re
 import tempfile
 from importlib.util import module_from_spec, spec_from_file_location
 from os import chmod
@@ -33,6 +34,115 @@ from picongpu.templates import path as tpath
 from .rendering import Renderer
 from .simulation import Simulation
 from .util import alt
+
+
+# --- Stepwise (chunked) execution helpers ---------------------------------
+#
+# `step()` runs the simulation in chunks [start, end). Each chunk re-uses the
+# already-compiled binary and the already-rendered base setup; only an
+# *additive* chunk config is written and a single chunk is executed. The C++
+# loop runs steps [start, end) when started with `-s <end>` (TBG_steps) plus a
+# restart block. See `run_chunk` / `render_chunk_config` below.
+
+
+def chunk_config_filename(start: int, end: int) -> str:
+    """Name of the additive chunk config for the step range [start, end)."""
+    return f"N-step-{int(start)}-{int(end)}.cfg"
+
+
+def _flag_present(text: str, flag: str) -> bool:
+    """True if ``flag`` appears as a whole command-line token (not a prefix)."""
+    return re.search(r"(^|\s)" + re.escape(flag) + r"(\s|$)", text) is not None
+
+
+def _flag_value(text: str, flag: str) -> str | None:
+    """The value following ``flag`` (first occurrence), or None."""
+    m = re.search(r"(^|\s)" + re.escape(flag) + r"\s+(\S+)", text)
+    return m.group(2) if m else None
+
+
+def _merge_checkpoint_period(text: str, spec: str) -> str:
+    """
+    Add ``spec`` to an existing ``--checkpoint.period`` spec list.
+
+    The PIConGPU CLI rejects a repeated ``--checkpoint.period`` (boost
+    ``multiple_values``), so the chunk's checkpoint step must be *merged* into
+    the user's period rather than appended as a second flag. Returns the text
+    unchanged if the spec is already present.
+    """
+    m = re.search(r"(--checkpoint\.period\s+)[\d:,]+", text)
+    if not m:
+        return text
+    existing = m.group(0).split(None, 1)[1]
+    if spec in existing.split(","):
+        return text
+    return text[: m.start()] + m.group(1) + existing + "," + spec + text[m.end() :]
+
+
+def chunk_config_text(
+    base_cfg_text: str,
+    end: int,
+    *,
+    checkpoint_directory: str = "checkpoints",
+    checkpoint_file: str = "checkpoint",
+    restart_step: int | None = None,
+    auto_checkpoint: int | None = None,
+) -> str:
+    """
+    Render an additive chunk config from the rendered base ``N.cfg`` text.
+
+    The base text is left as-is except that:
+
+    1. ``TBG_steps`` is overwritten to the chunk's *absolute* stop step
+       ``end`` (``-s <end>`` makes the C++ loop run exactly steps ``[start,
+       end)`` once ``--checkpoint.restart.step <start>`` is applied).
+    2. When ``auto_checkpoint`` is given, a checkpoint is scheduled at that
+       step (the chunk's final step) so the next chunk can resume. This is
+       *merged* into an existing user ``--checkpoint.period`` (never a second
+       flag, which the CLI rejects) or added as a new one. When ``auto_checkpoint``
+       is ``None`` the user's period (covering ``end``) is left untouched --
+       no forced double-write.
+    3. A restart block is appended (``--checkpoint.tryRestart`` [+
+       ``--checkpoint.restart.step <start>``] + the shared checkpoint
+       directory). ``tryRestart`` makes a fresh start (no prior checkpoint)
+       degrade cleanly to a fresh run (C++ ``TRY`` state, ``checkRestart``).
+
+    This never modifies the base file; it returns the chunk config text.
+    """
+    text = re.sub(r'^(\s*TBG_steps\s*=\s*)".*?"', rf'\g<1>"{int(end)}"', base_cfg_text, count=1, flags=re.M)
+
+    # 2. Auto-checkpoint at the chunk's final step (merged, not duplicated).
+    if auto_checkpoint is not None:
+        spec = f"{int(auto_checkpoint)}:{int(auto_checkpoint)}:1"
+        if _flag_present(text, "--checkpoint.period"):
+            text = _merge_checkpoint_period(text, spec)
+        else:
+            text = text.replace('--versionOnce"', f'--checkpoint.period {spec} --versionOnce"', 1)
+
+    # 3. Restart / checkpoint-directory block (only flags not already present).
+    flags = []
+    if not _flag_present(text, "--checkpoint.tryRestart"):
+        flags.append("--checkpoint.tryRestart")
+    if restart_step is not None and not _flag_present(text, "--checkpoint.restart.step"):
+        flags.append(f"--checkpoint.restart.step {int(restart_step)}")
+    # Reuse the user's checkpoint directory/file if given, else the defaults.
+    directory = _flag_value(text, "--checkpoint.directory") or checkpoint_directory
+    file = _flag_value(text, "--checkpoint.file") or checkpoint_file
+    if not _flag_present(text, "--checkpoint.directory"):
+        flags.append(f"--checkpoint.directory {directory}")
+    if not _flag_present(text, "--checkpoint.file"):
+        flags.append(f"--checkpoint.file {file}")
+    if not _flag_present(text, "--checkpoint.restart.directory"):
+        flags.append(f"--checkpoint.restart.directory {directory}")
+    if not _flag_present(text, "--checkpoint.restart.file"):
+        flags.append(f"--checkpoint.restart.file {file}")
+
+    if flags:
+        anchor = '--versionOnce"'
+        assert anchor in text, "cannot locate program-parameter anchor in rendered N.cfg"
+        text = text.replace(anchor, " ".join(flags) + " " + anchor, 1)
+    return text
+
 
 
 def script_content_with(commands, rc_params=rc_params):

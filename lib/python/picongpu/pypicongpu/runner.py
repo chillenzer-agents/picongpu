@@ -35,7 +35,6 @@ from .rendering import Renderer
 from .simulation import Simulation
 from .util import alt
 
-
 # --- Stepwise (chunked) execution helpers ---------------------------------
 #
 # `step()` runs the simulation in chunks [start, end). Each chunk re-uses the
@@ -142,7 +141,6 @@ def chunk_config_text(
         assert anchor in text, "cannot locate program-parameter anchor in rendered N.cfg"
         text = text.replace(anchor, " ".join(flags) + " " + anchor, 1)
     return text
-
 
 
 def script_content_with(commands, rc_params=rc_params):
@@ -333,6 +331,21 @@ class Runner(BaseModel):
     )
     sim: Annotated[Simulation, BeforeValidator(lambda s: alt(lambda: s.get_as_pypicongpu(), s))]
 
+    # Directory (relative to ``simOutput``) where checkpoints are written/read.
+    # Shared across all stepwise chunks so a later chunk can restart from an
+    # earlier chunk's checkpoint. Mirrors the C++ default ("checkpoints").
+    checkpoint_directory: str = "checkpoints"
+    # openPMD checkpoint file prefix (mirrors the C++ default "checkpoint").
+    checkpoint_file: str = "checkpoint"
+
+    # Whether the setup has been generated (base N.cfg rendered). Stepwise
+    # ``run_chunk`` calls must not re-render the base setup; the base ``N.cfg``
+    # stays as-is and each chunk only writes an additive chunk config.
+    _generated: bool = False
+    # Whether the PIConGPU binary has been built once for this runner. Build
+    # happens at most once; every stepwise chunk reuses it.
+    _built: bool = False
+
     def _log_dirs(self):
         """print human-readble list of paths to log"""
         logging.info(" template dir: {}".format(self.template_dir))
@@ -410,6 +423,14 @@ class Runner(BaseModel):
         return self.workflow_dir_path / "steps" / "run.cwl"
 
     @property
+    def run_chunk_step_path(self):
+        return self.workflow_dir_path / "steps" / "run_chunk.cwl"
+
+    @property
+    def run_chunk_script_path(self):
+        return self.workflow_scripts_path / "run_chunk.sh"
+
+    @property
     def cwl_cachedir(self):
         return self.run_dir / ".cwl_cache"
 
@@ -474,6 +495,93 @@ class Runner(BaseModel):
             )
             script.flush()
         chmod(self.submission_script_path, 0o755)
+
+    def generate_run_chunk_command(self, rc_params=rc_params):
+        """Generate the per-chunk foreground execution script used by ``run_chunk``.
+
+        The script re-uses the once-built binary and the additive chunk config
+        and runs a single chunk in the foreground, reusing the shared
+        ``simOutput``. Positional arguments (see ``run_chunk.cwl``):
+
+          1. submit_system (default ``bash``)
+          2. cfg_file        (the additive chunk config, e.g. ``etc/picongpu/N-step-0-2.cfg``)
+          3. project_path    (setup dir containing ``etc/`` and the chunk config)
+          4. bin_directory   (the once-built binaries)
+          5. dst_path        (shared run dir; ``simOutput`` accumulates here)
+          6. template_file   (the preset TBG template, e.g. ``etc/picongpu/<preset>/mpiexec.tpl``)
+
+        A stepwise chunk runs into the *shared* ``simOutput`` (results and
+        checkpoints accumulate across chunks) and re-uses the once-built
+        binary. The script therefore: stages the binary under
+        ``<dst_path>/input`` (the path the preset template expects), generates
+        ``submit.start`` via ``tbg`` into the shared ``dst_path`` (``-f``
+        overwrites the previous chunk's ``submit.start``), and runs
+        ``submit.start`` in the foreground. The preset template's
+        ``mkdir simOutput 2> /dev/null`` is idempotent, so the shared directory
+        is reused rather than wiped.
+        """
+        self.run_chunk_script_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.run_chunk_script_path.open("w") as script:
+            script.write(
+                script_content_with(
+                    [
+                        'export PIC_PROFILE="${PIC_PROFILE:-./picongpu.profile}"',
+                        # run_chunk.sh: $1 submit_system, $2 cfg_file, $3 project_path,
+                        #               $4 bin_directory, $5 dst_path, $6 template_file
+                        'SUBMIT_SYSTEM="$1"',
+                        'CFG_FILE="$2"',
+                        'PROJECT_PATH="$3"',
+                        'BIN_DIRECTORY="$4"',
+                        'DST_PATH="$5"',
+                        'TEMPLATE_FILE="$6"',
+                        'mkdir -p "$DST_PATH"',
+                        # Stage the once-built binary where the preset template
+                        # expects it ($TBG_dstPath/input/bin). BIN_DIRECTORY is
+                        # the build.cwl output (<run_dir>/bin).
+                        'if [ -d "$BIN_DIRECTORY" ]; then',
+                        '  mkdir -p "$DST_PATH/input"',
+                        '  rm -rf "$DST_PATH/input/bin"',
+                        '  cp -r "$BIN_DIRECTORY" "$DST_PATH/input/bin"',
+                        "fi",
+                        # Generate the chunk submission into the shared dst_path.
+                        # -f is required: every chunk reuses the same dst_path,
+                        # so a later chunk must overwrite the previous submit.start.
+                        'if [ -n "$TEMPLATE_FILE" ] && [ -f "$TEMPLATE_FILE" ]; then',
+                        '  tbg -c "$CFG_FILE" -s "${SUBMIT_SYSTEM:-bash}" -t "$TEMPLATE_FILE" -f "$PROJECT_PATH" "$DST_PATH"',
+                        "else",
+                        '  tbg -c "$CFG_FILE" -s "${SUBMIT_SYSTEM:-bash}" -f "$PROJECT_PATH" "$DST_PATH"',
+                        "fi",
+                        # Run the generated submission in the foreground (local
+                        # execution; batched submission is a follow-up).
+                        'bash "$DST_PATH/tbg/submit.start" > "$DST_PATH/output.chunk" 2>&1',
+                    ],
+                    rc_params=rc_params,
+                )
+            )
+            script.flush()
+        chmod(self.run_chunk_script_path, 0o755)
+
+    def _preset_run_template(self):
+        """Return the (preset) TBG template that submits via ``bash``/mpi, or None.
+
+        A stepwise chunk reuses this template verbatim: the preset template's
+        ``mkdir simOutput 2> /dev/null`` is idempotent, so a later chunk runs
+        into the *shared* ``simOutput`` (results/checkpoints accumulate) instead
+        of wiping it. An empty ``preset_dir`` is the foreground default, which
+        uses the ``bash/`` submission templates.
+        """
+        preset = rc_params.preset_dir or "bash"
+        preset_dir = self.setup_dir / "etc" / "picongpu" / preset
+        if not preset_dir.is_dir():
+            return None
+        for name in ("mpiexec.tpl", "mpirun.tpl", "bash_mpiexec.tpl", "bash_mpirun.tpl"):
+            candidate = preset_dir / name
+            if candidate.is_file():
+                return candidate
+        for candidate in sorted(preset_dir.glob("*.tpl")):
+            if "mpi" in candidate.read_text(errors="ignore"):
+                return candidate
+        return None
 
     def generate_workflow_input(self, build_flags: PicBuildFlags, run_flags: TBGFlags):
         with (self.workflow_input_path).open("w") as file:
@@ -555,6 +663,7 @@ class Runner(BaseModel):
         self.generate_build_command()
         self.generate_prepare_submission_command()
         self.generate_submission_command()
+        self.generate_run_chunk_command()
 
         self._render_templates(exist_ok=exist_ok)
 
@@ -568,6 +677,7 @@ class Runner(BaseModel):
         self.store_metadata(rc_params.model_dump(mode="json"), filename="rc_params.json")
 
         self._write_rocrate()
+        self._generated = True
 
     def _write_rocrate(self):
         rc_params.rocrate_info.add_metadata_to(ROCrate(self.setup_dir, version="1.2", init=True)).metadata.write(
@@ -590,3 +700,149 @@ class Runner(BaseModel):
                     }
                 )
             ).make(str(self.workflow_definition_path))(**json.load(file))
+
+    # ------------------------------------------------------------------ #
+    # Stepwise (chunked) execution                                         #
+    # ------------------------------------------------------------------ #
+
+    def chunk_config_path(self, start: int, end: int) -> Path:
+        """Location of the additive chunk config for [start, end)."""
+        return self.setup_dir / "etc" / "picongpu" / chunk_config_filename(start, end)
+
+    def write_chunk_config(self, start: int, end: int, *, need_checkpoint: bool = True) -> Path:
+        """
+        Render and write the additive chunk config for [start, end).
+
+        Reads the *rendered* base ``N.cfg`` (never the ``.mustache`` template)
+        and produces ``N-step-<start>-<end>.cfg`` = base + ``TBG_steps = <end>``
+        + (when ``need_checkpoint``) a checkpoint at ``end`` + the restart
+        block. The base ``N.cfg`` is left as-is.
+        """
+        base_cfg = self.setup_dir / "etc" / "picongpu" / "N.cfg"
+        base_text = base_cfg.read_text()
+        restart_step = int(start) if start > 0 else None
+        text = chunk_config_text(
+            base_text,
+            end,
+            checkpoint_directory=self.checkpoint_directory,
+            checkpoint_file=self.checkpoint_file,
+            restart_step=restart_step,
+            auto_checkpoint=int(end) if need_checkpoint else None,
+        )
+        out = self.chunk_config_path(start, end)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text)
+        return out
+
+    def detect_latest_checkpoint(self) -> int | None:
+        """Latest checkpoint step recorded under the shared ``simOutput`` dir.
+
+        Reads the C++ checkpoint master file (``checkpoints.txt``) from the
+        run's shared ``simOutput/<checkpoint_directory>`` and returns the last
+        step, or ``None`` when no checkpoint exists yet (fresh start).
+        """
+        master = self.run_dir / "simOutput" / self.checkpoint_directory / "checkpoints.txt"
+        if not master.is_file():
+            return None
+        steps = []
+        for line in master.read_text().splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    steps.append(int(line))
+                except ValueError:
+                    continue
+        return max(steps) if steps else None
+
+    def build_once(self, **flags) -> None:
+        """
+        Build the PIConGPU binary exactly once for this runner (chunks re-use it).
+
+        Runs the ``build.cwl`` step a single time and stages the compiled
+        binaries under ``<run_dir>/bin`` (the location the TBG submission
+        expects, ``$TBG_dstPath/input/bin`` with ``TBG_dstPath=<run_dir>``).
+        Subsequent stepwise chunks skip the build entirely: ``TBG_steps`` is a
+        *runtime* TBG variable (``-s !TBG_steps``), not a compile-time
+        ``.param``, so stepping across chunks never rebuilds.
+        """
+        if self._built:
+            return
+        if not self._generated:
+            self.generate(**flags)
+        build_input = {
+            k: v for k, v in json.loads(self.workflow_input_path.read_text()).items() if k.startswith("build_")
+        }
+        WorkflowFactory(
+            runtime_context=RuntimeContext(
+                kwargs={
+                    "outdir": str(self.run_dir),
+                    "rm_tmpdir": False,
+                    "move_outputs": "copy",
+                    "cachedir": str(self.cwl_cachedir),
+                    "preserve_entire_environment": True,
+                }
+            )
+        ).make(str(self.build_step_path))(**build_input)
+        self._built = True
+
+    @property
+    def _bin_dir(self) -> Path:
+        """Shared per-run dir where the once-built binary is staged (``<run_dir>/bin``)."""
+        return self.run_dir / "bin"
+
+    def run_chunk(self, start: int, end: int, *, need_checkpoint: bool = True) -> None:
+        """
+        Execute a single stepwise chunk [start, end) into the shared run_dir.
+
+        1. Writes the additive chunk config (base ``N.cfg`` + ``TBG_steps = end``
+           + checkpoint/restart block). When ``need_checkpoint`` is set, a
+           checkpoint is also scheduled at ``end`` so the next chunk can resume.
+        2. Builds the binary once (``build.cwl``) if not already built.
+        3. Runs the dedicated, reusable ``run_chunk`` CWL step once for this
+           chunk.
+
+        The top-level ``workflow.cwl`` is *not* re-invoked per chunk (that would
+        re-run ``build`` and the single-shot submission). Every chunk shares the
+        same ``run_dir`` / ``simOutput`` (constant ``TBG_dstPath``) so results
+        accumulate next to each other with no per-chunk post-merge.
+        """
+        chunk_config = self.write_chunk_config(start, end, need_checkpoint=need_checkpoint)
+        self.build_once()
+
+        if not need_checkpoint:
+            logging.info(
+                "step() chunk [%s, %s): no checkpoint scheduled (add_checkpoint=False or "
+                "covered by a user Checkpoint). The next chunk must provide its own "
+                "restart point.",
+                start,
+                end,
+            )
+
+        with self.workflow_input_path.open("r") as file:
+            workflow_input = json.load(file)
+        preset_template = self._preset_run_template()
+        # The chunk step writes into the *real* shared run directory in place,
+        # so all directory inputs are passed as absolute string paths (not
+        # staged Directories). See run_chunk.cwl for the rationale.
+        chunk_input = {
+            "start_step": int(start),
+            "end_step": int(end),
+            "cfg_file": str(chunk_config),
+            "project_path": str(self.setup_dir),
+            "bin_directory": str(self._bin_dir),
+            "dst_path": str(self.run_dir),
+            "submit_system": workflow_input.get("run_submit_system") or "bash",
+            "template_file": str(preset_template) if preset_template is not None else "",
+            "script": {"class": "File", "location": str(self.run_chunk_script_path)},
+        }
+        WorkflowFactory(
+            runtime_context=RuntimeContext(
+                kwargs={
+                    "outdir": str(self.run_dir),
+                    "rm_tmpdir": False,
+                    "move_outputs": "copy",
+                    "cachedir": str(self.cwl_cachedir),
+                    "preserve_entire_environment": True,
+                }
+            )
+        ).make(str(self.run_chunk_step_path))(**chunk_input)

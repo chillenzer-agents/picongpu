@@ -21,6 +21,7 @@ from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Fie
 
 from picongpu import pypicongpu, templates
 from picongpu.picmi import constants
+from picongpu.picmi.diagnostics.checkpoint import Checkpoint
 from picongpu.picmi.diagnostics.field_dump import NativeFieldDump, _FieldDump
 from picongpu.picmi.diagnostics.particle_dump import ParticleDump
 from picongpu.picmi.grid import Cartesian3DGrid
@@ -213,6 +214,10 @@ class Simulation(picmistandard.PICMI_Simulation):
     picongpu_distributions: list[_DensityImpl] = Field(default_factory=list)
 
     _runner: Runner | None = PrivateAttr(default=None)
+    # Number of steps already executed via stepwise `step()` calls. Used to
+    # default the next chunk's start and to reject out-of-order / overlapping
+    # chunks (see `step`).
+    _steps_completed: int = PrivateAttr(default=0)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -345,13 +350,156 @@ class Simulation(picmistandard.PICMI_Simulation):
             "PICMI standard interactions are not supported by PIConGPU, use the picongpu specific Interaction object instead"
         )
 
-    # @todo add refactor once restarts are supported by the Runner, Brian Marre, 2024
-    def step(self, nsteps: int = 1, **flags):
-        if nsteps != self.max_steps:
+    def step(
+        self,
+        nsteps: int = 1,
+        start: int | None = None,
+        end: int | None = None,
+        add_checkpoint: bool = True,
+        **flags,
+    ) -> tuple[int, int]:
+        """
+        Run a single chunk of the simulation, resuming from the previous
+        chunk's checkpoint.
+
+        `run()` / `picongpu_run()` execute the whole simulation in one shot
+        (a single chunk ``[0, max_steps)``). `step()` instead runs the simulation
+        chunk by chunk: each call covers the step range ``[start, end)`` and
+        resumes from the checkpoint written at the end of the previous chunk.
+        Chunks run into the same ``run_dir`` / ``simOutput``, so outputs
+        accumulate next to each other.
+
+        Parameters
+        ----------
+        nsteps: int, optional
+            Length of the chunk (``end - start``). Mutually exclusive with
+            ``end``. If neither ``nsteps`` nor ``end`` is given, the full
+            remaining range is used. Default ``1``.
+        start: int, optional
+            First step of the chunk (inclusive). Defaults to the previous
+            chunk's end, or to the latest checkpoint found on disk when resuming
+            a re-run.
+        end: int, optional
+            Last step of the chunk (exclusive).
+        add_checkpoint: bool, optional
+            Whether to auto-schedule a checkpoint at ``end`` so the next chunk
+            can resume. Default ``True``. A warning is emitted when the
+            auto-checkpoint is scheduled; it is silenced when an explicit
+            ``Checkpoint`` diagnostic already covers ``end`` or when
+            ``add_checkpoint=False``.
+        """
+        if self.max_steps is None:
             raise ValueError(
-                "PIConGPU does not support stepwise running. Invoke step() with max_steps (={})".format(self.max_steps)
+                "stepwise running requires `max_steps` to be set (got max_steps=None). "
+                "Cannot determine the step bounds for a chunk."
             )
-        self.picongpu_run(**flags)
+
+        # Resolve the chunk boundaries [start, end).
+        if start is None:
+            start = self._default_chunk_start()
+        if end is None:
+            if nsteps is None:
+                end = self.max_steps
+            else:
+                if nsteps < 0:
+                    raise ValueError(f"nsteps must be >= 0, got {nsteps}.")
+                end = start + nsteps
+        start = int(start)
+        end = int(end)
+
+        # Guards: bounds, out-of-order, overlap.
+        if end < start:
+            raise ValueError(f"step() chunk end ({end}) must be >= start ({start}).")
+        if end > self.max_steps:
+            raise ValueError(f"step() chunk end ({end}) exceeds max_steps ({self.max_steps}).")
+        if start < self._steps_completed:
+            raise ValueError(
+                f"step() chunk start ({start}) overlaps the steps already completed "
+                f"({self._steps_completed}). Chunks must not overlap or run out of order."
+            )
+
+        runner = self.picongpu_get_runner(**flags)
+        self._runner_generate_if_needed(runner, **flags)
+
+        # Decide whether a checkpoint must be (auto)scheduled at `end` so the
+        # next chunk can resume, and warn when we are doing the auto-scheduling
+        # (silenced by an explicit user Checkpoint covering `end` or by
+        # add_checkpoint=False -- in both cases no forced double-write).
+        need_checkpoint, warn = self._checkpoint_plan(runner, end, add_checkpoint=add_checkpoint)
+
+        # Write the additive chunk config (base N.cfg + chunk stop + restart
+        # block) and execute the single chunk into the shared run_dir.
+        runner.run_chunk(start=start, end=end, need_checkpoint=need_checkpoint)
+
+        if warn:
+            logging.warning(
+                "step() auto-scheduled a checkpoint at step %s (in '%s') so the next chunk "
+                "can resume; pass add_checkpoint=False to silence this and skip it.",
+                end,
+                runner.checkpoint_directory,
+            )
+
+        self._steps_completed = end
+        return (start, end)
+
+    def _default_chunk_start(self) -> int:
+        """Start of the next chunk: previous chunk's end, else latest checkpoint found on disk (re-run)."""
+        if self._steps_completed > 0:
+            return self._steps_completed
+        runner = self.picongpu_get_runner()
+        detected = runner.detect_latest_checkpoint()
+        return detected if detected is not None else 0
+
+    def _runner_generate_if_needed(self, runner, **flags) -> None:
+        """Render the base setup exactly once; subsequent step() calls reuse it."""
+        if not runner._generated:
+            runner.generate(exist_ok=True, **flags)
+
+    def _checkpoint_plan(self, runner, end: int, *, add_checkpoint: bool) -> tuple[bool, bool]:
+        """
+        Decide the checkpoint handling for a chunk ending at ``end``.
+
+        Returns ``(need_checkpoint, warn)``:
+
+        - an explicit user ``Checkpoint`` whose period covers ``end`` wins: no
+          auto-scheduling and no warning (the user already handles it).
+        - otherwise, when ``add_checkpoint`` is set, a checkpoint is scheduled
+          at ``end`` and a warning is emitted.
+        - with ``add_checkpoint=False`` nothing is scheduled and no warning is
+          emitted.
+        """
+        if self._user_checkpoint_covers(end):
+            return (False, False)
+        if not add_checkpoint:
+            return (False, False)
+        return (True, True)
+
+    def _user_checkpoint_covers(self, step: int) -> bool:
+        """True if the user explicitly configured a Checkpoint whose period covers `step`."""
+        for diagnostic in self.diagnostics:
+            if not isinstance(diagnostic, Checkpoint):
+                continue
+            if diagnostic.period is None:
+                continue
+            specs = diagnostic.period.get_as_pypicongpu(
+                time_step_size=self.time_step_size or 1, num_steps=self.max_steps or step
+            )
+            if self._checkpoint_period_covers(specs, step):
+                return True
+        return False
+
+    @staticmethod
+    def _checkpoint_period_covers(specs, step: int) -> bool:
+        """Mirror of C++ ``containsStep``: does the period cover (inclusive) `step`?"""
+        for spec in specs.specs:
+            start = spec.start if spec.start is not None else 0
+            stop = spec.stop if spec.stop is not None else -1
+            stride = spec.step if spec.step is not None else 1
+            if stop == -1:
+                stop = step  # open end covers up to and including the current step
+            if start <= step <= stop and (step - start) % stride == 0:
+                return True
+        return False
 
     def _generate_openpmd_plugins(self, diagnostics, num_steps):
         diagnostics = list(diagnostics)
@@ -480,6 +628,9 @@ class Simulation(picmistandard.PICMI_Simulation):
         return self.picongpu_base_density or 1.0e25
 
     def run(self, *args, **kwargs) -> None:
+        # A full run always covers the whole [0, max_steps) range as one chunk;
+        # reset stepwise bookkeeping so a subsequent step() starts from scratch.
+        self._steps_completed = 0
         return self.picongpu_run(*args, **kwargs)
 
     def picongpu_run(self, setup_dir=None, run_dir=None, **flags) -> None:

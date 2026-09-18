@@ -394,6 +394,17 @@ class Simulation(picmistandard.PICMI_Simulation):
                 "Cannot determine the step bounds for a chunk."
             )
 
+        # Legacy / full-run compatibility: a step() call with no explicit
+        # start/end that spans the whole simulation (nsteps == max_steps) is a
+        # single "run all" batched run -- exactly what the pre-stepwise step()
+        # did, and what the existing end-to-end tests rely on (e.g. step(0) with
+        # max_steps=0). It uses the full workflow (build + batched submission),
+        # which produces the submission artifacts those tests gather.
+        if start is None and end is None and nsteps == self.max_steps:
+            self._steps_completed = self.max_steps
+            self.picongpu_run(**flags)
+            return (0, self.max_steps)
+
         # Resolve the chunk boundaries [start, end).
         if start is None:
             start = self._default_chunk_start()

@@ -387,6 +387,21 @@ class Simulation(picmistandard.PICMI_Simulation):
             auto-checkpoint is scheduled; it is silenced when an explicit
             ``Checkpoint`` diagnostic already covers ``end`` or when
             ``add_checkpoint=False``.
+
+        Notes
+        -----
+        **Full-range legacy shortcut.** A call with no explicit ``start``/``end``
+        whose length spans the whole simulation (``nsteps == max_steps``) is
+        routed through the legacy batched full run (``picongpu_run()``) rather
+        than a stepwise foreground chunk. This is a deliberate backward-compat
+        trade-off: the existing end-to-end tests use ``max_steps=0`` +
+        ``step(0)`` as a "run all" shortcut that relies on the batched workflow's
+        artifacts (``submission_information.txt`` / ``link_results.sh`` /
+        ``simOutput`` via ``gather_results``). The consequence is that a single
+        whole-range chunk may be *batched* while an equivalent range covered by
+        several sub-range chunks (e.g. two ``step(2)`` on a 4-step sim) runs
+        *stepwise* in the foreground. Use ``start``/``end`` (or several sub-range
+        chunks) to force the stepwise foreground path for the full range.
         """
         if self.max_steps is None:
             raise ValueError(

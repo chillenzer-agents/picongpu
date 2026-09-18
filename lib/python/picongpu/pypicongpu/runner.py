@@ -739,14 +739,38 @@ class Runner(BaseModel):
         out.write_text(text)
         return out
 
+    def _resolve_checkpoint_directory(self) -> str:
+        """Checkpoint directory the chunks actually read/write.
+
+        A user ``Checkpoint(directory=...)`` is what ``chunk_config_text`` reuses
+        for the chunk's restart block and what the base ``N.cfg`` renders as
+        ``--checkpoint.directory <dir>``; restart discovery must look in the same
+        directory. It is resolved from the checkpoint output plugin on
+        ``self.sim`` (available before the base ``N.cfg`` is rendered), then from
+        the rendered base ``N.cfg``, then the C++ default.
+        """
+        from picongpu.pypicongpu.output.checkpoint import Checkpoint as CheckpointPlugin
+
+        for plugin in self.sim.output or []:
+            if isinstance(plugin, CheckpointPlugin) and plugin.directory is not None:
+                return str(plugin.directory)
+        base_cfg = self.setup_dir / "etc" / "picongpu" / "N.cfg"
+        if base_cfg.is_file():
+            directory = _flag_value(base_cfg.read_text(), "--checkpoint.directory")
+            if directory:
+                return directory
+        return self.checkpoint_directory
+
     def detect_latest_checkpoint(self) -> int | None:
         """Latest checkpoint step recorded under the shared ``simOutput`` dir.
 
         Reads the C++ checkpoint master file (``checkpoints.txt``) from the
         run's shared ``simOutput/<checkpoint_directory>`` and returns the last
-        step, or ``None`` when no checkpoint exists yet (fresh start).
+        step, or ``None`` when no checkpoint exists yet (fresh start). The
+        directory honors a user ``Checkpoint(directory=...)`` (see
+        ``_resolve_checkpoint_directory``).
         """
-        master = self.run_dir / "simOutput" / self.checkpoint_directory / "checkpoints.txt"
+        master = self.run_dir / "simOutput" / self._resolve_checkpoint_directory() / "checkpoints.txt"
         if not master.is_file():
             return None
         steps = []

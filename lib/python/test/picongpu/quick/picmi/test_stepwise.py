@@ -314,3 +314,30 @@ class TestDetectLatestCheckpoint:
         # a fresh sim (0 steps completed) resumes at the latest checkpoint (2)
         s.step(nsteps=2)
         assert calls["chunks"] == [(2, 4, True)]
+
+    def test_custom_checkpoint_directory_resolved(self, tmp_path, monkeypatch):
+        """A user Checkpoint(directory=...) is honored for restart discovery."""
+        _stub_step_exec(monkeypatch)
+        s = _make_sim(tmp_path, diagnostics=[Checkpoint(period=TimeStepSpec[2], directory="ckpts", file="chk")])
+        r = s.picongpu_get_runner()
+        assert r._resolve_checkpoint_directory() == "ckpts"
+        # checkpoint lives in the custom dir; a decoy sits in the default dir
+        (r.run_dir / "simOutput" / "ckpts").mkdir(parents=True)
+        (r.run_dir / "simOutput" / "ckpts" / "checkpoints.txt").write_text("0\n2\n")
+        (r.run_dir / "simOutput" / "checkpoints").mkdir(parents=True)
+        (r.run_dir / "simOutput" / "checkpoints" / "checkpoints.txt").write_text("0\n9\n")
+        assert r.detect_latest_checkpoint() == 2  # not 9 (the default-dir decoy)
+
+    def test_custom_directory_honored_before_generate(self, tmp_path, monkeypatch):
+        """Restart discovery reads the user's dir even before the base N.cfg
+        exists (the re-run case: a fresh step() resolves its start pre-generate)."""
+        _stub_step_exec(monkeypatch)
+        s = _make_sim(tmp_path, diagnostics=[Checkpoint(period=TimeStepSpec[2], directory="ckpts", file="chk")])
+        r = s.picongpu_get_runner()
+        assert not (r.setup_dir / "etc" / "picongpu" / "N.cfg").is_file()
+        (r.run_dir / "simOutput" / "ckpts").mkdir(parents=True)
+        (r.run_dir / "simOutput" / "ckpts" / "checkpoints.txt").write_text("0\n3\n")
+        assert r.detect_latest_checkpoint() == 3
+        # a fresh step() resumes from the custom-dir checkpoint (3), not 0
+        s.step(nsteps=1)
+        assert s._steps_completed == 4

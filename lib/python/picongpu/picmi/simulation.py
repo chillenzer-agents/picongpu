@@ -27,6 +27,7 @@ from picongpu.picmi.grid import Cartesian3DGrid
 from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
 from picongpu.picmi.layout import AnyLayout
+from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species
 from picongpu.picmi.species_requirements import (
     SimpleDensityOperation,
@@ -107,6 +108,12 @@ def _normalise_template_dir(directory: None | PathLike | Iterable[PathLike]) -> 
 
 def handled_via_openpmd(diagnostic):
     return isinstance(diagnostic, (ParticleDump, _FieldDump))
+
+
+def _filter_members(species):
+    """Return the individual species in ``species``, which may be a single
+    species or a list (the Binning plugin accepts a list of species)."""
+    return species if isinstance(species, list) else [species]
 
 
 def _validate_collisional_physics_setup(interactions):
@@ -398,21 +405,66 @@ class Simulation(picmistandard.PICMI_Simulation):
             raise ValueError("runtime not specified (neither as step count nor max time)")
 
     def _collect_particle_filters(self):
-        # This does not necessarily work on Binning plugin
-        # because that might have a list of species.
-        # But that's fine because the Binning plugin uses it's own mechanism
-        # and we don't need their filters to register
-        # unless they are used somewhere else as well.
-        return unique(
-            map(
-                get_as_pypicongpu,
-                chain(
-                    UnpackChain(self).diagnostics.species.functor,
-                    UnpackChain(self).picongpu_interaction.screening_species.functor,
-                    UnpackChain(self).picongpu_interaction.collisions.species_pairs[:].functor,
-                ),
-            )
-        )
+        # Collect every reusable particle filter that is registered on a
+        # FilteredSpecies, together with the compile-time name(s) of the species
+        # it is actually used on. The names are threaded onto the pypicongpu
+        # functor so that particleFilters.param can emit a name-keyed
+        # SpeciesEligibleForSolver specialisation restricting the filter to only
+        # those species instead of every species in VectorAllSpecies.
+        #
+        # A filter registered on several species (e.g. used on electrons in a
+        # diagnostic and on ions in a collision) accumulates all of their names,
+        # so the filter ends up eligible for exactly the union of them.
+        #
+        # Note: Binning filters are collected here too, even though the Binning
+        # plugin itself uses its own species mechanism; a filter that is used
+        # only by a Binning is still registered in particleFilters.param (as the
+        # previous behaviour did), so we keep collecting it and record its
+        # species names alongside.
+        #
+        # The pypicongpu functors are not hashable (they carry a per-call UUID
+        # typename and list-valued fields), so the same filter is recognised
+        # across its occurrences by a stable identity (the functor value minus the
+        # volatile ``typename`` and the ``species_names`` we are populating) and
+        # its species names are merged into a single set. This mirrors the
+        # previous ``unique()`` dedup, which recognised a filter by value equality.
+        def identity(functor):
+            return functor.model_dump(mode="json", exclude={"typename", "species_names"})
+
+        filters: list[dict] = []
+        for filtered in chain(
+            (
+                m
+                for sp in UnpackChain(self).diagnostics.species
+                for m in _filter_members(sp)
+                if isinstance(m, FilteredSpecies)
+            ),
+            (
+                m
+                for sp in UnpackChain(self).picongpu_interaction.screening_species
+                for m in _filter_members(sp)
+                if isinstance(m, FilteredSpecies)
+            ),
+            (
+                m
+                for pair in UnpackChain(self).picongpu_interaction.collisions.species_pairs[:]
+                for m in pair
+                if isinstance(m, FilteredSpecies)
+            ),
+        ):
+            pypicongpu_functor = get_as_pypicongpu(filtered.functor)
+            key = identity(pypicongpu_functor)
+            for entry in filters:
+                if entry["key"] == key:
+                    entry["species"].add(filtered.species.name)
+                    break
+            else:
+                filters.append({"key": key, "functor": pypicongpu_functor, "species": {filtered.species.name}})
+
+        return [
+            entry["functor"].model_copy(update={"species_names": [{"name": name} for name in sorted(entry["species"])]})
+            for entry in filters
+        ]
 
     def get_as_pypicongpu(self) -> pypicongpu.simulation.Simulation:
         """translate to PyPIConGPU object"""

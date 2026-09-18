@@ -190,9 +190,8 @@ class ParamReader(rF.ReadFiles):
 
         result = {}
 
-        lines = open(self._direction + filename, "r")
-
-        allLines = lines.readlines()
+        with open(self._direction + filename, "r") as lines:
+            allLines = lines.readlines()
 
         number = 0
 

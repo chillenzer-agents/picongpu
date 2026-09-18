@@ -544,15 +544,20 @@ class Runner(BaseModel):
                         '  cp -r "$BIN_DIRECTORY" "$DST_PATH/input/bin"',
                         "fi",
                         # Generate the chunk submission into the shared dst_path.
+                        # NOTE: tbg is called WITHOUT -s so it only *generates*
+                        # submit.start and does NOT auto-submit it; the explicit
+                        # foreground run below is the single execution of the
+                        # chunk (passing -s would make tbg submit a second time).
                         # -f is required: every chunk reuses the same dst_path,
                         # so a later chunk must overwrite the previous submit.start.
                         'if [ -n "$TEMPLATE_FILE" ] && [ -f "$TEMPLATE_FILE" ]; then',
-                        '  tbg -c "$CFG_FILE" -s "${SUBMIT_SYSTEM:-bash}" -t "$TEMPLATE_FILE" -f "$PROJECT_PATH" "$DST_PATH"',
+                        '  tbg -c "$CFG_FILE" -t "$TEMPLATE_FILE" -f "$PROJECT_PATH" "$DST_PATH"',
                         "else",
-                        '  tbg -c "$CFG_FILE" -s "${SUBMIT_SYSTEM:-bash}" -f "$PROJECT_PATH" "$DST_PATH"',
+                        '  tbg -c "$CFG_FILE" -f "$PROJECT_PATH" "$DST_PATH"',
                         "fi",
                         # Run the generated submission in the foreground (local
-                        # execution; batched submission is a follow-up).
+                        # execution; batched submission is a follow-up). This is
+                        # the single execution of the chunk.
                         'bash "$DST_PATH/tbg/submit.start" > "$DST_PATH/output.chunk" 2>&1',
                     ],
                     rc_params=rc_params,

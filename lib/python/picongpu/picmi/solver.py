@@ -213,6 +213,35 @@ class ElectromagneticSolver(PICMI_ElectromagneticSolver):
             self._stencil_neighbors = None
         return self
 
+    @model_validator(mode="after")
+    def _validate_guard_cells(self) -> Self:
+        # The vacuum field update's stencil must stay within the guard region, so
+        # every axis needs enough guard cells to hold the solver's half-stencil.
+        # "other:None" disables the vacuum update (no guard cells needed) and an
+        # unset guard_cells keeps PIConGPU's default ((1,1,1) super cells); both
+        # are skipped. The check is in cells, the unit of grid.guard_cells.
+        if self.method == "other:None":
+            return self
+        guard = self.grid.guard_cells
+        if guard is None:
+            return self
+        if self.method == "other:ArbitraryOrderFDTD":
+            neighbors = self._stencil_neighbors
+            for name, cells in zip("xyz", guard):
+                if cells < neighbors:
+                    raise ValueError(
+                        f"guard cells in {name} dimension must be at least the arbitrary-order FDTD "
+                        f"half-stencil of {neighbors} cells (order {2 * neighbors}), but you gave {cells}."
+                    )
+        else:  # Yee / Lehe / CKC all advance the field with a one-cell-wide stencil
+            for name, cells in zip("xyz", guard):
+                if cells < 1:
+                    raise ValueError(
+                        f"guard cells in {name} dimension must be at least 1 for the {self.method} "
+                        f"solver, but you gave {cells}."
+                    )
+        return self
+
     def _cfl_max_cdt(self, delta_x: float, delta_y: float, delta_z: float) -> float | None:
         """
         The CFL stability limit as a maximum of ``c * delta_t`` for this solver,

@@ -363,86 +363,54 @@ class Simulation(picmistandard.PICMI_Simulation):
         chunk's checkpoint.
 
         `run()` / `picongpu_run()` execute the whole simulation in one shot
-        (a single chunk ``[0, max_steps)``). `step()` instead runs the simulation
-        chunk by chunk: each call covers the step range ``[start, end)`` and
-        resumes from the checkpoint written at the end of the previous chunk.
-        Chunks run into the same ``run_dir`` / ``simOutput``, so outputs
-        accumulate next to each other.
+        (a single batched run of ``[0, max_steps)``). `step()` instead runs the
+        simulation chunk by chunk in the foreground: each call covers exactly the
+        steps requested -- `step()` one step, `step(nsteps=N)` exactly `N` steps,
+        or `step(start=s, end=e)` the explicit range ``[s, e)`` -- and resumes
+        from the checkpoint written at the end of the previous chunk. Chunks run
+        into the same ``run_dir`` / ``simOutput``, so outputs accumulate next to
+        each other. `step()` is decoupled from `max_steps`: it runs exactly the
+        steps it is asked to, no more. Re-running a range that overlaps steps
+        already completed is allowed and overwrites that section of the shared
+        output (a deliberate in-situ re-analysis use case).
 
         Parameters
         ----------
         nsteps: int, optional
-            Length of the chunk (``end - start``). Mutually exclusive with
-            ``end``. If neither ``nsteps`` nor ``end`` is given, the full
-            remaining range is used. Default ``1``.
+            Length of the chunk. Mutually exclusive with an explicit ``end``.
+            Default ``1`` (a single step). Must be ``>= 0``.
         start: int, optional
             First step of the chunk (inclusive). Defaults to the previous
             chunk's end, or to the latest checkpoint found on disk when resuming
             a re-run.
         end: int, optional
-            Last step of the chunk (exclusive).
+            Last step of the chunk (exclusive). When set, it is used directly and
+            ``nsteps`` is ignored.
         add_checkpoint: bool, optional
             Whether to auto-schedule a checkpoint at ``end`` so the next chunk
             can resume. Default ``True``. A warning is emitted when the
             auto-checkpoint is scheduled; it is silenced when an explicit
             ``Checkpoint`` diagnostic already covers ``end`` or when
             ``add_checkpoint=False``.
-
-        Notes
-        -----
-        **Full-range legacy shortcut.** A call with no explicit ``start``/``end``
-        whose length spans the whole simulation (``nsteps == max_steps``) is
-        routed through the legacy batched full run (``picongpu_run()``) rather
-        than a stepwise foreground chunk. This is a deliberate backward-compat
-        trade-off: the existing end-to-end tests use ``max_steps=0`` +
-        ``step(0)`` as a "run all" shortcut that relies on the batched workflow's
-        artifacts (``submission_information.txt`` / ``link_results.sh`` /
-        ``simOutput`` via ``gather_results``). The consequence is that a single
-        whole-range chunk may be *batched* while an equivalent range covered by
-        several sub-range chunks (e.g. two ``step(2)`` on a 4-step sim) runs
-        *stepwise* in the foreground. Use ``start``/``end`` (or several sub-range
-        chunks) to force the stepwise foreground path for the full range.
         """
-        if self.max_steps is None:
-            raise ValueError(
-                "stepwise running requires `max_steps` to be set (got max_steps=None). "
-                "Cannot determine the step bounds for a chunk."
-            )
-
-        # Legacy / full-run compatibility: a step() call with no explicit
-        # start/end that spans the whole simulation (nsteps == max_steps) is a
-        # single "run all" batched run -- exactly what the pre-stepwise step()
-        # did, and what the existing end-to-end tests rely on (e.g. step(0) with
-        # max_steps=0). It uses the full workflow (build + batched submission),
-        # which produces the submission artifacts those tests gather.
-        if start is None and end is None and nsteps == self.max_steps:
-            self._steps_completed = self.max_steps
-            self.picongpu_run(**flags)
-            return (0, self.max_steps)
-
-        # Resolve the chunk boundaries [start, end).
+        # Resolve the chunk boundaries [start, end). step() runs exactly the
+        # steps requested and has no coupling to max_steps.
         if start is None:
             start = self._default_chunk_start()
         if end is None:
             if nsteps is None:
-                end = self.max_steps
-            else:
-                if nsteps < 0:
-                    raise ValueError(f"nsteps must be >= 0, got {nsteps}.")
-                end = start + nsteps
+                nsteps = 1
+            if nsteps < 0:
+                raise ValueError(f"nsteps must be >= 0, got {nsteps}.")
+            end = start + nsteps
         start = int(start)
         end = int(end)
 
-        # Guards: bounds, out-of-order, overlap.
+        # A chunk whose end lies before its start is invalid. Overlapping an
+        # already-completed range is *not* an error: it re-runs (overwrites) that
+        # section of the shared output, which is the intended in-situ use case.
         if end < start:
             raise ValueError(f"step() chunk end ({end}) must be >= start ({start}).")
-        if end > self.max_steps:
-            raise ValueError(f"step() chunk end ({end}) exceeds max_steps ({self.max_steps}).")
-        if start < self._steps_completed:
-            raise ValueError(
-                f"step() chunk start ({start}) overlaps the steps already completed "
-                f"({self._steps_completed}). Chunks must not overlap or run out of order."
-            )
 
         runner = self.picongpu_get_runner(**flags)
         self._runner_generate_if_needed(runner, **flags)
@@ -465,7 +433,10 @@ class Simulation(picmistandard.PICMI_Simulation):
                 runner.checkpoint_directory,
             )
 
-        self._steps_completed = end
+        # Keep the "frontier" (default start for the next implicit chunk) monotonic:
+        # a re-run of an earlier section overwrites that output but must not move the
+        # frontier backwards.
+        self._steps_completed = max(self._steps_completed, end)
         return (start, end)
 
     def _default_chunk_start(self) -> int:

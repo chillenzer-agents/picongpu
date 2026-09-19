@@ -174,67 +174,60 @@ class TestStepBookkeeping:
         assert 'TBG_steps="2"' in (etc / "N-step-0-2.cfg").read_text()
         assert 'TBG_steps="4"' in (etc / "N-step-2-4.cfg").read_text()
 
-    def test_end_exceeds_max_steps(self, sim):
-        s, _ = sim
-        with raises(ValueError, match="exceeds max_steps"):
-            s.step(nsteps=5)
+    def test_no_max_steps_coupling(self, sim):
+        # step() runs exactly the steps requested and is decoupled from max_steps:
+        # a chunk longer than max_steps (4) is allowed and runs all 5 steps.
+        s, calls = sim
+        assert s.step(nsteps=5) == (0, 5)
+        assert calls["chunks"] == [(0, 5, True)]
 
-    def test_out_of_order_rejected(self, sim):
-        s, _ = sim
-        # complete the full range via chunks (2+2), then a chunk that goes back
-        # overlaps the completed range.
+    def test_rerun_overlapping_range_is_allowed(self, sim):
+        s, calls = sim
+        # complete the full range via chunks (2+2) ...
         s.step(nsteps=2)
         s.step(nsteps=2)
-        with raises(ValueError, match="overlap"):
-            s.step(start=0, end=2)
+        # ... then re-run an already-completed section. This is *not* an error: it
+        # overwrites that section of the shared output (in-situ re-analysis).
+        assert s.step(start=0, end=2) == (0, 2)
+        assert calls["chunks"] == [(0, 2, True), (2, 4, True), (0, 2, True)]
+        # the frontier is monotonic: a backward re-run does not move it backwards
+        assert s._steps_completed == 4
 
     def test_nsteps_negative_rejected(self, sim):
         s, _ = sim
         with raises(ValueError, match="nsteps must be >= 0"):
             s.step(nsteps=-1)
 
-    def test_max_steps_none_rejected(self, monkeypatch):
-        _stub_step_exec(monkeypatch)
-        # a bare sim (no runner yet) with max_steps=None: step() must reject
-        # before it needs the runner.
-        s = Simulation(time_step_size=17, max_steps=None, solver=ElectromagneticSolver(method="Yee", grid=_grid()))
-        with raises(ValueError, match="max_steps"):
-            s.step(nsteps=1)
+    def test_step_without_max_steps(self, tmp_path, monkeypatch):
+        # step() is decoupled from max_steps: a sim whose runtime is max_time
+        # (so max_steps is None) still runs exactly the steps it is asked to.
+        calls = _stub_step_exec(monkeypatch)
+        s = Simulation(
+            time_step_size=17,
+            max_steps=None,
+            max_time=100,
+            solver=ElectromagneticSolver(method="Yee", grid=_grid()),
+        )
+        s.picongpu_get_runner(setup_dir=tmp_path / "setup", run_dir=tmp_path / "run")
+        assert s.step(nsteps=1) == (0, 1)
+        assert s._steps_completed == 1
+        assert calls["chunks"] == [(0, 1, True)]
 
-    def test_full_run_is_legacy_batched_run(self, tmp_path, monkeypatch):
-        """A step() with nsteps == max_steps and no start/end is the legacy
-        "run all" batched run (picongpu_run), not a foreground chunk -- this
-        preserves the existing end-to-end tests that call step(0) with
-        max_steps=0."""
-        _stub_step_exec(monkeypatch)
-        s = _make_sim(tmp_path)
-        ran = {"full": False, "chunk": False}
+    def test_step_is_foreground_chunk_not_batched(self, tmp_path, monkeypatch):
+        """step() is always a foreground chunk -- it never diverts to the batched
+        full run (picongpu_run), even when nsteps == max_steps."""
+        calls = _stub_step_exec(monkeypatch)
+        ran = {"full": False}
 
         def fake_picongpu_run(self, *a, **k):
             ran["full"] = True
-            self._steps_completed = self.max_steps
-
-        def fake_run_chunk(self, start, end, *, need_checkpoint=True):
-            ran["chunk"] = True
 
         monkeypatch.setattr(Simulation, "picongpu_run", fake_picongpu_run)
-        monkeypatch.setattr(Runner, "run_chunk", fake_run_chunk)
 
-        # nsteps == max_steps (4) and no explicit start/end -> legacy full run
-        assert s.step(nsteps=4) == (0, 4)
-        assert ran["full"] and not ran["chunk"]
-        # and a zero-step "run all" (the existing e2e pattern: step(0), max 0)
-        s0 = _make_sim(tmp_path, max_steps=0)
-        ran0 = {"full": False, "chunk": False}
-
-        def fake_picongpu_run0(self, *a, **k):
-            ran0["full"] = True
-            self._steps_completed = self.max_steps
-
-        monkeypatch.setattr(Simulation, "picongpu_run", fake_picongpu_run0)
-        monkeypatch.setattr(Runner, "run_chunk", fake_run_chunk)
-        assert s0.step(0) == (0, 0)
-        assert ran0["full"] and not ran0["chunk"]
+        s = _make_sim(tmp_path)  # max_steps=4
+        s.step(nsteps=4)
+        assert calls["chunks"] == [(0, 4, True)]
+        assert not ran["full"]
 
 
 class TestCheckpointPlan:

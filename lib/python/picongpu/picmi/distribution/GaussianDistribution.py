@@ -54,6 +54,9 @@ class GaussianDistribution(Distribution):
     vacuum_front: float
     """size of the vacuum in front of density, gets rounded down to full cells, [m]"""
 
+    vacuum_rear: float = 0.0
+    """size of the vacuum behind density, gets rounded down to full cells, [m]"""
+
     lower_bound: tuple[float, float, float] | tuple[None, None, None] = (
         None,
         None,

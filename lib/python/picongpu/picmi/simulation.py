@@ -22,6 +22,7 @@ from sympy import Symbol
 
 from picongpu import pypicongpu, templates
 from picongpu.picmi import constants
+from picongpu.picmi.diagnostics import AnyDiagnostic
 from picongpu.picmi.diagnostics.field_dump import NativeFieldDump, _FieldDump
 from picongpu.picmi.diagnostics.particle_dump import ParticleDump
 from picongpu.picmi.diagnostics.phase_space import PhaseSpace
@@ -214,6 +215,14 @@ class Simulation(picmistandard.PICMI_Simulation):
     """time after which the cluster scheduler will stop the simulation"""
 
     picongpu_distributions: list[_DensityImpl] = Field(default_factory=list)
+
+    # The stock PICMI base types ``diagnostics`` as a list of the standard
+    # diagnostic union, which rejects our custom diagnostic classes
+    # (EnergyHistogram, ParticleEnergy, etc.). Re-declare it to accept the
+    # PIConGPU ``AnyDiagnostic`` union as well so ``extra="forbid"`` + the
+    # typed union don't reject them (see the picmi-standard pydantic-refactoring
+    # WIP).
+    diagnostics: list[AnyDiagnostic] = Field(default_factory=list)
 
     _runner: Runner | None = PrivateAttr(default=None)
 

@@ -7,6 +7,7 @@ License: GPLv3+
 
 from functools import partial
 from operator import gt, le
+from typing import Any
 
 import numpy as np
 import picmistandard
@@ -34,7 +35,7 @@ class GriddedLayout(picmistandard.PICMI_GriddedLayout):
         return Quiet(ppc=np.prod(self.n_macroparticles_per_cell), n_points=self.n_macroparticles_per_cell)
 
     @computed_field
-    def in_cell_offsets(self) -> np.ndarray:
+    def in_cell_offsets(self) -> Any:
         return (np.mgrid[*map(slice, self.n_macroparticles_per_cell)] + 0.5).reshape(
             len(self.n_macroparticles_per_cell), -1
         ).T / self.n_macroparticles_per_cell

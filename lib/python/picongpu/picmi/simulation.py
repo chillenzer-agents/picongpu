@@ -30,6 +30,7 @@ from picongpu.picmi.distribution.AnalyticDistribution import AnalyticDistributio
 from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid, AnyGrid
 from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
+from picongpu.picmi.lasers import AnyLaser
 from picongpu.picmi.layout import AnyLayout
 from picongpu.picmi.species import Species
 from picongpu.picmi.species_requirements import (
@@ -223,6 +224,13 @@ class Simulation(picmistandard.PICMI_Simulation):
     # typed union don't reject them (see the picmi-standard pydantic-refactoring
     # WIP).
     diagnostics: list[AnyDiagnostic] = Field(default_factory=list)
+
+    # Same for ``lasers``: the stock base types it as ``list[PICMI_AnyLaser]``
+    # (``PICMI_GaussianLaser | PICMI_AnalyticLaser | PICMI_LaserExtension``),
+    # which rejects our code-specific lasers that are not standard subclasses
+    # (PlaneWaveLaser, TWTSLaser, FromOpenPMDPulseLaser). Re-declare it with the
+    # PIConGPU ``AnyLaser`` union so ``add_laser`` accepts them.
+    lasers: list[AnyLaser] = Field(default_factory=list)
 
     _runner: Runner | None = PrivateAttr(default=None)
 

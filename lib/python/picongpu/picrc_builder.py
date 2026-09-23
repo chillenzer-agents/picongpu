@@ -1,9 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#   "picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python"
-# ]
-# ///
 """
 This file is part of PIConGPU.
 Copyright 2026 PIConGPU contributors
@@ -312,7 +306,3 @@ def main(argv=None):
         questionary.print("You can start your simulation now.")
     else:
         questionary.print("Aborted. Nothing was written.")
-
-
-if __name__ == "__main__":
-    main()

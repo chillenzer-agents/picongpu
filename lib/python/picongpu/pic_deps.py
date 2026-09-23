@@ -12,11 +12,12 @@ License: GPLv3+
 
 Best-effort dependency auto-installation for a PIConGPU preset.
 
-``pic-deps`` is a thin, preset-agnostic driver over the preset's own
-``dependencies_autoinstall.sh`` script. It reads everything from the standard
-``picongpu.rc_params`` discovery mechanism (no ``--preset`` argument), renders a
-sourceable profile, and either runs the script (``install``) or verifies the
-dependency directories the script owns (``check``).
+This module backs the ``picongpu dependencies install`` / ``picongpu
+dependencies check`` subcommands. It is a thin, preset-agnostic driver over the
+preset's own ``dependencies_autoinstall.sh`` script. It reads everything from
+the standard ``picongpu.rc_params`` discovery mechanism (no ``--preset``
+argument), renders a sourceable profile, and either runs the script
+(``install``) or verifies the dependency directories the script owns (``check``).
 """
 
 import argparse
@@ -41,7 +42,7 @@ __all__ = [
 ]
 
 _DESC = (
-    "pic-deps -- best-effort dependency auto-installation for a PIConGPU preset\n"
+    "picongpu dependencies -- best-effort dependency auto-installation for a PIConGPU preset\n"
     "\n"
     "Installs (or checks) the compile-time dependencies of the preset named in"
     " the current .picongpurc.toml by running the preset's own"
@@ -67,7 +68,7 @@ def resolve_preset_script(rcp):
     if not preset:
         raise SystemExit(
             "error: no preset is set in rc_params.\n"
-            "       Run 'picrc-builder' (or set `preset` in your .picongpurc.toml) first."
+            "       Run 'picongpu rc build' (or set `preset` in your .picongpurc.toml) first."
         )
     preset_dir = rcp.preset_dir
     if not preset_dir:
@@ -77,7 +78,7 @@ def resolve_preset_script(rcp):
         raise SystemExit(
             f"error: preset '{preset_dir}' has no dependencies_autoinstall.sh "
             f"(expected {script}).\n"
-            "       This preset is not supported by pic-deps."
+            "       This preset is not supported by the dependency tools."
         )
     return preset_dir, script
 
@@ -149,7 +150,7 @@ def _print_check(results: list[tuple[str, str, bool]]) -> int:
         print(f"  [{marker:7}] {root} = {where}")
     if missing:
         print(f"\n{len(missing)} of {len(results)} dependencies are missing: {', '.join(missing)}")
-        print("Run 'pic-deps install' to (re)build them, then re-check.")
+        print("Run 'picongpu dependencies install' to (re)build them, then re-check.")
         return 1
     print(f"\nAll {len(results)} dependencies are present.")
     return 0
@@ -184,7 +185,7 @@ def install(argv: list[str] | None = None) -> int:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
-        prog="pic-deps",
+        prog="picongpu dependencies",
         description=_DESC,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

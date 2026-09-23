@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from pydantic import BaseModel
+from picongpu.picmi import mutation_switch
 from picongpu.picmi.species import DependsOn, Species
 from picongpu.picmi.species_requirements import SynchrotronConstantConstruction
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
@@ -18,6 +19,9 @@ class Synchrotron(BaseModel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not mutation_switch.INIT_MUTATION_ENABLED:
+            # Derived from the (reachable) interaction by picmi.translate instead.
+            return
         self.electron_species.register_requirements(
             [
                 DependsOn(species=self.photon_species),

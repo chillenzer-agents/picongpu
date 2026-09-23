@@ -1,9 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#   "picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python"
-# ]
-# ///
 """
 This file is part of PIConGPU.
 Copyright 2026 PIConGPU contributors
@@ -29,7 +23,7 @@ from picongpu._rc_params import RCParams, _KEEP_AS_DEFAULT, get_available_preset
 __all__ = ["main"]
 
 _DESC = (
-    "picrc-builder -- interactive .picongpurc.toml configuration builder\n"
+    "picongpu rc build -- interactive .picongpurc.toml configuration builder\n"
     "\n"
     "Guides you through creating or completing a PIConGPU configuration file."
     " If a path to an existing .picongpurc.toml is given, the tool loads it"
@@ -195,7 +189,7 @@ def write_output(output, path):
 
 
 def main(argv=None):
-    """Entry point for the picrc-builder CLI.
+    """Entry point for the ``picongpu rc build`` subcommand.
 
     Parameters
     ----------
@@ -203,7 +197,7 @@ def main(argv=None):
         Command-line arguments (defaults to ``sys.argv[1:]``).
     """
     parser = argparse.ArgumentParser(
-        prog="picrc-builder",
+        prog="picongpu rc build",
         description=_DESC,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -220,7 +214,7 @@ def main(argv=None):
     target, is_new = resolve_target_path(args.config)
 
     questionary.print(
-        "Welcome to picrc-builder!\n"
+        "Welcome to the PIConGPU configuration builder!\n"
         "This tool helps you create or complete a .picongpurc.toml configuration "
         "file for your PIConGPU simulation setup.\n"
         "You will be asked to fill in any missing values required by your chosen preset.\n"
@@ -312,7 +306,3 @@ def main(argv=None):
         questionary.print("You can start your simulation now.")
     else:
         questionary.print("Aborted. Nothing was written.")
-
-
-if __name__ == "__main__":
-    main()

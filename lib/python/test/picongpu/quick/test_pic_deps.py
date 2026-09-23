@@ -1,5 +1,5 @@
 """
-Tests for pic-deps (lib/python/picongpu/pic_deps.py).
+Tests for the preset dependency tools (lib/python/picongpu/pic_deps.py).
 """
 
 from pathlib import Path

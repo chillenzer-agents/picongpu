@@ -1,9 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#   "picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python"
-# ]
-# ///
 """
 This file is part of PIConGPU.
 Copyright 2026 PIConGPU contributors
@@ -24,7 +18,6 @@ import argparse
 import os
 import re
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
@@ -196,7 +189,3 @@ def main(argv=None) -> int:
     if args.command == "install":
         return install()
     return check()
-
-
-if __name__ == "__main__":
-    sys.exit(main())

@@ -10,7 +10,7 @@ Copyright 2026 PIConGPU contributors
 Authors: Julian Lenz
 License: GPLv3+
 
-``picongpu`` — a single general entry point for the Python-layer tools.
+``picongpu`` -- a single general entry point for the Python-layer tools.
 
 Dispatches to the individual tools as subcommands, so everything can be invoked
 through one name (both as a console script and via ``python -m picongpu``):
@@ -37,9 +37,8 @@ from pathlib import Path
 
 import tomli_w
 
-from picongpu import rc_params as _rc_params_default
-from picongpu.pic_deps import check as deps_check
-from picongpu.pic_deps import install as deps_install
+from picongpu._rc_params import rc_params as _rc_params_default
+from picongpu.pic_deps import main as deps_main
 from picongpu.picrc_builder import main as rc_build
 from picongpu.pypicongpu.runner import generate_bare_profile
 
@@ -61,21 +60,20 @@ _DESC = (
 PROFILE_NAME = "picongpu.profile"
 
 
-def find_profile(from_path: Path | None) -> Path:
+def find_profile(from_path: Path | None, tmpdir: Path | None = None) -> Path:
     """Return the profile to source for ``shell --from *from_path*``.
 
     ``from_path`` may point at a ``picongpu.profile`` directly, or at a
     ``setup_dir``/``run_dir`` that contains one (in ``workflow/scripts/`` for a
     setup dir, or at its root for an organized run dir). With ``None`` a bare
-    profile is generated from the discovered ``rc_params`` in a temporary
-    directory -- the default ``picongpu.profile``.
+    profile is generated from the discovered ``rc_params`` into *tmpdir* (or a
+    fresh temporary directory) -- the default ``picongpu.profile``.
     """
     if from_path is None:
         import tempfile
 
-        return generate_bare_profile(
-            path=Path(tempfile.mkdtemp(prefix="picongpu-shell-")) / PROFILE_NAME
-        )
+        directory = Path(tempfile.mkdtemp(prefix="picongpu-shell-")) if tmpdir is None else Path(tmpdir)
+        return generate_bare_profile(path=directory / PROFILE_NAME)
 
     from_path = Path(from_path)
     if from_path.is_file():
@@ -92,41 +90,38 @@ def find_profile(from_path: Path | None) -> Path:
         if candidate.is_file():
             return candidate
     raise SystemExit(
-        f"error: no {PROFILE_NAME} found in {from_path} (looked in ./, workflow/scripts/, "
-        "input/workflow/scripts/)."
+        f"error: no {PROFILE_NAME} found in {from_path} (looked in ./, workflow/scripts/, input/workflow/scripts/)."
     )
-
-
-def _write_rcfile(profile: Path) -> Path:
-    """Write a bash rcfile that sources the user's bashrc, then *profile*.
-
-    The rcfile is written into a temporary directory so it never pollutes a
-    user's setup/run directory.
-    """
-    import tempfile
-
-    rcfile = Path(tempfile.mkdtemp(prefix="picongpu-shell-rc-")) / "picongpu.shell.rc"
-    rcfile.write_text(
-        "if [ -f ~/.bashrc ]; then . ~/.bashrc; fi\n"
-        f". {shlex.quote(str(profile))}\n"
-    )
-    return rcfile
 
 
 def shell(from_path: Path | None, command: list[str] | None) -> int:
-    """Drop into an interactive shell (or run *command*) with *profile* sourced."""
-    profile = find_profile(from_path)
-    rcfile = _write_rcfile(profile)
+    """Drop into an interactive shell (or run *command*) with the profile sourced.
 
-    env = dict(os.environ)
-    env["PIC_PROFILE"] = str(profile)
+    Everything transient (a generated default profile, the bash rcfile) lives in
+    one temporary directory that is removed when this function returns. For the
+    interactive case that is after the shell exits; the profile has been sourced
+    into the running shell by then.
+    """
+    import tempfile
 
-    if command:
-        # Non-interactive: source the profile, then exec the command.
-        snippet = f". {shlex.quote(str(rcfile))} >/dev/null 2>&1\nexec {shlex.join(command)}"
-        return subprocess.run(["bash", "-lc", snippet], env=env).returncode
+    with tempfile.TemporaryDirectory(prefix="picongpu-shell-") as tmp:
+        tmpdir = Path(tmp)
+        profile = find_profile(from_path, tmpdir)
 
-    return subprocess.run(["bash", "--rcfile", str(rcfile), "-i"], env=env).returncode
+        rcfile = tmpdir / "picongpu.shell.rc"
+        rcfile.write_text(f"if [ -f ~/.bashrc ]; then . ~/.bashrc; fi\n. {shlex.quote(str(profile))}\n")
+
+        env = dict(os.environ)
+        env["PIC_PROFILE"] = str(profile)
+
+        if command:
+            # Non-interactive: source the profile, then exec the command.
+            # Keep the profile's stderr (real diagnostics) visible; drop stdout
+            # and the interactive banner.
+            snippet = f". {shlex.quote(str(rcfile))} >/dev/null\nexec {shlex.join(command)}"
+            return subprocess.run(["bash", "-lc", snippet], env=env).returncode
+
+        return subprocess.run(["bash", "--rcfile", str(rcfile), "-i"], env=env).returncode
 
 
 def _print_rc(rcp) -> int:
@@ -145,9 +140,7 @@ def main(argv=None) -> int:
 
     rc = sub.add_parser("rc", help="rc_params related tools")
     rc_sub = rc.add_subparsers(dest="rc_command", required=True)
-    rc_build_parser = rc_sub.add_parser(
-        "build", help="interactive .picongpurc.toml configuration builder"
-    )
+    rc_build_parser = rc_sub.add_parser("build", help="interactive .picongpurc.toml configuration builder")
     rc_build_parser.add_argument(
         "config",
         nargs="?",
@@ -172,9 +165,14 @@ def main(argv=None) -> int:
         help="setup_dir or run_dir whose picongpu.profile to source "
         "(default: a freshly generated profile from the discovered rc_params).",
     )
+    # No `required=True` here: a bare `picongpu shell` must drop into the
+    # interactive shell, `shell run <cmd>` runs a command instead.
     shell_sub = shell_parser.add_subparsers(dest="shell_command")
+    # add_help=False so `shell run <cmd> -h` passes `-h` through to <cmd>
+    # instead of argparse intercepting it as its own help request.
     shell_run = shell_sub.add_parser(
         "run",
+        add_help=False,
         help="run a command in the corresponding shell environment",
     )
     shell_run.add_argument("run_command", nargs=argparse.REMAINDER)
@@ -187,9 +185,7 @@ def main(argv=None) -> int:
         return _print_rc(_rc_params_default)
 
     if args.command == "dependencies":
-        if args.dependencies_command == "install":
-            return deps_install()
-        return deps_check()
+        return deps_main([args.dependencies_command])
 
     if args.command == "shell":
         command = None

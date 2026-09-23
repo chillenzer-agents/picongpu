@@ -58,6 +58,32 @@ def test_find_profile_directory_without_profile():
             cli.find_profile(Path(d))
 
 
+def test_shell_run_reports_missing_from_path():
+    with TemporaryDirectory() as d:
+        with pytest.raises(SystemExit, match="does not exist"):
+            cli.shell(Path(d) / "nope", ["true"])
+
+
+def test_shell_run_reports_directory_without_profile():
+    with TemporaryDirectory() as d:
+        with pytest.raises(SystemExit, match="no picongpu.profile found"):
+            cli.shell(Path(d), ["true"])
+
+
+def test_shell_run_drops_leading_double_dash():
+    with TemporaryDirectory() as d:
+        _make_profile(Path(d) / "picongpu.profile")
+        # `--` must be consumed, not passed on as the command name.
+        assert cli.shell(Path(d), ["--", "true"]) == 0
+
+
+def test_shell_run_passes_dash_arguments_through():
+    with TemporaryDirectory() as d:
+        _make_profile(Path(d) / "picongpu.profile")
+        rc = cli.shell(Path(d), ["bash", "-c", 'test -n "$1"', "bash", "-x"])
+        assert rc == 0
+
+
 def test_shell_run_returns_command_status_and_sources_profile():
     with TemporaryDirectory() as d:
         _make_profile(Path(d) / "picongpu.profile", marker="from-cli-test")

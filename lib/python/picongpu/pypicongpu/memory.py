@@ -7,15 +7,30 @@ License: GPLv3+
 
 from typing import Annotated
 
-from pydantic import BaseModel, Field, BeforeValidator, PlainSerializer, field_serializer
+from pydantic import BaseModel, Field, BeforeValidator, PlainSerializer, field_serializer, field_validator
 
-from picongpu.pypicongpu.grid import serialise_vec3
+from picongpu.pypicongpu.grid import deserialise_vec, serialise_vec3
 
 
 def _non_negative(values):
     if any(x < 0 for x in values):
         raise ValueError(f"All values must be non-negative (>= 0). You gave {values}.")
     return values
+
+
+def _parse_bytes(value):
+    # accept the rendered form (e.g. "350 * 1024 * 1024") in addition to the
+    # native int form, so that model_dump(mode="json") output can be validated
+    # again (round-trip safety)
+    if isinstance(value, str):
+        try:
+            product = 1
+            for factor in value.split("*"):
+                product *= int(factor.strip())
+            return product
+        except ValueError as error:
+            raise ValueError(f"Expected a byte count as an integer literal product. You gave: {value=}.") from error
+    return value
 
 
 def _human_bytes(value: int) -> str:
@@ -55,17 +70,36 @@ class MemoryConfig(BaseModel):
     """exchange buffer bytes for corners (default 8 KiB)."""
 
     ref_local_dom_size: Annotated[
-        tuple[int, int, int], BeforeValidator(_non_negative), PlainSerializer(serialise_vec3, return_type=dict)
+        tuple[int, int, int],
+        BeforeValidator(_non_negative),
+        BeforeValidator(deserialise_vec),
+        PlainSerializer(serialise_vec3, return_type=dict),
     ] = (0, 0, 0)
     """reference local domain size for exchange scaling; three non-negative ints (0 = no scaling)."""
 
     dir_scaling_factor: Annotated[
-        tuple[float, float, float], BeforeValidator(_non_negative), PlainSerializer(serialise_vec3, return_type=dict)
+        tuple[float, float, float],
+        BeforeValidator(_non_negative),
+        BeforeValidator(deserialise_vec),
+        PlainSerializer(serialise_vec3, return_type=dict),
     ] = (0.0, 0.0, 0.0)
     """per-direction scaling rate for the exchange buffers; three non-negative floats (0.0 = no scaling)."""
 
     field_tmp_support_gather_communication: bool = True
     """whether ``FieldTmp`` may gather neighbor ("ghost"/"halo") information across devices."""
+
+    @field_validator(
+        "reserved_gpu_memory_size",
+        "bytes_exchange_x",
+        "bytes_exchange_y",
+        "bytes_exchange_z",
+        "bytes_edges",
+        "bytes_corner",
+        mode="before",
+    )
+    @classmethod
+    def _accept_rendered_bytes(cls, value):
+        return _parse_bytes(value)
 
     @field_serializer(
         "reserved_gpu_memory_size",

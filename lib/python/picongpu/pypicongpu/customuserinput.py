@@ -69,4 +69,10 @@ class CustomUserInput(RenderedObject, BaseModel):
 
     @model_serializer(mode="plain")
     def _get_serialized(self) -> dict[str, Any] | None:
-        return self.rendering_context
+        # lossless form: carry both the tags and the rendering context so that
+        # the entry can be reconstructed from its serialised form
+        # (round-trip safety); the *flattened* (merged) form is produced by
+        # Simulation's customuserinput field serializer.
+        if self.rendering_context is None and self.tags is None:
+            return None
+        return {"tags": self.tags, "rendering_context": self.rendering_context}

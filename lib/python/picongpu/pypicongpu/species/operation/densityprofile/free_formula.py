@@ -7,9 +7,9 @@ License: GPLv3+
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-from ....rendering.pmaccprinter import PMAccPrinter
+from ....rendering.pmaccprinter import serialise_expression
 
 
 class FreeFormula(BaseModel):
@@ -25,8 +25,13 @@ class FreeFormula(BaseModel):
     Units policy: the expression must evaluate to a number density, [m^-3].
     """
 
+    # accept both the field name (as produced by model_dump) and the alias
+    # (density_expression) upon construction, so that serialised output can be
+    # validated again (round-trip safety)
+    model_config = ConfigDict(populate_by_name=True)
+
     type_freeformula: Literal[True] = True
     """discriminator for the AnyDensityProfile union."""
 
-    function_body: Annotated[str, BeforeValidator(PMAccPrinter().doprint)] = Field(alias="density_expression")
+    function_body: Annotated[str, BeforeValidator(serialise_expression)] = Field(alias="density_expression")
     """C++ expression computing the local number density, [m^-3] (sympy expression or string)."""

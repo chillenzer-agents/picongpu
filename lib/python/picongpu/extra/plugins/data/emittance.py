@@ -1,9 +1,6 @@
 """
-This file is part of PIConGPU.
-
-Copyright 2017-2024 PIConGPU contributors
-Authors: Sophie Rudat, Axel Huebl
-License: GPLv3+
+SPDX-FileCopyrightText: 2017-2024 PIConGPU contributors, Sophie Rudat, Axel Huebl
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from .base_reader import DataReader

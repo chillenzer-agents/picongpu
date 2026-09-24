@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2018 PIConGPU contributors
+.. SPDX-License-Identifier: CC-BY-4.0
 .. _usage-plugins-sliceEmittance:
 
 Slice Emittance

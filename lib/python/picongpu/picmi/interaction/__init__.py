@@ -1,3 +1,8 @@
+"""
+SPDX-FileCopyrightText: 2024 PIConGPU contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
+
 from . import ionization
 from .synchrotron import Synchrotron
 from .collision import Collision, CollisionalPhysicsSetup, ConstLogCollision, DynamicLogCollision

@@ -1,11 +1,7 @@
 #!/usr/bin/env python
-
 """
-This file is part of PIConGPU.
-
-Copyright 2018-2024 PIConGPU contributors
-Authors: Marco Garten, Pawel Ordyna,Brian Marre
-License: GPLv3+
+SPDX-FileCopyrightText: 2018-2024 PIConGPU contributors, Marco Garten, Pawel Ordyna,Brian Marre
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from picongpu.extra.utils.memory_calculator import MemoryCalculator

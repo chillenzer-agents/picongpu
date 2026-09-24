@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2017 PIConGPU contributors
+# SPDX-License-Identifier: CC-BY-4.0
 # Minimal makefile for Sphinx documentation
 #
 

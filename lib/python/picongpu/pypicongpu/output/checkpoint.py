@@ -1,8 +1,6 @@
 """
-This file is part of PIConGPU.
-Copyright 2021-2025 PIConGPU contributors
-Authors: Masoud Afshari
-License: GPLv3+
+SPDX-FileCopyrightText: 2021-2025 PIConGPU contributors, Masoud Afshari
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from pathlib import Path

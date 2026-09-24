@@ -1,3 +1,8 @@
+"""
+SPDX-FileCopyrightText: 2023-2024 PIConGPU contributors, Simeon Ehrig
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
+
 from typing import List, Dict, Callable
 import sys
 import tomllib
@@ -7,13 +12,6 @@ import packaging.version
 import requests
 import yaml
 import typeguard
-
-"""
-This file is part of PIConGPU.
-Copyright 2023-2024 PIConGPU contributors
-Authors: Simeon Ehrig
-License: GPLv3+
-"""
 
 """@file Generate different CI test jobs for different Python version and
          depending on a pyproject.toml.

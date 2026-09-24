@@ -1,8 +1,6 @@
 """
-This file is part of PIConGPU.
-Copyright 2021-2025 PIConGPU contributors
-Authors: Hannes Troepgen, Brian Edward Marre, Richard Pausch, Julian Lenz
-License: GPLv3+
+SPDX-FileCopyrightText: 2021-2025 PIConGPU contributors, Hannes Troepgen, Brian Edward Marre, Richard Pausch, Julian Lenz
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 import enum

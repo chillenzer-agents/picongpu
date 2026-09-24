@@ -1,3 +1,5 @@
+SPDX-FileCopyrightText: 2013 PIConGPU contributors
+SPDX-License-Identifier: CC-BY-4.0
 How to Participate as a Developer
 ===============================================================================
 

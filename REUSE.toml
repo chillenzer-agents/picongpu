@@ -1,0 +1,213 @@
+# SPDX-FileCopyrightText: 2026 PIConGPU contributors
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version = 1
+
+# Machine readable licensing information for the vendored code in
+# thirdParty/ (everything except the git submodule thirdParty/catch2, which
+# is not part of this repository's tree).
+#
+# When multiple entries match a file, the last matching entry in this file
+# takes precedence; specific entries are therefore listed after the general
+# ones.
+# Adjust the copyright and license fields whenever a vendored copy is
+# updated.
+
+[[annotations]]
+path = "thirdParty/alpaka/**"
+precedence = "override"
+"SPDX-FileCopyrightText" = "2019-2026 The alpaka developers"
+"SPDX-License-Identifier" = "MPL-2.0"
+
+[[annotations]]
+path = ["thirdParty/alpaka/example/**", "thirdParty/alpaka/benchmarks/**"]
+precedence = "override"
+"SPDX-FileCopyrightText" = "2017-2026 The alpaka developers"
+"SPDX-License-Identifier" = "ISC"
+
+[[annotations]]
+path = "thirdParty/alpaka/benchmarks/babelstream/src/**"
+precedence = "override"
+"SPDX-FileCopyrightText" = "2015-2016 Tom Deakin, Simon McIntosh-Smith, University of Bristol HPC"
+"SPDX-License-Identifier" = "LicenseRef-BabelStream"
+
+# Warp shuffles partially derived from Intel DPCT
+[[annotations]]
+path = "thirdParty/alpaka/include/alpaka/warp/WarpGenericSycl.hpp"
+precedence = "override"
+"SPDX-FileCopyrightText" = [
+    "2023 Jan Stephan, Luca Ferragina, Andrea Bocci, Aurora Perego",
+    "Intel Corporation",
+]
+"SPDX-License-Identifier" = "MPL-2.0 AND Apache-2.0 WITH LLVM-exception"
+
+[[annotations]]
+path = "thirdParty/alpaka/include/alpaka/rand/TinyMT/tinymt32.h"
+precedence = "override"
+"SPDX-FileCopyrightText" = "2011-2023 Mutsuo Saito, Makoto Matsumoto, Axel Huebl, Benjamin Worpitz, Bernhard Manfred Gruber"
+"SPDX-License-Identifier" = "BSD-3-Clause"
+
+[[annotations]]
+path = "thirdParty/alpaka/thirdParty/catch2/**"
+precedence = "override"
+"SPDX-FileCopyrightText" = "2017-2025 The Catch2 authors"
+"SPDX-License-Identifier" = "BSL-1.0"
+
+[[annotations]]
+path = "thirdParty/alpaka/script/setup_utilities/travis_retry.sh"
+precedence = "override"
+"SPDX-FileCopyrightText" = "2018 Travis CI GmbH"
+"SPDX-License-Identifier" = "MIT"
+
+# Vendored CMake module written by PIConGPU developers
+[[annotations]]
+path = "thirdParty/cmake-modules/**"
+precedence = "override"
+"SPDX-FileCopyrightText" = "2014-2019 Axel Huebl, Felix Schmitt, Rene Widera, Carlchristian Eckert"
+"SPDX-License-Identifier" = "BSD-2-Clause"
+
+[[annotations]]
+path = "thirdParty/mallocMC/**"
+precedence = "override"
+"SPDX-FileCopyrightText" = [
+    "2012 Institute for Computer Graphics and Vision, Graz University of Technology",
+    "2014-2025 Institute of Radiation Physics, Helmholtz-Zentrum Dresden-Rossendorf",
+    "2019-2023 Lars Melchior and contributors (cmake files)",
+]
+"SPDX-License-Identifier" = "MIT"
+
+[[annotations]]
+path = "thirdParty/nlohmann_json/**"
+precedence = "override"
+"SPDX-FileCopyrightText" = "2013-2025 Niels Lohmann"
+"SPDX-License-Identifier" = "MIT"
+
+[[annotations]]
+path = "thirdParty/toml11/**"
+precedence = "override"
+"SPDX-FileCopyrightText" = "2017-2025 Toru Niina"
+"SPDX-License-Identifier" = "MIT"
+
+[[annotations]]
+path = "thirdParty/cuda_memtest/**"
+precedence = "override"
+"SPDX-FileCopyrightText" = "2009-2012 University of Illinois"
+"SPDX-License-Identifier" = "NCSA"
+
+# FindNVML module (NVIDIA), carried by cuda_memtest
+[[annotations]]
+path = "thirdParty/cuda_memtest/cmake/FindNVML.cmake"
+precedence = "override"
+"SPDX-FileCopyrightText" = "2008-2014 NVIDIA Corporation, Jiri Kraus"
+"SPDX-License-Identifier" = "MIT"
+
+# ---------------------------------------------------------------------------
+# Own-tree media/data assets (no license headers). CC-BY-4.0 for docs/ per
+# LICENSE.md; GPL-3.0-or-later for source-tree artifacts.
+# ---------------------------------------------------------------------------
+
+[[annotations]]
+path = "docs/*.odg"
+"SPDX-FileCopyrightText" = "2017 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/BorisPusher/*.tex"
+"SPDX-FileCopyrightText" = "2017 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/images/**"
+"SPDX-FileCopyrightText" = "2017 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/logo/**"
+"SPDX-FileCopyrightText" = "2017 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/models/media/*.png"
+"SPDX-FileCopyrightText" = "2020 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/models/media/*.svg"
+"SPDX-FileCopyrightText" = "2020 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/models/smilei_beam_relaxation_inputs.zip"
+"SPDX-FileCopyrightText" = "2022 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/models/smilei_thermalization_inputs.zip"
+"SPDX-FileCopyrightText" = "2022 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/pypicongpu/img/*.plantuml"
+"SPDX-FileCopyrightText" = "2022 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/pypicongpu/img/*.png"
+"SPDX-FileCopyrightText" = "2022 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/usage/media/*.png"
+"SPDX-FileCopyrightText" = "2024 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/usage/plugins/media/transition_foil_position.svg"
+"SPDX-FileCopyrightText" = "2024 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/usage/plugins/openPMD_extended_config.json"
+"SPDX-FileCopyrightText" = "2021 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/source/usage/plugins/openPMD_restart_config.json"
+"SPDX-FileCopyrightText" = "2021 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"
+
+[[annotations]]
+path = "lib/python/picongpu/extra/input/*.ipynb"
+"SPDX-FileCopyrightText" = "2023-2024 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "libraryDependencies.png"
+"SPDX-FileCopyrightText" = "2015 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "share/picongpu/examples/AtomicPhysics/validation/referenceData/mean_reference.data"
+"SPDX-FileCopyrightText" = "2024 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "share/picongpu/examples/AtomicPhysics/validation/referenceData/stdDev_reference.data"
+"SPDX-FileCopyrightText" = "2024 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "share/picongpu/examples/LaserWakefield/lib/python/snakemake/dag.png"
+"SPDX-FileCopyrightText" = "2023 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "share/picongpu/examples/LaserWakefield/lib/python/snakemake/params.csv"
+"SPDX-FileCopyrightText" = "2023 PIConGPU contributors"
+"SPDX-License-Identifier" = "GPL-3.0-or-later"
+
+[[annotations]]
+path = ".zenodo.json"
+"SPDX-FileCopyrightText" = "2018 PIConGPU contributors"
+"SPDX-License-Identifier" = "CC-BY-4.0"

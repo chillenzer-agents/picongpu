@@ -1,7 +1,6 @@
 """
-This file is part of PIConGPU.
-
-Copyright 2024-2024 Fabia Dietrich
+SPDX-FileCopyrightText: 2024-2024 Fabia Dietrich
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 import openpmd_api as openpmd

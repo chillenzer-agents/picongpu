@@ -1,5 +1,6 @@
 #!/bin/bash
-
+# SPDX-FileCopyrightText: 2024 PIConGPU contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # $1 - is the name of the subproject to test [pmacc, picongpu]
 
 source $CI_PROJECT_DIR/share/ci/pmacc_env.sh

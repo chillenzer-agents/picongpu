@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2022 PIConGPU contributors
+# SPDX-License-Identifier: CC-BY-4.0
 all: species_final.png species_initial.png species_prebook.png species_final_detail.png species_initial_detail.png species_example_init.png species_example_final.png
 
 species_final_detail.png: species.plantuml

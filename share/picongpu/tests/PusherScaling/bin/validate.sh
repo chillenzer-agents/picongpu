@@ -1,10 +1,6 @@
 #!/bin/bash
-#
-# This file is part of PIConGPU.
-# Copyright 2023-2024 PIConGPU contributors
-# Authors: Mika Soren Voss, Rene Widera, Hannes Wolf
-# License: GPLv3+
-#
+# SPDX-FileCopyrightText: 2023-2024 PIConGPU contributors, Mika Soren Voss, Rene Widera, Hannes Wolf
+# SPDX-License-Identifier: GPL-3.0-or-later
 help()
 {
   echo "Validate SingleParticle output data."

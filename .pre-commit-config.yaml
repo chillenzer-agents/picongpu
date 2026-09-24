@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2024 PIConGPU contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 minimum_pre_commit_version: 3.2.0 # necessitated by Lucas-C's hooks
 default_install_hook_types: [pre-commit, pre-push]
 exclude: "thirdParty"
@@ -16,6 +18,8 @@ repos:
       - id: check-merge-conflict
       - id: trailing-whitespace
         exclude_types: [markdown, rst]
+        # Canonical license texts contain trailing whitespace as published.
+        exclude: ^LICENSES/
       - id: end-of-file-fixer
       - id: check-toml
       - id: check-yaml
@@ -34,9 +38,13 @@ repos:
       - id: forbid-tabs
         types_or: [file]
         exclude_types: [rst, tex, tsv]
+        # Canonical license texts (e.g. CC-BY-4.0) use tabs for line
+        # wrapping; make recipes require a leading tab.
+        exclude: ^LICENSES/|(^|/)Makefile$
       - id: remove-tabs
         types_or: [file]
         exclude_types: [rst, tex, tsv]
+        exclude: ^LICENSES/|(^|/)Makefile$
       - id: forbid-crlf
       - id: remove-crlf
   - repo: local
@@ -53,6 +61,16 @@ repos:
         # TODO: Adjust the script to take filenames, so that we can pass the
         # filenames and speed things up before commits.
         stages: [manual, pre-push]
+      # 'reuse lint' checks the whole tree (~1 s), so it is light enough to run
+      # before every commit. The 'manual' stage makes the pull-request-validation
+      # CI job (pre-commit run --all-files --hook-stage manual) enforce REUSE
+      # compliance. The 'reuse' CLI is pinned in requirements_pre-commit.txt.
+      - id: reuse-lint
+        name: REUSE compliance (reuse lint)
+        entry: reuse lint
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push, manual]
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
     rev: v0.12.10
@@ -78,7 +96,8 @@ repos:
         # - .zenodo.json: Contains author names that might include special characters for correct spelling.
         # - unit_dimension.py: Contains theta as the symbol for temperature.
         exclude_types: [rst]
-        exclude: CHANGELOG.md|.zenodo.json|lib/python/picongpu/picmi/particle_functor/unit_dimension.py
+        # LICENSES/ holds canonical texts with typographic quotes (e.g. LGPL-3.0).
+        exclude: ^LICENSES/|CHANGELOG.md|.zenodo.json|lib/python/picongpu/picmi/particle_functor/unit_dimension.py
   - repo: https://github.com/BlankSpruce/gersemi
     rev: 0.22.1
     hooks:

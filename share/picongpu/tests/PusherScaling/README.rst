@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2024 PIConGPU contributors
+.. SPDX-License-Identifier: GPL-3.0-or-later
 PusherScaling: Testing the functionality of the Pushers in PIConGPU
 ===================================================================
 

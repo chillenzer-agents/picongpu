@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2023 PIConGPU contributors
+.. SPDX-License-Identifier: CC-BY-4.0
 .. _crosscompile-riscv:
 
 Cross-compile for RISC-V

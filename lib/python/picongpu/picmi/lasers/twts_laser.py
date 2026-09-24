@@ -1,8 +1,6 @@
 """
-This file is part of PIConGPU.
-Copyright 2025 PIConGPU contributors
-Authors: Julian Lenz, Alexander Debus
-License: GPLv3+
+SPDX-FileCopyrightText: 2025 PIConGPU contributors, Julian Lenz, Alexander Debus
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 import math

@@ -1,8 +1,6 @@
 """
-This file is part of PIConGPU.
-Copyright 2023-2024 PIConGPU contributors
-Authors: Kristin Tippey, Brian Edward Marre
-License: GPLv3+
+SPDX-FileCopyrightText: 2023-2024 PIConGPU contributors, Kristin Tippey, Brian Edward Marre
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from math import sqrt

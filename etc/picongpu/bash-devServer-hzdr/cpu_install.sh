@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2022 PIConGPU contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 echo "cmake:"
 spack install --reuse cmake@3.26.6 %gcc@12.2.0
 spack load cmake@3.26.6 ^openssl certs=mozilla %gcc@12.2.0

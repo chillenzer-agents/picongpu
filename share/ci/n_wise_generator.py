@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-
+# SPDX-FileCopyrightText: 2020 PIConGPU contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # generate a reduced test matrix based on the N-wise testing model
 # https://en.wikipedia.org/wiki/All-pairs_testing
 

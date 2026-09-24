@@ -1,5 +1,8 @@
 """
 internal representation of params to generate PIConGPU input files
+
+SPDX-FileCopyrightText: 2022 PIConGPU contributors
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from . import customuserinput, grid, laser, output, rendering, species, util

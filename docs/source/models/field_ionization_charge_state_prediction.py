@@ -1,9 +1,7 @@
 """Ionization prediction module and example.
 
-This file is part of PIConGPU.
-Copyright 2019-2024 PIConGPU contributors
-Authors: Marco Garten
-License: GPLv3+
+SPDX-FileCopyrightText: 2019-2024 PIConGPU contributors, Marco Garten
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 import sys

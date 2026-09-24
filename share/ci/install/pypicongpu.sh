@@ -1,9 +1,6 @@
 #!/bin/bash
-
-# This file is part of PIConGPU.
-# Copyright 2023-2024 PIConGPU contributors
-# Authors: Simeon Ehrig
-# License: GPLv3+
+# SPDX-FileCopyrightText: 2023-2024 PIConGPU contributors, Simeon Ehrig
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # - the script installs a Python environment
 # - generates a modified requirements.txt depending of the environment variables for pypicongpu

@@ -1,16 +1,12 @@
 #!/usr/bin/env python
+# SPDX-FileCopyrightText: 2022-2026 PIConGPU contributors, Hannes Troepgen, Julian Lenz
+# SPDX-License-Identifier: GPL-3.0-or-later
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
 #   "picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python"
 # ]
 # ///
-"""
-This file is part of PIConGPU.
-Copyright 2021-2026 PIConGPU contributors
-Authors: Hannes Troepgen, Julian Lenz
-License: GPLv3+
-"""
 
 from pathlib import Path
 from typing import Literal

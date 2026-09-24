@@ -1,10 +1,6 @@
 #!/bin/bash
-#
-# This file is part of PIConGPU.
-# Copyright 2023-2024 PIConGPU contributors
-# Authors: Mika Soren Voss, Hannes Wolf, Klaus Steiniger
-# License: GPLv3+
-#
+# SPDX-FileCopyrightText: 2023-2024 PIConGPU contributors, Mika Soren Voss, Hannes Wolf, Klaus Steiniger
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 set -o pipefail
 

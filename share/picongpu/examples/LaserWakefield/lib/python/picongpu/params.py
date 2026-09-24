@@ -1,9 +1,6 @@
 """
-This file is part of PIConGPU.
-
-Copyright 2017-2024 PIConGPU contributors
-Authors: Sebastian Starke, Jeffrey Kelling
-License: GPLv3+
+SPDX-FileCopyrightText: 2017-2024 PIConGPU contributors, Sebastian Starke, Jeffrey Kelling
+SPDX-License-Identifier: GPL-3.0-or-later
 
 
 If more parameters are added here, make sure to adapt the corresponding

@@ -1,9 +1,6 @@
 """
-This file is part of PIConGPU.
-
-Copyright 2022-2024 PIConGPU contributors
-Authors: Mika Soren Voss
-License: GPLv3+
+SPDX-FileCopyrightText: 2022-2024 PIConGPU contributors, Mika Soren Voss
+SPDX-License-Identifier: GPL-3.0-or-later
 
 Note: only one point of data is currently covered
       in theory, more cases have yet to be added

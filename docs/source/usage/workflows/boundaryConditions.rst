@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2021 PIConGPU contributors
+.. SPDX-License-Identifier: CC-BY-4.0
 .. _usage-workflows-boundaryConditions:
 
 Boundary Conditions

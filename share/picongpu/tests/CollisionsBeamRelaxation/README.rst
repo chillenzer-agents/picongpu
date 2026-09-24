@@ -1,3 +1,5 @@
+.. SPDX-FileCopyrightText: 2021 PIConGPU contributors
+.. SPDX-License-Identifier: GPL-3.0-or-later
 Collisions: Testing example beam relaxation
 ===========================================
 

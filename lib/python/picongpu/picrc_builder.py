@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 PIConGPU contributors, Julian Lenz
+# SPDX-License-Identifier: GPL-3.0-or-later
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
@@ -5,11 +7,6 @@
 # ]
 # ///
 """
-This file is part of PIConGPU.
-Copyright 2026 PIConGPU contributors
-Authors: Julian Lenz
-License: GPLv3+
-
 Interactive builder for .picongpurc.toml configuration files.
 
 Guides the user through filling in missing variables required by a

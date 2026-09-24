@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 """
-This file is part of PIConGPU.
-
-Copyright 2022-2024 PIConGPU contributors
-Authors: Pawel Ordyna
-License: GPLv3+
+SPDX-FileCopyrightText: 2022-2024 PIConGPU contributors, Pawel Ordyna
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from os import path

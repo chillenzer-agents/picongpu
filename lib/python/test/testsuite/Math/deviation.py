@@ -1,9 +1,6 @@
 """
-This file is part of PIConGPU.
-
-Copyright 2022-2024 PIConGPU contributors
-Authors: Mika Soren Voss
-License: GPLv3+
+SPDX-FileCopyrightText: 2022-2024 PIConGPU contributors, Mika Soren Voss
+SPDX-License-Identifier: GPL-3.0-or-later
 
 This module contains some auxiliary functions to determine the
 deviation between theory and simulation. It is not yet complete

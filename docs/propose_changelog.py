@@ -1,8 +1,6 @@
 #!/usr/bin/env python
-#
-# Copyright 2024-2024 Julian J. Lenz
-#
-# License: GPLv3+
+# SPDX-FileCopyrightText: 2024-2024 Julian J. Lenz
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # requirements:
 #   PyGithub

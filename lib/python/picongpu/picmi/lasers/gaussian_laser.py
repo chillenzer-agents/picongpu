@@ -1,9 +1,6 @@
 """
-This file is part of PIConGPU.
-Copyright 2021-2024 PIConGPU contributors
-Authors: Hannes Troepgen, Brian Edward Marre, Alexander Debus, Richard Pausch,
-         Masoud Afshari
-License: GPLv3+
+SPDX-FileCopyrightText: 2021-2024 PIConGPU contributors, Hannes Troepgen, Brian Edward Marre, Alexander Debus, Richard Pausch, Masoud Afshari
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 from typing import Annotated

@@ -18,12 +18,15 @@ def pytest_collection_modifyitems(items):
     - Tests in quick/ remain unmarked (fast)
     """
     for item in items:
-        nodeid = item.nodeid
+        # split on "/" and check directory parts directly instead of a
+        # substring match on the whole nodeid so that a test file living in a
+        # directory such as "not_a_compiling_dir/" is never mis-marked.
+        parts = item.nodeid.split("/")
 
-        if "/compiling/" in nodeid:
+        if "compiling" in parts:
             item.add_marker(pytest.mark.slow)
             item.add_marker(pytest.mark.compiling)
 
-        if "/end_to_end/" in nodeid:
+        if "end_to_end" in parts:
             item.add_marker(pytest.mark.slow)
             item.add_marker(pytest.mark.end_to_end)

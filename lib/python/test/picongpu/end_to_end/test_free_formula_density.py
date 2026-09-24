@@ -110,7 +110,7 @@ def setup_sim():
     # the core build. Even with the reduced binning set above, compiling with
     # the default -j 4 exceeds the CI runner's memory (cc1plus OOM-killed), so
     # limit the build to 2 parallel jobs.
-    sim.step(0, jobs=2)
+    sim.run(jobs=2)
     return sim
 
 

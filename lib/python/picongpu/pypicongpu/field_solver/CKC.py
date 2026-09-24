@@ -5,6 +5,8 @@ Authors: Hannes Troepgen, Brian Edward Marre, Julian Lenz
 License: GPLv3+
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, computed_field
 from ..rendering import RenderedObject
 
@@ -19,6 +21,9 @@ class CKCSolver(RenderedObject, BaseModel):
 
     note: has no parameters
     """
+
+    type_ckc: Literal[True] = True
+    """discriminator for the AnySolver union; rendered nowhere."""
 
     @computed_field
     def name(self) -> str:

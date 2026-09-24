@@ -173,7 +173,8 @@ namespace picongpu::fields::incidentField
             >;
     {{/type_twts}}
 
-    // TODO: find a better solution and move it into simulation class, or add a check that all lasers use the same positions
+    // All lasers are required to use identical Huygens surface positions (enforced in Python),
+    // so rendering the positions of the first laser once is sufficient for the whole simulation.
     {{/laser}}
     {{#laser}}
     {{#_first}}

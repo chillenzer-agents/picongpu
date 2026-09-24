@@ -18,6 +18,8 @@ from pydantic import (
     model_validator,
 )
 
+from .validation import validate_huygens_surface_positions
+
 
 class PolarizationType(Enum):
     """represents a polarization of a laser (for PIConGPU)"""
@@ -60,7 +62,20 @@ def validate_component_vector(value):
         return value
 
 
-class _BaseLaser(BaseModel):
+class _HuygensSurfaceMixin(BaseModel):
+    """Provide the Huygens surface position field and its validation for all laser types"""
+
+    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
+    """Position in cells of the Huygens surface relative to start/
+       edge(negative numbers) of the total domain"""
+
+    @model_validator(mode="after")
+    def check_huygens_surface_positions(self):
+        validate_huygens_surface_positions(self.huygens_surface_positions)
+        return self
+
+
+class _BaseLaser(_HuygensSurfaceMixin):
     """Base class for all laser types with common properties and serialization logic"""
 
     # Common properties for all lasers
@@ -88,11 +103,6 @@ class _BaseLaser(BaseModel):
     """E0 in V/m"""
     pulse_init: float = Field(ge=0.0)
     """laser will be initialized pulse_init times of duration (unitless)"""
-
-    # Huygens surface position (common to all lasers)
-    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
-    """Position in cells of the Huygens surface relative to start/
-       edge(negative numbers) of the total domain"""
 
     def _get_common_serialized_fields(self) -> dict:
         """Get all common serialized fields for lasers"""
@@ -171,7 +181,7 @@ class DispersivePulseLaser(_BaseLaser):
     """third order dispersion in focus [s^3]"""
 
 
-class FromOpenPMDPulseLaser(BaseModel):
+class FromOpenPMDPulseLaser(_HuygensSurfaceMixin):
     """
     PIConGPU FromOpenPMDPulseLaser
 
@@ -202,9 +212,6 @@ class FromOpenPMDPulseLaser(BaseModel):
     """Polarization axis name in the OpenPMD file"""
     propagationAxisOpenPMD: str
     """Propagation axis name in the OpenPMD file"""
-    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
-    """Position in cells of the Huygens surface relative to start/
-       edge(negative numbers) of the total domain"""
 
 
 class TWTSLaser(_BaseLaser):
@@ -241,9 +248,6 @@ class TWTSLaser(_BaseLaser):
     """Final time step number [#] after gradually switching off the laser using a Blackman-Nuttall window"""
     windowLength: float
     """Denotes the respective switching duration by half a Blackman-Nuttall window in number of time steps unit [#]"""
-    huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
-    """Position in cells of the Huygens surface relative to start/
-       edge(negative numbers) of the total domain"""
 
 
 AnyLaser = DispersivePulseLaser | FromOpenPMDPulseLaser | GaussianLaser | PlaneWaveLaser | TWTSLaser

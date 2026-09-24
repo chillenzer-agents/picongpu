@@ -195,6 +195,10 @@ class Simulation(RenderedObject, BaseModel):
         # single CustomUserInput, which re-serialises to the same flat form.
         if isinstance(value, dict):
             tags = value.get("tags")
+            # an entry without tags serialises tags=[] (the merged form's
+            # accumulator); the field is None | list-with-min-length-1
+            if not tags:
+                tags = None
             context = {key: val for key, val in value.items() if key != "tags"}
             return [CustomUserInput(tags=tags, rendering_context=context or None)]
         return value

@@ -5,6 +5,8 @@ Authors: Hannes Troepgen, Brian Edward Marre, Julian Lenz
 License: GPLv3+
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, computed_field
 from ..rendering import RenderedObject
 
@@ -20,6 +22,9 @@ class ArbitraryOrderFDTDSolver(RenderedObject, BaseModel):
     The C++ template parameter is the number of neighbors; the order of the
     solver is twice the number of neighbors.
     """
+
+    type_arbitraryorderfdtd: Literal[True] = True
+    """discriminator for the AnySolver union; rendered nowhere."""
 
     neighbors: int = Field(ge=1)
     """number of neighbors used for the finite difference (order = 2 * neighbors)"""

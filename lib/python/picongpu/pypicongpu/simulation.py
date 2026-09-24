@@ -38,7 +38,7 @@ from .memory import MemoryConfig
 from .movingwindow import MovingWindow
 from .output import AnyPlugin, OpenPMDPlugin
 from .precision_config import PrecisionConfig
-from .rendering import RenderedObject
+from .rendering import RenderedObject, render_converts_to
 from .walltime import Walltime
 
 
@@ -54,6 +54,16 @@ def _validate_min_weighting(value: float) -> float:
     return value
 
 
+def _render_output(self, clean):
+    # the one (b)-style minor adjustment of the Simulation render projection:
+    # splice each embedded openPMD plugin with its own render projection (a full
+    # custom projection) instead of its clean lossless serialisation, because the
+    # templates key the plugin by type_openPMD / config_filename /
+    # derived_fields, not by sources/config.
+    return self._openpmd_plugin_render_substituted(clean["output"])
+
+
+@render_converts_to(conversions={"output": _render_output})
 class Simulation(RenderedObject, BaseModel):
     """
     Represents all parameters required to build & run a PIConGPU simulation.
@@ -275,3 +285,6 @@ class Simulation(RenderedObject, BaseModel):
         for plugin in self.output or []:
             if isinstance(plugin, OpenPMDPlugin):
                 plugin.setup_dir = Path(setup_dir)
+                # materialise the openPMD backend config file once the setup dir
+                # is known (a side effect of generation, not of serialisation)
+                plugin.write_config_file()

@@ -6,19 +6,22 @@ Authors: Mika Soren Voss
 License: GPLv3+
 """
 
-import config
-import testsuite.Output.Log as log
 import sys
+
+import config
+
+import testsuite.Output.Log as log
+
 from . import _checkData as cD
 
 
 def run_testsuite(
-    direction: str = None,
-    dataDirection: str = None,
-    paramDirection: str = None,
-    jsonDirection: str = None,
-    resultDirection: str = None,
-    cmakeDirection: str = None,
+    direction: str | None = None,
+    dataDirection: str | None = None,
+    paramDirection: str | None = None,
+    jsonDirection: str | None = None,
+    resultDirection: str | None = None,
+    cmakeDirection: str | None = None,
 ):
     """
     Main function of the test-suite, starts and runs the test-suite.

@@ -20,8 +20,9 @@ paramInLine(parameter:str, filename, direction:str = None) -> dict
 
 __all__ = ["ParamReader"]
 
-from . import jsonReader
 import warnings
+
+from . import jsonReader
 from . import readFiles as rF
 
 
@@ -29,8 +30,8 @@ class ParamReader(rF.ReadFiles):
     def __init__(
         self,
         fileExtension: str = r".param",
-        direction: str = None,
-        directiontype: str = None,
+        direction: str | None = None,
+        directiontype: str | None = None,
     ):
         """
         constructor
@@ -64,12 +65,8 @@ class ParamReader(rF.ReadFiles):
     # private functions -> no documentation
     def __checkifDefination(self, line: str, parameter) -> bool:
         if "=" in line:
-            if parameter in line.partition("=")[0]:
-                return True
-            else:
-                return False
-        else:
-            return False
+            return parameter in line.partition("=")[0]
+        return False
 
     def __calculateIfNoDef(self, parameter: str) -> float:
         if "PARAM_" in parameter:
@@ -80,9 +77,10 @@ class ParamReader(rF.ReadFiles):
         try:
             jReader = jsonReader.JSONReader()
             # first search in json
-            if jReader.getAllFiles():
-                if jReader.getJSONwithParam(parameter.lower()) or jReader.getJSONwithParam(parameter.upper()):
-                    return jReader.getValue(parameter)
+            if jReader.getAllFiles() and (
+                jReader.getJSONwithParam(parameter.lower()) or jReader.getJSONwithParam(parameter.upper())
+            ):
+                return jReader.getValue(parameter)
 
         except Exception:
             # search for if not defined
@@ -90,7 +88,10 @@ class ParamReader(rF.ReadFiles):
             all_paramFiles = self.getParam(parameter)
 
             if len(all_paramFiles) > 1:
-                warnings.warn('Multiple files could be found with an "undefined block" for the same parameter.')
+                warnings.warn(
+                    'Multiple files could be found with an "undefined block" for the same parameter.',
+                    stacklevel=2,
+                )
 
             parameter = None
 
@@ -111,26 +112,27 @@ class ParamReader(rF.ReadFiles):
 
             return value + value_2
 
-        elif "*" in line:
+        if "*" in line:
             split = line.partition("*")
 
             value = float(split[0])
             value_2 = self.__calculateResult(split[2])
             return value * value_2
 
-        elif "-" in line:
+        if "-" in line:
             split = line.partition("-")
 
             value = float(split[0])
             value_2 = self.__calculateResult(split[2])
             return value - value_2
 
-        elif "/" in line:
+        if "/" in line:
             split = line.partition("/")
 
             value = float(split[0])
             value_2 = self.__calculateResult(split[2])
             return value / value_2
+        return None
 
     def __calculateResult(self, line: str) -> float:
         result = None
@@ -188,24 +190,14 @@ class ParamReader(rF.ReadFiles):
               and the context of the line
         """
 
-        result = {}
+        with open(self._direction + filename) as lines:
+            allLines = lines.readlines()
 
-        lines = open(self._direction + filename, "r")
-
-        allLines = lines.readlines()
-
-        number = 0
-
-        for line in allLines:
-            number += 1
-
-            if parameter in line:
-                result[number] = line
+        result = {number: line for number, line in enumerate(allLines, start=1) if parameter in line}
 
         if not result:
-            raise ValueError("The parameter {} could not be found".format(parameter))
-        else:
-            return result
+            raise ValueError(f"The parameter {parameter} could not be found")
+        return result
 
     def getParam(self, parameter: str) -> list:
         """
@@ -240,12 +232,9 @@ class ParamReader(rF.ReadFiles):
             )
 
         for file in self.getAllFiles():
-            fileParam = open(self._direction + file, "r")
-
-            if fileParam.read().find(parameter) != -1:
-                searchResult.append(file)
-
-            fileParam.close()
+            with open(self._direction + file) as fileParam:
+                if fileParam.read().find(parameter) != -1:
+                    searchResult.append(file)
 
         return searchResult
 

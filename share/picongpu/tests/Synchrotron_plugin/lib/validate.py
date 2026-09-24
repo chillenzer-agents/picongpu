@@ -19,9 +19,11 @@ If not, see <http://www.gnu.org/licenses/>.
 """
 
 import sys
-import openpmd_api as opmd
+from itertools import pairwise
+
 import numpy as np
-from synchrotron_lib import analytical_Propability, momentum_to_energy, quad, const
+import openpmd_api as opmd
+from synchrotron_lib import analytical_Propability, const, momentum_to_energy, quad
 
 
 # Used when comparing two sets of histogram data with different binning
@@ -134,17 +136,17 @@ def main(dataPath):
 
     delta = bins
     analytical_integrated = []
-    for x0, x1 in zip(delta[:-1], delta[1:]):
+    for x0, x1 in pairwise(delta):
         analytical_integrated.append(quad(lambda x: analytical_Propability(x, gamma, Heff, dt), x0, x1)[0])
 
     mask = a > 1000
     if mask.sum() < 5:
         print(
-            f"There is less than 5 bins with 1000 photons or more. Max photons in bin = {a.max()}. Increase your statistics: more iterations, more electrons, larger dt. Higher Heff or gamma"
+            f"There is less than 5 bins with 1000 photons or more. Max photons in bin = {a.max()}. "
+            "Increase your statistics: more iterations, more electrons, larger dt. Higher Heff or gamma"
         )
         return 1
 
-    # errorBar = np.sqrt(a[mask])/normalization_factor
     a = a / normalization_factor
     a = a[mask]
     b = b[1:]
@@ -158,7 +160,7 @@ def main(dataPath):
     poornessBound = 0.1  # 10% error. We want poorness to be less than 10%
     print(f"Poorness: {poorness}")
 
-    retValue = int(0) if poorness <= poornessBound else int(1)
+    retValue = 0 if poorness <= poornessBound else 1
     print(f"Test {'passed' if retValue == 0 else 'failed'}")
 
     sys.exit(retValue)

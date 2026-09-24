@@ -107,9 +107,9 @@ class TimeStepSpec(metaclass=_TimeStepSpecMeta):
 
     unit_system = None
 
-    def __init__(self, *args, specs_in_seconds=tuple()):
-        self.specs = tuple()
-        self.specs_in_seconds = tuple()
+    def __init__(self, *args, specs_in_seconds=()):
+        self.specs = ()
+        self.specs_in_seconds = ()
 
         # allow copy initialisation from another TimeStepSpec.
         if len(args) == 1 and isinstance(args[0], TimeStepSpec):
@@ -140,7 +140,7 @@ class TimeStepSpec(metaclass=_TimeStepSpecMeta):
         self.unit_system = unit_system
         if unit_system == "seconds":
             self.specs_in_seconds = self.specs
-            self.specs = tuple()
+            self.specs = ()
         return self
 
     def __add__(self, other):
@@ -163,7 +163,7 @@ class TimeStepSpec(metaclass=_TimeStepSpecMeta):
         return tuple(
             slice(
                 int(spec.start / time_step_size if spec.start is not None else 0),
-                int(ceil(spec.stop / time_step_size)) if spec.stop is not None else None,
+                ceil(spec.stop / time_step_size) if spec.stop is not None else None,
                 int(spec.step / time_step_size if spec.step is not None else 1) or 1,
             )
             for spec in specs_in_seconds
@@ -186,7 +186,7 @@ class TimeStepSpec(metaclass=_TimeStepSpecMeta):
             spec.step,
         )
 
-    def get_as_pypicongpu(self, time_step_size, num_steps, **kwargs):
+    def get_as_pypicongpu(self, time_step_size, num_steps, **_kwargs):
         """
         Creates the corresponding pypicongpu object by translating every specification
         into non-negative (except for -1) slices in units of steps. It takes `time_step_size`

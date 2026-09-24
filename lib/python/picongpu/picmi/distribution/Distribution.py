@@ -26,8 +26,8 @@ note on drift:
 The drift ("velocity") is represented using either directed_velocity or centroid_velocity (v, gamma*v respectively) and
 for the pypicongpu representation stored in a separate object (Drift).
 
-To accommodate that, this separate Drift object can be requested by the method get_picongpu_drift(). In case of no drift,
-this method returns None.
+To accommodate that, this separate Drift object can be requested by the method get_picongpu_drift().
+In case of no drift, this method returns None.
 """
 
 
@@ -56,6 +56,6 @@ class Distribution(PICMI_Extension):
         Get drift for pypicongpu
         :return: pypicongpu drift object or None
         """
-        if [0, 0, 0] == self.directed_velocity or (0, 0, 0) == self.directed_velocity:
+        if self.directed_velocity in ([0, 0, 0], (0, 0, 0)):
             return None
         return species.operation.momentum.Drift.from_velocity(tuple(self.directed_velocity))

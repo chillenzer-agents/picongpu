@@ -11,6 +11,7 @@ from unittest import TestCase
 
 import numpy as np
 import pandas as pd
+
 from picongpu import rc_params
 from picongpu.picmi import (
     Cartesian3DGrid,
@@ -19,8 +20,8 @@ from picongpu.picmi import (
     OnePositionLayout,
     PseudoRandomLayout,
     Simulation,
+    Species,
 )
-from picongpu.picmi import Species as Species
 from picongpu.picmi.diagnostics import (
     Checkpoint,
     TimeStepSpec,
@@ -114,7 +115,7 @@ class TestLayouts(TestCase):
         self.position_names = ["position_x", "position_y", "position_z"]
         self.particles = (
             sort_particles(read_particles(self.result_path / "simOutput" / "checkpoints" / "checkpoint_000000.bp5"))
-            .rename_axis(index=dict(zip(["setup", "impl"], self.index)))
+            .rename_axis(index=dict(zip(["setup", "impl"], self.index, strict=False)))
             .reset_index((0, 1), drop=True)
         )
 

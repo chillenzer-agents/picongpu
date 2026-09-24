@@ -5,9 +5,9 @@ Authors: Hannes Troepgen, Brian Edward Marre, Julian Lenz
 License: GPLv3+
 """
 
-from itertools import chain
 from functools import wraps
 from inspect import Parameter, signature
+from itertools import chain
 from operator import itemgetter
 from typing import Any, Self
 
@@ -24,7 +24,8 @@ def _extract_first_parameter(cls):
         ) from error
     if parameter.kind in [Parameter.VAR_KEYWORD, Parameter.VAR_POSITIONAL]:
         raise TypeError(
-            f"A decorating class cannot have variadic (keyword) arguments to its constructor first. You gave: {sig=} for {cls=}."
+            f"A decorating class cannot have variadic (keyword) arguments to its constructor first. "
+            f"You gave: {sig=} for {cls=}."
         )
     return parameter
 
@@ -62,7 +63,7 @@ def decorating_class(cls_or_name, parameter=None):
     # Otherwise, we'll only see the names of the decorator's arguments.
     parameter = parameter or _extract_first_parameter(cls_or_name)
 
-    @wraps(cls_or_name, updated=tuple())
+    @wraps(cls_or_name, updated=())
     class Tmp(cls_or_name):
         def __init__(self, decorated=None, **kwargs):
             """Turn a positional decorator argument into the named keyword.
@@ -147,7 +148,7 @@ def alt(expr, alternative, *exprs, ignore=(AttributeError, TypeError, IndexError
 
 
 class _Attribute(str):
-    pass
+    __slots__ = ()
 
 
 class _Item:

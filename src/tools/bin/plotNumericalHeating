@@ -36,10 +36,11 @@ Developer: Richard Pausch
 
 import argparse
 import os
-import sys
 import re
-import numpy as np
+import sys
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 # set up argument parser #
 parser = argparse.ArgumentParser(description=__doc__, epilog="For further questions please contact Richard Pausch.")
@@ -95,9 +96,7 @@ args = parser.parse_args()
 
 # get directories from parser #
 numDir = np.min((len(args.dir_run_all), 2))
-directories = []
-for i in range(numDir):
-    directories.append(args.dir_run_all[i])
+directories = [args.dir_run_all[i] for i in range(numDir)]
 
 
 # check if directories exit #
@@ -112,9 +111,8 @@ for i in range(numDir):
     if not os.path.isdir(directories[i] + simDir):
         sys.exit(warningText2.format(i + 1, simDir))
 
-if numDir == 2:
-    if directories[0] == directories[1]:
-        sys.exit("We do not allow cheating! Compare two different runs.")
+if numDir == 2 and directories[0] == directories[1]:
+    sys.exit("We do not allow cheating! Compare two different runs.")
 
 
 # lists for data from simulations #
@@ -134,12 +132,12 @@ for sim in directories:
     ]
     # check if file list is empty
     if len(files) == 0:
-        sys.exit('There were no energy files in "{}".'.format(mydir))
+        sys.exit(f'There were no energy files in "{mydir}".')
     # verbose output
-    print("\nFor directory: \n\t{}".format(sim))
+    print(f"\nFor directory: \n\t{sim}")
     print("the following files are considered for calculating the total energy:")
     for f in files:
-        print("\t \t - {}".format(f))
+        print(f"\t \t - {f}")
 
     # read time steps from first file in list
     Time = np.loadtxt(os.path.join(mydir, files[0]))[:, 0]
@@ -190,11 +188,8 @@ startEnergy = Energies[:][0]
 
 # plot numerical heating #
 
-# choose normalization
-if args.boolRelative:
-    norm = 100.0 / startEnergy[0]  # relative to startEnergy in percent
-else:
-    norm = 1.0  # absolute values
+# choose normalization (relative to startEnergy in percent, or absolute)
+norm = 100.0 / startEnergy[0] if args.boolRelative else 1.0
 
 if not args.boolDiff:
     # plot energy evolution

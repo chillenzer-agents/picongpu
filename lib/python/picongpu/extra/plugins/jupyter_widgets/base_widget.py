@@ -6,11 +6,11 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-import matplotlib.pyplot as plt
-
-from ipywidgets import widgets
 from datetime import datetime
 from warnings import warn
+
+import matplotlib.pyplot as plt
+from ipywidgets import widgets
 
 
 class BaseWidget(widgets.VBox):
@@ -61,7 +61,8 @@ class BaseWidget(widgets.VBox):
             # for a given output widget we don't add
             # it to the children but rely on the owner
             # of the widget to display it somewhere
-            assert isinstance(output_widget, widgets.Output)
+            if not isinstance(output_widget, widgets.Output):
+                raise AssertionError
             add_out_to_children = False
         else:
             output_widget = widgets.Output(layout={"border": "1px solid black"})
@@ -86,7 +87,7 @@ class BaseWidget(widgets.VBox):
         # widgets for selecting the simulation and the simulation step
         # dependent on the derived class which widget it should be
         # use the simulation labels of the plot_mpl visualizer from picongpu
-        self.sim_drop = self._create_sim_dropdown(sorted(list(self.label_path_lut.keys())))
+        self.sim_drop = self._create_sim_dropdown(sorted(self.label_path_lut.keys()))
         self.sim_drop.observe(self._handle_run_dir_selection_callback, names="value")
 
         self.sim_time_slider = widgets.SelectionSlider(
@@ -101,7 +102,7 @@ class BaseWidget(widgets.VBox):
         # to expose the parameters of the plot_mpl object.
         self.widgets_for_vis_args = self._create_widgets_for_vis_args()
         # Its changes will result in changes to the plot
-        for _, widg in self.widgets_for_vis_args.items():
+        for widg in self.widgets_for_vis_args.values():
             widg.observe(self._visualize_callback, names="value")
 
         # register the ui elements that will be displayed
@@ -112,10 +113,7 @@ class BaseWidget(widgets.VBox):
                 widgets.VBox(children=list(self.widgets_for_vis_args.values())),
             ]
         )
-        if add_fig_to_children:
-            top = widgets.HBox(children=[vis_widgets, self.fig.canvas])
-        else:
-            top = vis_widgets
+        top = widgets.HBox(children=[vis_widgets, self.fig.canvas]) if add_fig_to_children else vis_widgets
 
         if add_out_to_children:
             bottom = widgets.VBox(children=[self.sim_time_slider, self.output_widget])
@@ -139,15 +137,14 @@ class BaseWidget(widgets.VBox):
             run_dir_options = [run_dir_options]
 
         if len(run_dir_options) < 1:
-            warn("Empty run_dir_options list was passed!")
+            warn("Empty run_dir_options list was passed!", stacklevel=2)
             lut = {}
+        elif isinstance(run_dir_options[0], str):
+            # enumeration as labels
+            lut = {str(i): path for i, path in enumerate(run_dir_options)}
         else:
-            if isinstance(run_dir_options[0], str):
-                # enumeration as labels
-                lut = {str(i): path for i, path in enumerate(run_dir_options)}
-            else:
-                # assume run_dir_options is a list of tuples of length two
-                lut = {label: path for label, path in run_dir_options}
+            # assume run_dir_options is a list of tuples of length two
+            lut = dict(run_dir_options)
 
         # lookup table from label strings to paths
         self.label_path_lut = lut
@@ -157,7 +154,7 @@ class BaseWidget(widgets.VBox):
         Make the labels of the run_dir_options lookup table available for
         selection as options for the dropdown.
         """
-        sim_options = sorted(list(self.label_path_lut.keys()))
+        sim_options = sorted(self.label_path_lut.keys())
         self.sim_drop.unobserve(self._handle_run_dir_selection_callback, names="value")
         # set the UI
         self.sim_drop.options = sim_options
@@ -238,9 +235,7 @@ class BaseWidget(widgets.VBox):
         -------
         a jupyter widget that allows selection of value(s)
         """
-        sim_drop = widgets.SelectMultiple(description="Sims", options=options, value=())
-
-        return sim_drop
+        return widgets.SelectMultiple(description="Sims", options=options, value=())
 
     def _create_widgets_for_vis_args(self):
         """
@@ -312,11 +307,9 @@ class BaseWidget(widgets.VBox):
         if not isinstance(selected_sims, list):
             selected_sims = [selected_sims]
 
-        # print("in _update_plot_mpl_run_dir, selected_sims =", selected_sims)
-
         run_dirs = [self.label_path_lut[label] for label in selected_sims]
         # prepare nicer labels for run_dirs in the plots
-        run_dirs = list(zip(selected_sims, run_dirs))
+        run_dirs = list(zip(selected_sims, run_dirs, strict=False))
 
         self.plot_mpl.set_run_directories(run_dirs)
 
@@ -335,17 +328,15 @@ class BaseWidget(widgets.VBox):
             try:
                 vis_params = self._get_widget_args()
                 times_avail = reader.get_times(**vis_params)
-            except IOError as e:
+            except OSError as e:
                 print("Getting times failed!", e)
                 raise e
-            # print(reader.run_directory, ":", times_avail)
             all_sim_times.append(set(times_avail))
 
         # the simulation times shared by all selected simulations
-        common_sim_times = sorted(list(set.intersection(*all_sim_times)))
+        common_sim_times = sorted(set.intersection(*all_sim_times))
         if len(common_sim_times) == 0:
             common_sim_times = [""]
-        # print("common_sim_times = ", common_sim_times)
         # Note: this would trigger the callback function of the
         # iteration slider and we deactivate it here first
         self.sim_time_slider.unobserve(self._visualize_callback, names="value")
@@ -359,23 +350,22 @@ class BaseWidget(widgets.VBox):
             self.sim_time_slider.value = last_selected_val
         else:
             print(
-                "last selected time {0} not present with newly selected sim_times, set to {1}".format(
-                    last_selected_val, common_sim_times[0]
-                )
+                f"last selected time {last_selected_val} not present with newly selected sim_times, "
+                f"set to {common_sim_times[0]}"
             )
             self.sim_time_slider.value = common_sim_times[0]
 
         # re-enable the callback
         self.sim_time_slider.observe(self._visualize_callback, names="value")
 
-    def _visualize_callback(self, change):
+    def _visualize_callback(self, _change):
         """
         Callback that is executed when one of the extra_ui_elements
         changes or the iteration changes."""
         self.visualize()
 
     @capture_output
-    def visualize(self, **kwargs):
+    def visualize(self, **_kwargs):
         """
         Draw the plot by getting all necessary parameter values from the
         exposed widgets.
@@ -395,7 +385,7 @@ class BaseWidget(widgets.VBox):
         try:
             self.plot_mpl.visualize(time=time, **vis_params)
         except Exception as e:
-            warn("{}: visualization failed! Reason: {} ".format(type(self), e))
+            warn(f"{type(self)}: visualization failed! Reason: {e} ", stacklevel=2)
             # raise e
 
         # since interactive mode should be turned off, we have
@@ -403,7 +393,7 @@ class BaseWidget(widgets.VBox):
         try:
             self.update_plot()
         except ValueError as e:
-            warn("{}: drawing the plot failed! Reason: {}".format(type(self), e))
+            warn(f"{type(self)}: drawing the plot failed! Reason: {e}", stacklevel=2)
             # raise e
 
     def update_plot(self):
@@ -423,10 +413,9 @@ class BaseWidget(widgets.VBox):
             # handle SelectMultiple -> Dropdown
             if isinstance(val, tuple):
                 val = val[0]
-        elif isinstance(self.sim_drop, widgets.SelectMultiple):
+        elif isinstance(self.sim_drop, widgets.SelectMultiple) and not isinstance(val, tuple):
             # handle Dropdown -> SelectMultiple
-            if not isinstance(val, tuple):
-                val = (val,)
+            val = (val,)
 
         return val
 

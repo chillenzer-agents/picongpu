@@ -9,6 +9,7 @@ License: GPLv3+
 
 import argparse
 import os
+
 from BeamRelaxationVerifier import BeamRelaxationVerifier
 
 smilei_import_error = None
@@ -18,7 +19,7 @@ except ImportError as import_error:
     smilei_import_error = import_error
 
     class SmileiBeamRelaxation:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *_args, **_kwargs):
             raise Exception(
                 "Smilei data import class could not be imported. "
                 "Check module requirements or run without the "

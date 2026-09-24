@@ -17,7 +17,7 @@
 # along with PIConGPU.
 # If not, see <http://www.gnu.org/licenses/>.
 #
-from __future__ import division
+
 import numpy as np
 
 __doc__ = "This is the 'smooth' module which provides several functions that\n\
@@ -67,15 +67,13 @@ def makeOddNumber(number, larger=True):
     if number % 2 == 1:
         # in case number is odd
         return number
-    elif number % 2 == 0:
+    if number % 2 == 0:
         # in case number is even
         if larger:
             return number + 1
-        else:
-            return number - 1
-    else:
-        error_msg = ("ERROR: number (= {}) neither odd " + "nor even").format(number)
-        raise Exception(error_msg)
+        return number - 1
+    error_msg = ("ERROR: number (= {}) neither odd " + "nor even").format(number)
+    raise Exception(error_msg)
 
 
 def gaussWindow(N, sigma):
@@ -127,12 +125,12 @@ def smooth(x, sigma, window_len=11, fkt=gaussWindow):
     """
     # check input:
     if type(x) is not np.ndarray:
-        error_msg = "ERROR: input needs to by a 1D numpy array. " + "Data type is {}".format(type(x))
+        error_msg = "ERROR: input needs to by a 1D numpy array. " + f"Data type is {type(x)}"
         raise Exception(error_msg)
 
     if len(x.shape) != 1:
         # not a 1D array
-        error_msg = "ERROR: input needs to by a 1D numpy array. " + "Data shape is {}".format(x.shape)
+        error_msg = "ERROR: input needs to by a 1D numpy array. " + f"Data shape is {x.shape}"
         raise Exception(error_msg)
 
     # extending the data at the beginning and at the end
@@ -150,7 +148,7 @@ def smooth(x, sigma, window_len=11, fkt=gaussWindow):
     return y[overlap : len(y) - overlap]  # smoothed data without added borders
 
 
-def smooth2D(data, sigma_x=10, len_x=50, sigma_y=10, len_y=50, fkt=gaussWindow):
+def smooth2D(data, sigma_x=10, len_x=50, sigma_y=10, len_y=50, fkt=gaussWindow):  # noqa: ARG001 -- documented parameter, kept for API stability
     """
     This function smoothes the noisy data of a 2D array.
 
@@ -183,7 +181,7 @@ def smooth2D(data, sigma_x=10, len_x=50, sigma_y=10, len_y=50, fkt=gaussWindow):
     """
     # check input
     if type(data) is not np.ndarray:
-        error_msg = "ERROR: input needs to by a 2D numpy array. " + "Data type is {}".format(type(data))
+        error_msg = "ERROR: input needs to by a 2D numpy array. " + f"Data type is {type(data)}"
         raise Exception(error_msg)
 
     # make a copy since python is handling arrays by reference
@@ -191,7 +189,7 @@ def smooth2D(data, sigma_x=10, len_x=50, sigma_y=10, len_y=50, fkt=gaussWindow):
 
     if len(data.shape) != 2:
         # not a 2D array
-        error_msg = "ERROR: input needs to by a 2D numpy array. " + "Data shape is {}".format(data.shape)
+        error_msg = "ERROR: input needs to by a 2D numpy array. " + f"Data shape is {data.shape}"
         raise Exception(error_msg)
 
     # make add window bins (maximum value included)

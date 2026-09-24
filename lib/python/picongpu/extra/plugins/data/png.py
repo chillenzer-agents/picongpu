@@ -6,12 +6,13 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-from .base_reader import DataReader
+import collections
+import os
 
 import numpy as np
-import os
 from imageio import imread
-import collections
+
+from .base_reader import DataReader
 
 try:
     collectionsAbc = collections.abc
@@ -88,42 +89,41 @@ class PNGData(DataReader):
         output_dir = os.path.join(self.run_directory, "simOutput", dir_name)
 
         if not os.path.isdir(output_dir):
-            raise IOError(
-                "The simOutput/{0} directory does not "
-                "exist inside path:\n  {1}\n"
+            raise OSError(
+                f"The simOutput/{dir_name} directory does not "
+                f"exist inside path:\n  {self.run_directory}\n"
                 "Did you set the proper path to the run directory?\n"
-                "Did the simulation already run?".format(dir_name, self.run_directory)
+                "Did the simulation already run?"
             )
 
         if iteration is None:
             return output_dir
-        else:
-            if slice_point is None:
-                # determine slice point manually as the slice point of the
-                # first png file in alphabetical order
-                slice_point = [f.split("_")[3] for f in sorted(os.listdir(output_dir)) if f.endswith(".png")][0]
-                slice_point = float(slice_point)
+        if slice_point is None:
+            # determine slice point manually as the slice point of the
+            # first png file in alphabetical order
+            slice_point = next(f.split("_")[3] for f in sorted(os.listdir(output_dir)) if f.endswith(".png"))
+            slice_point = float(slice_point)
 
-            data_file_name = (
-                self.data_file_prefix.format(
-                    species,
-                    axis,
-                    str(slice_point),
-                    "{:0>#6d}".format(iteration),  # leading zeros for iter
-                )
-                + self.data_file_suffix
+        data_file_name = (
+            self.data_file_prefix.format(
+                species,
+                axis,
+                str(slice_point),
+                f"{iteration:0>#6d}",  # leading zeros for iter
+            )
+            + self.data_file_suffix
+        )
+
+        data_file_path = os.path.join(output_dir, data_file_name)
+
+        if not os.path.isfile(data_file_path):
+            raise OSError(
+                f"The file {data_file_path} does not exist.\n"
+                "Did the simulation already run?\n"
+                "Is there a png for this iteration?"
             )
 
-            data_file_path = os.path.join(output_dir, data_file_name)
-
-            if not os.path.isfile(data_file_path):
-                raise IOError(
-                    "The file {} does not exist.\n"
-                    "Did the simulation already run?\n"
-                    "Is there a png for this iteration?".format(data_file_path)
-                )
-
-            return data_file_path
+        return data_file_path
 
     def get_iterations(self, species, species_filter="all", axis=None, slice_point=None):
         """
@@ -157,7 +157,7 @@ class PNGData(DataReader):
 
         return np.array(sorted(iters))
 
-    def _get_for_iteration(self, iteration, species, species_filter="all", axis=None, slice_point=None, **kwargs):
+    def _get_for_iteration(self, iteration, species, species_filter="all", axis=None, slice_point=None, **_kwargs):
         """
         Get an array representation of a PNG file.
 
@@ -193,9 +193,7 @@ class PNGData(DataReader):
             # verify requested iterations exist
             if not set(iteration).issubset(available_iterations):
                 raise IndexError(
-                    "Iteration {} is not available!\nList of available iterations: \n{}".format(
-                        iteration, available_iterations
-                    )
+                    f"Iteration {iteration} is not available!\nList of available iterations: \n{available_iterations}"
                 )
         else:
             # iteration is None, so we use all available data

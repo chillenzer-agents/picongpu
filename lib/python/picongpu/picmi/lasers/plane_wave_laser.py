@@ -5,9 +5,8 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from collections.abc import Sequence
-
 import math
+from collections.abc import Sequence
 
 from pydantic import BaseModel, Field, computed_field, model_validator
 
@@ -21,7 +20,7 @@ from .polarization_type import PolarizationType
     laser.PlaneWaveLaser,
     conversions={
         "focal_position": "focus_pos",
-        "laser_nofocus_constant_si": lambda self: 0.0,
+        "laser_nofocus_constant_si": lambda _self: 0.0,
     },
 )
 class PlaneWaveLaser(BaseModel, BaseLaser):

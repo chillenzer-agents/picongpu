@@ -5,12 +5,13 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+from collections.abc import Callable
 from types import UnionType
-from typing import Any, Callable
-from scipy.constants import electron_volt
+from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, Field
+from scipy.constants import electron_volt
 
 from picongpu.pypicongpu.species.attribute.attribute import Attribute
 from picongpu.pypicongpu.species.constant.constant import Constant
@@ -36,7 +37,7 @@ def resolving_add(new, to):
         if try_update_with(into_instance, new):
             return to
 
-    return to + [new]
+    return [*to, new]
 
 
 def get_as_pypicongpu(obj, *args, **kwargs):
@@ -47,7 +48,7 @@ def get_as_pypicongpu(obj, *args, **kwargs):
 
 def must_be_unique(requirement):
     return (hasattr(requirement, "must_be_unique") and requirement.must_be_unique) or (
-        isinstance(requirement, Constant) or isinstance(requirement, Attribute)
+        isinstance(requirement, Constant | Attribute)
     )
 
 
@@ -58,11 +59,9 @@ def can_be_dropped_due_to_uniqueness(lhs, rhs):
         return True
     try:
         # These might well be apples and oranges and the comparison might fail.
-        if lhs == rhs:
-            return True
+        return lhs == rhs
     except Exception:
-        pass
-    return False
+        return False
 
 
 def try_update_with(into_instance, from_instance):
@@ -71,7 +70,7 @@ def try_update_with(into_instance, from_instance):
     return False
 
 
-class RequirementConflict(Exception):
+class RequirementConflict(Exception):  # noqa: N818 (name mirrors the domain term; renaming would be a breaking API change)
     pass
 
 
@@ -81,9 +80,12 @@ def check_for_conflict(obj1, obj2):
             obj1.check_for_conflict(obj2)
         if hasattr(obj2, "check_for_conflict"):
             obj2.check_for_conflict(obj1)
-        if isinstance(obj1, Constant) and (isinstance(obj1, type(obj2)) or isinstance(obj2, type(obj1))):
-            if obj1 != obj2:
-                raise RequirementConflict(f"Conflicting constants {obj1=} and {obj2=} required.")
+        if (
+            isinstance(obj1, Constant)
+            and (isinstance(obj1, type(obj2)) or isinstance(obj2, type(obj1)))
+            and obj1 != obj2
+        ):
+            raise RequirementConflict(f"Conflicting constants {obj1=} and {obj2=} required.")
     except Exception as err:
         raise RequirementConflict(
             f"A conflict in requirements between {obj1=} and {obj2=} has been detected."
@@ -96,7 +98,7 @@ def run_construction(obj):
 
 
 def evaluate_requirements(requirements, Types):
-    if isinstance(Types, type) or isinstance(Types, UnionType):
+    if isinstance(Types, type | UnionType):
         return next(evaluate_requirements(requirements, [Types]))
     return (
         filter(
@@ -114,19 +116,19 @@ class _Operators(BaseModel):
     # and I've got more urgent matters to deal with.
     constructor: Callable[[Any], Any] = lambda self: self.metadata.Type(
         *map(get_as_pypicongpu, self.metadata.args),
-        **dict(map(lambda kv: (kv[0], get_as_pypicongpu(kv[1])), self.metadata.kwargs.items())),
+        **{kv[0]: get_as_pypicongpu(kv[1]) for kv in self.metadata.kwargs.items()},
     )
-    try_update_with: Callable[[Any, Any], bool] = lambda self, other: False
+    try_update_with: Callable[[Any, Any], bool] = lambda _self, _other: False
     is_same_as: Callable[[Any, Any], bool] = lambda self, other: (
         isinstance(other, DelayedConstruction) and (self.metadata == other.metadata)
     )
     # This is supposed to raise in case of conflict:
-    check_for_conflict: Callable[[Any, Any], None] = lambda self, other: None
+    check_for_conflict: Callable[[Any, Any], None] = lambda _self, _other: None
 
 
 class _Metadata(BaseModel):
     Type: type
-    args: tuple[Any, ...] = tuple()
+    args: tuple[Any, ...] = ()
     kwargs: dict[str, Any] = Field(default_factory=dict)
 
     # This might be necessary to distinguish
@@ -170,6 +172,8 @@ class DelayedConstruction(BaseModel):
     In particular, the construction should perform the obvious and minimal action
     required to fulfill the intent declared in the metadata.
     """
+
+    __hash__ = None  # comparison goes through the customisable operators, not __eq__/__hash__
 
     metadata: _Metadata
     operators: _Operators = _Operators()
@@ -216,13 +220,13 @@ class GroundStateIonizationConstruction(DelayedConstruction):
         operators = {"constructor": constructor, "try_update_with": try_update_with}
         metadata = {"Type": GroundStateIonization, "kwargs": {"ionization_model_list": [ionization_model]}}
 
-        return super().__init__(operators=operators, metadata=metadata, must_be_unique=True)
+        super().__init__(operators=operators, metadata=metadata, must_be_unique=True)
 
 
 class SetChargeStateOperation(DelayedConstruction):
     def __init__(self, /, species):
         metadata = {"Type": SetChargeState, "kwargs": {"species": species, "charge_state": species.charge_state}}
-        return super().__init__(metadata=metadata, must_be_unique=True)
+        super().__init__(metadata=metadata, must_be_unique=True)
 
 
 class SimpleDensityOperation(DelayedConstruction):
@@ -254,7 +258,7 @@ class SimpleDensityOperation(DelayedConstruction):
         }
         operators = {"constructor": constructor, "try_update_with": try_update_with}
 
-        return super().__init__(metadata=metadata, operators=operators)
+        super().__init__(metadata=metadata, operators=operators)
 
 
 class SimpleMomentumOperation(DelayedConstruction):
@@ -290,9 +294,9 @@ class SimpleMomentumOperation(DelayedConstruction):
         }
         operators = {"constructor": constructor}
 
-        return super().__init__(metadata=metadata, operators=operators)
+        super().__init__(metadata=metadata, operators=operators)
 
 
 class SynchrotronConstantConstruction(DelayedConstruction):
     def __init__(self, /, photon_species):
-        return super().__init__(metadata={"Type": SynchrotronConstant, "kwargs": {"photon_species": photon_species}})
+        super().__init__(metadata={"Type": SynchrotronConstant, "kwargs": {"photon_species": photon_species}})

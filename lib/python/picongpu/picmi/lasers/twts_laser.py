@@ -11,11 +11,10 @@ from collections.abc import Sequence
 from pydantic import BaseModel, Field, computed_field, model_validator
 
 from ...pypicongpu import laser
+from .. import constants
 from ..copy_attributes import default_converts_to
 from .base_laser import BaseLaser, PositiveFloat
 from .polarization_type import PolarizationType
-
-from .. import constants
 
 
 @default_converts_to(laser.TWTSLaser)

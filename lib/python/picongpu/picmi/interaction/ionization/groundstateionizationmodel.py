@@ -5,9 +5,8 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
-from .ionizationmodel import IonizationModel
-
 from .... import pypicongpu
+from .ionizationmodel import IonizationModel
 
 
 class GroundStateIonizationModel(IonizationModel):

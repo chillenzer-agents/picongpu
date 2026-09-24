@@ -45,11 +45,7 @@ def CIC(x):
 
     """
 
-    if abs(x) < 1:
-        y = 1 - abs(x)
-    else:
-        y = 0
-    return y
+    return 1 - abs(x) if abs(x) < 1 else 0
 
 
 def TSC(x):
@@ -111,7 +107,6 @@ def W(s1, s2, s3, s4, s5, s6):
 
     """
 
-    W = 1 / 3 * (s4 * s5 * s6 - s1 * s5 * s6 + s4 * s2 * s3 - s1 * s2 * s3) + 1 / 6 * (
+    return 1 / 3 * (s4 * s5 * s6 - s1 * s5 * s6 + s4 * s2 * s3 - s1 * s2 * s3) + 1 / 6 * (
         s4 * s2 * s6 - s1 * s2 * s6 + s4 * s5 * s3 - s1 * s5 * s3
     )
-    return W

@@ -8,9 +8,9 @@ Authors: Marco Garten, Pawel Ordyna,Brian Marre
 License: GPLv3+
 """
 
-from picongpu.extra.utils.memory_calculator import MemoryCalculator
-
 import numpy as np
+
+from picongpu.extra.utils.memory_calculator import MemoryCalculator
 
 """
 @file
@@ -95,8 +95,9 @@ print(f"particle cell distribution: {gpu_particle_cell_distribution}")
 # debug checks
 check_distributions(simulation_dimension, grid_distribution, gpu_particle_cell_distribution)
 
-# get cell extent of each GPU: list of np.array[np.int_], one per simulation dimension, with each array entry being the
-#   cell extent of the corresponding gpu in the simulation, indexation by [simulation_dimension, gpu_index[0], gpu_index[1], ...]
+# get cell extent of each GPU: list of np.array[np.int_], one per simulation dimension, with each array entry
+#   being the cell extent of the corresponding gpu in the simulation,
+#   indexation by [simulation_dimension, gpu_index[0], gpu_index[1], ...]
 gpu_cell_extent = np.meshgrid(*grid_distribution, indexing="ij")
 
 # extent of cells filled with particles of each GPU:

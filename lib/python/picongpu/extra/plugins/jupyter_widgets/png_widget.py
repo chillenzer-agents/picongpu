@@ -6,10 +6,10 @@ Authors: Sebastian Starke
 License: GPLv3+
 """
 
-from .base_widget import BaseWidget
-from ..plot_mpl import PNGMPL
-
 from ipywidgets import widgets
+
+from ..plot_mpl import PNGMPL
+from .base_widget import BaseWidget
 
 
 class PNGWidget(BaseWidget):
@@ -34,9 +34,7 @@ class PNGWidget(BaseWidget):
         This should be a Dropdown since the underlying
         visualizer can not deal with multiple run_directories!
         """
-        sim_drop = widgets.Dropdown(description="Sims", options=options, value=None)
-
-        return sim_drop
+        return widgets.Dropdown(description="Sims", options=options, value=None)
 
     def _create_widgets_for_vis_args(self):
         """

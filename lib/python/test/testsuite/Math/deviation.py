@@ -32,15 +32,16 @@ getTestResult(theory, simulation, acceptance:float = None) -> bool:
 """
 
 __all__ = [
-    "getDifference",
-    "getMaxDifference",
-    "getDifferenceInPercentage",
     "getAcceptanceRange",
+    "getDifference",
+    "getDifferenceInPercentage",
+    "getMaxDifference",
     "getTestResult",
 ]
 
-import testsuite._checkData as cD
 import numpy as np
+
+import testsuite._checkData as cD
 
 
 def getMaxDifference(theory, simulation):
@@ -102,9 +103,7 @@ def getMinDifference(theory, simulation):
     out : The minimum in the deviation
     """
 
-    difference = np.abs(min(theory - simulation))
-
-    return difference
+    return np.abs(min(theory - simulation))
 
 
 def getDifference(theory, simulation):
@@ -173,7 +172,7 @@ def getDifferenceInPercentage(theory, simulation):
     return (theory - simMax) / theory * 100
 
 
-def getAcceptanceRange(theory, acceptance: float = None):
+def getAcceptanceRange(theory, acceptance: float | None = None):
     """
     represents the range around the theoretical value,
     which as a limit leads to the acceptance of the test
@@ -198,7 +197,7 @@ def getAcceptanceRange(theory, acceptance: float = None):
     return theory * (1 - acceptance), theory * (1 + acceptance)
 
 
-def getTestResult(theory, simulation, acceptance: float = None) -> bool:
+def getTestResult(theory, simulation, acceptance: float | None = None) -> bool:
     """
     determines whether a test passes or fails based on the acceptance range
 
@@ -233,7 +232,4 @@ def getTestResult(theory, simulation, acceptance: float = None) -> bool:
 
     acceptance = cD.checkVariables(variable="acceptance", parameter=acceptance)
 
-    if abs(getDifferenceInPercentage(theory, simulation)) <= acceptance * 100:
-        return True
-    else:
-        return False
+    return abs(getDifferenceInPercentage(theory, simulation)) <= acceptance * 100

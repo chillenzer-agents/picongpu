@@ -15,10 +15,11 @@ Returns whether they coincide or not.
 
 """
 
-import openpmd_api as opmd
-import numpy as np
-from grid_class import grid
 import sys
+
+import numpy as np
+import openpmd_api as opmd
+from grid_class import grid
 
 
 def get_params(path):
@@ -45,27 +46,26 @@ def get_params(path):
     if len(series.iterations) == 1:
         raise ValueError("There is just 1 iteration in the series make sure, there are at least two")
 
-    elif len(np.array(i.particles)) != 2:
+    if len(np.array(i.particles)) != 2:
         raise ValueError("There is more than one particle in the series make sure, there are exactly 2")
 
-    else:
-        # read the order of the assignment function
-        i = series.iterations[0]
-        electrons = i.particles["e"]
-        order = int(electrons.get_attribute("particleShape"))
+    # read the order of the assignment function
+    i = series.iterations[0]
+    electrons = i.particles["e"]
+    order = int(electrons.get_attribute("particleShape"))
 
-        params = {
-            # read the parameters of the simulation
-            "cell_depth": i.get_attribute("cell_depth"),
-            "cell_height": i.get_attribute("cell_height"),
-            "cell_width": i.get_attribute("cell_width"),
-            "dt": i.get_attribute("dt"),
-            "unit_time": i.get_attribute("unit_time"),
-            "unit_length": i.get_attribute("unit_length"),
-            "unit_charge": i.get_attribute("unit_charge"),
-        }
+    params = {
+        # read the parameters of the simulation
+        "cell_depth": i.get_attribute("cell_depth"),
+        "cell_height": i.get_attribute("cell_height"),
+        "cell_width": i.get_attribute("cell_width"),
+        "dt": i.get_attribute("dt"),
+        "unit_time": i.get_attribute("unit_time"),
+        "unit_length": i.get_attribute("unit_length"),
+        "unit_charge": i.get_attribute("unit_charge"),
+    }
 
-        return series, order, params
+    return series, order, params
 
 
 def read_series(series):
@@ -154,10 +154,9 @@ def compare(j_grid_x, j_grid_y, j_grid_z, J):
     if np.all(x_compare < epsilon) and np.all(y_compare < epsilon) and np.all(z_compare < epsilon):
         print("simulation and reference coincide")
         return 0
-    else:
-        print("no consensus between simulation and reference")
-        print("please check the simulation")
-        return 42
+    print("no consensus between simulation and reference")
+    print("please check the simulation")
+    return 42
 
 
 def main(dataPath):
@@ -193,9 +192,7 @@ def main(dataPath):
     )
 
     # comparison
-    compare_result = compare(j_grid_x, j_grid_y, j_grid_z, Js[1])
-
-    return compare_result
+    return compare(j_grid_x, j_grid_y, j_grid_z, Js[1])
 
 
 if __name__ == "__main__":

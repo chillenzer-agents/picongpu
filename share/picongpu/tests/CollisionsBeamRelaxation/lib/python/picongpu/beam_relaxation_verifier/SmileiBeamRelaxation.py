@@ -6,12 +6,12 @@ Authors: Pawel Ordyna
 License: GPLv3+
 """
 
-import numpy as np
-import happi
-import h5py
-import scipy.constants as cs
-
 from pathlib import Path
+
+import h5py
+import happi
+import numpy as np
+import scipy.constants as cs
 
 
 class SmileiBeamRelaxation:
@@ -19,7 +19,7 @@ class SmileiBeamRelaxation:
         self.ratios = ["equal", "lessIons", "moreIons"]
 
         def get_iterator():
-            return zip(self.ratios, [path_equal, path_less_ions, path_more_ions])
+            return zip(self.ratios, [path_equal, path_less_ions, path_more_ions], strict=False)
 
         self.sims = {key: happi.Open(path) for key, path in get_iterator()}
         self.unit_length = cs.c / self.sims[self.ratios[0]].namelist.Main.reference_angular_frequency_SI
@@ -48,9 +48,8 @@ class SmileiBeamRelaxation:
         w_vx_i = sim.ParticleBinning(2).get()
         n_i = sim.ParticleBinning(3).get()
         n_e = sim.ParticleBinning(4).get()
-        # cell_length = self.sims[ratio]
 
-        for i, t in enumerate(self.times_dict[ratio]):
+        for i, _ in enumerate(self.times_dict[ratio]):
             local_array_dict = {
                 "e_vx": w_vx_e["data"][i] / n_e["data"][i],
                 "i_vx": w_vx_i["data"][i] / n_i["data"][i],

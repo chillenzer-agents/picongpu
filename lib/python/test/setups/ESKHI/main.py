@@ -12,7 +12,7 @@ import sys
 
 # add the testsuite package to the path
 sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)) + "/../../")
-from testsuite import _manager as manager  # noqa
+from testsuite import _manager as manager
 
 parser = argparse.ArgumentParser(
     description="Starts the test suite."

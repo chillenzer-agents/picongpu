@@ -18,6 +18,8 @@ from pydantic import (
     model_validator,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class PolarizationType(Enum):
     """represents a polarization of a laser (for PIConGPU)"""
@@ -47,8 +49,10 @@ def _get_huygens_surface_serialized(huygens_surface_positions) -> dict:
 class _Component(BaseModel):
     component: float
 
+    __hash__ = None  # compared via __eq__, never used as a hash key
+
     def __eq__(self, other):
-        if isinstance(other, float) or isinstance(other, int):
+        if isinstance(other, float | int):
             return self.component == other
         return super().__eq__(other)
 
@@ -101,7 +105,12 @@ class _BaseLaser(BaseModel):
 
 def all_ge(values, than_value):
     if any(wrong := [x < than_value for x in values]):
-        logging.warning(f"All {values=} should be greater or equal {than_value=}. The following are {wrong=}.")
+        logger.warning(
+            "All values=%s should be greater or equal than_value=%s. The following are wrong=%s.",
+            values,
+            than_value,
+            wrong,
+        )
     return values
 
 
@@ -236,7 +245,8 @@ class TWTSLaser(_BaseLaser):
     """Offset from the middle of the simulation domain
        to the laser focus in z-direction [m]."""
     windowStart: float
-    """First time step number [#] at which the laser starts to be gradually switched on using a Blackman-Nuttall window"""
+    """First time step number [#] at which the laser starts to be gradually switched on using a
+    Blackman-Nuttall window"""
     windowEnd: float
     """Final time step number [#] after gradually switching off the laser using a Blackman-Nuttall window"""
     windowLength: float

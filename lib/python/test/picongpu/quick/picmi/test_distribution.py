@@ -5,16 +5,18 @@ Authors: Hannes Troepgen, Brian Edward Marre
 License: GPLv3+
 """
 
+from typing import ClassVar
 from unittest import TestCase
 
 import pytest
+from pydantic import ValidationError
+
 from picongpu import picmi
 from picongpu.picmi.grid import Cartesian3DGrid
 from picongpu.picmi.species import Species
 from picongpu.picmi.species_requirements import SimpleMomentumOperation, run_construction
 from picongpu.pypicongpu import species
 from picongpu.pypicongpu.util import UnsupportedFeatureError
-from pydantic import ValidationError
 
 ARBITRARY_GRID = Cartesian3DGrid(
     lower_bound=[0, 0, 0],
@@ -78,7 +80,7 @@ class TestPicmiUniformDistribution(TestCase, HelperTestPicmiBoundaries):
     def test_mandatory(self):
         """check that mandatory must be given"""
         # type of exception is not checked
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017 (exception type intentionally unpinned; varies by distribution)
             picmi.UniformDistribution().get_as_pypicongpu(ARBITRARY_GRID)
 
         # density is only required param
@@ -186,8 +188,7 @@ class TestPicmiFoilDistribution(TestCase, HelperTestPicmiBoundaries):
             exponential_post_plasma_length=length,
         )
 
-        testFoils = [foil_pre, foil_post, foil_both]
-        return testFoils
+        return [foil_pre, foil_post, foil_both]
 
     def test_cutoff_zero(self):
         """cutoff set to zero is accepted"""
@@ -225,7 +226,7 @@ class TestPicmiFoilDistribution(TestCase, HelperTestPicmiBoundaries):
     def test_mandatory(self):
         """check that mandatory must be given"""
         # type of exception is not checked
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017 (exception type intentionally unpinned; varies by distribution)
             picmi.FoilDistribution()
 
         # density, thickness and front are only required param
@@ -255,7 +256,7 @@ class TestPicmiFoilDistribution(TestCase, HelperTestPicmiBoundaries):
 
 
 class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
-    values = {
+    values: ClassVar[dict[str, float]] = {
         "density": 42.42,
         "center_front": 1.0,
         "center_rear": 2.0,
@@ -266,20 +267,24 @@ class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
         "vacuum_front": 50,
     }
 
-    def _get_distribution(self, lower_bound=[None, None, None], upper_bound=[None, None, None], **kwargs):
+    def _get_distribution(self, lower_bound=None, upper_bound=None, **kwargs):
+        if upper_bound is None:
+            upper_bound = [None, None, None]
+        if lower_bound is None:
+            lower_bound = [None, None, None]
         return picmi.GaussianDistribution(
-            **dict(
-                density=self.values["density"],
-                center_front=self.values["center_front"],
-                center_rear=self.values["center_rear"],
-                sigma_front=self.values["sigma_front"],
-                sigma_rear=self.values["sigma_rear"],
-                power=self.values["power"],
-                factor=self.values["factor"],
-                vacuum_front=self.values["vacuum_front"],
-                lower_bound=lower_bound,
-                upper_bound=upper_bound,
-            )
+            **{
+                "density": self.values["density"],
+                "center_front": self.values["center_front"],
+                "center_rear": self.values["center_rear"],
+                "sigma_front": self.values["sigma_front"],
+                "sigma_rear": self.values["sigma_rear"],
+                "power": self.values["power"],
+                "factor": self.values["factor"],
+                "vacuum_front": self.values["vacuum_front"],
+                "lower_bound": lower_bound,
+                "upper_bound": upper_bound,
+            }
             | kwargs
         )
 
@@ -454,7 +459,7 @@ class TestPicmiCylindricalDistribution(TestCase, HelperTestPicmiBoundaries):
 
     def test_mandatory(self):
         """check that mandatory must be given"""
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017 (exception type intentionally unpinned; varies by distribution)
             picmi.CylindricalDistribution().get_as_pypicongpu(ARBITRARY_GRID)
 
         # minimal valid
@@ -501,7 +506,7 @@ class TestDirectionalTemperature(TestCase):
         assert temperature.temperature_kev is None
         assert temperature.temperature_kev_directional is not None
         expected = (5.685630111285689e-05, 2.2742520445142756e-04, 5.11706710015712e-04)
-        for given, want in zip(temperature.temperature_kev_directional, expected):
+        for given, want in zip(temperature.temperature_kev_directional, expected, strict=False):
             assert abs(given - want) < 1e-12
 
     def test_isotropic_rms_velocity_gives_scalar_temperature(self):

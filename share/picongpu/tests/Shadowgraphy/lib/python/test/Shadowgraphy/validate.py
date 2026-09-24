@@ -12,7 +12,7 @@ import sys
 import numpy as np
 import openpmd_api as opmd
 import scipy.constants as const
-import scipy.optimize as optimize
+from scipy import optimize
 
 
 def gauss(x, amplitude, sigma, mean):
@@ -39,9 +39,8 @@ def test_deviation(val_simulation, val_theory, thresh, parameter_name):
     if relative_deviation < thresh:
         print(f"{parameter_name} passed the test with {val_simulation:.5e} compared to {val_theory:.5e}")
         return True
-    else:
-        print(f"{parameter_name} failed the test with {val_simulation:.5e} compared to {val_theory:.5e}")
-        return False
+    print(f"{parameter_name} failed the test with {val_simulation:.5e} compared to {val_theory:.5e}")
+    return False
 
 
 def main(path):
@@ -98,7 +97,7 @@ def main(path):
 
     # Load data from simulation
     series = opmd.Series(path + "/shadowgraphy_" + "%T." + "bp5", opmd.Access.read_only)
-    i = series.iterations[[i for i in series.iterations][0]]
+    i = series.iterations[next(iter(series.iterations))]
 
     shadowgram = i.meshes["shadowgram"][opmd.Mesh_Record_Component.SCALAR].load_chunk()
     unit = i.meshes["shadowgram"].get_attribute("unitSI")
@@ -154,7 +153,7 @@ def main(path):
     possible_fields = ["Ex", "Ey", "Bx", "By"]
     for sf in itertools.product(possible_signs, possible_fields):
         series = opmd.Series(path + "/shadowgraphy_fourierdata_" + "%T." + "bp5", opmd.Access.read_only)
-        i = series.iterations[[i for i in series.iterations][0]]
+        i = series.iterations[next(iter(series.iterations))]
 
         chunkdata = i.meshes[f"Fourier Domain Fields - {sf[0]}"][sf[1]].load_chunk()
         unit = i.meshes[f"Fourier Domain Fields - {sf[0]}"][sf[1]].get_attribute("unitSI")
@@ -205,7 +204,7 @@ def main(path):
             ]
 
         popt, pcov = optimize.curve_fit(gauss, odata, fourier_field_lineout, bounds=fit_bounds)
-        # (x, amplitude, sigma, mean)
+        # popt order: x, amplitude, sigma, mean
         test_results[f"[{sf[1]}-{sf[0]}] bandwidth"] = test_deviation(
             popt[1], bandwidth_expected, bandwidth_thresh, f"[{sf[1]}-{sf[0]}] bandwidth"
         )
@@ -214,7 +213,7 @@ def main(path):
             popt[2], sign_omega, omega_thresh, f"[{sf[1]}-{sf[0]}] omega"
         )
 
-    ret_value = np.array([test_results[test] for test in test_results.keys()]).all()
+    ret_value = np.array([test_results[test] for test in test_results]).all()
     sys.exit(int(not ret_value))
 
 
@@ -222,7 +221,7 @@ if __name__ == "__main__":
     try:
         arg = sys.argv[1]
     except IndexError:
-        raise SystemExit(f"Usage: {sys.argv[0]} <path_to_simulation_data>")
+        raise SystemExit(f"Usage: {sys.argv[0]} <path_to_simulation_data>") from None
     if len(sys.argv[1:]) > 1:
         raise SystemExit(f"Usage: {sys.argv[0]} <path_to_simulation_data>")
     main(sys.argv[1])

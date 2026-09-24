@@ -16,7 +16,11 @@ from picongpu.picmi.particle_functor.rng_arg import RNGArg
 from picongpu.picmi.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.particle_functor import (
     ParticleFunctor as PyPIConGPUParticleFunctor,
+)
+from picongpu.pypicongpu.particle_functor import (
     UnitDimension as PyPIConGPUUnitDimension,
+)
+from picongpu.pypicongpu.particle_functor import (
     generate_preamble,
 )
 from picongpu.pypicongpu.util import alt, decorating_class
@@ -41,8 +45,10 @@ _COORDINATE_SYSTEM = {
 
 
 class Particle:
+    # The stub documents the signature implemented by AbstractParticle.get,
+    # so the parameter names are kept in sync with the override.
     def get(self, attribute, **kwargs) -> Expr | Iterable[Expr]:
-        NotImplementedError()
+        raise NotImplementedError("abstract base class only")
 
 
 @decorating_class("functor")

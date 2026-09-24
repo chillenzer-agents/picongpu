@@ -6,9 +6,11 @@ License: GPLv3+
 """
 
 from typing import Literal
-from .momentum import Temperature, Drift
-from ..species import Species
+
 from pydantic import BaseModel
+
+from ..species import Species
+from .momentum import Drift, Temperature
 
 
 class SimpleMomentum(BaseModel):

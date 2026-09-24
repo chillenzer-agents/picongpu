@@ -46,7 +46,7 @@ plot_xaxis = None
 # for more values see the documentation (e.g. 2D plot needs zaxis and yaxis)
 
 
-def theory(**kwargs):
+def theory(**_kwargs):
     """
     this function indicates how the theoretical values
     can be calculated from the data. Please complete this
@@ -62,10 +62,10 @@ def theory(**kwargs):
     """
 
     # \ToDo: Fill in the calculation of the theory
-    return None
+    return
 
 
-def simData(**kwargs):
+def simData(**_kwargs):
     """
     this function indicates how the values from the simulation
     can be calculated from the data. Please complete this
@@ -82,4 +82,4 @@ def simData(**kwargs):
 
     # \ToDo: Fill in the Calculation
 
-    return None
+    return

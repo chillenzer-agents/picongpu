@@ -5,9 +5,9 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from unittest import TestCase
 from functools import reduce
-from math import floor, ceil
+from math import ceil, floor
+from unittest import TestCase
 
 import pytest
 
@@ -59,12 +59,12 @@ TESTCASES_IN_STEPS = [
         TimeStepSpec[20:50:10, ::7],
         set(inclusive_range(20, 50, 10)) | set(inclusive_range(0, INDEX_MAX, 7)),
     ),
-    (TimeStepSpec[11], set([11])),
-    (TimeStepSpec[11:12, 11], set([11, 12])),
-    (TimeStepSpec[10:12, 11], set([10, 11, 12])),
+    (TimeStepSpec[11], {11}),
+    (TimeStepSpec[11:12, 11], {11, 12}),
+    (TimeStepSpec[10:12, 11], {10, 11, 12}),
     (
         TimeStepSpec[20:50:10, ::7, 11],
-        set(inclusive_range(20, 50, 10)) | set(inclusive_range(0, INDEX_MAX, 7)) | set([11]),
+        set(inclusive_range(20, 50, 10)) | set(inclusive_range(0, INDEX_MAX, 7)) | {11},
     ),
     (TimeStepSpec[-10:], set(inclusive_range(INDEX_MAX - 10, INDEX_MAX))),
     (TimeStepSpec[:-10:], set(inclusive_range(0, INDEX_MAX - 10))),
@@ -80,7 +80,7 @@ TESTCASES_IN_STEPS = [
         TimeStepSpec[-20:-50:10],
         set(inclusive_range(INDEX_MAX - 20, INDEX_MAX - 50, 10)),
     ),
-    (TimeStepSpec[-11], set([INDEX_MAX - 11])),
+    (TimeStepSpec[-11], {INDEX_MAX - 11}),
 ]
 
 TESTCASES_IN_STEPS_RAISING = [
@@ -113,12 +113,12 @@ TESTCASES_IN_SECONDS = [
         TimeStepSpec[20:50:10, ::7]("seconds"),
         set(inclusive_range(40, 100, 20)) | set(inclusive_range(0, INDEX_MAX, 14)),
     ),
-    (TimeStepSpec[11]("seconds"), set([22])),
-    (TimeStepSpec[11:12, 11]("seconds"), set([22, 23, 24])),
+    (TimeStepSpec[11]("seconds"), {22}),
+    (TimeStepSpec[11:12, 11]("seconds"), {22, 23, 24}),
     (TimeStepSpec[10:12, 11]("seconds"), set(inclusive_range(20, 24))),
     (
         TimeStepSpec[20:50:10, ::7, 11]("seconds"),
-        set(inclusive_range(40, 100, 20)) | set(inclusive_range(0, INDEX_MAX, 14)) | set([22]),
+        set(inclusive_range(40, 100, 20)) | set(inclusive_range(0, INDEX_MAX, 14)) | {22},
     ),
     (TimeStepSpec[-10:]("seconds"), set(inclusive_range(INDEX_MAX - 20, INDEX_MAX))),
     (TimeStepSpec[:-10:]("seconds"), set(inclusive_range(0, INDEX_MAX - 20))),
@@ -140,7 +140,7 @@ TESTCASES_IN_SECONDS = [
         TimeStepSpec[-20:-50:10]("seconds"),
         set(inclusive_range(INDEX_MAX - 40, INDEX_MAX - 100, 20)),
     ),
-    (TimeStepSpec[-11]("seconds"), set([INDEX_MAX - 22])),
+    (TimeStepSpec[-11]("seconds"), {INDEX_MAX - 22}),
 ]
 
 
@@ -253,8 +253,7 @@ class TestTimeStepSpec(TestCase):
                         filter(
                             lambda s: s.start < 0
                             # -1 is allowed as a value for stop only
-                            or (s is not None and s.stop < -1)
-                            and s.step < 1,
+                            or ((s is not None and s.stop < -1) and s.step < 1),
                             ts.get_as_pypicongpu(TIME_STEP_SIZE, INDEX_MAX).specs,
                         )
                     )
@@ -263,9 +262,11 @@ class TestTimeStepSpec(TestCase):
 
     def test_raises_for_negative_step_size(self):
         for ts, indices in TESTCASES_IN_STEPS_RAISING:
-            with self.subTest(ts=ts, indices=indices):
-                with pytest.raises(ValueError, match="Step size must be >= 1"):
-                    ts.get_as_pypicongpu(TIME_STEP_SIZE, INDEX_MAX)
+            with (
+                self.subTest(ts=ts, indices=indices),
+                pytest.raises(ValueError, match="Step size must be >= 1"),
+            ):
+                ts.get_as_pypicongpu(TIME_STEP_SIZE, INDEX_MAX)
 
     def test_regression_wrong_int_casting(self):
         stop_time = 1.1195773740290312e-12

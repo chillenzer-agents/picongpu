@@ -8,7 +8,7 @@ License: GPLv3+
 import tomllib
 from contextlib import contextmanager
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from itertools import chain
 from operator import attrgetter, methodcaller
 from os import environ
@@ -91,7 +91,7 @@ def _parse_example_content(example_content):
 
 def _split_into_default_and_required(parsed_example):
     return {k: v for k, v in parsed_example.items() if k in _KEEP_AS_DEFAULT} | {
-        "required_information": [k for k in parsed_example.keys() if k not in _KEEP_AS_DEFAULT]
+        "required_information": [k for k in parsed_example if k not in _KEEP_AS_DEFAULT]
     }
 
 
@@ -157,7 +157,7 @@ PRESET_STORAGE_PATH = core.path("etc") / "picongpu"
 
 def get_available_presets() -> list[str]:
     """Return a list of available preset names from etc/picongpu."""
-    return list(map(lambda p: str(p.relative_to(PRESET_STORAGE_PATH)), PRESET_STORAGE_PATH.rglob("*.profile*")))
+    return [str(p.relative_to(PRESET_STORAGE_PATH)) for p in PRESET_STORAGE_PATH.rglob("*.profile*")]
 
 
 def _preset_path(preset) -> Path:
@@ -206,7 +206,7 @@ def _dirty_reset_handler_warn(trigger_key, trigger_value, previous, current):
         "You can set 'dirty_reset_policy' to 'ignore', 'raise' or a custom handler "
         "to stop this warning from being raised."
     )
-    warn(message)
+    warn(message, stacklevel=2)
     return current
 
 
@@ -226,7 +226,9 @@ def _interpret_dirty_reset_handler(value):
 
 def _missing_variable_warn(variable, *_):
     warn(
-        f"Found a missing {variable=} while rendering your profile template. It is unlikely that the code will run. Check your rc_params!"
+        f"Found a missing {variable=} while rendering your profile template. "
+        "It is unlikely that the code will run. Check your rc_params!",
+        stacklevel=2,
     )
     return ""
 
@@ -258,7 +260,7 @@ def _path_to_str(value):
 
 
 _RETAINED_CONTENT = {"dirty_reset_policy": "raise", "missing_variable_policy": "raise"}
-_DEFAULT_CONTENT = _RETAINED_CONTENT | {"required_information": tuple(), "pic_src_path": core.path()}
+_DEFAULT_CONTENT = _RETAINED_CONTENT | {"required_information": (), "pic_src_path": core.path()}
 
 
 def _read_picongpurc(path):
@@ -282,8 +284,8 @@ class RCParams:
         self._init_args = args
         self._init_kwargs = kwargs
         direct_init = dict(*args, **kwargs)
-        rc_config = _read_picongpurc(direct_init.get("picongpurc_path", None))
-        preset = _parse_example_into_preset(direct_init.get("preset", None) or rc_config.get("preset", None))
+        rc_config = _read_picongpurc(direct_init.get("picongpurc_path"))
+        preset = _parse_example_into_preset(direct_init.get("preset") or rc_config.get("preset", None))
         self._data = _DEFAULT_CONTENT | preset | rc_config | direct_init
 
     def model_dump(self, mode="json"):
@@ -334,10 +336,9 @@ class RCParams:
     def preset_dir(self):
         if "preset" in self._data:
             return self._data["preset"].split("/")[0]
-        elif "export PIC_SYSTEM_TEMPLATE_PATH=" in (txt := self.profile_content):
+        if "export PIC_SYSTEM_TEMPLATE_PATH=" in (txt := self.profile_content):
             return txt.split('PIC_SYSTEM_TEMPLATE_PATH:-"')[1].split('"}')[0].strip().split("/picongpu/")[1]
-        else:
-            return ""
+        return ""
 
     def __getitem__(self, *args, **kwargs):
         return self._data.__getitem__(*args, **kwargs)
@@ -398,7 +399,7 @@ class RCParams:
     def profile_template_content(self):
         if "profile_template_content" in self._data:
             return self._data["profile_template_content"]
-        elif "profile_template_path" in self._data:
+        if "profile_template_path" in self._data:
             with Path(self._data["profile_template_path"]).open("r") as file:
                 return file.read()
         else:
@@ -408,7 +409,7 @@ class RCParams:
     def profile_content(self):
         if "profile_content" in self._data:
             return self._data["profile_content"]
-        elif "profile_path" in self._data:
+        if "profile_path" in self._data:
             with Path(self._data["profile_path"]).open("r") as file:
                 return file.read()
         elif template := self.profile_template_content:
@@ -421,30 +422,29 @@ class RCParams:
             except MissingVariable as error:
                 message = (
                     "Rendering your profile template encountered a missing variable. "
-                    f"The following variables are expected from your preset: {self._data.get('required_information', [])}. "
+                    "The following variables are expected from your preset: "
+                    f"{self._data.get('required_information', [])}. "
                     "You can query this via rc_params['required_information']."
                 )
                 raise MissingVariable(message) from error
         else:
-            return f'export PATH="{str(core.path("bin"))}:$PATH"'
+            return f'export PATH="{core.path("bin")!s}:$PATH"'
 
     @property
     def shebang(self):
         if "shebang" in self._data:
             return self._data["shebang"]
-        elif (shebang := self.profile_content.split("\n", maxsplit=1)[0]).startswith("#!"):
+        if (shebang := self.profile_content.split("\n", maxsplit=1)[0]).startswith("#!"):
             return shebang
-        else:
-            return "#!/bin/bash"
+        return "#!/bin/bash"
 
     @property
     def preamble(self):
         if "preamble" in self._data:
             return self._data["preamble"]
-        else:
-            return f"""
+        return f"""
 set -exo pipefail
-export PATH="{str(core.path("bin"))}:$PATH"
+export PATH="{core.path("bin")!s}:$PATH"
 """
 
     @property
@@ -459,9 +459,9 @@ class SoftwareReference(BaseModel):
     version: str | None = __version__
 
 
-def _generate_rocrate_defaults(data):
+def _generate_rocrate_defaults(_data):
     return {
-        "name": f"PIConGPU simulation autogenerated by PyPIConGPU on {datetime.now(timezone.utc)}",
+        "name": f"PIConGPU simulation autogenerated by PyPIConGPU on {datetime.now(UTC)}",
         "description": """
             This RO-Crate was generated by PyPIConGPU.
             It contains one simulation setup to run PIConGPU with.
@@ -471,7 +471,7 @@ def _generate_rocrate_defaults(data):
             See the `workflow.cwl` for details.
             """,
         "mainEntity": "workflow/workflow.cwl",
-        # "license": "https://spdx.org/licenses/GPL-3.0-or-later",
+        # a "license" field (e.g. the SPDX URL for GPL-3.0-or-later) could be added
         "keywords": ["PIConGPU", "Plasma Physics", "Particle-in-Cell", "Simulation"],
     }
 
@@ -536,7 +536,8 @@ def make_workflow(workflow, crate):
 
 
 _DATASET_DESCRIPTIONS = {
-    "workflow": "Anything related to building and running this simulation setup, e.g., scripts, environment profiles, workflow definitions.",
+    "workflow": "Anything related to building and running this simulation setup, "
+    "e.g., scripts, environment profiles, workflow definitions.",
     "workflow/steps": "Workflow step definitions for building and running this simulation setup",
     "workflow/scripts": "Self-contained scripts for building and running this simulation setup",
     "etc": "Runtime configuration files for this simulation setup. "
@@ -547,7 +548,8 @@ _DATASET_DESCRIPTIONS = {
     "These files are C++ header files that are compiled into the binary during the build step. "
     "Some of these files have been rendered from mustache templates using metadata/pypicongpu_rendering_context.json. "
     "If so, the corresponding template is included with a suffix '.mustache'.",
-    "metadata": "These files constitute various forms of serialization of the entities involved in generating this simulation setup.",
+    "metadata": "These files constitute various forms of serialization of the entities "
+    "involved in generating this simulation setup.",
 }
 
 
@@ -569,7 +571,7 @@ class _ROCrateInfo(BaseModel):
     keywords: list[str] = []
 
     def __init__(self, data):
-        return super().__init__(**(_generate_rocrate_defaults(data) | data.get("rocrate", {}).get("info", {})))
+        super().__init__(**(_generate_rocrate_defaults(data) | data.get("rocrate", {}).get("info", {})))
 
     def add_metadata_to(self, crate):
         crate = deepcopy(crate)

@@ -10,8 +10,8 @@ from uuid import uuid4 as uuid
 
 from pydantic import BaseModel, BeforeValidator, computed_field, model_validator
 
-from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_to_cpp_type
 from picongpu.pypicongpu.particle_functor.rng_info import RNGInfo
+from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_to_cpp_type
 from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.rendering.renderedobject import RenderedObject
@@ -44,7 +44,10 @@ BINNING_ACCESSORS = (
             origin.lower(),
             precision.lower(),
             unit.lower(),
-        ): f"getParticlePosition<DomainOrigin::{origin}, PositionPrecision::{precision}, PositionUnits::{unit}>(domainInfo, particle)"
+        ): (
+            f"getParticlePosition<DomainOrigin::{origin}, PositionPrecision::{precision}, "
+            f"PositionUnits::{unit}>(domainInfo, particle)"
+        )
         for origin in ("TOTAL", "GLOBAL", "LOCAL", "MOVING_WINDOW", "LOCAL_WITH_GUARDS")
         for precision in ("CELL", "SUB_CELL")
         for unit in ("CELL", "PIC", "SI")
@@ -89,7 +92,9 @@ def random_number_command(**kwargs):
     scale = kwargs.get("scale", 1)
     if scale < 0:
         raise ValueError(f"{scale=} must be >= 0.")
-    return f"random_number(rng, static_cast<typename RNGType::result_type>({kwargs.get('loc', 0)}), static_cast<typename RNGType::result_type>({scale}))"
+    return f"random_number(rng, static_cast<typename RNGType::result_type>({kwargs.get('loc', 0)}), "
+    f"static_cast<typename RNGType::result_type>({scale}))"
+    return None
 
 
 def filter_access(name, default):
@@ -151,6 +156,7 @@ class ParticleFunctor(RenderedObject, BaseModel):
                 )
         if self.needs_total_position and self.rng_info is not None:
             raise ValueError(
-                f"PIConGPU does not support particle functors that need total position and random numbers. You gave: {self.rng_info=}."
+                f"PIConGPU does not support particle functors that need total position and random numbers. "
+                f"You gave: {self.rng_info=}."
             )
         return self

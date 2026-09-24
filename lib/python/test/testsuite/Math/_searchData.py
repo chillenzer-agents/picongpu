@@ -12,11 +12,12 @@ searchParameter(parameter:str, directiontype:str = None)
 
 __all__ = ["searchParameter"]
 
-from .. import Reader
 import warnings
 
+from .. import Reader
 
-def searchParameter(parameter: str, directiontype: str = None, **kwargs):
+
+def searchParameter(parameter: str, directiontype: str | None = None, **kwargs):
     """
     searches in the data (passed in config.py as a directory).
     To avoid errors, usage without directiontype is not recommended
@@ -61,7 +62,8 @@ def searchParameter(parameter: str, directiontype: str = None, **kwargs):
         warnings.warn(
             "The test suite now searches for the parameters"
             " independently. To prevent this please specify"
-            " directiontype."
+            " directiontype.",
+            stacklevel=2,
         )
         try:
             pR = Reader.paramReader.ParamReader(directiontype="paramDirection")
@@ -84,5 +86,5 @@ def searchParameter(parameter: str, directiontype: str = None, **kwargs):
                 result = None
 
     if result is None:
-        raise ValueError("The Parameter {} could not be found".format(parameter))
+        raise ValueError(f"The Parameter {parameter} could not be found")
     return result

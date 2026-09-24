@@ -53,11 +53,7 @@ class Element(RenderedObject, BaseModel):
         """does openpmd_name describe an element?"""
         mass_number, symbol = Element.parse_openpmd_isotopes(openpmd_name)
 
-        for element in periodictable.elements:
-            if symbol == element.symbol:
-                if openpmd_name not in ["n"]:
-                    return True
-        return False
+        return any(symbol == element.symbol and openpmd_name not in ["n"] for element in periodictable.elements)
 
     def __init__(self, openpmd_name: str) -> None:
         """

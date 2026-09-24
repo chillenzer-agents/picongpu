@@ -6,10 +6,11 @@ Authors: Axel Huebl, Finn-Ole Carstens
 License: GPLv3+
 """
 
-from .base_reader import DataReader
+import os
 
 import numpy as np
-import os
+
+from .base_reader import DataReader
 
 
 class TransitionRadiationData(DataReader):
@@ -55,22 +56,21 @@ class TransitionRadiationData(DataReader):
 
         sim_output_dir = os.path.join(self.run_directory, "simOutput")
         if not os.path.isdir(sim_output_dir):
-            raise IOError(
+            raise OSError(
                 "The simOutput/ directory does not exist inside "
-                "path:\n  {}\n"
+                f"path:\n  {self.run_directory}\n"
                 "Did you set the proper path to the run directory?\n"
-                "Did the simulation already run?".format(self.run_directory)
+                "Did the simulation already run?"
             )
 
         if iteration is None:
             return sim_output_dir
-        else:
-            data_file_path = os.path.join(
-                sim_output_dir, species + self.data_file_prefix + str(iteration) + self.data_file_suffix
-            )
-            if not os.path.isfile(data_file_path):
-                raise IOError("The file {} does not exist.\nDid the simulation already run?".format(data_file_path))
-            return data_file_path
+        data_file_path = os.path.join(
+            sim_output_dir, species + self.data_file_prefix + str(iteration) + self.data_file_suffix
+        )
+        if not os.path.isfile(data_file_path):
+            raise OSError(f"The file {data_file_path} does not exist.\nDid the simulation already run?")
+        return data_file_path
 
     def _get_for_iteration(self, iteration=None, **kwargs):
         """
@@ -100,9 +100,8 @@ class TransitionRadiationData(DataReader):
             self.data = np.loadtxt(data_file_path)
 
             # Read values to automatically create theta, phi and omega arrays
-            f = open(data_file_path)
-            parameters = f.readlines()[0].split("\t")
-            f.close()
+            with open(data_file_path) as f:
+                parameters = f.readlines()[0].split("\t")
 
             # Create discretized arrays or angles and frequency as they are
             # discretized for the
@@ -222,9 +221,9 @@ class TransitionRadiationData(DataReader):
                     0,
                 )[0]
 
-            print("Spectrum is plotted at phi={:.2e} and theta={:.2e}".format(self.phis[phi], self.thetas[theta]))
+            print(f"Spectrum is plotted at phi={self.phis[phi]:.2e} and theta={self.thetas[theta]:.2e}")
             return self.omegas, self.data[theta * len(self.phis) + phi, :]
-        elif type == "sliceovertheta":
+        if type == "sliceovertheta":
             # find phi and omega with maximum intensity if they are not
             # given as parameters
             if omega is None and phi is None:
@@ -238,12 +237,11 @@ class TransitionRadiationData(DataReader):
                 omega = 0
 
             print(
-                "Angular intensity distribution is sliced at phi={:.2e} with omega={:.2e}.".format(
-                    self.phis[phi], self.omegas[omega]
-                )
+                f"Angular intensity distribution is sliced at phi={self.phis[phi]:.2e} "
+                f"with omega={self.omegas[omega]:.2e}."
             )
             return self.thetas, self.data[phi :: len(self.phis), omega]
-        elif type == "sliceoverphi":
+        if type == "sliceoverphi":
             # find theta and omega with maximum intensity if they are not
             # given as parameters
             if theta is None and omega is None:
@@ -257,29 +255,27 @@ class TransitionRadiationData(DataReader):
                 theta = int(np.floor(maxIndex / len(self.phis)))
 
             print(
-                "Angular intensity distribution is sliced at theta={:.2e} with omega={:.2e}.".format(
-                    self.thetas[theta], self.omegas[omega]
-                )
+                f"Angular intensity distribution is sliced at theta={self.thetas[theta]:.2e} "
+                f"with omega={self.omegas[omega]:.2e}."
             )
             return (
                 self.phis,
                 self.data[theta * len(self.phis) : (theta + 1) * len(self.phis), omega],
             )
-        elif type == "heatmap":
+        if type == "heatmap":
             # find omega with maximum intensity if it is not given as parameter
             if omega is None:
                 omega = 0
             # meshgrids for visualization
             theta_mesh, phi_mesh = np.meshgrid(self.thetas, self.phis)
 
-            print("Heatmap is for omega={:.2e}.".format(self.omegas[omega]))
+            print(f"Heatmap is for omega={self.omegas[omega]:.2e}.")
             return (
                 theta_mesh,
                 phi_mesh,
                 self.data[::, omega].reshape((len(self.thetas), len(self.phis))).transpose(),
             )
-        else:
-            raise ValueError("Illegal type of figure!")
+        raise ValueError("Illegal type of figure!")
 
     def get_iterations(self, species):
         """

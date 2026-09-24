@@ -9,12 +9,14 @@ from math import sqrt
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field, model_validator
-
 from .plasmaramp import AllPlasmaRamps, None_
 
 
 class _Component(BaseModel):
+    """single (float) component of a 3D vector argument"""
+
     component: float
+    """vector component value"""
 
     def __eq__(self, other):
         if isinstance(other, float) or isinstance(other, int):
@@ -42,21 +44,29 @@ class Cylinder(BaseModel):
       the reduced_radius is equal = @f[\\sqrt{R^2 -L^2} -L @f]
       with R - cylinder_radius and L - prePlasmaLength (scale length of the ramp)
       the reduced radius ensures mass conservation
+
+    C++ counterpart: the cylinder profile template in
+    include/picongpu/param/density.param.
+
+    Units policy: SI (m^-3 for densities, m for positions/lengths);
+    the cylinder axis is a normalized direction (dimensionless).
     """
 
     type_cylinder: Literal[True] = True
+    """discriminator for the AnyDensityProfile union."""
 
-    density_si: float = Field(gt=0.0)
-    """particle number density at at the foil plateau (m^-3)"""
+    density_si: Annotated[float, Field(gt=0.0)]
+    """particle number density at at the foil plateau, [m^-3]; must be > 0."""
 
     center_position_si: Annotated[tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)]
     """center of the cylinder [x, y, z], [m]"""
 
-    radius_si: float
-    """cylinder radius, [m]"""
+    radius_si: Annotated[float, Field(ge=0.0)]
+    """cylinder radius, [m]; must be >= 0 and > sqrt(2)*pre_plasma_length when a
+    pre-plasma ramp is used (so that the reduced radius stays non-negative)."""
 
     cylinder_axis: Annotated[tuple[_Component, _Component, _Component], BeforeValidator(validate_component_vector)]
-    """cylinder axis [x, y, z], [unitless]"""
+    """cylinder axis [x, y, z], [dimensionless direction]"""
 
     # This still relies on some magic to insert the typeID.
     # We'll handle it another time:

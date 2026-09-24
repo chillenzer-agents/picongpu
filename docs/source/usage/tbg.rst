@@ -95,3 +95,13 @@ It is used, e.g. on Summit at ORNL.
 
 .. include:: ../install/profiles/summit-ornl/LSF_Tutorial.rst
    :start-line: 3
+
+EuroHPC Federation Platform (EFP)
+"""""""""""""""""""""""""""""""""
+
+PIConGPU can also be submitted to the :ref:`EuroHPC Federation Platform (EFP) Workflows <pypicongpu-running-efp>`
+(a.k.a. LEXIS platform), which execute job scripts on the participating EuroHPC systems.
+The ``efp-<system>`` presets (e.g. ``etc/picongpu/efp-jupiter-jsc/``) render a self-contained job script
+via :ref:`TBG <usage-tbg>` that can be uploaded to the EFP Workflows as-is,
+with the input dataset (the ``input/`` directory of the TBG destination) staged into ``./input``
+relative to the job execution context.

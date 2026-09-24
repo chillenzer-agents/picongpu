@@ -154,6 +154,7 @@ In case you are already fluent in compiling C++ projects and HPC, running PIC si
    pypicongpu/translation
    pypicongpu/testing
    pypicongpu/running
+   pypicongpu/running_on_efp
    pypicongpu/species
    pypicongpu/misc
    pypicongpu/faq

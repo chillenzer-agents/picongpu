@@ -9,7 +9,7 @@ import re
 
 import periodictable
 import scipy
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, computed_field, model_validator
 
 from picongpu.pypicongpu.rendering import RenderedObject
 
@@ -29,7 +29,25 @@ class Element(RenderedObject, BaseModel):
     To describe atoms/ions you also need to initialize the charge_state of the species.
     """
 
+    openpmd_name: str
+    """(case-sensitive) chemical/nuclear element symbol (e.g. "H", "He",
+    "#2H"); source of truth for the periodic table lookup, kept as a field so
+    that the element (including isotope/mass number) survives a
+    serialization round-trip"""
+
     _store: periodictable.core.Element | None = None
+
+    @model_validator(mode="after")
+    def _lookup_element(self):
+        mass_number, symbol = Element.parse_openpmd_isotopes(self.openpmd_name)
+
+        # search for symbol in periodic table
+        for element in periodictable.elements:
+            if symbol == element.symbol:
+                self._store = element if mass_number is None else element[mass_number]
+                return self
+
+        raise NameError(f"unknown element: {symbol}")
 
     @staticmethod
     def parse_openpmd_isotopes(openpmd_name: str) -> tuple[int | None, str]:
@@ -58,31 +76,6 @@ class Element(RenderedObject, BaseModel):
                 if openpmd_name not in ["n"]:
                     return True
         return False
-
-    def __init__(self, openpmd_name: str) -> None:
-        """
-        get the correct substance implementation from a openPMD type name
-
-        @param openpmd_name (case-sensitive) chemical/nuclear element symbols (e.g. "H", "D", "He", "N").
-
-        :return: object representing the given species
-        """
-        BaseModel.__init__(self)
-
-        mass_number, openpmd_name = Element.parse_openpmd_isotopes(openpmd_name)
-
-        found = False
-        # search for name in periodic table
-        for element in periodictable.elements:
-            if openpmd_name == element.symbol:
-                if mass_number is None:
-                    self._store = element
-                else:
-                    self._store = element[mass_number]
-                found = True
-
-        if not found:
-            raise NameError(f"unknown element: {openpmd_name}")
 
     def get_picongpu_name(self) -> str:
         """

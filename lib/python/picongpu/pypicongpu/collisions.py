@@ -6,12 +6,13 @@ License: GPLv3+
 """
 
 from itertools import chain
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
     Field,
     computed_field,
+    field_serializer,
     field_validator,
     model_validator,
 )
@@ -115,6 +116,24 @@ class Collision(BaseModel):
     functor: CollisionFunctor
     """the collision functor (constant or dynamic Coulomb logarithm)"""
 
+    @field_validator("functor", mode="before")
+    @classmethod
+    def _parse_functor(cls, value):
+        # accept the serialised form (a dict carrying the type_constlog /
+        # type_dynamiclog discriminator) in addition to a CollisionFunctor
+        # instance, so that model_dump(mode="json") output can be validated
+        # again (round-trip safety)
+        if isinstance(value, dict):
+            if value.get("type_constlog"):
+                data = value.get("data")
+                coulomb_log = data.get("coulomb_log") if isinstance(data, dict) else None
+                if coulomb_log is None:
+                    raise ValueError(f"A constant-log collision functor requires data.coulomb_log. You gave: {value=}.")
+                return ConstLogCollision(coulomb_log=coulomb_log)
+            if value.get("type_dynamiclog"):
+                return DynamicLogCollision()
+        return value
+
     @computed_field
     def species(self) -> list[Species]:
         return unique([s for p in self.species_pairs for s in (p.species_lhs, p.species_rhs)])
@@ -122,6 +141,17 @@ class Collision(BaseModel):
     @computed_field
     def has_filters(self) -> bool:
         return any(isinstance(s, FilteredSpecies) for p in self.species_pairs for s in (p.species_lhs, p.species_rhs))
+
+    @field_serializer("functor", return_type=dict[str, Any])
+    def _serialize_functor(self, value):
+        # The rendered form carries the discriminator (type_constlog /
+        # type_dynamiclog) plus, for the constant-log functor, the parameters
+        # nested under "data" (see collision.param.mustache); the inverse
+        # mapping is _parse_functor (round-trip safety).
+        dumped = value.model_dump(mode="json")
+        if isinstance(value, ConstLogCollision):
+            return {"type_constlog": True, "data": {"coulomb_log": dumped["coulomb_log"]}}
+        return {"type_dynamiclog": True}
 
 
 class CollisionNumericsConfig(BaseModel):

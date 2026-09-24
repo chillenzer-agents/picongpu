@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 from typing import Annotated, Literal
-from pydantic import AfterValidator, BaseModel, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 
 def neq_0(value):
@@ -29,6 +29,11 @@ class Gaussian(BaseModel):
 
     Units policy: SI (m^-3 for densities, m for positions/sigmas).
     """
+
+    # accept both the field names (as produced by model_dump) and the aliases
+    # (e.g. center_front) upon construction, so that serialised output can be
+    # validated again (round-trip safety)
+    model_config = ConfigDict(populate_by_name=True)
 
     type_gaussian: Literal[True] = True
     """discriminator for the AnyDensityProfile union."""

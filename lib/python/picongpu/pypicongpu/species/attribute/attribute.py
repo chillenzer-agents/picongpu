@@ -23,8 +23,14 @@ class Attribute(BaseModel):
 
     Identified by its PIConGPU name.
 
-    PIConGPU term: "particle attributes"
+    PIConGPU term: "particle attributes".
+
+    C++ counterpart: the particle attribute types registered in
+    include/picongpu/param/speciesDefinition.param.
+
+    Units policy: attribute-specific (see the individual attributes).
     """
 
     picongpu_name: str
-    """C++ Code implementing this attribute"""
+    """C++ type name of this attribute (e.g. "weighting"), rendered into the
+    species particle typedef; must be a valid C++ identifier/typename."""

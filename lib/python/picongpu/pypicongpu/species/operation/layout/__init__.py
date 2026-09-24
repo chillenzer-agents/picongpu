@@ -9,5 +9,6 @@ from .one_position import OnePosition
 from .quiet import Quiet
 from .random import Random
 
+# every union member must have a rendering template fragment (see test_union_templates.py)
 AnyLayout = Random | Quiet | OnePosition
 __all__ = ["AnyLayout", "Random", "Quiet", "OnePosition"]

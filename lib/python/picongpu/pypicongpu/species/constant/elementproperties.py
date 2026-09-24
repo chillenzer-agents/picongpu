@@ -15,10 +15,15 @@ class ElementProperties(Constant):
 
     Produces PIConGPU atomic number and ionization energies.
 
+    C++ counterpart: the atomicNumbers / ionizationEnergies /
+    effectiveNuclearCharge particle flags in
+    include/picongpu/param/speciesDefinition.param.
+
     Note: Not necessarily all of the generated properties will be required
     during runtime. However, this is left to the compiler to optimize (which
     is a core concept of PIConGPU).
     """
 
     element: Element
-    """represented chemical element"""
+    """represented chemical element (provides atomic number, ionization
+    energies and the effective nuclear charge)."""

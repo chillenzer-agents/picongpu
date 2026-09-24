@@ -8,7 +8,7 @@ License: GPLv3+
 from typing import Annotated, Literal
 from uuid import uuid4 as uuid
 
-from pydantic import BaseModel, BeforeValidator, computed_field, model_validator
+from pydantic import BaseModel, BeforeValidator, computed_field, field_validator, model_validator
 
 from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_to_cpp_type
 from picongpu.pypicongpu.particle_functor.rng_info import RNGInfo
@@ -16,6 +16,7 @@ from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.rendering.renderedobject import RenderedObject
 from picongpu.pypicongpu.util import alt
+from picongpu.pypicongpu.validation import validate_cpp_identifier
 
 
 def by_bracket(attribute):
@@ -124,17 +125,64 @@ def generate_preamble(attribute_mapping, mode: Literal["Binning", "Filter", "Der
 
 
 class _PreambleStatement(BaseModel):
+    """
+    one preamble statement of a particle functor
+
+    Rendered verbatim into the functor's C++ lambda body (one statement per
+    line) ahead of the main return expression.
+    """
+
     statement: str
+    """the C++ statement, rendered verbatim (a semicolon is appended when
+    the preamble is generated)"""
 
 
 class ParticleFunctor(RenderedObject, BaseModel):
+    """
+    a particle functor (a function of the particle state)
+
+    C++ counterpart: the functor structs rendered into
+    include/picongpu/param/particleFilters.param (filters and derived
+    fields) and binningSetup.param (binning axes and deposition).
+
+    The functor is the combination of a preamble (local variable
+    declarations) and a return expression, both in the C++ scope of the
+    functor's callable body (a lambda, a member function, or a standalone
+    function depending on the rendering context).
+
+    Units policy: the unit dimension of the return value is given by
+    `unit_dimension` (SI base unit exponents).
+    """
+
     name: str
+    """name of the functor, [C++ identifier]; rendered as the C++ alias
+    `using {name} = ...` and the struct `{name}_{uuid}`, so it must be a
+    valid C++ identifier ([A-Za-z_][A-Za-z0-9_]*)"""
+
     functor_expression: Annotated[str, BeforeValidator(PMAccPrinter().doprint)]
+    """the return expression of the functor, given as a sympy expression
+    (converted to a C++ string during validation)"""
+
     functor_preamble: list[_PreambleStatement]
+    """local variable declarations executed before the return expression"""
+
     return_type: Annotated[str, BeforeValidator(translate_to_cpp_type)]
+    """the C++ type of the functor's return value (e.g. "float_X", "int",
+    "bool")"""
+
     unit_dimension: UnitDimension | None = UnitDimension()
+    """the SI unit dimension of the return value; None for integral types
+    (enforced by validation); must be the zero dimension for unitless
+    quantities"""
+
     needs_total_position: bool = False
+    """if True, the functor requires the particle position relative to the
+    total (global) origin; incompatible with random numbers (enforced by
+    validation)"""
+
     rng_info: RNGInfo | None = None
+    """the random number generator distribution used by the functor
+    (uniform or normal); None if the functor is deterministic"""
 
     @computed_field
     def typename(self) -> str:
@@ -154,3 +202,10 @@ class ParticleFunctor(RenderedObject, BaseModel):
                 f"PIConGPU does not support particle functors that need total position and random numbers. You gave: {self.rng_info=}."
             )
         return self
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, name):
+        # The name renders into the C++ alias `using {name} = ...` and the
+        # struct `{name}_{uuid}`.
+        return validate_cpp_identifier(name, field="functor name")

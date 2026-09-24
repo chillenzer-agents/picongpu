@@ -13,8 +13,25 @@ from picongpu.pypicongpu.species.species import Species
 
 
 class FilteredSpecies(BaseModel, RenderedObject):
+    """
+    a species with a particle filter applied
+
+    C++ counterpart: the misc::SpeciesFilter specialization rendered into
+    include/picongpu/param/particleFilters.param and used wherever a
+    (possibly filtered) species is referenced (collisions, diagnostics).
+
+    The combined name `{species.name}_{functor.name}` is used as the C++
+    type name of the filtered species.
+
+    Units policy: see the species and the functor.
+    """
+
     species: Species
+    """the underlying species"""
+
     functor: ParticleFunctor
+    """the particle filter (a boolean particle functor) selecting the
+    subset of particles"""
 
     @computed_field
     def name_with_filter(self) -> str:

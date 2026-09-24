@@ -9,7 +9,7 @@ import math
 from typing import Annotated
 
 import numpy as np
-from pydantic import AfterValidator, BaseModel, Field, PlainSerializer
+from pydantic import AfterValidator, BeforeValidator, BaseModel, Field, PlainSerializer
 from scipy import constants
 
 from ....rendering import RenderedObject
@@ -24,6 +24,18 @@ def serialise_vec(value) -> dict:
     return dict(zip("xyz", value))
 
 
+def deserialise_vec(value):
+    # accept the serialised form (dict with x/y/z keys) in addition to the
+    # native tuple form, so that model_dump(mode="json") output can be
+    # validated again (round-trip safety)
+    if isinstance(value, dict):
+        try:
+            return (value["x"], value["y"], value["z"])
+        except KeyError as error:
+            raise ValueError(f"Expected a vector with the keys x, y, z. You gave: {value=}.") from error
+    return value
+
+
 def validate_unit_vec(value):
     epsilon = 1.0e-5
     if any(np.isinf(value)) or any(np.isnan(value)):
@@ -33,7 +45,12 @@ def validate_unit_vec(value):
     return value
 
 
-Vec3_float = Annotated[tuple[float, float, float], PlainSerializer(serialise_vec), AfterValidator(validate_unit_vec)]
+Vec3_float = Annotated[
+    tuple[float, float, float],
+    BeforeValidator(deserialise_vec),
+    PlainSerializer(serialise_vec),
+    AfterValidator(validate_unit_vec),
+]
 
 
 class Drift(RenderedObject, BaseModel):
@@ -43,13 +60,23 @@ class Drift(RenderedObject, BaseModel):
     Note that the drift is specified by a direction (normalized velocity
     vector) and gamma. Helpers to load from other representations (originating
     from PICMI) are provided.
+
+    C++ counterpart: the drift (gamma * direction) in
+    include/picongpu/param/particle.param.
+
+    Units policy: direction_normalized is dimensionless (unit vector),
+    gamma is the dimensionless Lorentz factor; the drift velocity is
+    (gamma, direction) and is guaranteed < c by gamma >= 1 with a unit direction.
     """
 
     direction_normalized: Vec3_float
-    """direction of drift, length of one"""
+    """direction of drift, [dimensionless]; must be a normalized vector (length 1, no inf/nan).
+    C++ name: direction (particle.param)."""
 
-    gamma: float = Field(ge=1.0, allow_inf_nan=False)
-    """gamma, the physicists know"""
+    gamma: Annotated[float, Field(ge=1.0, allow_inf_nan=False)]
+    """Lorentz factor of the drift, [dimensionless]; must be >= 1 (the physical
+    invariant velocity < c).
+    C++ name: gamma (particle.param)."""
 
     @classmethod
     def from_velocity(cls, velocity: tuple[float, float, float]):
@@ -58,7 +85,7 @@ class Drift(RenderedObject, BaseModel):
 
         computes gamma and direction_normalized for self
 
-        :param velocity: velocity given as vector
+        :param velocity: velocity given as vector, [m/s]
         """
         if (0, 0, 0) == velocity:
             raise ValueError("velocity must not be zero")
@@ -81,7 +108,7 @@ class Drift(RenderedObject, BaseModel):
 
         computes gamma and direction_normalized for self
 
-        :param velocity: velocity given as vector multiplied with gamma
+        :param velocity: velocity given as vector multiplied with gamma, [kg*m/s] (gamma * m * v)
         """
         if (0, 0, 0) == gamma_velocity:
             raise ValueError("velocity must not be zero")

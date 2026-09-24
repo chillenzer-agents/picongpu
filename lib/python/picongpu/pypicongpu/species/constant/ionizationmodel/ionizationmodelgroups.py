@@ -31,6 +31,9 @@ class IonizationModelGroups(BaseModel):
         "Keldysh_like": [Keldysh],
         "electronic_collisional_equilibrium": [ThomasFermi],
     }
+    """the mutual exclusion groups: ionization models in the same group
+    (e.g. the BSI variants) must not be used at the same time; the key is
+    the group name, the value the member model classes"""
 
     def get_by_group(self) -> dict[str, list[type[IonizationModel]]]:
         return copy.deepcopy(self.by_group)

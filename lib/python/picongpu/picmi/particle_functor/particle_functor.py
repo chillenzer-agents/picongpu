@@ -19,7 +19,7 @@ from picongpu.pypicongpu.particle_functor import (
     UnitDimension as PyPIConGPUUnitDimension,
     generate_preamble,
 )
-from picongpu.pypicongpu.util import alt, decorating_class
+from picongpu.pypicongpu.util import alt, decorating_class, cpp_identifier_or_raise
 
 _COORDINATE_SYSTEM = {
     (
@@ -97,6 +97,7 @@ class ParticleFunctor(BaseModel):
             raise ValueError(
                 f"ParticleFunctor can take at most one RNG. You have requested {rng_classes=} in your signature."
             )
+        cpp_identifier_or_raise(self.name, usage="ParticleFunctor(functor=..., name='my_functor').")
         return self
 
     def get_as_pypicongpu(self, mode) -> PyPIConGPUParticleFunctor:

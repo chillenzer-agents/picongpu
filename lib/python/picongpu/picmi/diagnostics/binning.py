@@ -7,6 +7,7 @@ License: GPLv3+
 
 import warnings
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -18,9 +19,12 @@ from picongpu.pypicongpu.output.binning import Binning as PyPIConGPUBinning
 from picongpu.pypicongpu.output.binning import BinningAxis as PyPIConGPUBinningAxis
 from picongpu.pypicongpu.output.binning import BinSpec as PyPIConGPUBinSpec
 from picongpu.pypicongpu.output.binning import ParticleRegion
+from picongpu.pypicongpu.util import as_functor
 
 from ..copy_attributes import default_converts_to
 from .timestepspec import TimeStepSpec
+
+_BINNING_FUNCTOR_USAGE = "ParticleFunctor(functor=..., name='my_functor')."
 
 
 def _period_starts_at_zero(period: TimeStepSpec) -> bool:
@@ -39,7 +43,8 @@ class BinSpec(BaseModel):
 
 
 class BinningAxis(BaseModel):
-    functor: BinningFunctor
+    # A bare named callable is instantiated as the field's declared class (ParticleFunctor).
+    functor: Annotated[BinningFunctor, as_functor(BinningFunctor, usage=_BINNING_FUNCTOR_USAGE)]
     bin_spec: BinSpec
     name: str | None = None
     use_overflow_bins: bool = True
@@ -62,7 +67,8 @@ class Binning(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str
-    deposition_functor: BinningFunctor
+    # A bare named callable is instantiated as the field's declared class (ParticleFunctor).
+    deposition_functor: Annotated[BinningFunctor, as_functor(BinningFunctor, usage=_BINNING_FUNCTOR_USAGE)]
     axes: list[BinningAxis]
     species: Species | FilteredSpecies | list[Species | FilteredSpecies]
     period: TimeStepSpec | None = None

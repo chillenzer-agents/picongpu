@@ -7,6 +7,7 @@ import sys
 import picmistandard
 
 from . import constants, diagnostics
+from .applied_field import AnalyticAppliedField, ConstantAppliedField
 from .distribution import (
     AnalyticDistribution,
     CylindricalDistribution,
@@ -57,6 +58,8 @@ __all__ = [
     "GaussianLaser",
     "TWTSLaser",
     "PlaneWaveLaser",
+    "ConstantAppliedField",
+    "AnalyticAppliedField",
     "Species",
     "FilteredSpecies",
     "ParticleFilter",

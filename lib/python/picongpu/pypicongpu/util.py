@@ -294,28 +294,46 @@ _CPP_IDENTIFIER = re.compile(r"^[A-Za-z0-9_]+$")
 
 def cpp_identifier_or_raise(name: Any, *, usage: str) -> str:
     """
-    Return `name` if it is a valid C++ identifier (`[A-Za-z0-9_]+`), else raise a `ValueError`.
+    Return `name` if it consists only of C++-compatible identifier characters
+    (`[A-Za-z0-9_]+`, the same check the species name uses), else raise a `ValueError`.
 
+    This deliberately mirrors the species-name check rather than fully validating C++
+    (it does not reject C++ keywords or names starting with a digit); see issue #184.
     `usage` is appended to the error message to point the user at the explicit alternative.
     """
     if not isinstance(name, str) or not _CPP_IDENTIFIER.fullmatch(name):
         raise ValueError(
-            f"A functor name must be a valid C++ identifier ([A-Za-z0-9_]+) because it becomes part of the "
-            f"generated C++, but got {name!r}. Give the callable a proper name, or {usage}"
+            f"A functor name may only contain C++-compatible identifier characters ([A-Za-z0-9_]+) because it "
+            f"becomes part of the generated C++, but got {name!r}. Give the callable a proper name, or {usage}"
         )
     return name
 
 
-def as_functor(cls: type, *, already: type | tuple[type, ...] | None = None, usage: str) -> BeforeValidator:
+def as_functor(
+    cls: type,
+    *,
+    already: type | tuple[type, ...] | None = None,
+    usage: str,
+    allow_list: bool = False,
+) -> BeforeValidator:
     """
     Return a pydantic BeforeValidator that accepts a bare *named* callable in a
     functor-typed field and instantiates `cls` from it.
 
-    It fires only when the value is callable and not already an instance of the
-    declared functor type (`already`, defaulting to `cls`). Anonymous callables
-    (e.g. lambdas, which have ``__name__ == "<lambda>"``) and callables whose
-    ``__name__`` is not a valid C++ identifier are rejected eagerly, as the name
-    becomes part of the generated C++.
+    It fires only when the value is callable, is not a class, and is not already
+    an instance of the declared functor type (`already`, defaulting to `cls`).
+    Anonymous callables (e.g. lambdas, which have ``__name__ == "<lambda>"``) and
+    callables whose ``__name__`` is not a valid C++ identifier are rejected
+    eagerly, as the name becomes part of the generated C++.
+
+    Classes are excluded: a class is callable and (usually) has a valid
+    ``__name__``, but instantiating ``cls`` *from a class* would silently store
+    that class as the wrapped callable and defer the failure; passing a class
+    where a functor/instance is expected is a user error and stays rejected.
+
+    With ``allow_list=True`` a list is coerced element-wise (fields whose PICMI
+    type is a union with ``list[...]``, e.g. ``Species.initial_distribution``);
+    non-callable elements are left untouched so pydantic still reports them.
 
     Usage:
         class Model(BaseModel):
@@ -323,11 +341,19 @@ def as_functor(cls: type, *, already: type | tuple[type, ...] | None = None, usa
     """
     already = already if already is not None else cls
 
-    def _coerce(value: Any) -> Any:
-        if callable(value) and not isinstance(value, already):
+    def _coerce_one(value: Any) -> Any:
+        if callable(value) and not isinstance(value, type) and not isinstance(value, already):
             cpp_identifier_or_raise(getattr(value, "__name__", None), usage=usage)
             return cls(value)
         return value
+
+    def _coerce(value: Any) -> Any:
+        if allow_list and isinstance(value, list):
+            coerced = [_coerce_one(item) for item in value]
+            if all(new is old for new, old in zip(coerced, value)):
+                return value
+            return coerced
+        return _coerce_one(value)
 
     return BeforeValidator(_coerce)
 

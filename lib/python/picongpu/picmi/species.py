@@ -107,7 +107,12 @@ class Species(PICMI_Species):
     # distribution instance (all pydantic models) unchanged.
     initial_distribution: Annotated[
         PICMI_AnyDistribution | list[PICMI_AnyDistribution] | None,
-        as_functor(AnalyticDistribution, already=BaseModel, usage="AnalyticDistribution(density_function=...)."),
+        as_functor(
+            AnalyticDistribution,
+            already=BaseModel,
+            usage="AnalyticDistribution(density_function=...).",
+            allow_list=True,
+        ),
     ] = None
 
     # Theoretically, Position(), Momentum() and Weighting() are also requirements imposed from the outside,

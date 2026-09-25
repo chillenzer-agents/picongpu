@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from picongpu.picmi.diagnostics.backend_config import OpenPMDConfig
+from picongpu.picmi.diagnostics.backend_config import OpenPMDBackendConfig, OpenPMDConfig
 from picongpu.picmi.particle_functor import ParticleFunctor as BinningFunctor
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species
@@ -66,7 +66,7 @@ class Binning(BaseModel):
     axes: list[BinningAxis]
     species: Species | FilteredSpecies | list[Species | FilteredSpecies]
     period: TimeStepSpec | None = None
-    openPMDBackendConfig: dict | None = None
+    openPMDBackendConfig: OpenPMDBackendConfig | None = None
     openPMDExt: str | None = None
     openPMDInfix: str | None = None
     dumpPeriod: int = 1

@@ -7,13 +7,14 @@ License: GPLv3+
 
 from os import PathLike
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, computed_field
 
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species
 from picongpu.pypicongpu.output.openpmd_plugin import NATIVE_FIELDS
+from picongpu.pypicongpu.util import as_functor
 from .backend_config import BackendConfig, OpenPMDConfig
 from .timestepspec import TimeStepSpec
 from picongpu.picmi.particle_functor import ParticleFunctor
@@ -36,7 +37,10 @@ class NativeFieldDump(_FieldDump):
 
 class DerivedFieldDump(_FieldDump):
     species: Species | FilteredSpecies
-    functor: ParticleFunctor
+    # A bare named callable is instantiated as the field's declared class (ParticleFunctor).
+    functor: Annotated[
+        ParticleFunctor, as_functor(ParticleFunctor, usage="ParticleFunctor(functor=..., name='my_functor').")
+    ]
 
     @computed_field
     def filtername(self) -> None | str:

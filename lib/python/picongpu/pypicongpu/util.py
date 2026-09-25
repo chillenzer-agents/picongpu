@@ -5,6 +5,7 @@ Authors: Hannes Troepgen, Brian Edward Marre, Julian Lenz
 License: GPLv3+
 """
 
+import re
 from itertools import chain
 from functools import wraps
 from inspect import Parameter, signature
@@ -286,6 +287,49 @@ def _normalize_for_comparison(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return tuple(value)
     return value
+
+
+_CPP_IDENTIFIER = re.compile(r"^[A-Za-z0-9_]+$")
+
+
+def cpp_identifier_or_raise(name: Any, *, usage: str) -> str:
+    """
+    Return `name` if it is a valid C++ identifier (`[A-Za-z0-9_]+`), else raise a `ValueError`.
+
+    `usage` is appended to the error message to point the user at the explicit alternative.
+    """
+    if not isinstance(name, str) or not _CPP_IDENTIFIER.fullmatch(name):
+        raise ValueError(
+            f"A functor name must be a valid C++ identifier ([A-Za-z0-9_]+) because it becomes part of the "
+            f"generated C++, but got {name!r}. Give the callable a proper name, or {usage}"
+        )
+    return name
+
+
+def as_functor(cls: type, *, already: type | tuple[type, ...] | None = None, usage: str) -> BeforeValidator:
+    """
+    Return a pydantic BeforeValidator that accepts a bare *named* callable in a
+    functor-typed field and instantiates `cls` from it.
+
+    It fires only when the value is callable and not already an instance of the
+    declared functor type (`already`, defaulting to `cls`). Anonymous callables
+    (e.g. lambdas, which have ``__name__ == "<lambda>"``) and callables whose
+    ``__name__`` is not a valid C++ identifier are rejected eagerly, as the name
+    becomes part of the generated C++.
+
+    Usage:
+        class Model(BaseModel):
+            functor: Annotated[ParticleFunctor, as_functor(ParticleFunctor, usage="...")]
+    """
+    already = already if already is not None else cls
+
+    def _coerce(value: Any) -> Any:
+        if callable(value) and not isinstance(value, already):
+            cpp_identifier_or_raise(getattr(value, "__name__", None), usage=usage)
+            return cls(value)
+        return value
+
+    return BeforeValidator(_coerce)
 
 
 def rejects_unsupported(feature: str, *, default: Any = None) -> BeforeValidator:

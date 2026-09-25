@@ -5,13 +5,14 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from typing import Any, Callable
+from typing import Annotated, Any, Callable
 
 from pydantic import BaseModel, ConfigDict, computed_field
 
 from picongpu.picmi.particle_functor.particle_functor import Particle, ParticleFunctor
 from picongpu.picmi.species import Species
 from picongpu.pypicongpu.particle_functor import FilteredSpecies as PyPIConGPUFilteredSpecies
+from picongpu.pypicongpu.util import as_functor
 
 
 class ParticleFilter(ParticleFunctor):
@@ -24,7 +25,10 @@ class ParticleFilter(ParticleFunctor):
 
 class FilteredSpecies(BaseModel):
     species: Species
-    functor: ParticleFilter
+    # A bare named callable is turned into a ParticleFilter (the field's declared class);
+    # @ParticleFilter remains the explicit way to obtain a filter. Anonymous callables
+    # and C++-invalid names are rejected eagerly by the coercion helper.
+    functor: Annotated[ParticleFilter, as_functor(ParticleFilter, usage="@ParticleFilter(name='my_filter').")]
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

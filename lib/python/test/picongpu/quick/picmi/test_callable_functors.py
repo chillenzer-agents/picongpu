@@ -54,7 +54,9 @@ class TestCallableFunctorsAccepted(TestCase):
 
     def test_binning_axis_functor_is_coerced_to_particle_functor(self):
         coerced = BinningAxis(functor=kinetic_energy, bin_spec=bin_spec())
-        explicit = BinningAxis(functor=ParticleFunctor(name="kinetic_energy", functor=kinetic_energy), bin_spec=bin_spec())
+        explicit = BinningAxis(
+            functor=ParticleFunctor(name="kinetic_energy", functor=kinetic_energy), bin_spec=bin_spec()
+        )
 
         self.assertIsInstance(coerced.functor, ParticleFunctor)
         self.assertNotIsInstance(coerced.functor, ParticleFilter)
@@ -76,7 +78,9 @@ class TestCallableFunctorsAccepted(TestCase):
         explicit = Binning(
             name="b",
             deposition_functor=ParticleFunctor(name="kinetic_energy", functor=kinetic_energy),
-            axes=[BinningAxis(functor=ParticleFunctor(name="kinetic_energy", functor=kinetic_energy), bin_spec=bin_spec())],
+            axes=[
+                BinningAxis(functor=ParticleFunctor(name="kinetic_energy", functor=kinetic_energy), bin_spec=bin_spec())
+            ],
             species=self.species,
         )
 
@@ -107,10 +111,24 @@ class TestCallableFunctorsAccepted(TestCase):
         )
 
         self.assertIsInstance(coerced.initial_distribution, AnalyticDistribution)
-        self.assertEqual(coerced.initial_distribution.density_expression, explicit.initial_distribution.density_expression)
+        self.assertEqual(
+            coerced.initial_distribution.density_expression, explicit.initial_distribution.density_expression
+        )
         self.assertEqual(
             coerced.initial_distribution.get_as_pypicongpu(None),
             explicit.initial_distribution.get_as_pypicongpu(None),
+        )
+
+    def test_species_initial_distribution_list_of_callables_is_coerced(self):
+        coerced = picmi.Species(name="e", particle_type="electron", initial_distribution=[density])
+        explicit = picmi.Species(
+            name="e", particle_type="electron", initial_distribution=[AnalyticDistribution(density_function=density)]
+        )
+
+        self.assertEqual(len(coerced.initial_distribution), 1)
+        self.assertIsInstance(coerced.initial_distribution[0], AnalyticDistribution)
+        self.assertEqual(
+            coerced.initial_distribution[0].density_expression, explicit.initial_distribution[0].density_expression
         )
 
     def test_existing_instances_and_decorators_stay_unchanged(self):
@@ -190,6 +208,28 @@ class TestCallableFunctorsRejected(TestCase):
             ParticleFunctor(functor=positive, name="not a valid identifier")
         # the explicit valid spelling still works
         self.assertEqual(ParticleFunctor(functor=positive, name="valid_name").name, "valid_name")
+
+    def test_classes_are_rejected_eagerly_at_all_sites(self):
+        # A class is callable and has a valid __name__, but passing it is a user
+        # error: it must not be coerced into a functor wrapping the class itself.
+        cases = {
+            "FilteredSpecies": lambda: picmi.FilteredSpecies(species=self.species, functor=ParticleFilter),
+            "BinningAxis": lambda: BinningAxis(functor=ParticleFunctor, bin_spec=bin_spec()),
+            "Binning": lambda: Binning(
+                name="b",
+                deposition_functor=ParticleFunctor,
+                axes=[BinningAxis(functor=kinetic_energy, bin_spec=bin_spec())],
+                species=self.species,
+            ),
+            "DerivedFieldDump": lambda: DerivedFieldDump(species=self.species, functor=ParticleFunctor),
+            "Species": lambda: picmi.Species(
+                name="e", particle_type="electron", initial_distribution=AnalyticDistribution
+            ),
+        }
+        for label, construct in cases.items():
+            with self.subTest(site=label):
+                with self.assertRaises(ValidationError):
+                    construct()
 
 
 class TestAsFunctorHelper(TestCase):

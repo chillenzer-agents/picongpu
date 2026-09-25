@@ -6,16 +6,19 @@ License: GPLv3+
 """
 
 from enum import Enum
-from operator import attrgetter, itemgetter
-from typing import Callable, Literal
+from operator import attrgetter
+from typing import Annotated, Callable, Literal
 
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     Field,
+    PlainSerializer,
     computed_field,
     field_validator,
+    model_validator,
 )
-from sympy import Expr, Symbol
+from sympy import Expr, Symbol, srepr, sqrt, sympify
 from sympy.vector import CoordSys3D, Vector
 
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
@@ -25,29 +28,88 @@ from picongpu.pypicongpu.species import Species
 
 
 class LinearFrequencies(BaseModel):
-    """Linear frequency scale configuration."""
+    """
+    linear frequency scale for the radiation calculation
 
-    N_omega: int = Field(2048, description="Number of frequency values in linear scale")
-    omega_min: float = Field(0.0, description="Minimum frequency in [1/s]")
-    omega_max: float = Field(1.06e16, description="Maximum frequency in [1/s]")
+    C++ counterpart: the frequency scale parameters of the radiation plugin
+    (type "linear": N_omega, omega_min, omega_max).
+
+    Units policy: angular frequencies in [1/s].
+    """
+
+    N_omega: Annotated[int, Field(ge=1)] = 2048
+    """number of frequency points, [dimensionless]; must be >= 1"""
+
+    omega_min: Annotated[float, Field(ge=0.0)] = 0.0
+    """lowest angular frequency of the scale, [1/s]; must be >= 0 and < omega_max"""
+
+    omega_max: Annotated[float, Field(gt=0.0)] = 1.06e16
+    """highest angular frequency of the scale, [1/s]; must be > 0 and > omega_min"""
+
     type_linear_frequencies: Literal[True] = True
+    """tag field identifying the linear frequency scale (discriminator)"""
+
+    @model_validator(mode="after")
+    def _check_omega_range(self):
+        if self.omega_min >= self.omega_max:
+            raise ValueError(
+                f"omega_min must be smaller than omega_max. "
+                f"You gave omega_min={self.omega_min}, omega_max={self.omega_max}."
+            )
+        return self
 
 
 class LogFrequencies(BaseModel):
-    """Logarithmic frequency scale configuration."""
+    """
+    logarithmic frequency scale for the radiation calculation
 
-    N_omega: int = Field(2048, description="Number of frequency values in linear scale")
-    omega_min: float = Field(1.0e14, description="Minimum frequency in [1/s]")
-    omega_max: float = Field(1.0e17, description="Maximum frequency in [1/s]")
+    C++ counterpart: the frequency scale parameters of the radiation plugin
+    (type "log": N_omega, omega_min, omega_max).
+
+    Units policy: angular frequencies in [1/s].
+    """
+
+    N_omega: Annotated[int, Field(ge=1)] = 2048
+    """number of frequency points, [dimensionless]; must be >= 1"""
+
+    omega_min: Annotated[float, Field(gt=0.0)] = 1.0e14
+    """lowest angular frequency of the scale, [1/s]; must be > 0 (logarithm is
+    undefined for non-positive frequencies) and < omega_max"""
+
+    omega_max: Annotated[float, Field(gt=0.0)] = 1.0e17
+    """highest angular frequency of the scale, [1/s]; must be > 0 and > omega_min"""
+
     type_log_frequencies: Literal[True] = True
+    """tag field identifying the logarithmic frequency scale (discriminator)"""
+
+    @model_validator(mode="after")
+    def _check_omega_range(self):
+        if self.omega_min >= self.omega_max:
+            raise ValueError(
+                f"omega_min must be smaller than omega_max. "
+                f"You gave omega_min={self.omega_min}, omega_max={self.omega_max}."
+            )
+        return self
 
 
 class FrequenciesFromList(BaseModel):
-    """Frequency list configuration."""
+    """
+    frequency scale for the radiation calculation read from a file
 
-    N_omega: int = Field(2048, description="Number of frequency values in linear scale")
-    list_location: str = Field(description="Path to text file containing frequencies")
+    C++ counterpart: the frequency scale parameters of the radiation plugin
+    (type "from list": N_omega, list_location).
+
+    Units policy: frequencies in [1/s].
+    """
+
+    N_omega: Annotated[int, Field(ge=1)] = 2048
+    """number of frequency points, [dimensionless]; must be >= 1"""
+
+    list_location: Annotated[str, Field(min_length=1)]
+    """path to a text file containing the frequencies, one per line, [1/s]; must not be empty"""
+
     type_frequencies_from_list: Literal[True] = True
+    """tag field identifying the from-list frequency scale (discriminator)"""
 
 
 FrequencyConfiguration = LinearFrequencies | LogFrequencies | FrequenciesFromList
@@ -83,24 +145,86 @@ def _make_vector(coefficients, basis_vectors=CoordSys3D("e")):
     return sum((coeff * vec for coeff, vec in zip(coefficients, basis_vectors)), Vector.zero)
 
 
-class RadiationObserverConfiguration(BaseModel):
-    """Complete observer configuration."""
+# Fixed symbol used for the (de)serialisation of index_to_direction, so that
+# the serialised form is canonical (stable symbol name) and round-trips.
+# The name is mangled so that it cannot collide with a user-provided direction
+# mapping that legitimately uses its own symbol named "index" (sympy interns
+# symbols by name and assumptions, so a user "index" would be the very same
+# object and get silently re-bound during deserialisation).
+_OBSERVER_INDEX = Symbol("pypicongpu_observer_index")
 
-    N_observer: int = Field(256, description="Total number of observation directions")
-    index_to_direction: Callable[[Symbol], tuple[Expr, Expr, Expr]] = Field(exclude=True)
+
+def serialise_index_to_direction(value) -> dict[str, str]:
+    # Evaluate the direction mapping at the canonical symbol and serialise the
+    # three component expressions (lossless, via sympy's srepr). Components
+    # are canonicalised through sympify first, because srepr of a python
+    # scalar (e.g. 0 -> "0") differs from srepr of its sympy counterpart
+    # (Integer(0) -> "Integer(0)"), which the normalising validator produces.
+    # A dict (rather than a list) is used so that the value is also accepted
+    # by the rendering context checker (lists may only contain dicts).
+    return {key: srepr(sympify(component)) for key, component in zip("xyz", value(_OBSERVER_INDEX))}
+
+
+def deserialise_index_to_direction(value):
+    # Rebuild the direction mapping from the serialised form (a dict of three
+    # sympy expression strings, keyed x/y/z), so that model_dump(mode="json")
+    # output can be validated again (round-trip safety). Components stay
+    # sympy objects (srepr is a faithful round-trip), so that re-serialising
+    # yields the identical srepr strings.
+    if isinstance(value, dict) and set(value) == {"x", "y", "z"}:
+        components = [sympify(value[key]) for key in "xyz"]
+
+        def direction(arg):
+            return tuple(component.subs(_OBSERVER_INDEX, arg) for component in components)
+
+        return direction
+    return value
+
+
+class RadiationObserverConfiguration(BaseModel):
+    """
+    observer (virtual detector) configuration for the radiation plugin
+
+    C++ counterpart: the observer direction mapping of the radiation plugin
+    (N_observer and the direction expression per observer index).
+
+    Units policy: dimensionless (indices and direction cosines).
+    """
+
+    N_observer: Annotated[int, Field(ge=1)] = 256
+    """total number of observation directions, [dimensionless]; must be >= 1"""
+
+    index_to_direction: Annotated[
+        Callable[[Symbol], tuple[Expr, Expr, Expr]],
+        BeforeValidator(deserialise_index_to_direction),
+        PlainSerializer(serialise_index_to_direction),
+    ]
+    """sympy mapping from the observer index to a (nonzero, normalisable) 3D
+    direction vector; normalised to unit length during validation. Serialised
+    as the three component expressions (sympy srepr strings, keyed x/y/z)."""
 
     @field_validator("index_to_direction", mode="after")
     @classmethod
     def _validate_index_to_direction(cls, value):
-        index = Symbol("index")
-        vec = _make_vector(value(index))
+        # the mapping is evaluated at the canonical placeholder, so that a
+        # user direction that legitimately uses its own symbol named "index"
+        # is not conflated with the observer index (n1)
+        components = [sympify(component) for component in value(_OBSERVER_INDEX)]
+        vec = _make_vector(components)
         if vec.magnitude().equals(1):
             return value
         if vec.magnitude().equals(0):
             raise ValueError(f"The index_to_direction expression must be normalisable. You gave: {vec=} with norm 0.")
-        return lambda arg: tuple(
-            map(itemgetter(2), sorted(vec.normalize().subs(index, arg).components.items(), key=itemgetter(1)))
-        )
+        # normalise component-wise; the normalised Vector cannot be
+        # re-extracted by sorting its components dict, because neither the
+        # basis terms nor the symbolic coefficients are orderable in sympy
+        magnitude_sq = sum(component**2 for component in components)
+
+        def direction(arg):
+            magnitude = sqrt(magnitude_sq.subs(_OBSERVER_INDEX, arg))
+            return tuple(component.subs(_OBSERVER_INDEX, arg) / magnitude for component in components)
+
+        return direction
 
     @computed_field
     def component_expressions(self) -> dict[str, str]:
@@ -110,126 +234,133 @@ class RadiationObserverConfiguration(BaseModel):
 
 
 class RadiationConfiguration(BaseModel):
-    """Complete radiation plugin configuration."""
+    """
+    core radiation calculation parameters
 
-    verbose_level: int = Field(
-        3,
-        description="Verbose level (0=nothing, 1=physics, 2=sim_state, 4=memory, 8=critical)",
-    )
+    C++ counterpart: the core parameters of the radiation plugin
+    (verbose level, frequency scale, Nyquist factor, form factor).
 
-    frequencies: FrequencyConfiguration = Field(
-        default_factory=LinearFrequencies,
-        description="Frequency scale configuration",
-    )
+    Units policy: angular frequencies in [1/s] (via the frequency scale);
+    all other quantities dimensionless.
+    """
 
-    nyquist_factor: float = Field(0.5, description="Nyquist factor (0 < factor < 1)")
+    verbose_level: Annotated[int, Field(ge=0)] = 3
+    """verbose level (0=nothing, 1=physics, 2=sim_state, 4=memory, 8=critical),
+    [dimensionless]; must be >= 0"""
 
-    form_factor: FormFactorConfiguration = Field(
-        FormFactorConfiguration.Gauss_spherical,
-        description="Form factor type for particle charge distribution",
-    )
+    frequencies: FrequencyConfiguration = Field(default_factory=LinearFrequencies)
+    """frequency scale configuration (linear, logarithmic, or from list)"""
+
+    nyquist_factor: Annotated[float, Field(gt=0.0, lt=1.0)] = 0.5
+    """Nyquist factor for the time integration, [dimensionless]; must satisfy 0 < factor < 1"""
+
+    form_factor: FormFactorConfiguration = FormFactorConfiguration.Gauss_spherical
+    """form factor type for the particle charge distribution"""
 
 
 class RadiationPluginConfig(BaseModel):
-    """Top-level radiation plugin configuration.
+    """
+    complete radiation plugin configuration
+
+    C++ counterpart: include/picongpu/plugins/radiation (the
+    --radiation.* parameters in the generated N.cfg).
 
     Combines radiation settings, observer settings, and window function
     configuration into a single coherent model.
+
+    Units policy: time steps and thresholds are dimensionless unless tagged.
     """
 
-    radiation: RadiationConfiguration = Field(
-        default_factory=RadiationConfiguration,
-        description="Core radiation plugin configuration",
-    )
+    radiation: RadiationConfiguration = Field(default_factory=RadiationConfiguration)
+    """core radiation plugin configuration"""
 
-    observer: RadiationObserverConfiguration = Field(description="Observer configuration for virtual detectors")
+    observer: RadiationObserverConfiguration
+    """observer configuration for the virtual detectors"""
 
-    window_function: WindowFunctionConfiguration = Field(
-        WindowFunctionConfiguration.NONE,
-        description="Window function to reduce ringing effects",
-    )
+    window_function: WindowFunctionConfiguration = WindowFunctionConfiguration.NONE
+    """window function to reduce ringing effects"""
 
-    num_accumulation_steps: int = Field(
-        0,
-        description="Period, after which the calculated radiation data should be dumped to the file system. Default is 0, therefore never. In order to store the radiation data, a value >=1 should be used.",
-    )
+    num_accumulation_steps: Annotated[int, Field(ge=0)] = 0
+    """period, after which the calculated radiation data are dumped to the
+    file system, [time-step number]; must be >= 0 (0 = never)"""
 
-    last_radiation: bool = Field(
-        False,
-        description="If set, the radiation spectra summed between the last and the current dump-time-step are stored. Used for a better evaluation of the temporal evolution of the emitted radiation.",
-    )
+    last_radiation: bool = False
+    """if set, the radiation spectra summed between the last and the current
+    dump time step are stored"""
 
-    folder_last_rad: str = Field(
-        "lastRad",
-        description="Name of the folder, in which the summed spectra for the simulation time between the last dump and the current dump are stored. Default is 'lastRad'.",
-    )
+    folder_last_rad: str = "lastRad"
+    """folder name for the summed spectra between the last and the current
+    dump time step"""
 
-    total_radiation: bool = Field(
-        False,
-        description="If set the spectra summed from simulation start till current time step are stored.",
-    )
+    total_radiation: bool = False
+    """if set, the spectra summed from simulation start till the current time
+    step are stored"""
 
-    folder_total_rad: str = Field(
-        "totalRad",
-        description="Folder name in which the total radiation spectra, integrated from the beginning of the simulation, are stored. Default 'totalRad'.",
-    )
+    folder_total_rad: str = "totalRad"
+    """folder name for the total radiation spectra, integrated from the
+    beginning of the simulation"""
 
-    start: int = Field(
-        2,
-        description="Time step, at which PIConGPU starts calculating the radiation. Default is 2 in order to get enough history of the particles.",
-    )
+    start: Annotated[int, Field(ge=0)] = 2
+    """time step at which PIConGPU starts calculating the radiation,
+    [time-step number]; must be >= 0 (default 2: enough particle history)"""
 
-    end: int = Field(
-        0,
-        description="Time step, at which the radiation calculation should end. Default: 0 (stops at end of simulation).",
-    )
+    end: Annotated[int, Field(ge=0)] = 0
+    """time step at which the radiation calculation ends, [time-step number];
+    must be >= 0 (0 = until the end of the simulation)"""
 
-    rad_per_gpu: bool = Field(
-        False,
-        description="If set, each GPU additionally stores its own spectra without summing over the entire simulation area. This allows for a localization of specific spectral features.",
-    )
+    rad_per_gpu: bool = False
+    """if set, each GPU additionally stores its own spectra without summing
+    over the entire simulation area"""
 
-    folder_rad_per_gpu: str = Field(
-        "radPerGPU",
-        description="Name of the folder, where the GPU specific spectra are stored. Default: 'radPerGPU'",
-    )
+    folder_rad_per_gpu: str = "radPerGPU"
+    """folder name for the GPU-specific spectra"""
 
-    num_jobs: int = Field(
-        2,
-        description="Number of independent jobs used for the radiation calculation. This option is used to increase the utilization of the device by producing more independent work. This option enables accumulation of data in parallel into multiple temporary arrays, thereby increasing the utilization of the device by increasing the memory footprint. Default: 2",
-    )
+    num_jobs: Annotated[int, Field(ge=1)] = 2
+    """number of independent jobs used for the radiation calculation,
+    [dimensionless]; must be >= 1"""
 
-    open_pmd_suffix: str = Field(
-        "_%T_0_0_0.h5",
-        description="This sets the suffix for openPMD filename extension and iteration expansion pattern. Default: '_%T_0_0_0.h5'",
-    )
+    open_pmd_suffix: str = "_%T_0_0_0.h5"
+    """suffix for the openPMD filename extension and iteration expansion
+    pattern"""
 
-    open_pmd_checkpoint_extension: str = Field(
-        "h5",
-        description="Set filename extension for openPMD checkpoints. Default: 'h5'",
-    )
+    open_pmd_checkpoint_extension: str = "h5"
+    """filename extension for openPMD checkpoints"""
 
-    open_pmd_config: str = Field(
-        "{}",
-        description="Give JSON/TOML configuration for initializing openPMD. Default: '{}' (no JSON/TOML configuration used)",
-    )
+    open_pmd_config: str = "{}"
+    """JSON/TOML configuration for initializing openPMD (empty = none)"""
 
-    open_pmd_checkpoint_config: str = Field(
-        "{}",
-        description="Give JSON/TOML configuration for initializing openPMD checkpointing. Default: '{}' (no JSON/TOML configuration used)",
-    )
+    open_pmd_checkpoint_config: str = "{}"
+    """JSON/TOML configuration for initializing openPMD checkpointing
+    (empty = none)"""
 
-    distributed_amplitude: bool = Field(
-        False,
-        description="Activate the optional output of distributed amplitudes per MPI rank. in the openPMD output. Default: 0 (deactivated/no additional output)",
-    )
+    distributed_amplitude: bool = False
+    """if set, output the distributed amplitudes per MPI rank in the
+    openPMD output"""
 
 
 class RadiationPlugin(BaseModel):
+    """
+    the radiation plugin (top level)
+
+    C++ counterpart: the radiation plugin instance in
+    include/picongpu/plugins (type tag + config + species + period).
+
+    Units policy: see the sub-models.
+    """
+
     type_radiation: Literal[True] = True
+    """tag field identifying the radiation plugin (discriminator)"""
+
     config: RadiationPluginConfig
+    """the complete radiation plugin configuration"""
+
     species: list[Species | FilteredSpecies]
+    """the particle species (or filtered species) whose radiation is
+    calculated"""
+
     period: TimeStepSpec
+    """the output periods; must not contain a period starting at time step 0
+    (the radiation needs particle history)"""
 
     @field_validator("period", mode="after")
     @classmethod

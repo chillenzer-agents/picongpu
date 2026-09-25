@@ -15,6 +15,7 @@ exactly the code that is executed in CI**.
    - `running_simulation/`: bash commands and workflow invocations
    - `quickstart/`: the commands of the quick start guide
    - `selected_topics/`: the feature deep dives
+   - `troubleshooting/`: input-file-generation validation
  - Python snippets are executed by the pytest suite in `test_snippets.py`
    (one test per snippet): each script runs in a subprocess with a fresh
    working directory and an isolated environment (`HOME`, `PIC_RC`) and must
@@ -96,8 +97,9 @@ exactly the code that is executed in CI**.
   `selected_topics/binning.py`, `selected_topics/openpmd.py`,
   `selected_topics/energy_histogram.py`, `selected_topics/phase_space.py`,
   `selected_topics/radiation.py`, `selected_topics/checkpoint.py`,
-  `selected_topics/macro_particle_count.py` and
-  `selected_topics/time_steps.py`.
+  `selected_topics/macro_particle_count.py`,
+  `selected_topics/time_steps.py` and
+  `troubleshooting/validate_before_submit.py`.
   A few files are short enough that the whole file is intended, so the
   directive carries no focus option at all (e.g. the TOML configuration
   examples).

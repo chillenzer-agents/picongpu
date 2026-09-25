@@ -22,7 +22,6 @@ from sympy import Symbol
 
 from picongpu import pypicongpu, templates
 from picongpu.picmi import constants
-from picongpu.picmi.diagnostics import AnyDiagnostic
 from picongpu.picmi.diagnostics.field_dump import NativeFieldDump, _FieldDump
 from picongpu.picmi.diagnostics.particle_dump import ParticleDump
 from picongpu.picmi.diagnostics.phase_space import PhaseSpace
@@ -30,7 +29,6 @@ from picongpu.picmi.distribution.AnalyticDistribution import AnalyticDistributio
 from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid, AnyGrid
 from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
-from picongpu.picmi.lasers import AnyLaser
 from picongpu.picmi.layout import AnyLayout
 from picongpu.picmi.species import Species
 from picongpu.picmi.species_requirements import (
@@ -216,21 +214,6 @@ class Simulation(picmistandard.PICMI_Simulation):
     """time after which the cluster scheduler will stop the simulation"""
 
     picongpu_distributions: list[_DensityImpl] = Field(default_factory=list)
-
-    # The stock PICMI base types ``diagnostics`` as a list of the standard
-    # diagnostic union, which rejects our custom diagnostic classes
-    # (EnergyHistogram, ParticleEnergy, etc.). Re-declare it to accept the
-    # PIConGPU ``AnyDiagnostic`` union as well so ``extra="forbid"`` + the
-    # typed union don't reject them (see the picmi-standard pydantic-refactoring
-    # WIP).
-    diagnostics: list[AnyDiagnostic] = Field(default_factory=list)
-
-    # Same for ``lasers``: the stock base types it as ``list[PICMI_AnyLaser]``
-    # (``PICMI_GaussianLaser | PICMI_AnalyticLaser | PICMI_LaserExtension``),
-    # which rejects our code-specific lasers that are not standard subclasses
-    # (PlaneWaveLaser, TWTSLaser, FromOpenPMDPulseLaser). Re-declare it with the
-    # PIConGPU ``AnyLaser`` union so ``add_laser`` accepts them.
-    lasers: list[AnyLaser] = Field(default_factory=list)
 
     _runner: Runner | None = PrivateAttr(default=None)
 

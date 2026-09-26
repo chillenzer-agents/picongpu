@@ -10,5 +10,4 @@ Please refer to the documentation for a deeper discussion.
 from . import attribute as attribute
 from . import constant as constant
 from . import operation as operation
-
 from .species import Species as Species

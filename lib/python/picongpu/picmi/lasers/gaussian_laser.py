@@ -12,7 +12,7 @@ from picmistandard import PICMI_GaussianLaser
 from pydantic import Field, computed_field, model_validator
 
 from ...pypicongpu import laser, util
-from ..copy_attributes import default_converts_to
+from .._copy_attributes import default_converts_to
 from .base_laser import BaseLaser
 from .polarization_type import PolarizationType
 

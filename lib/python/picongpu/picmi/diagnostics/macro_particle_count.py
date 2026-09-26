@@ -7,7 +7,7 @@ License: GPLv3+
 
 from pydantic import BaseModel, ConfigDict
 
-from picongpu.picmi.copy_attributes import default_converts_to
+from picongpu.picmi._copy_attributes import default_converts_to
 
 from ...pypicongpu.output.macro_particle_count import (
     MacroParticleCount as PyPIConGPUMacroParticleCount,

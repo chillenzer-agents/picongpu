@@ -34,6 +34,64 @@ all parameterized by the same :class:`~picongpu.picmi.diagnostics.OpenPMDConfig`
    :start-at: @ParticleFunctor(name="kineticEnergy")
    :end-before: for config in sorted
 
+Built-in derived fields
+-----------------------
+
+A :class:`~picongpu.picmi.diagnostics.DerivedFieldDump` always compiles a
+Python :class:`~picongpu.picmi.particle_functor.ParticleFunctor` into the
+binary. For the most common deposition operations PIConGPU ships a native
+C++ implementation, which is used by
+:class:`~picongpu.picmi.diagnostics.NativeDerivedFieldDump` without any
+Python functor:
+
+.. literalinclude:: ../../snippets/selected_topics/derived_fields.py
+   :language: python
+   :start-at: density = NativeDerivedFieldDump(
+   :end-before: sim = picmi.Simulation(
+
+:class:`~picongpu.picmi.diagnostics.NativeDerivedFieldDump` takes a
+``field`` from the built-in set:
+
+* scalar fields:
+  ``"Density"``, ``"BoundElectronDensity"``, ``"ChargeDensity"``,
+  ``"Counter"``, ``"Energy"``, ``"EnergyDensity"``, ``"LarmorPower"``
+  and ``"MacroCounter"``;
+* combined fields:
+  ``"RelativisticDensity"`` and ``"ScreeningInvSquared"``;
+* directional fields:
+  ``"MidCurrentDensityComponent"``, ``"Momentum"``, ``"MomentumDensity"``
+  and ``"WeightedVelocity"`` -- these deposit one vector component and
+  therefore require an explicit ``direction`` (``"x"``, ``"y"`` or ``"z"``).
+
+A different ``direction`` or ``field`` produces a separate grid field;
+the direction is part of the stored field name
+(e.g. ``electrons_all_weightedVelocity/x``).
+For a directional field, omitting ``direction``
+(or passing one to a non-directional field) is a validation error.
+
+Use :class:`~picongpu.picmi.diagnostics.AverageDerivedFieldDump`
+to store the cell-wise *average* of a built-in field instead of its sum
+it is the total weighted value divided by the number of contributing
+particles (the C++ ``AverageAttribute`` operation).
+This is physically meaningful for per-particle quantities such as
+``"WeightedVelocity"`` or ``"Momentum"``; averaging a scalar per-cell
+quantity such as ``"Density"`` reduces it to a value of about 1
+and PIConGPU emits a warning for those fields.
+
+Both classes accept the same ``species``
+(a :class:`~picongpu.picmi.species.Species` or a
+:class:`~picongpu.picmi.particle_functor.FilteredSpecies`) and ``period``
+as :class:`~picongpu.picmi.diagnostics.DerivedFieldDump`,
+and support the built-in set only -- arbitrary expressions still go through
+:class:`~picongpu.picmi.diagnostics.DerivedFieldDump`.
+
+.. note::
+
+   Above, ``electrons`` is a plain species, but a
+   :class:`~picongpu.picmi.particle_functor.FilteredSpecies` restricts the
+   deposition to the selected particles, exactly as for
+   :class:`~picongpu.picmi.diagnostics.DerivedFieldDump`.
+
 Output files
 ------------
 

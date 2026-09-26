@@ -118,12 +118,12 @@ electron_energy_density = DerivedFieldDump(species=electrons, functor=kinetic_en
 
 # Built-in particle-to-grid fields use PIConGPU's native C++ implementations and
 # therefore do not require or generate a ParticleFunctor.
-electron_density = NativeDerivedFieldDump(species=electrons, field="Density", period=TimeStepSpec[::100])
+electron_density = NativeDerivedFieldDump(species=electrons, field="Density", period=TS[::100])
 electron_weighted_velocity_x = NativeDerivedFieldDump(
-    species=electrons, field="WeightedVelocity", direction="x", period=TimeStepSpec[::100]
+    species=electrons, field="WeightedVelocity", direction="x", period=TS[::100]
 )
 electron_average_velocity_x = AverageDerivedFieldDump(
-    species=electrons, field="WeightedVelocity", direction="x", period=TimeStepSpec[::100]
+    species=electrons, field="WeightedVelocity", direction="x", period=TS[::100]
 )
 
 

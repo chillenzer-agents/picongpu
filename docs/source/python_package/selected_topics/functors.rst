@@ -46,10 +46,13 @@ Particle functors
 A :class:`~picongpu.picmi.particle_functor.ParticleFunctor`
 is a Python function of one (or two) arguments
 that describes a particle property symbolically.
-It is used as a decorator::
+It is used as a decorator, and its first argument must be annotated with the
+particle flavour it operates on --
+:class:`~picongpu.picmi.particle_functor.MacroParticle` (the default) or
+:class:`~picongpu.picmi.particle_functor.PhysicalParticle`::
 
    @ParticleFunctor
-   def gamma(particle):
+   def gamma(particle: MacroParticle):
        ...
 
 The ``particle`` argument provides access to the particle's attributes
@@ -90,6 +93,54 @@ to declare the physical unit of the result.
    :language: python
    :start-after: BEGIN-PARTICLE-FUNCTOR
    :end-before: END-PARTICLE-FUNCTOR
+
+Single-particle semantics
+-------------------------
+
+Every functor is *implemented* on macroparticles, but the type annotation of
+its first argument declares what the returned quantity *means*:
+
+* :class:`~picongpu.picmi.particle_functor.MacroParticle`
+  (also the default when no annotation is given) is a macro-particle,
+  weighting-scaled property -- this is what the accessors produce as-is.
+* :class:`~picongpu.picmi.particle_functor.PhysicalParticle`
+  interprets the result as a single-particle property.
+  The generated code symbolically divides the weighting out of the
+  scaling-sensitive symbols (``"mass"``, ``"charge"``,
+  ``"kinetic energy"``), so e.g. a mass functor returns the physical
+  particle mass rather than the macroparticle mass, while per-particle
+  quantities such as momentum, velocity, position and
+  ``"damped_weighting"`` are already unaffected.
+
+.. literalinclude:: ../snippets/selected_topics/particle_functors.py
+   :language: python
+   :start-after: BEGIN-PHYSICAL-PARTICLE
+   :end-before: END-PHYSICAL-PARTICLE
+
+A quantity that is *not* a pure per-particle property but still scales with a
+known power of the weighting (e.g. a density) can set
+``scales_with_weighting`` on a ``PhysicalParticle`` functor; the whole result
+is then multiplied by the weighting to that power.
+This is only allowed on ``PhysicalParticle`` functors, and the scaling is a
+manual override for quantities the automatic per-symbol rescaling cannot
+express.
+
+If the functor's result has a physical unit, declare it with the
+``unit_dimension`` (see :ref:`units`); the generated derived-field trait then
+reports it through ``getUnit()`` / ``getUnitDimension()``.
+For pure monomial quantities these are derived automatically from the
+7-component unit vector, matching the built-in derived attributes.
+A dimension that is not a pure monomial (it has a temperature,
+amount-of-substance or luminous-intensity component, or a non-integer
+exponent) cannot be derived; set the explicit ``unit_factor`` string
+instead, or input-file generation raises.
+
+Because functors and filters touch concrete particle attributes, the generated
+``SpeciesEligibleForSolver`` trait registers those requirements
+(``HasIdentifiers`` / ``HasFlag``, e.g. ``momentum`` or the ``massRatio<>``
+flag): a species that lacks an attribute a functor or filter needs is excluded
+at compile time instead of failing to build.
+This is automatic and needs no user action.
 
 .. _particle-filters:
 

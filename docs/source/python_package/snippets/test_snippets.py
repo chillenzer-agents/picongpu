@@ -358,10 +358,16 @@ EXPECTED_FILES = {
         "files": [
             "particle_functors_setup/etc/picongpu/N.cfg",
             "particle_functors_setup/include/picongpu/param/particleFilters.param",
+            "particle_functors_setup/include/picongpu/param/fileOutput.param",
         ],
         "file_contains": [
             ("particle_functors_setup/etc/picongpu/N.cfg", "--electrons_energyHistogram.filter fast"),
             ("particle_functors_setup/include/picongpu/param/particleFilters.param", '"fast"'),
+            # the filter's C++ eligibility trait registers the attributes it needs
+            ("particle_functors_setup/include/picongpu/param/particleFilters.param", "SpeciesEligibleForSolver"),
+            ("particle_functors_setup/include/picongpu/param/particleFilters.param", "massRatio<>"),
+            # the functor's unit is derived from its unit_dimension
+            ("particle_functors_setup/include/picongpu/param/fileOutput.param", "sim.unit.mass()"),
         ],
     },
     "selected_topics/units_and_constants.py": {

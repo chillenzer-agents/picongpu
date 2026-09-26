@@ -68,6 +68,27 @@ they are placed at the same positions with their ``density_scale``
 respected --
 the standard way to build charge-neutral plasmas.
 
+Validation
+~~~~~~~~~~
+
+A species is checked when it is converted to its PyPIConGPU
+representation, which happens for every species when the simulation is run
+and when its input files are generated with
+``simulation.write_input_file(...)``.
+A species that violates the invariants then raises a Pydantic
+``ValidationError`` instead of being accepted silently.
+The checks require a name that is a valid C++ identifier
+(only letters, digits and underscores: ``[A-Za-z0-9_]+``),
+a ``position`` and a ``momentum`` attribute, unique attribute names and
+unique constant types.
+In particular, a :class:`~picongpu.picmi.species.Species` with an invalid
+``name`` is rejected when it is rendered:
+
+.. literalinclude:: ../snippets/selected_topics/species_validation.py
+   :language: python
+   :start-after: BEGIN-SPECIES-VALIDATION
+   :end-before: END-SPECIES-VALIDATION
+
 .. _distributions:
 
 Particle Distributions

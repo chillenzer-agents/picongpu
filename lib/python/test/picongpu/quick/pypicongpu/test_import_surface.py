@@ -45,14 +45,17 @@ class TestStarImport(TestCase):
 
     EXPECTED_NAMES = {
         # explicit submodules
+        "backgroundfield",
         "collision",
         "customuserinput",
         "field_solver",
         "grid",
         "laser",
+        "memory",
         "movingwindow",
         "output",
         "particle_functor",
+        "precision_config",
         "rendering",
         "runner",
         "simulation",

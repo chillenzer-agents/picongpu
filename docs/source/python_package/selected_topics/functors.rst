@@ -39,11 +39,38 @@ equivalent to the matching ``density_function``:
 
 Provide exactly one of ``density_function`` or ``density_expression``.
 
-Use ``sympy.Piecewise`` for conditional profiles;
-the momentum parameters ``rms_velocity`` and ``directed_velocity``
-are currently only partially supported
-(``rms_velocity`` is pinned to zero; ``directed_velocity`` is accepted
-but untested).
+Constants used in the expressions may be passed as additional keyword
+arguments; they are collected automatically into ``user_defined_kw`` and
+substituted before rendering (both in the density and in the momentum
+expressions), mirroring the PICMI standard.
+
+Momentum and thermal spread
+---------------------------
+
+The standard :class:`~picongpu.picmi.distribution.AnalyticDistribution`
+surface is implemented. Its ``momentum_expressions`` give the analytic
+``gamma * velocity`` per axis in m/s and are rendered to the pypicongpu
+``Drift`` operation, while ``momentum_spread_expressions`` give a Gaussian
+thermal spread sigma per axis in m/s and are rendered to the ``Temperature``
+operation. Both are supported in their **constant** form only: expressions
+that depend on ``x``, ``y`` or ``z`` raise an ``UnsupportedFeatureError`` at
+input-file generation.
+
+.. literalinclude:: ../snippets/selected_topics/analytic_distribution.py
+   :language: python
+   :start-after: BEGIN-MOMENTUM-EXPRESSIONS
+   :end-before: END-MOMENTUM-EXPRESSIONS
+
+The legacy ``directed_velocity`` (a plain velocity) and ``rms_velocity``
+remain available and are combined with the standard parameters
+(``rms_velocity`` takes the per-axis maximum of itself and the constant
+spread expressions). ``directed_velocity`` and ``momentum_expressions``
+are mutually exclusive ways of setting the drift; supplying a non-zero
+``directed_velocity`` together with a ``momentum_expressions`` entry raises.
+The standard's ``lower_bound``, ``upper_bound`` and ``fill_in`` are not
+supported and raise if set to non-default values.
+
+Use ``sympy.Piecewise`` for conditional profiles.
 
 The same symbolic machinery is the natural building block for other
 user-supplied, code-level expressions;

@@ -8,9 +8,9 @@ License: GPLv3+
 import re
 from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Any
+from typing import Annotated, Any
 
-from picmistandard import PICMI_Species
+from picmistandard import PICMI_AnyDistribution, PICMI_Species
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -20,6 +20,7 @@ from pydantic import (
     model_validator,
 )
 
+from picongpu.picmi.distribution.AnalyticDistribution import AnalyticDistribution
 from picongpu.picmi.species_requirements import evaluate_requirements, resolving_add, run_construction
 from picongpu.pypicongpu.species.attribute import Momentum, Position
 from picongpu.pypicongpu.species.attribute.attribute import Attribute
@@ -31,6 +32,7 @@ from picongpu.pypicongpu.species.constant.mass import Mass
 from picongpu.pypicongpu.species.operation import AnyOperation
 from picongpu.pypicongpu.species.species import Pusher, Shape
 from picongpu.pypicongpu.species.species import Species as PyPIConGPUSpecies
+from picongpu.pypicongpu.util import as_functor
 
 from .. import pypicongpu
 from ..pypicongpu.species.util.element import Element
@@ -98,6 +100,20 @@ class Species(PICMI_Species):
     picongpu_fixed_charge: bool = False
     particle_shape: str | None = "quadratic"
     method: str | None = "Boris"
+
+    # Accept a bare named callable and turn it into an AnalyticDistribution, like the
+    # explicit `AnalyticDistribution(...)` form. The BeforeValidator runs before the
+    # PICMI_AnyDistribution union dispatch; `already=BaseModel` keeps every existing
+    # distribution instance (all pydantic models) unchanged.
+    initial_distribution: Annotated[
+        PICMI_AnyDistribution | list[PICMI_AnyDistribution] | None,
+        as_functor(
+            AnalyticDistribution,
+            already=BaseModel,
+            usage="AnalyticDistribution(density_function=...).",
+            allow_list=True,
+        ),
+    ] = None
 
     # Theoretically, Position(), Momentum() and Weighting() are also requirements imposed from the outside,
     # e.g., by the current deposition, pusher, ..., but these concepts are not separately modelled in PICMI

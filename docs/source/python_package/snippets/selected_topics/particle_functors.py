@@ -16,7 +16,7 @@ and a particle filter that selects the ultra-relativistic electrons.
 """
 
 from pathlib import Path
-from sympy import sqrt
+from sympy import exp, sqrt
 
 from picongpu import picmi
 from picongpu.picmi.diagnostics import BinSpec, Binning, BinningAxis, EnergyHistogram
@@ -31,11 +31,20 @@ grid = picmi.Cartesian3DGrid(
 )
 solver = picmi.ElectromagneticSolver(method="Yee", cfl=0.5, grid=grid)
 
+
+# BEGIN-BARE-CALLABLE
+# A named function of x, y, z (in SI units) may be passed directly where a
+# distribution is expected; it is turned into an AnalyticDistribution:
+def density(x, y, z):
+    return 1e25 * exp(-(((x - 5e-7) / 1e-7) ** 2))
+
+
 electrons = picmi.Species(
     name="electrons",
     particle_type="electron",
-    initial_distribution=picmi.UniformDistribution(density=1e23, rms_velocity=[0.1 * picmi.constants.c] * 3),
+    initial_distribution=density,
 )
+# END-BARE-CALLABLE
 
 
 # BEGIN-PARTICLE-FUNCTOR

@@ -91,6 +91,41 @@ to declare the physical unit of the result.
    :start-after: BEGIN-PARTICLE-FUNCTOR
    :end-before: END-PARTICLE-FUNCTOR
 
+.. _bare-callable-functors:
+
+Bare named callables
+--------------------
+
+Wherever a functor is expected, you may pass a bare *named* callable
+(a plain ``def`` function) instead of the explicit decorator/constructor form.
+The functor class of the field is then used to wrap it,
+and its ``name`` defaults to the function name.
+This works for all functor-typed fields in the PICMI dialect:
+
+* the ``density_function`` of an :class:`~picongpu.picmi.distribution.AnalyticDistribution`
+  (used as a species' ``initial_distribution``, also inside a list),
+* :class:`~picongpu.picmi.particle_functor.ParticleFunctor` fields such as
+  the ``functor`` of a :class:`~picongpu.picmi.diagnostics.BinningAxis`
+  or ``deposition_functor`` of a :class:`~picongpu.picmi.diagnostics.Binning`,
+* :class:`~picongpu.picmi.particle_functor.ParticleFilter` fields such as
+  the ``functor`` of a :class:`~picongpu.picmi.particle_functor.FilteredSpecies`,
+* the ``functor`` of a :class:`~picongpu.picmi.diagnostics.DerivedFieldDump`.
+
+.. literalinclude:: ../snippets/selected_topics/particle_functors.py
+   :language: python
+   :start-after: BEGIN-BARE-CALLABLE
+   :end-before: END-BARE-CALLABLE
+
+The function name becomes part of the generated C++,
+so the same restriction as for an explicit ``name`` applies:
+it must consist only of C++-compatible identifier characters
+(``[A-Za-z0-9_]+``).
+Anonymous callables -- most notably lambdas -- are therefore rejected eagerly,
+as are classes (passing the class itself, rather than an instance or a
+function, is a user error).
+Pass an explicitly named function, or the explicit form,
+e.g. ``ParticleFilter(name="...", functor=...)``.
+
 .. _particle-filters:
 
 Particle filters

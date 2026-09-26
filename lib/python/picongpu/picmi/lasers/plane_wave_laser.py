@@ -13,7 +13,7 @@ from picmistandard import PICMI_Laser, resolve_once
 from pydantic import Field, computed_field, model_validator
 
 from ...pypicongpu import laser
-from ..copy_attributes import default_converts_to
+from .._copy_attributes import default_converts_to
 from .base_laser import BaseLaser, PositiveFloat
 from .polarization_type import PolarizationType
 

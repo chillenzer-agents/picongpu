@@ -83,6 +83,16 @@ TOML_EXPECTED = {
     "configuring_environment/rc_params_shebang.toml": {
         "shebang": "#!/usr/bin/env zsh",
     },
+    "configuring_environment/rc_params_provenance.toml": {
+        "preset": "bash",
+        "provenance": {
+            "enabled": True,
+            "full_name": "Your Name",
+            "orcid": "0000-0002-1825-0097",
+            "host": True,
+            "user": False,
+        },
+    },
     "configuring_environment/rc_params_profile_precedence.toml": {
         "my_rc_params_value": "Rendering template content directly",
         "profile_content": "echo 'Using profile_content directly'",

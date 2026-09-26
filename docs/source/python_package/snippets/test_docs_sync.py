@@ -160,6 +160,8 @@ def test_documented_run_directory_matches_workflow_outputs(tmp_path):
         produced.add(str(rel).split("/")[0])
     # the cache directory is created by the runner, not the workflow step
     produced.add(".cwl_cache")
+    # the cwltool provenance Research Object is written by the runner as well
+    produced.add("provenance")
 
     missing = documented - produced
     assert not missing, f"documented run-directory entries not produced by the workflow: {sorted(missing)}"

@@ -5,11 +5,14 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from picmistandard import PICMI_Interaction
+from picmistandard import PICMI_Interaction as PICMI_Interaction
 
-from . import ionization
-from .synchrotron import Synchrotron
-from .collision import Collision, CollisionalPhysicsSetup, ConstLogCollision, DynamicLogCollision
+from . import ionization as ionization
+from .collision import Collision as Collision
+from .collision import CollisionalPhysicsSetup as CollisionalPhysicsSetup
+from .collision import ConstLogCollision as ConstLogCollision
+from .collision import DynamicLogCollision as DynamicLogCollision
+from .synchrotron import Synchrotron as Synchrotron
 
 
 # The union of every interaction type that PIConGPU supports. It is used to type
@@ -21,15 +24,3 @@ Interaction = ionization.IonizationModel | Synchrotron | Collision | Collisional
 # The same set as concrete classes, for isinstance-based rejection of interaction
 # types that PIConGPU does not support.
 SUPPORTED_INTERACTION_TYPES = (ionization.IonizationModel, Synchrotron, Collision, CollisionalPhysicsSetup)
-
-__all__ = [
-    "Interaction",
-    "SUPPORTED_INTERACTION_TYPES",
-    "PICMI_Interaction",
-    "ionization",
-    "Synchrotron",
-    "Collision",
-    "ConstLogCollision",
-    "DynamicLogCollision",
-    "CollisionalPhysicsSetup",
-]

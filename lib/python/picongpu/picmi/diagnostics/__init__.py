@@ -22,6 +22,7 @@ from .particle_energy import ParticleEnergy as ParticleEnergy
 from .phase_space import PhaseSpace as PhaseSpace
 from .radiation import Radiation as Radiation
 from .radiation import RadiationObserverConfiguration as RadiationObserverConfiguration
+from .timestepspec import TS as TS
 from .timestepspec import TimeStepSpec as TimeStepSpec
 
 AnyDiagnostic = (

@@ -9,9 +9,11 @@ from . import customuserinput as customuserinput
 from . import field_solver as field_solver
 from . import grid as grid
 from . import laser as laser
+from . import memory as memory
 from . import movingwindow as movingwindow
 from . import output as output
 from . import particle_functor as particle_functor
+from . import precision_config as precision_config
 from . import rendering as rendering
 from . import species as species
 from . import util as util

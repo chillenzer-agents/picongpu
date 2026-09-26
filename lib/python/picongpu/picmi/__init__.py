@@ -38,9 +38,11 @@ from .lasers import TWTSLaser as TWTSLaser
 from .layout import GriddedLayout as GriddedLayout
 from .layout import OnePositionLayout as OnePositionLayout
 from .layout import PseudoRandomLayout as PseudoRandomLayout
+from .memory_config import MemoryConfig as MemoryConfig
 from .particle_functor import FilteredSpecies as FilteredSpecies
 from .particle_functor import ParticleFilter as ParticleFilter
 from .particle_functor import ParticleFunctor as ParticleFunctor
+from .precision_config import PrecisionConfig as PrecisionConfig
 from .simulation import Simulation as Simulation
 from .solver import BinomialSmoother as BinomialSmoother
 from .solver import ElectromagneticSolver as ElectromagneticSolver

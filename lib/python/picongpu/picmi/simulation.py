@@ -582,7 +582,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                     )
             for species in self.species:
                 if isinstance(species.initial_distribution, AnalyticDistribution):
-                    if Symbol("z") in species.initial_distribution.density_expression.free_symbols:
+                    if Symbol("z") in species.initial_distribution._density_expression().free_symbols:
                         raise ValueError(
                             "A z-dependent AnalyticDistribution density is not supported on a 2D grid. "
                             f"You gave a density formula depending on 'z' for species {species.name!r} on a 2D grid."

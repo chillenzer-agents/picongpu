@@ -31,20 +31,16 @@ Selecting a subset of the workflow
 ``Simulation.picongpu_run()`` accepts two additional keyword arguments to
 select which stages are executed:
 
-.. code-block:: python
+.. literalinclude:: ../snippets/selected_topics/partial_workflow.py
+   :language: python
+   :start-after: # BEGIN-PARTIAL-WORKFLOW
+   :end-before: # END-PARTIAL-WORKFLOW
 
-   from picongpu.picmi import Simulation, Stage
+.. note::
 
-   sim = Simulation(...)
-
-   # the default: run the whole pipeline, exactly as before
-   sim.picongpu_run()
-
-   # run everything up to and including the given stage
-   sim.picongpu_run(up_to=Stage.build)
-
-   # resume at the given stage
-   sim.picongpu_run(from_=Stage.submit)
+   The snippet above runs against the emulated workflow of the documentation
+   test harness (the ``run`` step is replaced by a no-op), so it only
+   demonstrates the calls, not the actual compilation and submission.
 
 ``up_to`` and ``from_`` both accept a :class:`~picongpu.picmi.Stage` or its
 string value (e.g. ``"build"``). They are mutually exclusive.
@@ -74,16 +70,13 @@ the requested stage and everything after it recompute.
 
 This is how an interrupted run is continued without redoing the completed
 stages - e.g. after ``picongpu_run(up_to=Stage.submit)`` failed inside
-``submit``:
+``submit``, the resumed call only recomputes ``submit`` and ``collect``
+(the earlier stages are served from the job store):
 
-.. code-block:: python
-
-   # first attempt: failed inside 'submit' ('build' and 'prepare' succeeded)
-   sim.picongpu_run(up_to=Stage.submit)
-
-   # after fixing the problem: 'build' and 'prepare' are served from the job
-   # store, only 'submit' and 'collect' recompute
-   sim.picongpu_run(from_=Stage.submit)
+.. literalinclude:: ../snippets/selected_topics/partial_workflow.py
+   :language: python
+   :start-at: # resume at
+   :end-before: # END-PARTIAL-WORKFLOW
 
 The job store is the **only** state: the runner itself persists nothing.
 Because cwltool's job-store keys are hashes of the step inputs, a resume is

@@ -33,4 +33,5 @@ The remaining pages are deep dives into cross-cutting features.
    units
    serialization
    custom_input
+   partial_workflow
    hpc_submission

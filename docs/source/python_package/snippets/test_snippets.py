@@ -174,6 +174,22 @@ EXPECTED_FILES = {
         "files": [f"scan/focal_{focal:.1e}/setup/include/picongpu/param/simulation.param" for focal in SCAN_FOCALS]
         + [f"scan/focal_{focal:.1e}/setup/workflow/input.yaml" for focal in SCAN_FOCALS],
     },
+    "defining_simulation/simulation_group.py": {
+        "no_run": True,
+        "files": [
+            "simulation_group_setup/stable/workflow/workflow.cwl",
+            "simulation_group_setup/stable/ro-crate-metadata.json",
+            "simulation_group_setup/coarse/workflow/workflow.cwl",
+            "simulation_group_setup/coarse/ro-crate-metadata.json",
+            "simulation_group_setup/workflow/group_workflow.cwl",
+            "simulation_group_setup/ro-crate-metadata.json",
+        ],
+        "file_contains": [
+            ("simulation_group_setup/workflow/group_workflow.cwl", "stable_step"),
+            ("simulation_group_setup/workflow/group_workflow.cwl", "../coarse/workflow/workflow.cwl"),
+        ],
+        "stdout_contains": ["sub-simulation: stable", "sub-simulation: coarse"],
+    },
     "defining_simulation/postprocess_histogram.py": {
         "files": ["electron_count.png"],
     },

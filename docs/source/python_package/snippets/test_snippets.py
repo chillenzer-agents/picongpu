@@ -362,6 +362,15 @@ EXPECTED_FILES = {
             ("analytic_distribution_setup/include/picongpu/param/speciesDefinition.param", "species_electrons"),
         ],
     },
+    "selected_topics/bounded_gaussian.py": {
+        "no_run": True,
+        "files": [
+            "bounded_gaussian_setup/include/picongpu/param/speciesDefinition.param",
+        ],
+        "file_contains": [
+            ("bounded_gaussian_setup/include/picongpu/param/speciesDefinition.param", "species_electrons"),
+        ],
+    },
     "selected_topics/particle_functors.py": {
         "no_run": True,
         "files": [

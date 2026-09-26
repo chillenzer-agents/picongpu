@@ -126,6 +126,29 @@ The available distributions are:
 The reference density used to normalize the code units is
 ``simulation.picongpu_base_density`` (default ``1.0e25`` m⁻³).
 
+Bounded Gaussian profiles
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Giving a :class:`~picongpu.picmi.distribution.GaussianDistribution` a
+``lower_bound`` / ``upper_bound`` routes it to an
+:class:`~picongpu.picmi.distribution.AnalyticDistribution` instead of the
+native Gaussian: the native pypicongpu model has no bound fields and the C++
+``GaussianImpl`` does not implement sub-volume boxes. The resulting analytic
+profile reproduces the native y-only Gaussian (front/plateau/rear ramps and the
+vacuum front, including the cell-centre correction) exactly and stores the full
+3-vector bounds:
+
+.. literalinclude:: ../snippets/selected_topics/bounded_gaussian.py
+   :language: python
+   :start-after: BEGIN-BOUNDED-GAUSSIAN
+   :end-before: END-BOUNDED-GAUSSIAN
+
+The bounds are stored on the resulting distribution, but the PIConGPU C++ core
+does not (yet) apply them when sampling particles, so the sampled profile is
+currently equivalent to the unbounded Gaussian. Passing bounds is the supported
+way to pin that behaviour (see the functors page for the underlying symbolic
+machinery).
+
 Layouts
 -------
 

@@ -17,30 +17,106 @@ At the time of writing, the runtime configuration is used for the following aspe
   * On a specific machine making the correct compilers, libraries, etc. available.
   * For a specific user configuring the correct metadata to facilitate FAIR workflows.
 
-.. _configuring_env_picrc_builder:
+.. _configuring_env_picongpu_tool:
 
-Recommended: The ``picrc-builder`` Tool
----------------------------------------
+Recommended: The ``picongpu`` Command-Line Tool
+-----------------------------------------------
+
+The ``picongpu`` package ships a single general command, ``picongpu``,
+that groups all of its Python-layer tools as subcommands
+(the same interface is available as ``python -m picongpu``):
+
+.. literalinclude:: ../snippets/configuring_environment/picongpu_overview.sh
+   :language: bash
+   :start-after: BEGIN-PICONGPU-OVERVIEW
+   :end-before: END-PICONGPU-OVERVIEW
+
+This replaces the former standalone ``picrc-builder`` and ``pic-deps``
+console scripts;
+the interface is tracked in
+`issue #165 <https://github.com/chillenzer-agents/picongpu/issues/165>`__.
+
+If the package is installed (see :ref:`Running Your Simulation <python_package/foundations/running_simulation:Running Your Simulation>`),
+you can invoke ``picongpu`` directly.
+You can also run it without installing anything
+using the `uv <https://docs.astral.sh/uv/>`__ tool;
+just substitute the subcommand of your choice for ``rc build``:
+
+.. literalinclude:: ../snippets/configuring_environment/picongpu_uv.sh
+   :language: bash
+   :start-after: BEGIN-PICONGPU-UV
+   :end-before: END-PICONGPU-UV
+
+Building a Runtime Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In order to streamline the onboarding onto a new system,
-the ``picongpu`` package ships the ``picrc-builder`` tool.
-It guides you interactively through writing a runtime configuration file
-``.picongpurc.toml``:
+``picongpu rc build`` guides you interactively through writing a runtime
+configuration file ``.picongpurc.toml``:
 it lets you pick one of the available presets (see `Presets`_ below)
 and asks for the required parameters as well as any additional fine-tuning.
 
-If the package is installed (see :ref:`Running Your Simulation <python_package/foundations/running_simulation:Running Your Simulation>`),
-you can simply run::
+.. literalinclude:: ../snippets/configuring_environment/picongpu_rc_build.sh
+   :language: bash
+   :start-after: BEGIN-PICONGPU-RC-BUILD
+   :end-before: END-PICONGPU-RC-BUILD
 
-  picrc-builder
-
-You can also run it without installing anything
-using the `uv <https://docs.astral.sh/uv/>`__ tool::
-
-  uv run --with="picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python" picrc-builder
-
-In either case, store the generated file in one of the locations
+Store the generated file in one of the locations
 described in `The .picongpurc.toml File`_ below.
+
+Inspecting the Resulting Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Once a runtime configuration is in place,
+``picongpu rc print`` prints the full, resolved ``rc_params`` content as TOML --
+exactly the values the package would use when (re)rendering the profile:
+
+.. literalinclude:: ../snippets/configuring_environment/picongpu_rc_print.sh
+   :language: bash
+   :start-after: BEGIN-PICONGPU-RC-PRINT
+   :end-before: END-PICONGPU-RC-PRINT
+
+This is a convenient way to check which preset was picked up
+and which additional parameters (if any) are still missing.
+
+Entering the Environment
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+``picongpu shell`` drops you into an interactive shell
+with a generated ``picongpu.profile`` sourced,
+so that the compilers, libraries and PIConGPU tools of your configuration
+are available without setting anything up by hand.
+With ``--from`` you can instead source the profile of an existing setup
+directory (``workflow/scripts/picongpu.profile``) or organized run directory
+(a ``picongpu.profile`` at its root) --
+the same profile the workflow generates.
+``shell run <command>`` runs a single command in that environment
+instead of opening an interactive shell:
+
+.. literalinclude:: ../snippets/running_simulation/picongpu_shell.sh
+   :language: bash
+   :start-after: BEGIN-PICONGPU-SHELL
+   :end-before: END-PICONGPU-SHELL
+
+Building the Dependencies
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``picongpu dependencies`` is a best-effort driver over your preset's own
+``dependencies_autoinstall.sh``,
+building PIConGPU's compile-time dependencies:
+``install`` runs the script and ``check`` verifies each dependency directory
+it owns.
+This is only available for the presets that ship such a script
+(the cluster presets that build their toolchain from source);
+for presets that rely on system modules it is not needed.
+
+.. literalinclude:: ../snippets/configuring_environment/picongpu_dependencies.sh
+   :language: bash
+   :start-after: BEGIN-PICONGPU-DEPENDENCIES
+   :end-before: END-PICONGPU-DEPENDENCIES
+
+See :ref:`Quick Start <python_package/quickstart:Quick Start>` for where this
+step fits into a first run.
 
 .. _configuring_env_toml_file:
 

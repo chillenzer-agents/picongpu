@@ -385,6 +385,13 @@ EXPECTED_FILES = {
             ("custom_iteration_setup/include/picongpu/species_report", "ions: mine"),
         ],
     },
+    "selected_topics/partial_workflow.py": {
+        "no_run": True,
+        "files": [
+            "partial_workflow_setup/workflow/workflow.cwl",
+            "partial_workflow_setup/metadata/pypicongpu_runner.json",
+        ],
+    },
 }
 
 

@@ -291,6 +291,13 @@ until then, a checkpoint-based restart
 in the sense of the C++ code
 has to be arranged outside of the Python interface.)
 
+.. note::
+
+   This ``step`` semantics is about *time stepping*, not about the workflow.
+   A subset of the *workflow stages* (build, prepare, submit, collect) can be
+   selected with ``simulation.picongpu_run(up_to=..., from_=...)``;
+   see :ref:`Partial Workflow Execution <picmi-partial-workflow>`.
+
 .. _running_simulation_from_installation:
 
 From Installation

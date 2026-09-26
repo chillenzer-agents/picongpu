@@ -56,6 +56,12 @@ _DESC = (
 # historical buggy form that omitted the `$`, e.g. `if [ ! -d "X_ROOT" ];`).
 _GUARD_RE = re.compile(r'! -d\s+"?\$?([A-Za-z0-9_]+_ROOT)"?\s*\]')
 
+# Matches an explicit, ordered declaration of the roots a (wrapper) script
+# owns, e.g. `DEPS_CHECK_ROOTS=(BOOST_ROOT HDF5_ROOT FFTW3_ROOT)`. This is
+# the forward-looking form: thin wrappers over the shared installer have no
+# per-dependency guards to scan.
+_ROOTS_DECL_RE = re.compile(r"DEPS_CHECK_ROOTS=\(([^)]*)\)")
+
 
 def resolve_preset_script(rcp):
     """Fail-fast validation: return (preset_dir, script_path) or raise SystemExit.
@@ -83,11 +89,23 @@ def resolve_preset_script(rcp):
 
 
 def parse_guard_roots(script: Path) -> list[str]:
-    """Return the ordered, de-duplicated ``*_ROOT`` vars the autoinstall script guards on."""
+    """Return the ordered, de-duplicated ``*_ROOT`` vars the autoinstall script owns.
+
+    An explicit ``DEPS_CHECK_ROOTS=(...)`` declaration takes precedence; it is
+    the only source of truth for thin wrappers over the shared installer,
+    which replace the per-dependency ``if [ ! -d "$X_ROOT" ]`` guards.
+    Otherwise the historical guard lines are scanned.
+    """
+    text = script.read_text()
+    declared = _ROOTS_DECL_RE.search(text)
+    if declared is not None:
+        candidates = [root.strip().strip("\"'") for root in declared.group(1).split()]
+    else:
+        candidates = _GUARD_RE.findall(text)
     seen: set[str] = set()
     roots: list[str] = []
-    for root in _GUARD_RE.findall(script.read_text()):
-        if root not in seen:
+    for root in candidates:
+        if root and root not in seen:
             seen.add(root)
             roots.append(root)
     return roots

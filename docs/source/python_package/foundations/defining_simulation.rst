@@ -30,6 +30,53 @@ The only other necessary piece of information is
 the electromagnetic field solver which -- in turn -- contains information about the grid.
 We will see more elements to add to a ``Simulation`` further below.
 
+Importing the frontend
+----------------------
+
+Always import the frontend explicitly::
+
+   from picongpu import picmi
+
+A bare ``import picongpu`` does *not* make ``picongpu.picmi`` available;
+you would get an ``AttributeError`` on first use.
+The same holds for the middle layer, which you import as
+``from picongpu import pypicongpu`` when you need it.
+
+The most frequently used classes -- ``Simulation``, the grids, solvers,
+lasers, species, distributions, layouts, interactions and the constants --
+are re-exported directly at the :mod:`picongpu.picmi` top level,
+so ``picmi.<Name>`` works for all of them.
+A few more specialised, but still user-facing, names are grouped one level
+deeper and are not repeated at the top level.
+The most important to know:
+
+* the functor-authoring helpers live in :mod:`picongpu.picmi.particle_functor`
+  -- :class:`~picongpu.picmi.particle_functor.RNGArg` for parameterising a
+  functor by a random number, and the predefined unit dimensions
+  ``I``, ``L``, ``M`` and ``T``
+  (of type :class:`~picongpu.picmi.particle_functor.UnitDimension`)
+  for annotating a functor's result;
+* the diagnostics helpers and the ``TS`` shorthand for ``TimeStepSpec`` live in
+  :mod:`picongpu.picmi.diagnostics`
+  (see :ref:`TimeStepSpec <time-steps>`).
+
+The following snippet exercises the surface;
+it is executed as part of the test suite, so every name it touches is
+guaranteed to resolve:
+
+.. literalinclude:: ../snippets/defining_simulation/import_surface.py
+   :language: python
+   :start-after: BEGIN-IMPORT-SURFACE
+   :end-before: END-IMPORT-SURFACE
+
+There is no ``__all__`` list: the public surface is defined by the explicit
+re-exports in the package ``__init__`` files.
+Consequently, ``from picongpu.picmi import *`` imports exactly those names that
+are bound in the top-level namespace
+(plus the submodules ``constants`` and ``diagnostics``),
+rather than an explicitly curated list.
+Prefer the explicit ``picmi.<Name>`` form in your input files.
+
 Input files can carry `PEP 723 inline script metadata <https://peps.python.org/pep-0723/>`__ at the top
 (all snippets in the repository carry it, too).
 Tools like `uv <https://docs.astral.sh/uv/>`__ and `pipx <https://pipx.pypa.io/>`__ and others can use this to install necessary dependencies on-the-fly.

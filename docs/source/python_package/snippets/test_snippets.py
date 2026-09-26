@@ -180,6 +180,16 @@ EXPECTED_FILES = {
             "overridden RO-Crate context: https://w3id.org/ro/crate/1.2/context",
         ],
     },
+    "defining_simulation/import_surface.py": {
+        "stdout_contains": [
+            "polarization types: ['LINEAR', 'CIRCULAR']",
+            "rng argument type: RNGArg",
+            "energy unit dimension: L^2.0 M^1.0 T^-2.0",
+            "TS is TimeStepSpec: True",
+            "BinningFunctor is ParticleFunctor: True",
+            "It worked!",
+        ],
+    },
     "defining_simulation/multiple_simulations.py": {
         "no_run": True,
         "files": [f"scan/focal_{focal:.1e}/setup/include/picongpu/param/simulation.param" for focal in SCAN_FOCALS]

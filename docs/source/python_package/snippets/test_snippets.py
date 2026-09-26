@@ -151,6 +151,9 @@ EXPECTED_FILES = {
         "file_contains": [
             ("warm_plasma_setup/include/picongpu/param/speciesDefinition.param", "ions"),
             ("warm_plasma_setup/include/picongpu/param/speciesDefinition.param", "electrons"),
+            # collective initialisation via MultiSpecies: one CreateDensity + derive
+            ("warm_plasma_setup/include/picongpu/param/speciesInitialization.param", "CreateDensity"),
+            ("warm_plasma_setup/include/picongpu/param/speciesInitialization.param", "ManipulateDerive"),
         ],
     },
     "defining_simulation/laser_variants.py": {
@@ -351,6 +354,21 @@ EXPECTED_FILES = {
         "file_contains": [
             ("species_distributions_layouts_setup/include/picongpu/param/speciesDefinition.param", "species_ions"),
             ("species_distributions_layouts_setup/include/picongpu/param/speciesDefinition.param", "species_electrons"),
+        ],
+    },
+    "selected_topics/multi_species.py": {
+        "no_run": True,
+        "files": [
+            "multi_species_setup/include/picongpu/param/speciesDefinition.param",
+            "multi_species_setup/include/picongpu/param/speciesInitialization.param",
+        ],
+        "file_contains": [
+            ("multi_species_setup/include/picongpu/param/speciesDefinition.param", "species_ions"),
+            ("multi_species_setup/include/picongpu/param/speciesDefinition.param", "species_electrons"),
+            # collective initialisation: one CreateDensity placing the first member,
+            # the remaining members derived from it (identical in-cell positions)
+            ("multi_species_setup/include/picongpu/param/speciesInitialization.param", "CreateDensity"),
+            ("multi_species_setup/include/picongpu/param/speciesInitialization.param", "ManipulateDerive"),
         ],
     },
     "selected_topics/particle_functors.py": {

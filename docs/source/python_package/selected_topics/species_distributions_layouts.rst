@@ -63,10 +63,53 @@ Its most important parameters are:
   rescales the species' density relative to a shared profile
   (see below).
 
-When several species share the same distribution and layout,
-they are placed at the same positions with their ``density_scale``
-respected --
-the standard way to build charge-neutral plasmas.
+By default, every species is initialised **independently**: even when several
+species happen to share the same distribution and layout, each one draws its
+own in-cell positions.
+To place several species *collectively* -- i.e. on exactly the same in-cell
+positions, the standard way to build charge-neutral plasmas -- group them in a
+:class:`~picongpu.picmi.multi_species.MultiSpecies`
+(see :ref:`multi_species`).
+
+.. _multi_species:
+
+MultiSpecies: collective initialisation
+---------------------------------------
+
+A :class:`~picongpu.picmi.multi_species.MultiSpecies` is the explicit way to
+request **collective (coordinated) initialisation**: all its members share one
+``initial_distribution`` and are placed with a single density operation, so they
+occupy exactly the same in-cell positions -- and are therefore charge-neutral by
+construction, irrespective of per-member momentum or temperature.
+
+.. literalinclude:: ../snippets/selected_topics/multi_species.py
+   :language: python
+   :start-after: BEGIN-MULTI-SPECIES
+   :end-before: END-MULTI-SPECIES
+
+Each member is a plain :class:`~picongpu.picmi.species.Species` and is added to
+the simulation individually (typically with the same layout).
+The value at each position of ``proportions`` becomes the corresponding member's
+``density_scale`` (its ``DensityRatio`` on the C++ level), so a
+``proportions=[1.0, 1.0]`` ion/electron pair yields a neutral plasma.
+
+.. note::
+
+   Collective initialisation requires the members to agree on the layout.
+   In particular, two :class:`~picongpu.picmi.layout.PseudoRandomLayout`\ s
+   with different ``seed``\ s are treated as distinct and are therefore
+   initialised independently (deliberately non-neutral).
+   See the :class:`~picongpu.picmi.layout.PseudoRandomLayout` warning for what
+   the ``seed`` does and does not do.
+
+.. warning::
+
+   Prior to the introduction of ``MultiSpecies``, species sharing the same
+   distribution *and* the same layout were merged implicitly. This heuristic has
+   been removed: such species are now initialised independently and PIConGPU
+   emits a ``UserWarning`` naming the affected species. Wrap them in a
+   :class:`~picongpu.picmi.multi_species.MultiSpecies` to restore the previous
+   charge-neutral behaviour.
 
 .. _distributions:
 

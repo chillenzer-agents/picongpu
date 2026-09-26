@@ -169,6 +169,9 @@ EXPECTED_FILES = {
         "files": ["electrons.json"],
         "stdout_contains": ["serialized simulation into", "It worked!"],
     },
+    "foundations/translation.py": {
+        "stdout_contains": ["unused model -> ionization: False", "added model  -> ionization: True"],
+    },
     "defining_simulation/multiple_simulations.py": {
         "no_run": True,
         "files": [f"scan/focal_{focal:.1e}/setup/include/picongpu/param/simulation.param" for focal in SCAN_FOCALS]

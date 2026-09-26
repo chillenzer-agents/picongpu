@@ -321,6 +321,18 @@ EXPECTED_FILES = {
             ("lasers_setup/include/picongpu/param/incidentField.param", "GaussianPulse"),
         ],
     },
+    "selected_topics/applied_fields.py": {
+        "no_run": True,
+        "files": [
+            "applied_fields_setup/include/picongpu/param/fieldBackground.param",
+        ],
+        "file_contains": [
+            ("applied_fields_setup/include/picongpu/param/fieldBackground.param", "FieldBackgroundE"),
+            # the analytic expression is rendered into the C++ functor:
+            ("applied_fields_setup/include/picongpu/param/fieldBackground.param", "pmacc::math::sin"),
+            ("applied_fields_setup/include/picongpu/param/fieldBackground.param", "wavelength"),
+        ],
+    },
     "selected_topics/simulation_settings.py": {
         "no_run": True,
         "files": [

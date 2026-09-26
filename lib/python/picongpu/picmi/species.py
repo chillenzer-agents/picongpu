@@ -7,8 +7,13 @@ License: GPLv3+
 
 import re
 from collections.abc import Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .grid import AnyGrid
 
 from picmistandard import PICMI_Species
 from pydantic import (
@@ -34,7 +39,33 @@ from picongpu.pypicongpu.species.species import Species as PyPIConGPUSpecies
 
 from .. import pypicongpu
 from ..pypicongpu.species.util.element import Element
+from .particle_boundary import ParticleBoundary
 from .predefinedparticletypeproperties import PredefinedParticleTypeProperties
+
+
+# The grid whose per-axis particle boundary conditions are the *default* for
+# every species translated within a simulation. Species conversion is a single
+# choke point (get_as_pypicongpu) reached from many call sites (the main
+# species list, diagnostics, collisions, ionization, init operations) that do
+# not each own a grid; the surrounding Simulation.get_as_pypicongpu() installs
+# its grid here so the per-species boundary can be resolved explicitly.
+_translation_grid: ContextVar["AnyGrid | None"] = ContextVar("picongpu_translation_grid", default=None)
+
+
+@contextmanager
+def particle_boundary_translation_context(grid: "AnyGrid"):
+    """Temporarily make *grid* the grid used to resolve species particle boundaries.
+
+    Used by :meth:`picongpu.picmi.simulation.Simulation.get_as_pypicongpu` so that
+    every species converted inside the simulation (including the ones nested in
+    diagnostics, interactions and operations) resolves its per-species particle
+    boundary against the simulation grid.
+    """
+    token = _translation_grid.set(grid)
+    try:
+        yield
+    finally:
+        _translation_grid.reset(token)
 
 
 # Accepted particle-shape terms: the PICMI-standard names plus PIConGPU-only
@@ -98,6 +129,19 @@ class Species(PICMI_Species):
     picongpu_fixed_charge: bool = False
     particle_shape: str | None = "quadratic"
     method: str | None = "Boris"
+
+    picongpu_particle_boundary: ParticleBoundary | None = None
+    """
+    PIConGPU extension: per-species particle boundary condition.
+
+    Per-axis kind (``periodic``/``absorbing``/``reflect``/``thermal``) with optional
+    ``boundary_offset`` (int, >= 0) and ``boundary_temperature`` (float, >= 0, keV).
+
+    The grid's particle boundary conditions are the *default*; this field, if set,
+    *overrides* the grid's per-axis value for this species. If unset, the grid's
+    particle BC applies to this species. See
+    :mod:`picongpu.picmi.particle_boundary`.
+    """
 
     # Theoretically, Position(), Momentum() and Weighting() are also requirements imposed from the outside,
     # e.g., by the current deposition, pusher, ..., but these concepts are not separately modelled in PICMI
@@ -202,11 +246,21 @@ class Species(PICMI_Species):
         return _lookup("pusher method", _PUSHER_BY_NAME, self.method or "Boris")
 
     def get_as_pypicongpu(self, *args, **kwargs):
+        grid = _translation_grid.get()
+        if grid is None:
+            raise ValueError(
+                f"Cannot convert species {self.name!r} to pypicongpu without a grid context. "
+                "Translate species as part of a Simulation (which provides the grid used to resolve "
+                "the per-species particle boundary), or enter a particle-boundary translation context."
+            )
         return PyPIConGPUSpecies(
             name=self.name,
             **self._evaluate_species_requirements(),
             shape=self._shape(),
             pusher=self._pusher(),
+            particle_boundary=grid.get_particle_boundary(
+                name=self.name, picongpu_particle_boundary=self.picongpu_particle_boundary
+            ),
         )
 
     def picongpu_get_mass_si(self) -> float:

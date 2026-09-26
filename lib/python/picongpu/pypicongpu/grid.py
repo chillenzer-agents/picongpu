@@ -16,9 +16,16 @@ from .rendering import RenderedObject
 
 class BoundaryCondition(enum.Enum):
     """
-    Boundary Condition of PIConGPU
+    Boundary Condition of PIConGPU (field boundary)
 
-    Maps to the ``--periodic`` grid option (``1`` = periodic, ``0`` = absorbing/open).
+    Defines how the electromagnetic fields are treated at the simulation
+    bounding box. This maps to the ``--periodic`` option and is complete for
+    that option.
+
+    Particle boundary conditions (reflecting, thermal, per-axis, with offset
+    and temperature) are per-species and are handled by
+    ``pypicongpu.species.species_boundary.SpeciesParticleBoundary``, not by this
+    field-boundary enum.
     """
 
     PERIODIC = 1

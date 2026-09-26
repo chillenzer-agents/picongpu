@@ -15,6 +15,12 @@ from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.species.constant.charge import Charge
 from picongpu.pypicongpu.species.constant.mass import Mass
 from picongpu.pypicongpu.species.species import Species
+from picongpu.pypicongpu.species.species_boundary import SpeciesParticleBoundary
+
+# The pypicongpu Species requires an explicit resolved particle boundary; these
+# tests exercise constants normalization and do not care about the boundary, so a
+# neutral absorbing-on-all-axes value is sufficient.
+_BOUNDARY = SpeciesParticleBoundary(boundary="absorbing absorbing absorbing")
 
 
 def _attributes():
@@ -28,7 +34,12 @@ class TestSpeciesConstantsNormalization(TestCase):
         # None by the constants field validator.
         mass = Mass(mass_si=9.109e-31)
         charge = Charge(charge_si=1.602e-19)
-        species = Species(name="electron", constants={"mass": mass, "charge": charge}, attributes=_attributes())
+        species = Species(
+            name="electron",
+            constants={"mass": mass, "charge": charge},
+            attributes=_attributes(),
+            particle_boundary=_BOUNDARY,
+        )
         self.assertIs(species.constants.mass, mass)
         self.assertIs(species.constants.charge, charge)
 
@@ -37,7 +48,9 @@ class TestSpeciesConstantsNormalization(TestCase):
         # keep working.
         mass = Mass(mass_si=9.109e-31)
         charge = Charge(charge_si=1.602e-19)
-        species = Species(name="electron", constants=[mass, charge], attributes=_attributes())
+        species = Species(
+            name="electron", constants=[mass, charge], attributes=_attributes(), particle_boundary=_BOUNDARY
+        )
         self.assertIs(species.constants.mass, mass)
         self.assertIs(species.constants.charge, charge)
 
@@ -46,7 +59,7 @@ class TestSpeciesConstantsNormalization(TestCase):
         # (e.g. "mss" instead of "mass" would leave mass as None without error).
         mass = Mass(mass_si=9.109e-31)
         with self.assertRaises(ValidationError) as ctx:
-            Species(name="electron", constants={"mss": mass}, attributes=_attributes())
+            Species(name="electron", constants={"mss": mass}, attributes=_attributes(), particle_boundary=_BOUNDARY)
         self.assertIn("mss", str(ctx.exception))
         self.assertIn("mass", str(ctx.exception))
 
@@ -55,11 +68,18 @@ class TestSpeciesConstantsNormalization(TestCase):
         # once" contract; the effective (documented) semantics are last-wins.
         first = Mass(mass_si=1.0)
         second = Mass(mass_si=2.0)
-        species = Species(name="electron", constants=[first, second], attributes=_attributes())
+        species = Species(
+            name="electron", constants=[first, second], attributes=_attributes(), particle_boundary=_BOUNDARY
+        )
         self.assertIs(species.constants.mass, second)
 
     def test_absent_constants_default_to_none(self):
-        species = Species(name="electron", constants={"mass": Mass(mass_si=9.109e-31)}, attributes=_attributes())
+        species = Species(
+            name="electron",
+            constants={"mass": Mass(mass_si=9.109e-31)},
+            attributes=_attributes(),
+            particle_boundary=_BOUNDARY,
+        )
         self.assertIsNotNone(species.constants.mass)
         self.assertIsNone(species.constants.charge)
         self.assertIsNone(species.constants.density_ratio)
@@ -69,6 +89,7 @@ class TestSpeciesConstantsNormalization(TestCase):
             name="electron",
             constants={"mass": Mass(mass_si=9.109e-31), "charge": Charge(charge_si=1.602e-19)},
             attributes=_attributes(),
+            particle_boundary=_BOUNDARY,
         )
         # Sanity-check should not trip the (previously always-firing) unique-constant check.
         species.check()

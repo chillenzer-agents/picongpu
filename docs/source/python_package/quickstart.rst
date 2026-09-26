@@ -21,12 +21,12 @@ for alternatives and details).
 Step 2: Build Your Runtime Configuration
 ----------------------------------------
 
-.. literalinclude:: snippets/quickstart/picrc_builder.sh
+.. literalinclude:: snippets/quickstart/picongpu_rc_build.sh
    :language: bash
-   :start-after: BEGIN-PICRC-BUILDER
-   :end-before: END-PICRC-BUILDER
+   :start-after: BEGIN-PICONGPU-RC-BUILD
+   :end-before: END-PICONGPU-RC-BUILD
 
-``picrc-builder`` guides you interactively through writing the
+``picongpu rc build`` guides you interactively through writing the
 ``.picongpurc.toml`` runtime configuration:
 it asks for the preset of your system and writes the file.
 See :ref:`Configuring Your Environment <python_package/foundations/configuring_environment:Configuring Your Environment>`
@@ -35,12 +35,12 @@ for the search order of that file, the available presets and all further knobs.
 Step 3: Install the Dependencies
 --------------------------------
 
-.. literalinclude:: snippets/quickstart/pic_deps_install.sh
+.. literalinclude:: snippets/quickstart/picongpu_dependencies_install.sh
    :language: bash
-   :start-after: BEGIN-PIC-DEPS-INSTALL
-   :end-before: END-PIC-DEPS-INSTALL
+   :start-after: BEGIN-PICONGPU-DEPENDENCIES-INSTALL
+   :end-before: END-PICONGPU-DEPENDENCIES-INSTALL
 
-``pic-deps`` is a best-effort driver over your preset's own
+``picongpu dependencies`` is a best-effort driver over your preset's own
 ``dependencies_autoinstall.sh``,
 building PIConGPU's compile-time dependencies.
 This step is only available for the presets that ship such a script

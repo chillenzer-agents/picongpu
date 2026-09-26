@@ -57,9 +57,7 @@ dependencies = [
 
 optional-dependencies.test = [ "pytest>=9" ]
 
-scripts.pic-deps = "picongpu.pic_deps:main"
-
-scripts.picrc-builder = "picongpu.picrc_builder:main"
+scripts.picongpu = "picongpu.cli:main"
 
 [tool.hatch.metadata]
 allow-direct-references = true

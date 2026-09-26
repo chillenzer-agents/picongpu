@@ -13,7 +13,9 @@ License: GPLv3+
 
 Defines an analytic density profile in two equivalent ways:
 as a sympy function handed over as a decorator, and as a
-sympy-parseable ``density_expression`` string.
+sympy-parseable ``density_expression`` string, and adds a
+constant drift and thermal spread via the standard
+``momentum_expressions`` / ``momentum_spread_expressions``.
 """
 
 from pathlib import Path
@@ -36,6 +38,20 @@ def density(x, y, z):
 density_string = picmi.AnalyticDistribution(density_expression="1e25 * exp(-((x - 1e-6) / 1e-7) ** 2)")
 # END-DENSITY-EXPRESSION
 
+# BEGIN-MOMENTUM-EXPRESSIONS
+# a constant drift (gamma * velocity [m/s]) along z and a Gaussian
+# thermal spread sigma [m/s] along the same axis; `n0`, `vz` and `vth`
+# are collected automatically into `user_defined_kw`:
+drifting = picmi.AnalyticDistribution(
+    density_expression="n0 * exp(-(((x - 1e-6) / 1e-7) ** 2))",
+    n0=1e25,
+    momentum_expressions=[None, None, "vz"],
+    momentum_spread_expressions=[None, None, "vth"],
+    vz=1.0e6,
+    vth=1.0e5,
+)
+# END-MOMENTUM-EXPRESSIONS
+
 grid = picmi.Cartesian3DGrid(
     number_of_cells=[32, 32, 32],
     lower_bound=[0.0, 0.0, 0.0],
@@ -48,7 +64,7 @@ solver = picmi.ElectromagneticSolver(method="Yee", cfl=0.7, grid=grid)
 electrons = picmi.Species(
     name="electrons",
     particle_type="electron",
-    initial_distribution=density_string,
+    initial_distribution=drifting,
 )
 layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=2)
 

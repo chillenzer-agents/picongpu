@@ -353,6 +353,9 @@ EXPECTED_FILES = {
             ("species_distributions_layouts_setup/include/picongpu/param/speciesDefinition.param", "species_electrons"),
         ],
     },
+    "selected_topics/species_validation.py": {
+        "stdout_contains": ["valid species: electrons", "rejected:", "It worked!"],
+    },
     "selected_topics/particle_functors.py": {
         "no_run": True,
         "files": [

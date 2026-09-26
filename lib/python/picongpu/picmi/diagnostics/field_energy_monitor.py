@@ -7,7 +7,7 @@ License: GPLv3+
 
 from pydantic import BaseModel, ConfigDict
 
-from picongpu.picmi.copy_attributes import default_converts_to
+from picongpu.picmi._copy_attributes import default_converts_to
 
 from ...pypicongpu.output.field_energy_monitor import (
     FieldEnergyMonitor as PyPIConGPUFieldEnergyMonitor,

@@ -8,7 +8,7 @@ License: GPLv3+
 from pydantic import model_validator
 
 from ...pypicongpu import laser
-from ..copy_attributes import default_converts_to
+from .._copy_attributes import default_converts_to
 from .gaussian_laser import GaussianLaser
 
 

@@ -311,6 +311,14 @@ EXPECTED_FILES = {
             ("grids_and_solvers_setup/etc/picongpu/N.cfg", 'TBG_gridSize="128 128 128"'),
         ],
     },
+    "selected_topics/grids_guard_cells.py": {
+        "stdout_contains": [
+            "guard cells in x dimension must be at least 1 for the Yee solver",
+            "guard cells in x dimension must be at least the arbitrary-order FDTD half-stencil of 2 cells",
+            "accepted solver: other:ArbitraryOrderFDTD",
+            "It worked!",
+        ],
+    },
     "selected_topics/lasers.py": {
         "no_run": True,
         "files": [

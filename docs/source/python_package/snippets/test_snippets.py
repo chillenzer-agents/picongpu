@@ -90,6 +90,11 @@ TOML_EXPECTED = {
         "profile_template_content": "echo {{{my_rc_params_value}}}",
         "profile_template_path": "/path/to/my/profile-template",
     },
+    "hpc_submission/efp_lexis_config.toml": {
+        "workflow_backend": "lexis",
+        "author": "Your Name",
+        "email": "you@example.org",
+    },
 }
 
 EXPECTED_FILES = {
@@ -383,6 +388,24 @@ EXPECTED_FILES = {
         "file_contains": [
             ("custom_iteration_setup/include/picongpu/species_report", "electrons: mine"),
             ("custom_iteration_setup/include/picongpu/species_report", "ions: mine"),
+        ],
+    },
+    "hpc_submission/efp_lexis_workflow.py": {
+        "no_run": True,
+        "files": [
+            "efp_lexis_setup/workflow/workflow.lwd.yaml",
+            # the CWL workflow is still generated alongside (non-destructive)
+            "efp_lexis_setup/workflow/workflow.cwl",
+        ],
+        "file_contains": [
+            ("efp_lexis_setup/workflow/workflow.lwd.yaml", "command_template_name: picongpu"),
+            ("efp_lexis_setup/workflow/workflow.lwd.yaml", "location_name: jupiter"),
+            ("efp_lexis_setup/workflow/workflow.lwd.yaml", "source: ddi://~/your-picongpu-setup"),
+        ],
+        "stdout_contains": [
+            "project_shortname: your-efp-project",
+            "submission steps: ['create_workflow', 'execute_workflow', 'poll_state']",
+            "It worked!",
         ],
     },
 }

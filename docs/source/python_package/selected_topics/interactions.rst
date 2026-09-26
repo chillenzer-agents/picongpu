@@ -5,8 +5,16 @@ Interactions describe the physics that acts on your particles
 *in addition to* the electromagnetic fields
 the solver provides:
 ionization, binary collisions and radiation reaction.
-They are passed to the simulation via the
-``picongpu_interaction`` parameter:
+There are two entry points:
+the PIConGPU-specific ``picongpu_interaction`` parameter,
+which takes the concrete interaction objects documented below,
+and the PICMI-standard
+:meth:`~picongpu.picmi.simulation.Simulation.add_interaction`,
+which accepts field ionization
+(the standard
+:class:`~picongpu.picmi.interaction.ionization.fieldionization.PICMI_FieldIonization`,
+converted to the matching concrete model)
+as well as PIConGPU's own interaction objects.
 
 .. code-block:: python
 
@@ -14,10 +22,11 @@ They are passed to the simulation via the
 
 .. note::
 
-   The PICMI-standard method ``simulation.add_interaction()``
-   is *not* supported by PIConGPU:
-   it raises an ``UnsupportedFeatureError``.
-   Always use the ``picongpu_interaction`` parameter instead.
+   ``add_interaction()`` accepts only field ionization
+   and PIConGPU's own interaction types;
+   other PICMI-standard interaction types still raise an
+   ``UnsupportedFeatureError``.
+   The generic ``picongpu_interaction`` parameter accepts them all.
 
 Each interaction is attached to the species it acts on
 (and, where applicable, creates new species);
@@ -86,6 +95,36 @@ The same snippet also shows the BSI variant:
    Deep dive:
    :ref:`the ionization models in the PIConGPU code <model-fieldIonization>`
    and :ref:`the collisional ionization model <model-collisionalIonization>`.
+
+Standard interface
+^^^^^^^^^^^^^^^^^^
+
+The PICMI-standard field ionization object
+
+:class:`~picongpu.picmi.interaction.ionization.fieldionization.PICMI_FieldIonization`
+   A thin, standard-compatible adapter taking the standard arguments
+   ``model``, ``ionized_species`` and ``product_species``,
+   plus the PIConGPU-specific knobs
+   ``ionization_current``, ``ADK_variant`` and ``BSI_extensions``.
+   It is passed to :meth:`~picongpu.picmi.simulation.Simulation.add_interaction`
+   and converted to the matching concrete model
+   (``ADK``, ``BSI`` or ``Keldysh``) at add time,
+   so the rest of the workflow is identical to using ``picongpu_interaction``.
+
+The ``model`` string is matched case-insensitively against the concrete
+models' ``MODEL_NAME``
+(``"adk"``, ``"Adk"`` and ``"ADK"`` all select the ADK model).
+Model-specific knobs are required rather than defaulted:
+the ADK model requires ``ADK_variant``
+and the BSI model requires ``BSI_extensions``.
+As with the concrete models, a bare standard field ionization uses
+``ionization_current=None``
+(the C++ ``current::None`` default).
+
+.. literalinclude:: ../snippets/selected_topics/interactions.py
+   :language: python
+   :start-after: BEGIN-INTERACTIONS-STANDARD
+   :end-before: END-INTERACTIONS-STANDARD
 
 .. _collisions:
 

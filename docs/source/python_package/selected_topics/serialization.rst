@@ -34,7 +34,8 @@ Metadata in a setup directory
 -----------------------------
 
 Generating the input files writes machine-readable descriptions
-into the ``metadata/`` directory of the setup:
+into the ``metadata/`` directory of the generated setup
+(the run directory's ``input/`` directory):
 
 * ``metadata/pypicongpu_runner.json``:
   the state of the runner,

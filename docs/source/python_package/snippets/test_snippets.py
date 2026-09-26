@@ -118,51 +118,51 @@ EXPECTED_FILES = {
     "defining_simulation/minimal_example.py": {
         "no_run": True,
         "files": [
-            "minimal_example_setup/include/picongpu/param/simulation.param",
-            "minimal_example_setup/workflow/workflow.cwl",
-            "minimal_example_setup/workflow/scripts/picongpu.profile",
-            "minimal_example_setup/metadata/pypicongpu_runner.json",
+            "minimal_example_run/input/include/picongpu/param/simulation.param",
+            "minimal_example_run/input/workflow/workflow.cwl",
+            "minimal_example_run/input/workflow/scripts/picongpu.profile",
+            "minimal_example_run/input/metadata/pypicongpu_runner.json",
         ],
     },
     "defining_simulation/lwfa_example.py": {
         "no_run": True,
         "files": [
-            "lwfa_example_setup/include/picongpu/param/simulation.param",
-            "lwfa_example_setup/include/picongpu/param/incidentField.param",
-            "lwfa_example_setup/include/picongpu/param/speciesDefinition.param",
-            "lwfa_example_setup/include/picongpu/param/fileOutput.param",
-            "lwfa_example_setup/workflow/workflow.cwl",
-            "lwfa_example_setup/metadata/pypicongpu_runner.json",
+            "lwfa_example_run/input/include/picongpu/param/simulation.param",
+            "lwfa_example_run/input/include/picongpu/param/incidentField.param",
+            "lwfa_example_run/input/include/picongpu/param/speciesDefinition.param",
+            "lwfa_example_run/input/include/picongpu/param/fileOutput.param",
+            "lwfa_example_run/input/workflow/workflow.cwl",
+            "lwfa_example_run/input/metadata/pypicongpu_runner.json",
         ],
         "file_contains": [
-            ("lwfa_example_setup/include/picongpu/param/speciesDefinition.param", "hydrogen"),
-            ("lwfa_example_setup/include/picongpu/param/speciesDefinition.param", "electrons"),
+            ("lwfa_example_run/input/include/picongpu/param/speciesDefinition.param", "hydrogen"),
+            ("lwfa_example_run/input/include/picongpu/param/speciesDefinition.param", "electrons"),
         ],
     },
     "defining_simulation/warm_plasma.py": {
         "no_run": True,
         "files": [
-            "warm_plasma_setup/include/picongpu/param/simulation.param",
-            "warm_plasma_setup/include/picongpu/param/speciesDefinition.param",
-            "warm_plasma_setup/include/picongpu/param/speciesInitialization.param",
-            "warm_plasma_setup/workflow/workflow.cwl",
-            "warm_plasma_setup/metadata/pypicongpu_runner.json",
+            "warm_plasma_run/input/include/picongpu/param/simulation.param",
+            "warm_plasma_run/input/include/picongpu/param/speciesDefinition.param",
+            "warm_plasma_run/input/include/picongpu/param/speciesInitialization.param",
+            "warm_plasma_run/input/workflow/workflow.cwl",
+            "warm_plasma_run/input/metadata/pypicongpu_runner.json",
         ],
         "file_contains": [
-            ("warm_plasma_setup/include/picongpu/param/speciesDefinition.param", "ions"),
-            ("warm_plasma_setup/include/picongpu/param/speciesDefinition.param", "electrons"),
+            ("warm_plasma_run/input/include/picongpu/param/speciesDefinition.param", "ions"),
+            ("warm_plasma_run/input/include/picongpu/param/speciesDefinition.param", "electrons"),
         ],
     },
     "defining_simulation/laser_variants.py": {
         "no_run": True,
         "files": [
-            "laser_variants_setup/include/picongpu/param/incidentField.param",
-            "laser_variants_setup/workflow/workflow.cwl",
-            "laser_variants_setup/metadata/pypicongpu_runner.json",
+            "laser_variants_run/input/include/picongpu/param/incidentField.param",
+            "laser_variants_run/input/workflow/workflow.cwl",
+            "laser_variants_run/input/metadata/pypicongpu_runner.json",
         ],
         "file_contains": [
-            ("laser_variants_setup/include/picongpu/param/incidentField.param", "PyPIConGPUGaussianPulseParam"),
-            ("laser_variants_setup/include/picongpu/param/incidentField.param", "PyPIConGPUDispersivePulseParam"),
+            ("laser_variants_run/input/include/picongpu/param/incidentField.param", "PyPIConGPUGaussianPulseParam"),
+            ("laser_variants_run/input/include/picongpu/param/incidentField.param", "PyPIConGPUDispersivePulseParam"),
         ],
     },
     "defining_simulation/serialize_simulation.py": {
@@ -171,8 +171,8 @@ EXPECTED_FILES = {
     },
     "defining_simulation/multiple_simulations.py": {
         "no_run": True,
-        "files": [f"scan/focal_{focal:.1e}/setup/include/picongpu/param/simulation.param" for focal in SCAN_FOCALS]
-        + [f"scan/focal_{focal:.1e}/setup/workflow/input.yaml" for focal in SCAN_FOCALS],
+        "files": [f"scan/focal_{focal:.1e}/input/include/picongpu/param/simulation.param" for focal in SCAN_FOCALS]
+        + [f"scan/focal_{focal:.1e}/input/workflow/input.yaml" for focal in SCAN_FOCALS],
     },
     "defining_simulation/postprocess_histogram.py": {
         "files": ["electron_count.png"],
@@ -199,47 +199,47 @@ EXPECTED_FILES = {
     "selected_topics/phase_space.py": {
         "no_run": True,
         "files": [
-            "phase_space_setup/etc/picongpu/N.cfg",
-            "phase_space_setup/workflow/workflow.cwl",
+            "phase_space_run/input/etc/picongpu/N.cfg",
+            "phase_space_run/input/workflow/workflow.cwl",
         ],
         "file_contains": [
-            ("phase_space_setup/etc/picongpu/N.cfg", "--electrons_phaseSpace.period 0:-1:10"),
-            ("phase_space_setup/etc/picongpu/N.cfg", "--electrons_phaseSpace.space y"),
-            ("phase_space_setup/etc/picongpu/N.cfg", "--electrons_phaseSpace.momentum py"),
+            ("phase_space_run/input/etc/picongpu/N.cfg", "--electrons_phaseSpace.period 0:-1:10"),
+            ("phase_space_run/input/etc/picongpu/N.cfg", "--electrons_phaseSpace.space y"),
+            ("phase_space_run/input/etc/picongpu/N.cfg", "--electrons_phaseSpace.momentum py"),
             # SI momentum input converted to m_species*c by the frontend (see the phase_space page)
-            ("phase_space_setup/etc/picongpu/N.cfg", "--electrons_phaseSpace.min -1.0"),
-            ("phase_space_setup/etc/picongpu/N.cfg", "--electrons_phaseSpace.max 1.0"),
+            ("phase_space_run/input/etc/picongpu/N.cfg", "--electrons_phaseSpace.min -1.0"),
+            ("phase_space_run/input/etc/picongpu/N.cfg", "--electrons_phaseSpace.max 1.0"),
         ],
     },
     "selected_topics/energy_histogram.py": {
         "no_run": True,
         "files": [
-            "energy_histogram_setup/etc/picongpu/N.cfg",
+            "energy_histogram_run/input/etc/picongpu/N.cfg",
         ],
         "file_contains": [
-            ("energy_histogram_setup/etc/picongpu/N.cfg", "--electrons_energyHistogram.period 0:-1:10"),
-            ("energy_histogram_setup/etc/picongpu/N.cfg", "--electrons_energyHistogram.binCount 50"),
-            ("energy_histogram_setup/etc/picongpu/N.cfg", "--electrons_energyHistogram.maxEnergy 500.0"),
+            ("energy_histogram_run/input/etc/picongpu/N.cfg", "--electrons_energyHistogram.period 0:-1:10"),
+            ("energy_histogram_run/input/etc/picongpu/N.cfg", "--electrons_energyHistogram.binCount 50"),
+            ("energy_histogram_run/input/etc/picongpu/N.cfg", "--electrons_energyHistogram.maxEnergy 500.0"),
         ],
     },
     "selected_topics/macro_particle_count.py": {
         "no_run": True,
         "files": [
-            "macro_particle_count_setup/etc/picongpu/N.cfg",
+            "macro_particle_count_run/input/etc/picongpu/N.cfg",
         ],
         "file_contains": [
-            ("macro_particle_count_setup/etc/picongpu/N.cfg", "--electrons_macroParticlesCount.period 0:-1:10"),
+            ("macro_particle_count_run/input/etc/picongpu/N.cfg", "--electrons_macroParticlesCount.period 0:-1:10"),
         ],
     },
     "selected_topics/openpmd.py": {
         "no_run": True,
         "files": [
-            "openpmd_setup/etc/picongpu/N.cfg",
-            "openpmd_setup/include/picongpu/param/fileOutput.param",
+            "openpmd_run/input/etc/picongpu/N.cfg",
+            "openpmd_run/input/include/picongpu/param/fileOutput.param",
         ],
         "file_contains": [
-            ("openpmd_setup/etc/picongpu/N.cfg", "--openPMD.pluginConfig"),
-            ("openpmd_setup/include/picongpu/param/fileOutput.param", "FieldE"),
+            ("openpmd_run/input/etc/picongpu/N.cfg", "--openPMD.pluginConfig"),
+            ("openpmd_run/input/include/picongpu/param/fileOutput.param", "FieldE"),
         ],
         "stdout_contains": [
             'file = "simData"',
@@ -252,92 +252,95 @@ EXPECTED_FILES = {
     "selected_topics/binning.py": {
         "no_run": True,
         "files": [
-            "binning_setup/include/picongpu/param/binningSetup.param",
+            "binning_run/input/include/picongpu/param/binningSetup.param",
         ],
         "file_contains": [
-            ("binning_setup/include/picongpu/param/binningSetup.param", "gammaDistribution"),
-            ("binning_setup/include/picongpu/param/binningSetup.param", "addParticleBinner"),
-            ("binning_setup/include/picongpu/param/binningSetup.param", 'setNotifyPeriod("0:-1:10")'),
+            ("binning_run/input/include/picongpu/param/binningSetup.param", "gammaDistribution"),
+            ("binning_run/input/include/picongpu/param/binningSetup.param", "addParticleBinner"),
+            ("binning_run/input/include/picongpu/param/binningSetup.param", 'setNotifyPeriod("0:-1:10")'),
             # the filtered-species binner renders the filter as a boolean functor
-            ("binning_setup/include/picongpu/param/binningSetup.param", "fastGammaDistribution"),
-            ("binning_setup/include/picongpu/param/binningSetup.param", "FilteredSpecies"),
-            ("binning_setup/include/picongpu/param/binningSetup.param", "Ekin > 1.6e-15"),
+            ("binning_run/input/include/picongpu/param/binningSetup.param", "fastGammaDistribution"),
+            ("binning_run/input/include/picongpu/param/binningSetup.param", "FilteredSpecies"),
+            ("binning_run/input/include/picongpu/param/binningSetup.param", "Ekin > 1.6e-15"),
         ],
     },
     "selected_topics/radiation.py": {
         "no_run": True,
         "files": [
-            "radiation_setup/etc/picongpu/N.cfg",
-            "radiation_setup/include/picongpu/param/radiation.param",
+            "radiation_run/input/etc/picongpu/N.cfg",
+            "radiation_run/input/include/picongpu/param/radiation.param",
         ],
         "file_contains": [
-            ("radiation_setup/etc/picongpu/N.cfg", "--electrons_radiation.period 2:-1:5"),
-            ("radiation_setup/etc/picongpu/N.cfg", "--electrons_radiation.totalRadiation"),
-            ("radiation_setup/etc/picongpu/N.cfg", "--electrons_radiation.dump 5"),
+            ("radiation_run/input/etc/picongpu/N.cfg", "--electrons_radiation.period 2:-1:5"),
+            ("radiation_run/input/etc/picongpu/N.cfg", "--electrons_radiation.totalRadiation"),
+            ("radiation_run/input/etc/picongpu/N.cfg", "--electrons_radiation.dump 5"),
         ],
     },
     "selected_topics/checkpoint.py": {
         "no_run": True,
         "files": [
-            "checkpoint_setup/etc/picongpu/N.cfg",
+            "checkpoint_run/input/etc/picongpu/N.cfg",
         ],
         "file_contains": [
-            ("checkpoint_setup/etc/picongpu/N.cfg", "--checkpoint.period 0:-1:20"),
-            ("checkpoint_setup/etc/picongpu/N.cfg", "--checkpoint.directory checkpoints"),
+            ("checkpoint_run/input/etc/picongpu/N.cfg", "--checkpoint.period 0:-1:20"),
+            ("checkpoint_run/input/etc/picongpu/N.cfg", "--checkpoint.directory checkpoints"),
         ],
     },
     "selected_topics/interactions.py": {
         "no_run": True,
         "files": [
-            "adk_setup/include/picongpu/param/speciesDefinition.param",
-            "bsi_setup/include/picongpu/param/speciesDefinition.param",
-            "synchrotron_setup/include/picongpu/param/synchrotron.param",
-            "synchrotron_setup/workflow/workflow.cwl",
+            "adk_run/input/include/picongpu/param/speciesDefinition.param",
+            "bsi_run/input/include/picongpu/param/speciesDefinition.param",
+            "synchrotron_run/input/include/picongpu/param/synchrotron.param",
+            "synchrotron_run/input/workflow/workflow.cwl",
         ],
         "file_contains": [
-            ("adk_setup/include/picongpu/param/speciesDefinition.param", "ADKLinPol"),
-            ("bsi_setup/include/picongpu/param/speciesDefinition.param", "BSIStarkShifted"),
-            ("synchrotron_setup/include/picongpu/param/speciesDefinition.param", "synchrotron<species_photons>"),
+            ("adk_run/input/include/picongpu/param/speciesDefinition.param", "ADKLinPol"),
+            ("bsi_run/input/include/picongpu/param/speciesDefinition.param", "BSIStarkShifted"),
+            ("synchrotron_run/input/include/picongpu/param/speciesDefinition.param", "synchrotron<species_photons>"),
         ],
     },
     "selected_topics/grids_and_solvers.py": {
         "no_run": True,
         "files": [
-            "grids_and_solvers_setup/etc/picongpu/N.cfg",
-            "grids_and_solvers_setup/include/picongpu/param/fieldSolver.param",
+            "grids_and_solvers_run/input/etc/picongpu/N.cfg",
+            "grids_and_solvers_run/input/include/picongpu/param/fieldSolver.param",
         ],
         "file_contains": [
-            ("grids_and_solvers_setup/etc/picongpu/N.cfg", "TBG_devices_y=2"),
-            ("grids_and_solvers_setup/etc/picongpu/N.cfg", 'TBG_gridSize="128 128 128"'),
+            ("grids_and_solvers_run/input/etc/picongpu/N.cfg", "TBG_devices_y=2"),
+            ("grids_and_solvers_run/input/etc/picongpu/N.cfg", 'TBG_gridSize="128 128 128"'),
         ],
     },
     "selected_topics/lasers.py": {
         "no_run": True,
         "files": [
-            "lasers_setup/include/picongpu/param/incidentField.param",
+            "lasers_run/input/include/picongpu/param/incidentField.param",
         ],
         "file_contains": [
-            ("lasers_setup/include/picongpu/param/incidentField.param", "PyPIConGPUGaussianPulseParam"),
-            ("lasers_setup/include/picongpu/param/incidentField.param", "GaussianPulse"),
+            ("lasers_run/input/include/picongpu/param/incidentField.param", "PyPIConGPUGaussianPulseParam"),
+            ("lasers_run/input/include/picongpu/param/incidentField.param", "GaussianPulse"),
         ],
     },
     "selected_topics/simulation_settings.py": {
         "no_run": True,
         "files": [
-            "simulation_settings_setup/etc/picongpu/N.cfg",
-            "simulation_settings_setup/include/picongpu/param/simulation.param",
-            "simulation_settings_setup/include/picongpu/param/precision.param",
-            "simulation_settings_setup/include/picongpu/param/memory.param",
+            "simulation_settings_run/input/etc/picongpu/N.cfg",
+            "simulation_settings_run/input/include/picongpu/param/simulation.param",
+            "simulation_settings_run/input/include/picongpu/param/precision.param",
+            "simulation_settings_run/input/include/picongpu/param/memory.param",
         ],
         "file_contains": [
-            ("simulation_settings_setup/etc/picongpu/N.cfg", "windowMovePoint 0.9"),
-            ("simulation_settings_setup/etc/picongpu/N.cfg", "stopWindow 800"),
-            ("simulation_settings_setup/etc/picongpu/N.cfg", 'wallTime="1:00:00"'),
-            ("simulation_settings_setup/include/picongpu/param/simulation.param", "TYPICAL_PARTICLES_PER_CELL = 4"),
-            ("simulation_settings_setup/include/picongpu/param/precision.param", "precisionPIConGPU = precision64Bit"),
-            ("simulation_settings_setup/include/picongpu/param/precision.param", "precisionSqrt = precision64Bit"),
+            ("simulation_settings_run/input/etc/picongpu/N.cfg", "windowMovePoint 0.9"),
+            ("simulation_settings_run/input/etc/picongpu/N.cfg", "stopWindow 800"),
+            ("simulation_settings_run/input/etc/picongpu/N.cfg", 'wallTime="1:00:00"'),
+            ("simulation_settings_run/input/include/picongpu/param/simulation.param", "TYPICAL_PARTICLES_PER_CELL = 4"),
             (
-                "simulation_settings_setup/include/picongpu/param/memory.param",
+                "simulation_settings_run/input/include/picongpu/param/precision.param",
+                "precisionPIConGPU = precision64Bit",
+            ),
+            ("simulation_settings_run/input/include/picongpu/param/precision.param", "precisionSqrt = precision64Bit"),
+            (
+                "simulation_settings_run/input/include/picongpu/param/memory.param",
                 "reservedGpuMemorySize = 350 * 1024 * 1024",
             ),
         ],
@@ -345,23 +348,26 @@ EXPECTED_FILES = {
     "selected_topics/species_distributions_layouts.py": {
         "no_run": True,
         "files": [
-            "species_distributions_layouts_setup/include/picongpu/param/speciesDefinition.param",
-            "species_distributions_layouts_setup/include/picongpu/param/speciesInitialization.param",
+            "species_distributions_layouts_run/input/include/picongpu/param/speciesDefinition.param",
+            "species_distributions_layouts_run/input/include/picongpu/param/speciesInitialization.param",
         ],
         "file_contains": [
-            ("species_distributions_layouts_setup/include/picongpu/param/speciesDefinition.param", "species_ions"),
-            ("species_distributions_layouts_setup/include/picongpu/param/speciesDefinition.param", "species_electrons"),
+            ("species_distributions_layouts_run/input/include/picongpu/param/speciesDefinition.param", "species_ions"),
+            (
+                "species_distributions_layouts_run/input/include/picongpu/param/speciesDefinition.param",
+                "species_electrons",
+            ),
         ],
     },
     "selected_topics/particle_functors.py": {
         "no_run": True,
         "files": [
-            "particle_functors_setup/etc/picongpu/N.cfg",
-            "particle_functors_setup/include/picongpu/param/particleFilters.param",
+            "particle_functors_run/input/etc/picongpu/N.cfg",
+            "particle_functors_run/input/include/picongpu/param/particleFilters.param",
         ],
         "file_contains": [
-            ("particle_functors_setup/etc/picongpu/N.cfg", "--electrons_energyHistogram.filter fast"),
-            ("particle_functors_setup/include/picongpu/param/particleFilters.param", '"fast"'),
+            ("particle_functors_run/input/etc/picongpu/N.cfg", "--electrons_energyHistogram.filter fast"),
+            ("particle_functors_run/input/include/picongpu/param/particleFilters.param", '"fast"'),
         ],
     },
     "selected_topics/units_and_constants.py": {
@@ -369,20 +375,20 @@ EXPECTED_FILES = {
     },
     "selected_topics/custom_input.py": {
         "files": [
-            "custom_input_setup/include/picongpu/my_param",
+            "custom_input_run/input/include/picongpu/my_param",
         ],
         "file_contains": [
-            ("custom_input_setup/include/picongpu/my_param", "MY_NUMBER = 42"),
+            ("custom_input_run/input/include/picongpu/my_param", "MY_NUMBER = 42"),
         ],
         "stdout_contains": ["MY_NUMBER = 42", "It worked!"],
     },
     "selected_topics/custom_iteration.py": {
         "files": [
-            "custom_iteration_setup/include/picongpu/species_report",
+            "custom_iteration_run/input/include/picongpu/species_report",
         ],
         "file_contains": [
-            ("custom_iteration_setup/include/picongpu/species_report", "electrons: mine"),
-            ("custom_iteration_setup/include/picongpu/species_report", "ions: mine"),
+            ("custom_iteration_run/input/include/picongpu/species_report", "electrons: mine"),
+            ("custom_iteration_run/input/include/picongpu/species_report", "ions: mine"),
         ],
     },
 }

@@ -120,7 +120,11 @@ def test_documented_run_directory_matches_workflow_outputs(tmp_path):
     assert documented, "failed to parse the documented run directory tree"
 
     # dummy inputs for the organize_output step
-    project_path = tmp_path / "project"
+    work_dir = tmp_path / "run"
+    work_dir.mkdir()
+    # the generated setup is staged as ``input`` by the CWL
+    # InitialWorkDirRequirement before the script runs (single run dir layout)
+    project_path = work_dir / "input"
     for entry in ("etc", "include", "metadata", "workflow"):
         (project_path / entry).mkdir(parents=True)
     bin_directory = tmp_path / "bin"
@@ -134,8 +138,6 @@ def test_documented_run_directory_matches_workflow_outputs(tmp_path):
     link_results = tmp_path / "link_results.sh"
     link_results.write_text("#!/bin/bash\n")
 
-    work_dir = tmp_path / "run"
-    work_dir.mkdir()
     script = REPO_ROOT / "lib/python/picongpu/templates/workflow/scripts/organize_output.sh"
     subprocess.run(
         [

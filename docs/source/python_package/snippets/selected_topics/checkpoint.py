@@ -54,4 +54,4 @@ sim = picmi.Simulation(
 #
 #     Checkpoint(period=TS[::20], tryRestart=True)
 
-sim.run(setup_dir=Path("checkpoint_setup"), run_dir=Path("checkpoint_run"))
+sim.run(run_dir=Path("checkpoint_run"))

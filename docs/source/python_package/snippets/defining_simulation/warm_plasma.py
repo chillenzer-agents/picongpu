@@ -63,5 +63,5 @@ simulation = picmi.Simulation(
     layouts=[layout, layout],
 )
 
-simulation.run(setup_dir=Path("warm_plasma_setup"), run_dir=Path("warm_plasma_run"))
+simulation.run(run_dir=Path("warm_plasma_run"))
 # END-WARM-PLASMA

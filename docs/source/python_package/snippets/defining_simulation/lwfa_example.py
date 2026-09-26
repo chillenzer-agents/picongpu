@@ -104,5 +104,5 @@ sim = picmi.Simulation(
 # END-LWFA-SIMULATION
 
 # BEGIN-LWFA-RUN
-sim.run(setup_dir=Path("lwfa_example_setup"), run_dir=Path("lwfa_example_run"))
+sim.run(run_dir=Path("lwfa_example_run"))
 # END-LWFA-RUN

@@ -76,7 +76,7 @@ FOCAL_POSITIONS = [4.4e-5, 4.6e-5, 4.8e-5]
 def run_simulation(focal_position):
     run_dir = Path("scan") / f"focal_{focal_position:.1e}"
     simulation = make_simulation(focal_position)
-    simulation.run(setup_dir=run_dir / "setup", run_dir=run_dir)
+    simulation.run(run_dir=run_dir)
     return run_dir
 
 

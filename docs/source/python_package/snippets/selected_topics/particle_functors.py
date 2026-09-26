@@ -91,4 +91,4 @@ simulation = picmi.Simulation(
     diagnostics=[gamma_distribution, histogram],
 )
 
-simulation.write_input_file(Path("particle_functors_setup"))
+simulation.write_input_file(Path("particle_functors_run"))

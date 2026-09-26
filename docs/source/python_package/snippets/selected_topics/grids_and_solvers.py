@@ -41,4 +41,4 @@ solver = picmi.ElectromagneticSolver(
 
 simulation = picmi.Simulation(max_steps=100, solver=solver)
 
-simulation.write_input_file(Path("grids_and_solvers_setup"))
+simulation.write_input_file(Path("grids_and_solvers_run"))

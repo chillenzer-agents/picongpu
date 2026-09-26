@@ -50,4 +50,4 @@ sim = picmi.Simulation(
     diagnostics=[histogram],
 )
 
-sim.run(setup_dir=Path("energy_histogram_setup"), run_dir=Path("energy_histogram_run"))
+sim.run(run_dir=Path("energy_histogram_run"))

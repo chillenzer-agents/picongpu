@@ -52,7 +52,7 @@ The rendering context
 
 The data available to a template is the *rendering context*:
 a JSON object that is written to
-``metadata/pypicongpu_rendering_context.json`` in every generated setup
+``input/metadata/pypicongpu_rendering_context.json`` in every generated setup
 (see :ref:`the serialization page <serialization>`).
 Its top-level keys include ``species``, ``laser``, ``solver``, ``grid``,
 ``time_steps`` and ``customuserinput``.

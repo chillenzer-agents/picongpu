@@ -1,6 +1,6 @@
 #!/bin/bash
 # BEGIN-LEGACY-WORKFLOW
-cd $SETUP_DIR
+cd $RUN_DIR/input
 source workflow/scripts/picongpu.profile
 pic-build
 tbg $TBG_ARGS $RUN_DIR

@@ -97,4 +97,4 @@ sim = picmi.Simulation(
     diagnostics=[binning, fast_binning],
 )
 
-sim.run(setup_dir=Path("binning_setup"), run_dir=Path("binning_run"))
+sim.run(run_dir=Path("binning_run"))

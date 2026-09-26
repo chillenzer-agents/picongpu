@@ -134,7 +134,7 @@ def electron_count_of(focal_position):
     if run_dir.exists():
         shutil.rmtree(run_dir)
     simulation = make_simulation(focal_position)
-    simulation.run(setup_dir=run_dir / "setup", run_dir=run_dir)
+    simulation.run(run_dir=run_dir)
     # best-effort wait for the submitted job and its linked results
     # (system specific, see "Immediate post-processing"):
     gather_results(run_dir)

@@ -73,8 +73,8 @@ sim = picmi.Simulation(
     diagnostics=[particle_dump, electric_field_dump, kinetic_energy_dump, magnetic_field_dump],
 )
 
-sim.run(setup_dir=Path("openpmd_setup"), run_dir=Path("openpmd_run"))
+sim.run(run_dir=Path("openpmd_run"))
 
-for config in sorted(Path("openpmd_setup").joinpath("etc").glob("openPMD_config_*.toml")):
+for config in sorted(Path("openpmd_run").joinpath("input", "etc").glob("openPMD_config_*.toml")):
     print(config.name)
     print(config.read_text())

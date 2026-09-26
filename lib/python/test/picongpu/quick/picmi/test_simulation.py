@@ -468,12 +468,12 @@ class TestPicmiSimulation(TestCase):
         sim.write_input_file(outdir)
 
         # a rendered file from a nested template dir, rendered by the runner itself
-        nested_file = outdir + "/etc/picongpu/N.cfg"
+        nested_file = outdir + "/input/etc/picongpu/N.cfg"
         assert os.path.exists(nested_file)
         with open(nested_file) as file:
             nested_content = file.read()
         # a param rendered from a default template
-        param_file = outdir + "/include/picongpu/param/simulation.param"
+        param_file = outdir + "/input/include/picongpu/param/simulation.param"
         assert os.path.exists(param_file)
         with open(param_file) as file:
             param_content = file.read()

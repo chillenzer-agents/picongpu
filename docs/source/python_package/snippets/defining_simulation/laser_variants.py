@@ -61,5 +61,5 @@ simulation = picmi.Simulation(
     lasers=[gaussian, dispersive],
 )
 
-simulation.run(setup_dir=Path("laser_variants_setup"), run_dir=Path("laser_variants_run"))
+simulation.run(run_dir=Path("laser_variants_run"))
 # END-LASER-VARIANTS

@@ -52,4 +52,4 @@ sim = picmi.Simulation(
     diagnostics=[phase_space],
 )
 
-sim.run(setup_dir=Path("phase_space_setup"), run_dir=Path("phase_space_run"))
+sim.run(run_dir=Path("phase_space_run"))

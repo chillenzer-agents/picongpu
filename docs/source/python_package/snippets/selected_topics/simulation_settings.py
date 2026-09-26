@@ -57,4 +57,4 @@ simulation = picmi.Simulation(
     picongpu_walltime=timedelta(hours=1),
 )
 
-simulation.write_input_file(Path("simulation_settings_setup"))
+simulation.write_input_file(Path("simulation_settings_run"))

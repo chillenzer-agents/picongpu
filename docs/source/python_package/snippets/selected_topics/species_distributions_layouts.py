@@ -58,4 +58,4 @@ simulation = picmi.Simulation(
     layouts=[ion_layout, electron_layout],
 )
 
-simulation.write_input_file(Path("species_distributions_layouts_setup"))
+simulation.write_input_file(Path("species_distributions_layouts_run"))

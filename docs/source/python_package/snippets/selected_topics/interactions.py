@@ -59,7 +59,7 @@ sim_adk = picmi.Simulation(
     layouts=[layout, None],
     picongpu_interaction=[adk],
 )
-sim_adk.run(setup_dir=Path("adk_setup"), run_dir=Path("adk_run"))
+sim_adk.run(run_dir=Path("adk_run"))
 # END-INTERACTIONS-ADK
 
 # BEGIN-INTERACTIONS-BSI
@@ -89,7 +89,7 @@ sim_bsi = picmi.Simulation(
     layouts=[layout, None],
     picongpu_interaction=[bsi],
 )
-sim_bsi.run(setup_dir=Path("bsi_setup"), run_dir=Path("bsi_run"))
+sim_bsi.run(run_dir=Path("bsi_run"))
 # END-INTERACTIONS-BSI
 
 # BEGIN-INTERACTIONS-SYNCHROTRON
@@ -113,5 +113,5 @@ sim_sync = picmi.Simulation(
     layouts=[layout, None],
     picongpu_interaction=[synchrotron],
 )
-sim_sync.run(setup_dir=Path("synchrotron_setup"), run_dir=Path("synchrotron_run"))
+sim_sync.run(run_dir=Path("synchrotron_run"))
 # END-INTERACTIONS-SYNCHROTRON

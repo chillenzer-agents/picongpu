@@ -48,6 +48,6 @@ custom = CustomUserInput()
 custom.addToCustomInput({"my_number": 42}, tag="my_parameters")
 simulation.picongpu_add_custom_user_input(custom)
 
-simulation.write_input_file(Path("custom_input_setup"))
-print((Path("custom_input_setup") / "include" / "picongpu" / "my_param").read_text())
+simulation.write_input_file(Path("custom_input_run"))
+print((Path("custom_input_run") / "input" / "include" / "picongpu" / "my_param").read_text())
 print("It worked!")

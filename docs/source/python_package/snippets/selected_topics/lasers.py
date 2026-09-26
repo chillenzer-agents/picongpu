@@ -56,4 +56,4 @@ solver = picmi.ElectromagneticSolver(method="Yee", cfl=0.95, grid=grid)
 
 simulation = picmi.Simulation(max_steps=100, solver=solver, lasers=[laser])
 
-simulation.write_input_file(Path("lasers_setup"))
+simulation.write_input_file(Path("lasers_run"))

@@ -32,5 +32,5 @@ sim = picmi.Simulation(
     ),
 )
 
-sim.run(setup_dir=Path("minimal_example_setup"), run_dir=Path("minimal_example_run"))
+sim.run(run_dir=Path("minimal_example_run"))
 # END-MINIMAL-EXAMPLE

@@ -43,12 +43,12 @@ sim = picmi.Simulation(
         ),
     ),
 )
-sim.write_input_file(Path("setup"))
+sim.write_input_file(Path("run"))
 PY
 # PICSRC is already exported by share/ci/install/pypicongpu.sh in CI;
 # unset it so that the test below verifies the generated profile itself.
 unset PICSRC
-source setup/workflow/scripts/picongpu.profile
+source run/input/workflow/scripts/picongpu.profile
 test -n "$PIC_BACKEND"
 test -n "$PICSRC"
 echo "profile check OK: PIC_BACKEND=$PIC_BACKEND PICSRC=$PICSRC"

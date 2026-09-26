@@ -54,7 +54,8 @@ determines the file it writes to:
 
 For every group of shared options,
 the input file generation writes an openPMD configuration file
-to ``etc/`` of the setup directory (a TOML file,
+to ``etc/`` of the generated setup
+(the run directory's ``input/`` directory; a TOML file,
 referenced from the generated ``N.cfg`` via ``--openPMD.pluginConfig``).
 It lists, per time step, which fields and particles are written:
 
@@ -66,7 +67,7 @@ It lists, per time step, which fields and particles are written:
 
    The example above prints the generated configuration files.
    In a real setup directory, look for
-   ``etc/openPMD_config_*.toml`` --
+   ``input/etc/openPMD_config_*.toml`` --
    the suffix is a hash of the configuration content,
    so the name changes when you change the diagnostics.
 

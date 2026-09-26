@@ -62,5 +62,5 @@ custom = CustomUserInput()
 custom.addToCustomInput({"report_tag": "mine"}, tag="report")
 simulation.picongpu_add_custom_user_input(custom)
 
-simulation.write_input_file(Path("custom_iteration_setup"))
-print((Path("custom_iteration_setup") / "include" / "picongpu" / "species_report").read_text())
+simulation.write_input_file(Path("custom_iteration_run"))
+print((Path("custom_iteration_run") / "input" / "include" / "picongpu" / "species_report").read_text())

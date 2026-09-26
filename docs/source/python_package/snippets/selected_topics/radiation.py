@@ -64,4 +64,4 @@ sim = picmi.Simulation(
     diagnostics=[radiation],
 )
 
-sim.run(setup_dir=Path("radiation_setup"), run_dir=Path("radiation_run"))
+sim.run(run_dir=Path("radiation_run"))

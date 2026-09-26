@@ -43,4 +43,4 @@ sim = picmi.Simulation(
     diagnostics=[counter],
 )
 
-sim.run(setup_dir=Path("macro_particle_count_setup"), run_dir=Path("macro_particle_count_run"))
+sim.run(run_dir=Path("macro_particle_count_run"))

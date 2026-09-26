@@ -164,16 +164,17 @@ The Workflow
 ``simulation.run()`` orchestrates the build and submission as a workflow
 in the `Common Workflow Language (CWL) <https://www.commonwl.org/>`__
 (version 1.2),
-which is written into the setup directory as ``workflow/workflow.cwl``.
+which is written into the run directory's ``input/`` directory as
+``input/workflow/workflow.cwl``.
 The workflow consists of four steps:
 
 1. **build**
-   Runs the generated script ``workflow/scripts/build.sh``,
+   Runs the generated script ``input/workflow/scripts/build.sh``,
    which sets up the environment from your runtime configuration
    and compiles the tailored PIConGPU binary via ``pic-build``.
-   The compiled binaries end up in ``bin/``.
+   The compiled binaries end up in ``input/bin/``.
 2. **prepare submission**
-   Runs the generated script ``workflow/scripts/prepare_submission.sh``,
+   Runs the generated script ``input/workflow/scripts/prepare_submission.sh``,
    which invokes ``tbg`` with the configured batch parameters
    (see `Advanced Workflows`_ for the available knobs)
    and creates the batch script
@@ -181,7 +182,7 @@ The workflow consists of four steps:
    configuration files ``tbg/submit.tpl`` and ``tbg/submit.cfg``).
    At this point, nothing is submitted yet.
 3. **submit**
-   Runs the generated script ``workflow/scripts/submit.sh``,
+   Runs the generated script ``input/workflow/scripts/submit.sh``,
    which pins the output location of the batch script to its working directory
    and submits it with the configured submission command
    (``tbg_submit`` of your preset, e.g. ``sbatch`` for Slurm
@@ -189,7 +190,7 @@ The workflow consists of four steps:
    This produces the ``submission_information.txt`` and ``link_results.sh``
    mentioned above.
 4. **organize output**
-   Runs the generated script ``workflow/scripts/organize_output.sh``,
+   Runs the generated script ``input/workflow/scripts/organize_output.sh``,
    which assembles the final run directory (see below).
 
 All inputs of the workflow steps
@@ -197,7 +198,7 @@ All inputs of the workflow steps
 ``cmake_build_system``
 and the ``tbg`` parameters ``cfg_file``, ``submit_system``,
 ``template_file``, ``overwrite_vars``, ``force``)
-are written into ``workflow/input.yaml``
+are written into ``input/workflow/input.yaml``
 and can be customized by passing them as keyword arguments
 to ``simulation.run()`` / ``simulation.write_input_file()``
 (e.g. ``simulation.run(jobs=8, force=True)``).
@@ -205,11 +206,11 @@ The runner accepts the step short names for the ones that have one:
 ``cmake_build_system`` is also ``G``, ``cfg_file`` is ``cfg``,
 ``submit_system`` is ``submit`` (or ``s``), ``template_file`` is ``tpl``
 and ``overwrite_vars`` is ``o``.
-The ``setup_dir`` / ``run_dir`` keyword arguments of
-``simulation.run()`` are different:
-they only choose where the runner writes the setup directory
-and where it expects the run directory;
-they are not part of the workflow input.
+The ``run_dir`` keyword argument of
+``simulation.run()`` is different:
+it only chooses where the runner writes the run directory
+(whose ``input/`` subdirectory holds the generated setup);
+it is not part of the workflow input.
 
 The Layout of the Run Directory
 -------------------------------
@@ -218,7 +219,7 @@ After ``simulation.run()`` returned,
 the run directory looks like this::
 
   my_run/
-  ├── input/                      # the generated setup directory (a copy)
+  ├── input/                      # the generated setup directory
   │   ├── bin/                    #   the compiled PIConGPU binaries
   │   ├── etc/                    #   runtime parameters (incl. the preset's templates)
   │   ├── include/                #   compile-time parameters
@@ -244,18 +245,18 @@ and creates a symbolic link to its ``simOutput/`` at a path you choose
 Metadata and Provenance
 -----------------------
 
-Every generated setup directory carries machine-readable descriptions
+Every generated setup directory (``input/``) carries machine-readable descriptions
 of itself, so that it stays self-contained and reusable:
 
-* ``metadata/pypicongpu_runner.json``:
+* ``input/metadata/pypicongpu_runner.json``:
   the state of the runner,
   including the complete PyPIConGPU representation of the simulation.
-* ``metadata/pypicongpu_rendering_context.json``:
+* ``input/metadata/pypicongpu_rendering_context.json``:
   the full rendering context,
   i.e. all the values that went into the template rendering.
-* ``metadata/rc_params.json``:
+* ``input/metadata/rc_params.json``:
   the runtime configuration that was used.
-* ``ro-crate-metadata.json``:
+* ``input/ro-crate-metadata.json``:
   an `RO-Crate <https://www.w3.org/TR/2021/REC-vc-r-crate-20211109/>`__ (version 1.2)
   describing the setup directory as a dataset:
   the ``workflow/workflow.cwl`` as its main entity,
@@ -345,8 +346,9 @@ Advanced Workflows
 PIConGPU's Python package can take full control of orchestrating the various steps for running your simulation.
 But under specific circumstances, more fine-grained control for the user is required.
 For such cases, the following workflows are supported.
-The following assumes that the variables ``$SETUP_DIR`` and ``$RUN_DIR`` are set to the same values
-that they would have in the equivalent ``simulation.run()`` invocation.
+The following assumes that the variable ``$RUN_DIR`` is set to the same value
+that the ``run_dir`` argument would have in the equivalent ``simulation.run()`` invocation;
+the generated setup then lives in ``$RUN_DIR/input``.
 
 .. _running_simulation_legacy_workflow:
 
@@ -355,12 +357,13 @@ Input for the Legacy Workflow
 
 In your PICMI input script you can use ``simulation.write_input_file()``
 instead of ``simulation.run()``
-to write a simulation setup the specified location
-without executing it.
+to write a simulation setup to the specified run directory
+without executing it
+(the setup is rendered into the run directory's ``input/`` subdirectory).
 
 If you are familiar with the legacy ``pic-create``/``pic-build``/``tbg`` interface of core PIConGPU (:ref:`TBG documentation <usage-tbg>`),
 you can use the generated setup in the same manner that you would have used a ``pic-create`` setup.
-Furthermore, you can find a tailored :ref:`profile <install-profile>` in ``workflow/scripts/picongpu.profile``.
+Furthermore, you can find a tailored :ref:`profile <install-profile>` in ``input/workflow/scripts/picongpu.profile``.
 In effect, you can run:
 
 .. literalinclude:: ../snippets/running_simulation/legacy_workflow.sh
@@ -383,7 +386,7 @@ Manually running the full workflow
 """"""""""""""""""""""""""""""""""
 
 Starting from a generated setup (see `running_simulation_legacy_workflow`_),
-we can find a full workflow definition in `Common Workflow Language (CWL) <https://www.commonwl.org/>`__ in ``workflow/``.
+we can find a full workflow definition in `Common Workflow Language (CWL) <https://www.commonwl.org/>`__ in ``input/workflow/``.
 The equivalent of using ``simulation.run()`` directly
 can be achieved on a generated setup by the following invocation of the `cwltool <https://github.com/common-workflow-language/cwltool>`__,
 which mirrors the runner's runtime context (``--leave-tmpdir`` for
@@ -395,9 +398,9 @@ which mirrors the runner's runtime context (``--leave-tmpdir`` for
    :start-after: BEGIN-CWLTOOL-WORKFLOW
    :end-before: END-CWLTOOL-WORKFLOW
 
-In here, the ``workflow/workflow.cwl`` contains the full definition of
+In here, the ``input/workflow/workflow.cwl`` contains the full definition of
 the workflow of building and submitting your simulation.
-``workflow/input.yaml`` and ``CWL_ARGS``
+``input/workflow/input.yaml`` and ``CWL_ARGS``
 contain the input parameters resp. ``cwltool`` runtime context
 as the default orchestration via ``simulation.run()`` would have used them.
 You can use them as customization points to meet your specific needs.
@@ -405,7 +408,7 @@ You can use them as customization points to meet your specific needs.
 Running individual steps of the workflow
 """"""""""""""""""""""""""""""""""""""""
 
-The ``workflow/workflow.cwl`` refers to individual steps as defined in ``workflow/steps/``.
+The ``input/workflow/workflow.cwl`` refers to individual steps as defined in ``input/workflow/steps/``.
 These can be executed individually in the following manner (exemplified by the ``build.cwl`` step):
 
 .. literalinclude:: ../snippets/running_simulation/cwltool_step.sh
@@ -420,7 +423,7 @@ The individual workflow steps refer to generated bash scripts to do their job.
 Those can be invoked directly as well.
 The ``InitialWorkDirRequirement`` section of a workflow step contains information about
 how to re-create a clean working directory as ``cwltool`` would do it upon execution.
-For example, the ``build.cwl`` specifies that it needs access to the ``include/`` directory and the ``workflow/scripts/build.sh`` script.
+For example, the ``build.cwl`` specifies that it needs access to the ``input/include/`` directory and the ``input/workflow/scripts/build.sh`` script.
 Consequently, we can perform the equivalent of the above partial workflow execution via:
 
 .. literalinclude:: ../snippets/running_simulation/manual_step.sh
@@ -434,7 +437,7 @@ Integration into overarching workflows
 If you want to embed PIConGPU runs into your own workflows
 (a parameter sweep, a follow-up simulation that depends on the output of a previous one,
 a cluster-specific pipeline, ...),
-the generated setup directory is designed to be the integration point:
+the generated setup directory (the run directory's ``input/``) is designed to be the integration point:
 
 * It is **largely self-contained**:
   the runtime configuration is baked into the scripts and the workflow is a
@@ -453,7 +456,7 @@ the generated setup directory is designed to be the integration point:
   (``pypicongpu_runner.json`` / ``rc_params.json``),
   so that other tools (and your future self) can inspect and reuse it.
 * It is **parameterized**:
-  ``workflow/input.yaml`` contains the inputs of the workflow steps
+  ``input/workflow/input.yaml`` contains the inputs of the workflow steps
   (build flags, the run step's ``tbg`` configuration and the referenced
   files/directories) as plain data,
   which you can modify and feed to your own workflow engine.

@@ -353,6 +353,25 @@ EXPECTED_FILES = {
             ("species_distributions_layouts_setup/include/picongpu/param/speciesDefinition.param", "species_electrons"),
         ],
     },
+    "selected_topics/uniform_subvolume.py": {
+        "files": [
+            "uniform_subvolume_setup/include/picongpu/param/density.param",
+        ],
+        "file_contains": [
+            (
+                "uniform_subvolume_setup/include/picongpu/param/density.param",
+                "requested lower bound of the sub-volume",
+            ),
+            (
+                "uniform_subvolume_setup/include/picongpu/param/density.param",
+                "requested upper bound of the sub-volume",
+            ),
+            (
+                "uniform_subvolume_setup/include/picongpu/param/density.param",
+                "requested to refill the sub-volume",
+            ),
+        ],
+    },
     "selected_topics/particle_functors.py": {
         "no_run": True,
         "files": [

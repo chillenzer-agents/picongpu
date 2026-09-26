@@ -36,6 +36,7 @@ but you can also import them directly:
    grid
    solver
    species
+   particle_boundary
    layout
    particle_functor
    distribution

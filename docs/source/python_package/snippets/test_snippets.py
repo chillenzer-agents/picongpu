@@ -353,6 +353,19 @@ EXPECTED_FILES = {
             ("species_distributions_layouts_setup/include/picongpu/param/speciesDefinition.param", "species_electrons"),
         ],
     },
+    "selected_topics/particle_boundaries.py": {
+        "no_run": True,
+        "files": [
+            "particle_boundaries_setup/etc/picongpu/N.cfg",
+        ],
+        "file_contains": [
+            # grid default on electrons, species override on ions
+            ("particle_boundaries_setup/etc/picongpu/N.cfg", "--electrons_boundary periodic absorbing absorbing"),
+            ("particle_boundaries_setup/etc/picongpu/N.cfg", "--ions_boundary periodic reflecting thermal"),
+            ("particle_boundaries_setup/etc/picongpu/N.cfg", "--ions_boundaryOffset 0 2 1"),
+            ("particle_boundaries_setup/etc/picongpu/N.cfg", "--ions_boundaryTemperature 0 0 10"),
+        ],
+    },
     "selected_topics/particle_functors.py": {
         "no_run": True,
         "files": [

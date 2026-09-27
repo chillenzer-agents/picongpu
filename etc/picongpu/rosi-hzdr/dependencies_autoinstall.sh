@@ -40,6 +40,8 @@ source "$PIC_PROFILE"
 
 # cluster-specific settings for the shared installer
 export DEPS_JOBS=${DEPS_JOBS:-16}
+# The dependency prefixes this preset owns, in build order.
+DEPS_CHECK_ROOTS=(BOOST_ROOT BLOSC_ROOT LIBPNG_ROOT PNGwriter_ROOT HDF5_ROOT ADIOS2_ROOT OPENPMD_ROOT FFTW_ROOT)
 # shared source cache on the cluster filesystem (fetch once per cluster)
 export DEPS_SOURCE_CACHE=${DEPS_SOURCE_CACHE:-"$PIC_LIBS/deps-sources"}
 

@@ -43,6 +43,9 @@ source "$PIC_PROFILE"
 
 # cluster-specific settings for the shared installer
 export DEPS_JOBS=${DEPS_JOBS:-16}
+# The dependency prefixes this preset owns, in build order (modules provide
+# libpng/HDF5/FFTW, so only these five are built).
+DEPS_CHECK_ROOTS=(BOOST_ROOT BLOSC_ROOT PNGwriter_ROOT ADIOS2_ROOT OPENPMD_ROOT)
 # shared source cache on the scratch filesystem (fetch once per cluster)
 if [ -n "${CFS:-}" ] && [ -n "${proj:-}" ]; then
     export DEPS_SOURCE_CACHE=${DEPS_SOURCE_CACHE:-"$CFS/$proj/$USER/deps-sources"}

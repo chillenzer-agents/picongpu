@@ -1,0 +1,15 @@
+# Runtime configuration for a LEXIS/EFP submission (see the
+# "Submitting to the EuroHPC Federation Platform" section of the
+# HPC Submission Internals page).
+workflow_backend = "lexis"
+author = "Your Name"
+email = "you@example.org"
+
+[lexis]
+project_shortname = "your-efp-project"
+command_template_name = "picongpu"
+location_name = "jupiter"
+location_resource = "gh200"
+walltime_limit = 7200
+max_cores = 64
+input_dataset = "ddi://~/your-picongpu-setup"

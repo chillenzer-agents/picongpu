@@ -167,12 +167,12 @@ EFP (JUPITER, JSC)
 
 **JUPITER:** see the JSC HPC system documentation.
 
-Profile for running PIConGPU on JUPITER via the :ref:`EuroHPC Federation Platform (EFP) Workflows <pypicongpu-running-efp>`
+Profile for running PIConGPU on JUPITER via the :ref:`EuroHPC Federation Platform (EFP) Workflows <efp-submission>`
 (a.k.a. LEXIS platform), i.e. by uploading a self-contained job script instead of submitting it from the system's login node.
 The profile selects the self-contained job script template ``gh200_efp.tpl``;
 the rendered job script can be uploaded to the EFP Workflows as-is with JUPITER as target system.
 For direct (interactive/SSH) submission on JUPITER, use the ``jupiter-jsc`` preset instead.
-See :ref:`running on EFP <pypicongpu-running-efp>` for the full workflow.
+See :ref:`submitting to the EFP <efp-submission>` for the full workflow.
 
 Queue: booster (4 x Nvidia GH200 per node)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

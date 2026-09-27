@@ -99,7 +99,7 @@ It is used, e.g. on Summit at ORNL.
 EuroHPC Federation Platform (EFP)
 """""""""""""""""""""""""""""""""
 
-PIConGPU can also be submitted to the :ref:`EuroHPC Federation Platform (EFP) Workflows <pypicongpu-running-efp>`
+PIConGPU can also be submitted to the :ref:`EuroHPC Federation Platform (EFP) Workflows <efp-submission>`
 (a.k.a. LEXIS platform), which execute job scripts on the participating EuroHPC systems.
 The ``efp-<system>`` presets (e.g. ``etc/picongpu/efp-jupiter-jsc/``) render a self-contained job script
 via :ref:`TBG <usage-tbg>` that can be uploaded to the EFP Workflows as-is,

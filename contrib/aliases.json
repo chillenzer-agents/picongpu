@@ -1,0 +1,181 @@
+{
+  "comment": "Zenodo creator identity aliases (release automation L2). Keys under 'people' are canonical person keys; each person may list a canonical 'email' plus 'aliases' (further emails or raw git names used by the same human from different machines). Identities matching 'skip' are bots/CI/maintenance accounts that must never appear as people. Unknown identities are surfaced for human attribution (never auto-merged).",
+  "skip": {
+    "emails": [
+      "picongpu@hzdr.de",
+      "tools@hzdr.de"
+    ],
+    "patterns": [
+      "(?i)dependabot",
+      "(?i)renovate",
+      "(?i)github-actions",
+      "(?i)gitlab-ci",
+      "root@",
+      "noreply@github\\.com",
+      "noreply@opencode\\.ai",
+      "noreply@blablador\\.localhost"
+    ]
+  },
+  "people": {
+    "afshari-masoud": {
+      "aliases": [
+        "mafshari",
+        "mafshari44@gmail.com"
+      ],
+      "email": "mafshari@hzdr.de",
+      "name": "Afshari, Masoud"
+    },
+    "berceanu-andrei": {
+      "aliases": [
+        "andreicberceanu@gmail.com"
+      ],
+      "email": "andreicberceanu@gmail.com",
+      "name": "Berceanu, Andrei"
+    },
+    "carstens-finn-ole": {
+      "aliases": [
+        "finn-ole.carstens@mailbox.tu-dresden.de"
+      ],
+      "email": "f.carstens@hzdr.de",
+      "name": "Carstens, Finn-Ole"
+    },
+    "debus-alexander": {
+      "aliases": [
+        "a.debus@hzdr.de"
+      ],
+      "email": "a.debus@hzdr.de",
+      "name": "Debus, Alexander"
+    },
+    "dietrich-fabia": {
+      "aliases": [
+        "Dietrich, Fabia (FWKK) - 147104"
+      ],
+      "email": "f.dietrich@hzdr.de",
+      "name": "Dietrich, Fabia"
+    },
+    "ehrig-simeon": {
+      "aliases": [
+        "s.ehrig@hzdr.de"
+      ],
+      "email": "s.ehrig@hzdr.de",
+      "name": "Ehrig, Simeon"
+    },
+    "ermakov-sergey": {
+      "aliases": [
+        "SergeyKonstantinErmakov",
+        "sergey.k.ermakov@gmail.com"
+      ],
+      "email": "sergey.k.ermakov@gmail.com",
+      "name": "Ermakov, Sergey Konstantin"
+    },
+    "lehmann-max": {
+      "aliases": [
+        "m.lehmann@hzdr.de"
+      ],
+      "email": "m.lehmann@hzdr.de",
+      "name": "Lehmann, Max"
+    },
+    "lenz-julian": {
+      "aliases": [
+        "j.lenz@hzdr.de",
+        "j.j.lenz@swansea.ac.uk",
+        "107195608+chillenzer@users.noreply.github.com",
+        "chillenzer"
+      ],
+      "email": "j.lenz@hzdr.de",
+      "name": "Lenz, Julian"
+    },
+    "marre-brian": {
+      "aliases": [
+        "BrianMarre"
+      ],
+      "email": "b.marre@hzdr.de",
+      "name": "Marre, Brian Edward"
+    },
+    "narwal-tapish": {
+      "aliases": [
+        "Tapish",
+        "narwal83@hzdr.de",
+        "10693329+ikbuibui@users.noreply.github.com"
+      ],
+      "email": "narwal83@hzdr.de",
+      "name": "Narwal, Tapish"
+    },
+    "optolowicz-filip": {
+      "aliases": [
+        "FilipO28555",
+        "filipoptolowicz@gmail.com"
+      ],
+      "email": "filipoptolowicz@gmail.com",
+      "name": "Optołowicz, Filip"
+    },
+    "ordyna-pawel": {
+      "aliases": [
+        "p.ordyna@hzdr.de"
+      ],
+      "email": "p.ordyna@hzdr.de",
+      "name": "Ordyna, Paweł"
+    },
+    "pausch-richard": {
+      "aliases": [
+        "PrometheusPi",
+        "r.pausch@hzdr.de"
+      ],
+      "email": "r.pausch@hzdr.de",
+      "name": "Pausch, Richard"
+    },
+    "poeschel-franz": {
+      "aliases": [
+        "franz.poeschel@gmail.com"
+      ],
+      "email": "franz.poeschel@gmail.com",
+      "name": "Poeschel, Franz"
+    },
+    "sprenger-lennert": {
+      "aliases": [
+        "lennertsprenger"
+      ],
+      "email": "l.sprenger@hzdr.de",
+      "name": "Sprenger, Lennert"
+    },
+    "steiniger-klaus": {
+      "aliases": [
+        "steindev",
+        "k.steiniger@hzdr.de"
+      ],
+      "email": "k.steiniger@hzdr.de",
+      "name": "Steiniger, Klaus"
+    },
+    "tiebel-jessica": {
+      "aliases": [
+        "JessicaTiebel",
+        "Tiebel",
+        "tiebel93@hemera5.cluster",
+        "j.tiebel@hzdr.de"
+      ],
+      "email": "j.tiebel@hzdr.de",
+      "name": "Tiebel, Jessica"
+    },
+    "widera-rene": {
+      "aliases": [
+        "r.widera@hzdr.de"
+      ],
+      "email": "r.widera@hzdr.de",
+      "name": "Widera, René"
+    },
+    "wolf-hannes": {
+      "aliases": [
+        "h.wolf@hzdr.de"
+      ],
+      "email": "h.wolf@hzdr.de",
+      "name": "Wolf, Hannes"
+    },
+    "wrobel-nico": {
+      "aliases": [
+        "n.wrobel@hzdr.de"
+      ],
+      "email": "n.wrobel@hzdr.de",
+      "name": "Wrobel, Nico"
+    }
+  }
+}

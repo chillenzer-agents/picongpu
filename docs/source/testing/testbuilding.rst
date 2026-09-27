@@ -8,23 +8,25 @@ General
 
 .. note::
 
-   Of course, all functionalities can be used to design your own test without resorting to the structure with Data.py.
+   Of course, all functionalities can be used to design your own test without resorting to the structure with config.py.
    This is assumed to be known and is therefore not discussed further here.
    Please refer to the documentation for the individual functionalities.
-    
-A template for developing a new test is available under ``.lib/python/test/testsuite/Template``.
-The files it contains can now be adapted to the new test in an extra folder. 
-The main.py file is only used to run the test and does not need to be changed any further.
-Much more important is the adaptation of Data.py. This is explained in more detail in the next section.
-If the test case is to be checked automatically by the ci afterwards, ci.sh and, if possible, a validate.sh must also be written after adapting Data.py.
+
+A template for developing a new test is available under ``lib/python/test/testsuite/Template``.
+The file it contains (``config.py``) can now be adapted to the new test in an extra folder,
+e.g. under ``lib/python/test/setups``.
+The ``main.py`` files of the existing setups (``lib/python/test/setups/MI``, ``lib/python/test/setups/ESKHI``)
+only start the test and do not need to be changed any further.
+Much more important is the adaptation of config.py. This is explained in more detail in the next section.
+If the test case is to be checked automatically by the ci afterwards, ci.sh and, if possible, a validate.sh must also be written after adapting config.py.
 To do this, adapt the existing ci.sh or validate.sh files for the sake of simplicity.
 
-Using Data.py
--------------
+Using config.py
+---------------
 
-The data.py file provides the test suite with all the essential data for running the test.
+The config.py file provides the test suite with all the essential data for running the test.
 The most important are the functions for calculating the data from theory and from the simulation.
-To better illustrate Data.py, the usage will be explained in more detail here using the MI example.
+To better illustrate config.py, the usage will be explained in more detail here using the MI example.
 
 1. Data not relevant to the test
 """"""""""""""""""""""""""""""""
@@ -69,7 +71,7 @@ In the MI example, no ``json_parameter`` is required:
 
     # parameter information found in .param files
     param_Parameter = ["gamma", "BASE_DENSITY_SI", "DELTA_T_SI"]
-    data_Parameter = ["Bz", "step"]
+    data_Parameter = ["Bx", "step"]
     
 3. test condition
 """""""""""""""""
@@ -117,7 +119,7 @@ Since both functions have a similar structure, we only consider the theoretical 
 
 .. code-block:: python
 
-    def theory(gamma, *args):
+    def theory(gamma, **kwargs):
         """
         this function indicates how the theoretical values
         can be calculated from the data. It must be filled out
@@ -131,7 +133,7 @@ Since both functions have a similar structure, we only consider the theoretical 
         out : theoretical values!
         """
         # gamma is calculated automatically, does not have to be passed
-        v = ts.Math.physics.calculateV_O()
+        v = ts.Math.physics.calculateV_O(gamma)
 
         return (v / (c * np.sqrt(gamma)))
         

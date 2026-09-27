@@ -45,10 +45,10 @@ N steps per stage (see the stability test, section 12), so a future
 Names chosen per the task proposal (`prepare`, `build`, `submit`,
 `collect`). Rationale: they describe *what is achieved* (a milestone), not
 *how* (a tool invocation). `prepare` is intentionally not
-`prepare_submission` — the stage survives tbg being replaced by a different
+`prepare_submission` - the stage survives tbg being replaced by a different
 submission-preparation mechanism.
 
-## 3. Public API — chosen shape
+## 3. Public API - chosen shape
 
 ```python
 sim.picongpu_run()                              # full pipeline (unchanged default)
@@ -80,7 +80,7 @@ sim.picongpu_run(force=Stage.build)             # re-run build + dependents
   surface (Python API only, per the requester).
 
 Open question for the requester: confirm the argument names `up_to`/`from_`
-(`from` is a Python keyword, hence the trailing underscore — an alternative
+(`from` is a Python keyword, hence the trailing underscore - an alternative
 would be `since=`/`until=`).
 
 ## 4. Stage -> step adapter (implementation)
@@ -106,7 +106,7 @@ The default plan mirrors the `in:`/`out:` bindings of `workflow.cwl`
 (steps, lines 112-155) exactly, including the task-05 `destination_path`
 input.
 
-## 5. Execution mechanisms — comparison and recommendation
+## 5. Execution mechanisms - comparison and recommendation
 
 **Option 1 (chosen): per-step cwltool invocations.** Each stage's steps are
 run as standalone `steps/*.cwl` tools through `cwltool.factory.Factory`, in
@@ -157,6 +157,22 @@ stable `destination_path` workflow input (the run dir) into `submit.cwl`, so
 for the full run; the `organize_output` sed-based rewrite remains a safety
 net for per-step runs too (a per-step submit also runs inside a
 `.cwl_cache` job dir).
+
+**Staging-order caveat (default `bash` preset, inherited from task 05).**
+The submitted job runs `$TBG_dstPath/input/bin/picongpu`, i.e.
+`run_dir/input/bin/picongpu`. The submit step pre-stages `input/bin` and
+`input/etc` into the run dir (task-05 fix in the generated `submit.sh`); the
+rest of the input (the full project copy: metadata, `.build`,
+`ro-crate.json`, ...) is only placed there by `organize_output` (collect).
+A partial run that stops after `submit` therefore leaves a *partial*
+`run_dir/input`: the local job can find its binary (verified with the real
+`submit.cwl`, not the test dummies), but it runs against the partial input,
+and the organized artifacts (`tbg/`, `simOutput` link, submission
+information) only exist after `collect`. In the full workflow this ordering
+is a pre-existing race; "submit now, collect later" makes it explicit.
+Staging the complete `input/` ahead of the job launch (e.g. fully inside the
+submit stage) is a possible future improvement; this draft does not change
+the staging order.
 
 ## 6. State file format
 
@@ -262,11 +278,11 @@ easy policy swap later if desired.)
   which is additive).
 - Previously, a *second* `picongpu_run()` on the same setup crashed in
   `generate()`'s "setup directory must not exist" assert; it now resumes
-  (skips completed stages) — strictly less surprising.
+  (skips completed stages) - strictly less surprising.
 - New: `picongpu_run(flags=...)` after generation raises a clear `ValueError`
   instead of the same confusing assert (changing workflow flags would
   invalidate the recorded state; the existing `generate(exist_ok=True)`
-  path is not re-entrant anyway — the renderer refuses to overwrite
+  path is not re-entrant anyway - the renderer refuses to overwrite
   rendered files, a pre-existing limitation left untouched).
 - `step()` is unchanged in behaviour (full run only) and now documents that
   time-stepping and workflow stages are orthogonal.
@@ -301,49 +317,49 @@ Deliberately deferred (open for the next iteration):
 - Concurrency: `build` and `prepare` are independent but run sequentially
   (cwltool's SingleJobExecutor; parallelism could come later without API
   change).
-- `stages=[...]` set syntax and milestone shorthand (`run("submit")`) —
+- `stages=[...]` set syntax and milestone shorthand (`run("submit")`) -
   see open questions.
 - Stale-artifact GC of `.stage_outputs/<stage>/step-N` after plan changes.
 - Pre-existing stale hooks `run_step_path`/`gather_results_script_path`
-  (point to non-existent files, unused) — left untouched.
+  (point to non-existent files, unused) - left untouched.
 
 ## 12. Tests and results
 
-`lib/python/test/picongpu/quick/picmi/test_partial_workflow.py` (8 tests)
+`lib/python/test/picongpu/quick/picmi/test_partial_workflow.py` (12 tests)
 uses tiny echo CWL steps (same input names/types as the production steps)
 installed into the generated setup dir:
 
-1. `test_full_run_default_and_state` — default run places final artifacts in
+1. `test_full_run_default_and_state` - default run places final artifacts in
    the run dir like today; state file is stage-keyed, all stages completed,
    artifacts are `class`+`location` objects; no step names in the file.
-2. `test_second_run_skips_completed` — a second no-arg run does not redo or
+2. `test_second_run_skips_completed` - a second no-arg run does not redo or
    even rewrite completed stages (state file byte-identical).
-3. `test_range_build_only` — `up_to=Stage.build` completes exactly `build`;
+3. `test_range_build_only` - `up_to=Stage.build` completes exactly `build`;
    artifact lands in `.stage_outputs/build/step-1/bin`.
-4. `test_incremental_stage_scenario` — the task's manual scenario:
+4. `test_incremental_stage_scenario` - the task's manual scenario:
    build-only, then prepare-only, then submit-only
    (`from_=up_to=submit`), then collect-only (`from_=collect`); state grows
    stage by stage and final artifacts match a full run (the built-binary
    marker flows build -> submit -> collect).
-5. `test_missing_prerequisite_is_an_error` — `from_=Stage.submit` on a fresh
+5. `test_missing_prerequisite_is_an_error` - `from_=Stage.submit` on a fresh
    run raises `WorkflowPrerequisiteError` (naming `build, prepare`), and
    nothing is executed; `from_` after `up_to` raises `ValueError`.
-6. `test_force_stage_invalidates_dependents` — full run, then
+6. `test_force_stage_invalidates_dependents` - full run, then
    `run_range(up_to=Stage.submit, force=Stage.build)` with a changed build
    input: build re-runs with new content, submit re-runs (invalidated),
    prepare is skipped (state entry untouched), collect is marked
    `invalidated` (stale, outside the range).
-7. `test_flags_after_generation_are_rejected` — flags after generation raise
+7. `test_flags_after_generation_are_rejected` - flags after generation raise
    a clear `ValueError`; the state is left intact.
-8. **Stability test** `test_stability_future_workflow` — a "future"
+8. **Stability test** `test_stability_future_workflow` - a "future"
    workflow simulated as a mutated scratch `workflow.cwl` (a step id renamed,
    an extra `upload` step inserted ahead of `submit` inside the submit stage)
    with a correspondingly updated plan: the public API (stage names, ranges,
    state file) works unchanged; the in-stage wiring is verified (the upload
    output reaches the final `tbg`); the state file contains no step names.
-   **Result: passed** — the adapter absorbs a step inserted inside an
+   **Result: passed** - the adapter absorbs a step inserted inside an
    existing stage without any API change.
-9. **Plan/template sync** `test_default_plan_matches_workflow_template` —
+9. **Plan/template sync** `test_default_plan_matches_workflow_template` -
    loads the real `templates/workflow/workflow.cwl` and asserts that every
    plan step covers exactly one workflow step (same file), with the same
    input names and sources (workflow inputs, stage artifacts, in-stage step
@@ -351,15 +367,34 @@ installed into the generated setup dir:
    The per-step path never reads `workflow.cwl`, so this turns "keep the
    adapter in sync with the templates" into a CI-enforced invariant (drift
    would otherwise silently diverge full and partial runs).
+10. **Input-change detection** `test_input_change_invalidates_completed_stages` -
+    full run, edit `build_cmake` in `workflow/input.yaml`, re-run with no
+    args: the build stage (changed input) and its dependents (submit,
+    collect) are re-run with the new input visible in the final artifacts,
+    while prepare (unchanged input) is skipped. Without the per-stage
+    `inputs_digest`, this re-run would have been a silent no-op reusing
+    stale artifacts.
+11. **Load-failure error contract** `test_step_file_renamed_raises_workflow_stage_error` -
+    rename the (dummy) `build.cwl` step file so the plan points at a missing
+    file: the cwltool load failure surfaces as `WorkflowStageError`, not a
+    raw cwltool exception.
+12. **State version check** `test_unknown_state_version_is_ignored` - a
+    state file with an unknown `version` is ignored (treated as empty): the
+    stage is re-run and the state is re-recorded with the supported version.
 
-Results (venv `task-09`):
+Results (venv `task-09`, after the rework):
 
-- `python -m pytest quick/ -q`: **185 passed, 2 xfailed, 1 xpassed**
-  (baseline on the branch: 177 passed, 2 xfailed, 1 xpassed; +8 new tests,
-  no regressions; includes task 05's 3 workflow tests).
-- `pre-commit run --all-files`: **all hooks passed** (after replacing two
-  non-ASCII characters in the inherited `TASK-05-PR-PROPOSAL.md` task
-  artifact, which made the base branch fail the `require-ascii` hook).
+- `python -m pytest quick/ -q`: **190 passed, 2 xfailed, 1 xpassed**
+  (3499 subtests; baseline on the branch in this environment: 186 passed,
+  2 xfailed, 1 xpassed; +4 new tests, no regressions; includes task 05's
+  workflow tests).
+- `pre-commit run --all-files`: **all hooks passed** (verified by running
+  it). Note: at the time of the original review, this file's em dashes
+  failed `require-ascii`; the file has now been ASCII-normalized (em dash to
+  hyphen, the same treatment applied to the inherited
+  `TASK-05-PR-PROPOSAL.md`), so the claim holds under the hook config of
+  either time. (The review commit additionally added a `^TASK-.*\.md$`
+  exclusion to the hook; that exclusion was not part of the reviewed code.)
 
 ## 13. Documentation
 
@@ -389,7 +424,7 @@ Results (venv `task-09`):
    root (like the full workflow); other stages' outputs in
    `run_dir/.stage_outputs/...`. Acceptable?
 6. **State on flag change**: flags after generation are rejected (chosen;
-   regeneration is not re-entrant yet — pre-existing renderer limitation).
+   regeneration is not re-entrant yet - pre-existing renderer limitation).
    Alternative: auto-regenerate + state reset (needs the renderer fix).
 7. Should `Runner` expose a `verify()` that re-checks recorded artifacts
    on disk (deferred)?
@@ -411,4 +446,4 @@ Results (venv `task-09`):
   `Runner._record_full_run`).
 - `picongpu_run` now skips `generate()` when the workflow input exists; any
   code that relied on the old (crashing) double-generate behaviour would
-  notice — none exists in the repo/tests.
+  notice - none exists in the repo/tests.

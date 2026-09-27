@@ -139,13 +139,17 @@ workflow steps (`--do-work` etc. only control staging/debugging).
 *default* path byte-for-byte identical (section 9), which option 2 could not
 do as cleanly (the default would also become a generated sub-workflow).
 
-**Composition with the cwltool job cache:** kept as an internal
-optimization. The state file skips at stage granularity; within a (re)run,
-cwltool's `cachedir` (`.cwl_cache`, shared between full and per-step runs)
-skips individual jobs with unchanged inputs. Both layers are independent:
-`force` bypasses the state layer, and the job cache still applies to the
-forced re-runs (a no-op when the inputs changed, which is usually the point
-of forcing).
+**Composition with the cwltool job cache:** the legacy single-invocation
+full run (`Runner.run()`) keeps the shared `.cwl_cache` as before (job-level
+resume safety net). Per-step invocations deliberately do not use the job
+cache (`cachedir=None`): the stage state file is the skip mechanism of the
+per-step path, and invoked steps always execute freshly. This is required
+for correctness, not just an optimization: cwltool's cache key does not
+cover the *contents* of `Directory` inputs, so a re-run stage that
+regenerates an artifact directory in place (same `.stage_outputs` path)
+would otherwise let its dependents hit a stale cache entry (verified before
+the fix: `force=Stage.build` after changing `build_cmake` produced the new
+binary, but the submit step's *cached* tbg still contained the old one).
 
 **Composition with task 05:** the per-step `submit` run passes the same
 stable `destination_path` workflow input (the run dir) into `submit.cwl`, so
@@ -166,6 +170,7 @@ net for per-step runs too (a per-step submit also runs inside a
     "build": {
       "status": "completed",
       "updated_at": "2026-08-29T02:57:45.608147",
+      "inputs_digest": "9f86d081884c7d65...",
       "artifacts": {
         "bin_directory": {"class": "Directory", "location": "/.../run_dir/.stage_outputs/build/step-1/bin"}
       }
@@ -173,6 +178,7 @@ net for per-step runs too (a per-step submit also runs inside a
     "submit": {
       "status": "completed",
       "updated_at": "...",
+      "inputs_digest": "3a7bd1e02c9f48ab...",
       "artifacts": {
         "tbg_directory": {"class": "Directory", "location": "/.../run_dir/.stage_outputs/submit/step-1/tbg"},
         "submission_information": {"class": "File", "location": "/.../run_dir/.stage_outputs/submit/step-1/submission_information.txt"},
@@ -193,6 +199,13 @@ Rules:
   steps.
 - Statuses: `running` (crash marker), `completed`, `failed`, `invalidated`
   (a dependent of a forced stage). Only `completed` counts as done.
+- `inputs_digest`: sha256 of the workflow inputs (from `workflow/input.yaml`)
+  the stage consumed, recorded when it runs. On a re-run, a completed stage
+  whose digest no longer matches (or has none, e.g. a state file from before
+  digest recording) is treated as stale: it and its transitive dependents are
+  invalidated and re-run. This is how an edit of `input.yaml` after a
+  completed run is detected (without it, the run would silently skip every
+  stage and reuse stale artifacts).
 - Unreadable/foreign state files are logged and treated as empty.
 - The file is safe to delete (fresh start); `Runner.reset_workflow_state()`
   does it programmatically.
@@ -207,8 +220,11 @@ runs".
 
 ## 7. Resume and failure semantics
 
-- Re-run with no args: stages recorded `completed` are skipped; the first
+- Re-run with no args: stages recorded `completed` are skipped (only if the
+  workflow inputs they consumed are unchanged, see section 6); the first
   incomplete stage runs (and everything after it).
+- Changed workflow inputs invalidate the affected stages and their
+  dependents (logged), so an edited `input.yaml` is never silently ignored.
 - A stage marked `running`/`failed`/`invalidated` is re-run.
 - While a stage runs, the state is updated `running` -> (on success)
   `completed` with artifacts; on failure the stage is marked `failed` and

@@ -7,6 +7,7 @@ License: GPLv3+
 
 import datetime
 import enum
+import hashlib
 import json
 import logging
 import shutil
@@ -377,6 +378,7 @@ class StageState(BaseModel):
     status: StageStatus
     updated_at: datetime.datetime | None = None
     artifacts: dict[str, dict[str, str]] = {}
+    inputs_digest: str | None = None
 
 
 class WorkflowState(BaseModel):
@@ -781,6 +783,28 @@ class Runner(BaseModel):
                     queue.append(dependent)
         return invalidated
 
+    def _stage_inputs_digest(self, stage: Stage) -> str:
+        """
+        SHA-256 digest of the workflow inputs consumed by a stage.
+
+        ``workflow/input.yaml`` is a plain file the user may edit at any time
+        (the ``build_``/``run_`` prefixed entries exist precisely to run the
+        steps individually), and nothing else on disk reflects such an edit.
+        Recording a digest per stage lets a re-run detect that the inputs of
+        a completed stage changed, instead of silently skipping it and
+        reusing stale artifacts.
+        """
+        spec = self.stage_plan[stage]
+        with self.workflow_input_path.open("r") as file:
+            workflow_inputs = json.load(file)
+        consumed = {
+            input_name: workflow_inputs[source]
+            for step_spec in spec.steps
+            for input_name, source in step_spec.inputs.items()
+            if isinstance(source, str) and source in workflow_inputs
+        }
+        return hashlib.sha256(json.dumps(consumed, sort_keys=True).encode()).hexdigest()
+
     def _record_full_run(self, state: WorkflowState, outputs: dict) -> None:
         """
         Record the stages as completed after a full single-invocation workflow run.
@@ -829,7 +853,12 @@ class Runner(BaseModel):
         for stage, stage_artifacts in artifacts.items():
             clean = {name: value for name, value in stage_artifacts.items() if value is not None}
             if clean:
-                state.stages[stage] = StageState(status=StageStatus.completed, updated_at=now, artifacts=clean)
+                state.stages[stage] = StageState(
+                    status=StageStatus.completed,
+                    updated_at=now,
+                    artifacts=clean,
+                    inputs_digest=self._stage_inputs_digest(stage),
+                )
         self._save_workflow_state(state)
 
     def _stage_outdir(self, stage: Stage, step_index: int) -> Path:
@@ -853,7 +882,13 @@ class Runner(BaseModel):
                             "outdir": str(outdir),
                             "rm_tmpdir": False,
                             "move_outputs": "copy",
-                            "cachedir": str(self.cwl_cachedir),
+                            # No job cache for per-step runs: the stage state (not the
+                            # job cache) decides what runs, and the job cache key does
+                            # not cover Directory contents -- a re-run stage that
+                            # regenerates an artifact directory in place would otherwise
+                            # serve its dependents stale cached outputs. The legacy
+                            # single-invocation full run (run()) keeps the shared cache.
+                            "cachedir": None,
                             "preserve_entire_environment": True,
                         }
                     )
@@ -899,6 +934,7 @@ class Runner(BaseModel):
         logging.info("running stage '%s' (steps: %s)", stage.value, [step.step for step in spec.steps])
         state.stages[stage] = StageState(status=StageStatus.running, updated_at=datetime.datetime.now())
         self._save_workflow_state(state)
+        inputs_digest = self._stage_inputs_digest(stage)
 
         try:
             step_outputs: dict[str, dict[str, dict[str, str]]] = {}
@@ -931,7 +967,10 @@ class Runner(BaseModel):
             raise
 
         state.stages[stage] = StageState(
-            status=StageStatus.completed, updated_at=datetime.datetime.now(), artifacts=stage_artifacts
+            status=StageStatus.completed,
+            updated_at=datetime.datetime.now(),
+            artifacts=stage_artifacts,
+            inputs_digest=inputs_digest,
         )
         self._save_workflow_state(state)
         return stage_artifacts
@@ -954,8 +993,12 @@ class Runner(BaseModel):
           stage are invalidated as well, so they are re-run too.
 
         Progress is persisted in ``run_dir/.workflow_state.json`` (keyed by
-        stage, never by CWL step). Returns the artifacts of the last executed
-        stage, or ``None`` if everything was already up to date.
+        stage, never by CWL step). A completed stage is skipped only if the
+        workflow inputs it consumed have not changed since it ran (each
+        stage records a digest of them); changed inputs invalidate the
+        affected stages and the stages that depend on them. Returns the
+        artifacts of the last executed stage, or ``None`` if everything was
+        already up to date.
         """
         plan = self.stage_plan
         up_to = Stage(up_to) if up_to is not None else None
@@ -971,6 +1014,28 @@ class Runner(BaseModel):
 
         state = self._load_workflow_state()
 
+        # Detect changes to workflow/input.yaml since the stages were last
+        # executed: a completed stage whose recorded input digest no longer
+        # matches (or which has none at all, e.g. a state file from before
+        # digest recording) is stale, and so are the stages that depend on it.
+        stale = set()
+        if self.workflow_input_path.is_file():
+            for stage, entry in state.stages.items():
+                if entry.status is not StageStatus.completed:
+                    continue
+                if entry.inputs_digest is None:
+                    logging.warning(
+                        "stage '%s' was recorded without an input digest; treating it as stale", stage.value
+                    )
+                    stale.add(stage)
+                elif entry.inputs_digest != self._stage_inputs_digest(stage):
+                    logging.warning(
+                        "the workflow inputs of stage '%s' changed since it was last executed; "
+                        "it and the stages that depend on it will be re-run",
+                        stage.value,
+                    )
+                    stale.add(stage)
+
         if up_to is None and from_ is None and not forced and not state.completed:
             # Historical full-run path: single cwltool invocation of workflow.cwl
             outputs = self.run()
@@ -981,15 +1046,17 @@ class Runner(BaseModel):
         high = order.index(up_to) if up_to is not None else len(order) - 1
         range_stages = order[low : high + 1]
 
-        invalidated = self._invalidated_dependents(forced, plan)
+        invalidated = self._invalidated_dependents(forced, plan) | self._invalidated_dependents(stale, plan)
         for stage in invalidated:
-            if state.stages.get(stage) is not None and state.stages[stage].status is StageStatus.completed:
+            entry = state.stages.get(stage)
+            if entry is not None and entry.status is StageStatus.completed:
                 state.stages[stage] = StageState(
                     status=StageStatus.invalidated,
                     updated_at=datetime.datetime.now(),
-                    artifacts=state.stages[stage].artifacts,
+                    artifacts=entry.artifacts,
+                    inputs_digest=entry.inputs_digest,
                 )
-        if forced:
+        if invalidated:
             self._save_workflow_state(state)
 
         completed = state.completed - invalidated

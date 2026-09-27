@@ -56,8 +56,7 @@ def _openpmd_read_roundtrip(tmp_path_factory):
 
     if values != [1.0, 2.0]:
         pytest.skip(
-            "openpmd-api read path broken in this environment "
-            f"(round-trip returned {values!r}, expected [1.0, 2.0])"
+            f"openpmd-api read path broken in this environment (round-trip returned {values!r}, expected [1.0, 2.0])"
         )
 
 
@@ -118,7 +117,6 @@ class TestSyntheticSeries:
         finally:
             series.close()
 
-        omega_pe = ts_physics.plasmafrequence(density=density_si, gamma=gamma, relativistic=True)
         steps = np.array([0, 5, 10, 15, 20, 25])
         expected = np.exp(eskhi_growthrate_theory(gamma) * steps * 0.1) * (1.0 + 1e-3 * 15)
         np.testing.assert_allclose(amplitude, expected, rtol=1e-12)

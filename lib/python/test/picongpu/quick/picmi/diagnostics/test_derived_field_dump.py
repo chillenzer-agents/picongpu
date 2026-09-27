@@ -1,5 +1,7 @@
 """Tests for PICMI native and combined derived-field diagnostics."""
 
+import logging
+
 import pytest
 from pydantic import ValidationError
 
@@ -77,3 +79,21 @@ def test_invalid_native_field_configuration(species, kwargs):
 def test_non_averageable_fields_are_rejected(species, field):
     with pytest.raises(ValidationError):
         AverageDerivedFieldDump(species=species, field=field)
+
+
+@pytest.mark.parametrize("field", ["Density", "BoundElectronDensity", "ChargeDensity", "Counter", "EnergyDensity"])
+def test_averaging_scalar_per_cell_fields_warns(species, field, caplog):
+    with caplog.at_level(logging.WARNING, logger="picongpu.picmi.diagnostics.field_dump"):
+        AverageDerivedFieldDump(species=species, field=field)
+
+    assert any(
+        f"AverageDerivedFieldDump of {field}" in record.message and "not physically meaningful" in record.message
+        for record in caplog.records
+    )
+
+
+def test_averaging_per_particle_field_does_not_warn(species, caplog):
+    with caplog.at_level(logging.WARNING, logger="picongpu.picmi.diagnostics.field_dump"):
+        AverageDerivedFieldDump(species=species, field="WeightedVelocity", direction="z")
+
+    assert not caplog.records

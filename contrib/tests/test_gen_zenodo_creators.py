@@ -164,16 +164,100 @@ def test_wrong_branch_guard(synthetic_repo):
     git(repo, "checkout", "-q", "-b", "release-0.0.2")
     git(repo, "tag", "0.0.2")
 
-    # Candidate on the release branch -> guard passes.
-    ok = gzc.check_release_branch_guard(repo, "0.0.2")
+    # Candidate on the release branch -> guard passes, not blocked.
+    ok, blocked = gzc.check_release_branch_guard(repo, "0.0.2")
     assert any("guard OK" in w for w in ok)
+    assert not blocked
 
-    # A candidate not reachable from the release branch -> guard fails.
+    # Remote-tracking release branches are found too (fresh clone / CI case).
+    git(repo, "update-ref", "refs/remotes/origin/release-0.0.2", "0.0.2")
+    ok_remote, blocked_remote = gzc.check_release_branch_guard(repo, "0.0.2")
+    assert any(b.endswith("release-0.0.2") for b in ok_remote) or any("guard OK" in w for w in ok_remote)
+
+    # A candidate not reachable from the release branch -> guard fails + blocks.
     git(repo, "checkout", "-q", "dev")
     commit_as(repo, "Alice Miller", "alice@example.com", "dev-only commit")
     git(repo, "tag", "0.0.3")
-    bad = gzc.check_release_branch_guard(repo, "0.0.3")
+    bad, blocked = gzc.check_release_branch_guard(repo, "0.0.3")
     assert any("guard FAILED" in w for w in bad)
+    assert blocked
+
+
+def test_wrong_branch_guard_exit_code(synthetic_repo, tmp_path, capsys):
+    """The guard must actually fail hard (non-zero exit) on a wrong branch."""
+    repo, base, head = build_scenario(synthetic_repo)
+    alias_file = write_aliases(repo, ALIASES)
+    git(repo, "checkout", "-q", "-b", "release-0.0.2")
+    git(repo, "tag", "0.0.2")
+
+    common = ["--repo", str(repo), "--range", f"{base}..{head}", "--aliases", str(alias_file), "--no-diff"]
+
+    # Candidate reachable from the release branch -> exit 0.
+    rc = gzc.main([*common, "--check-release-branch", "0.0.2"])
+    assert rc == 0
+
+    # Dev-only candidate, not on any release branch -> hard non-zero exit.
+    git(repo, "checkout", "-q", "dev")
+    commit_as(repo, "Alice Miller", "alice@example.com", "dev-only commit 2")
+    git(repo, "tag", "0.0.3")
+    rc = gzc.main([*common, "--check-release-branch", "0.0.3"])
+    assert rc != 0
+    out = capsys.readouterr().out
+    assert "REFUSED" in out
+    assert "Proposed .zenodo.json diff" not in out
+
+    # ... unless --ignore-release-branch is given.
+    rc = gzc.main([*common, "--check-release-branch", "0.0.3", "--ignore-release-branch"])
+    assert rc == 0
+
+
+def test_mailmap_used_only_when_present(synthetic_repo):
+    repo, _base, _head = build_scenario(synthetic_repo)
+    # No .mailmap in the repo -> the flag must NOT be passed.
+    assert gzc.mailmap_enabled(repo, no_mailmap=False) is False
+    # Once a .mailmap exists -> enable it; --no-mailmap still disables it.
+    (repo / ".mailmap").write_text("Alice Miller <alice@example.com>\n")
+    assert gzc.mailmap_enabled(repo, no_mailmap=False) is True
+    assert gzc.mailmap_enabled(repo, no_mailmap=True) is False
+
+
+def test_contributors_dedup_no_creator_leak(synthetic_repo, tmp_path, capsys):
+    """
+    Contributors must be deduplicated by canonical person and must not leak
+    creator identities back in (emitted .zenodo.json would otherwise be
+    corrupted with duplicates and wrong rows).
+    """
+    repo = synthetic_repo
+    # History BEFORE the release tag -> contributors, not creators.
+    commit_as(repo, "Zoe Zoe", "zoe@corp.example.com", "zoe pre a")
+    commit_as(repo, "Zoe Zoe", "zoe@home.example.com", "zoe pre b")  # same person
+    commit_as(repo, "Alice Miller", "alice@prerange.example.com", "alice pre-range")
+    git(repo, "tag", "0.0.1")
+    # Release-range committers -> creators.
+    commit_as(repo, "Alice Miller", "alice@example.com", "alice range a")
+    commit_as(repo, "Bob Smith", "bob@example.com", "bob range")
+    alias_file = write_aliases(repo, ALIASES)
+
+    rc = gzc.main(
+        [
+            "--repo",
+            str(repo),
+            "--range",
+            "0.0.1..HEAD",
+            "--aliases",
+            str(alias_file),
+            "--no-diff",
+        ]
+    )
+    assert rc == 0
+    out = capsys.readouterr().out
+    contributors_section = out.split("=== Contributors")[1].split("=== Skipped")[0]
+    # Same canonical person from two unknown emails collapses to one row.
+    assert contributors_section.count("Zoe, Zoe") == 1
+    # A creator identity must NOT leak back into contributors.
+    assert "Miller, Alice" not in contributors_section
+    # Unrelated contributor stays.
+    assert "Zoe, Zoe" in contributors_section
 
 
 def test_main_renders_proposal_and_diff(synthetic_repo, tmp_path, capsys):

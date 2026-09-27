@@ -89,7 +89,9 @@ complementary artifacts** (recommended option **A + B**):
   git-native way to normalise names and addresses (``Proper Name <proper@email>``
   lines, ``<proper@email> Other <other@email>`` merges). It is reusable by git
   itself, ``git shortlog``, etc. The PoC passes ``--use-mailmap`` whenever a
-  ``.mailmap`` exists.
+  ``.mailmap`` exists (``--no-mailmap`` disables it); with no ``.mailmap`` in the
+  tree it is simply inactive and ``contrib/aliases.json`` is the active
+  mechanism.
 * **Option B — ``contrib/aliases.json``.** A checked-in, zenodo-specific skip
   and merge table:
 
@@ -103,6 +105,13 @@ complementary artifacts** (recommended option **A + B**):
 
   Unknown identities (no alias entry) are **not** silently merged or dropped —
   they are surfaced with a ``NEEDS-HUMAN-ATTRIBUTION`` marker.
+
+  Raw-name aliases in ``people.aliases`` (e.g. ``"Tapish"``, ``"Tiebel"``,
+  ``"PrometheusPi"``) are **curated, explicit entries**, not automatic
+  name-matching: a person is only merged via a raw name if a maintainer listed
+  it, so a future contributor who happens to use the same ``git user.name`` is
+  not silently collapsed into someone else. Unlisted name collisions stay
+  surfaced for review.
 
 Why ``.mailmap`` alone is not enough: it can merge *known* identities but gives
 no explicit way to drop bots, and people who never bothered to configure git
@@ -181,7 +190,12 @@ Creators vs contributors
 * **Contributors** = every other distinct person in the repository history
   (whole ``git log --use-mailmap``), minus bots, rendered with
   ``"type": "Other"`` — this implements the email recipe "move old creators to
-  contributor add (type Other)".
+  contributor add (type Other)". Rows are deduplicated by **canonical person**
+  (two unknown emails that normalise to the same name collapse to one row),
+  creator identities never leak back into contributors, and the historical,
+  curated contributor names are conserved by adding their raw git handles to
+  the alias table (see the ``contrib/aliases.json`` entries for e.g.
+  ``Thévenet, Maxence``, ``Burau, Heiko``, ``Schumann, Conrad``).
 
 ORCID / affiliation: human sidecar
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -199,10 +213,12 @@ Wrong-branch guard
 
 The zenodo PR must target the **release branch**, never ``dev`` (the historical
 ``#5235``/``#5239`` failure). The PoC implements ``--check-release-branch
-<ref>`` which asserts the candidate ref is reachable from a local ``release-*``
-branch and refuses to proceed otherwise. The requirement should also be encoded
-in the zenodo PR template / checklist (cross-link with TT-05 L1) by making the
-diff step fail outside a ``release-*`` branch.
+<ref>`` which asserts the candidate ref is reachable from a ``release-*`` branch
+(local **and** remote-tracking, so it works on a fresh clone / CI) and **refuses
+to proceed with a non-zero exit code** when it is not, unless
+``--ignore-release-branch`` is given to override. The requirement should also be
+encoded in the zenodo PR template / checklist (cross-link with TT-05 L1) by
+making the diff step fail outside a ``release-*`` branch.
 
 README / Contributors sync
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -300,7 +316,7 @@ Usage::
 
    python contrib/gen_zenodo_creators.py --repo <repo> --range 0.7.0..0.8.0
        [--aliases contrib/aliases.json] [--no-mailmap] [--no-diff]
-       [--check-release-branch 0.8.0]
+       [--check-release-branch 0.8.0] [--ignore-release-branch]
 
 The script runs ``git log --use-mailmap``, applies skip/merge aliases, dedups,
 and prints creators, contributors ("type": "Other"), skipped identities, an
@@ -323,18 +339,35 @@ identity-aware dedup:
   identity ``s0134766@login2.alpha.hpc.tu-dresden.de`` (1 commit, cluster
   profile update) which is deliberately flagged, not auto-merged.
 
-21 raw identities were dropped as bots/CI (`Third Party`/`Tools` under
-``picongpu@hzdr.de``/``tools@hzdr.de``). Contributors = 78 distinct people from
-the rest of history. This matches the historical structure and demonstrates the
-dedup/bot-exclusion/surface-unknown behaviour the requester asked for.
+5 distinct raw bot/CI identities were dropped (44 commit instances in range:
+`Third Party` x22 + `ThirdParty` x1 under ``picongpu@hzdr.de``, `Tools` x21
+under ``tools@hzdr.de``/``picongpu@hzdr.de``). Contributors = **47 distinct
+canonical people** from the rest of history (the raw ``git log`` run surfaces
+78 rows; deduplication by canonical person plus exclusion of creator
+identities collapses them to 47, and the historical curated contributor names
+— e.g. ``Thévenet, Maxence``, ``Burau, Heiko``, ``Schumann, Conrad``,
+``Bastrakova, Kseniia``, ``Meyer, Felix``, ``Ong, Jian Fuh``,
+``Knespel, Maximilian``, ``Voß, Mika Soren`` — are conserved via the alias
+table instead of degrading to raw handles). This matches the historical
+structure and demonstrates the dedup/bot-exclusion/surface-unknown/curated-name
+conservation behaviour the requester asked for.
+
+Only identities that cannot be confidently attributed are left surfaced with a
+``NEEDS-HUMAN-ATTRIBUTION`` marker (e.g. Taurus/HZDR login-node accounts and a
+handful of raw names); three historical curated contributor names that have no
+recoverable git identity in this repo (``Bifeng, Lei``, ``Hoehnig, Wolfgang``,
+``Rudat, Sophie``) are the ones a human needs to map or carry over by hand in
+the follow-up task.
 
 Tests
 ^^^^^
 
 ``contrib/tests/test_gen_zenodo_creators.py`` builds a synthetic git repo with
 deliberately inconsistent identities and asserts: multi-identity dedup, bot
-exclusion, unknown identities surfaced (not merged), and the wrong-branch guard
-pass/fail behaviour. Run with ``pytest contrib/tests``.
+exclusion, unknown identities surfaced (not merged), contributor dedup + no
+creator leak, the wrong-branch guard pass/fail behaviour **including its
+hard-fail exit code**, and that ``--use-mailmap`` is only applied when a
+``.mailmap`` exists. Run with ``pytest contrib/tests``.
 
 Open questions for the requester
 --------------------------------
@@ -351,15 +384,28 @@ Open questions for the requester
    fallback; requester confirmed GitHub remains in play.
 4. **Bot/CI skip list** — the PoC ships one (including the terok/opencode gate
    identity and project mail addresses); additions welcome.
+5. **Privacy / consent for ``contrib/aliases.json``** — the alias table maps
+   raw git names to people and may list personal email addresses (e.g.
+   ``filipoptolowicz@gmail.com``) in addition to public institution/cluster
+   addresses. All of them are already public in this repo's git history, so
+   incremental exposure is low, but please get explicit consent from the named
+   people (EU academic context) before treating the table as more than a local
+   tool. The rule of thumb: **only ever include identities that are already
+   publicly committed**, and prefer the historical ``.zenodo.json`` practice of
+   exposing ORCIDs rather than raw personal emails where an ORCID exists.
 
 Follow-up (implementation task)
 -------------------------------
 
 1. Add ``.mailmap`` (subset needed for release identity merging) or keep
    ``aliases.json`` as the sole table (validate against the next release range).
-2. Wire the derivation into the release workflow: generate ``.zenodo.json``
+2. Map the remaining surfaced/ambiguous identities by hand and carry over the
+   three historical curated contributor names with no recoverable git identity
+   (``Bifeng, Lei``, ``Hoehnig, Wolfgang``, ``Rudat, Sophie``) — likely a
+   maintainer-side, one-time consolidation in ``aliases.json``.
+3. Wire the derivation into the release workflow: generate ``.zenodo.json``
    diff, ORCID sidecar review, wrong-branch guard in the PR template.
-3. Add ``CONTRIBUTORS`` generation from the same alias table; point README at
+4. Add ``CONTRIBUTORS`` generation from the same alias table; point README at
    it (coordinate with upstream `#5728 <https://github.com/ComputationalRadiationPhysics/picongpu/pull/5728>`__).
-4. Implement the Level 3 recommendation as a GitHub Actions workflow prototype
+5. Implement the Level 3 recommendation as a GitHub Actions workflow prototype
    (trigger + L1 checklist call + ``gh release create --draft``, dry-run only).

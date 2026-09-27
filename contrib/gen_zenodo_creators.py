@@ -12,10 +12,16 @@ Given a git release range ``<prev>..<cand>`` the tool derives the proposed
 range) and ``contributors`` (every body else in the repository history,
 ``"type": "Other"``), taking badly configured git identities into account:
 
-* ``git log --use-mailmap`` applies ``.mailmap`` if one exists;
+* ``git log --use-mailmap`` applies ``.mailmap`` if one exists (it is only
+  passed when a ``.mailmap`` file is present);
 * a checked-in alias/skip table (default ``contrib/aliases.json``) merges the
   same person's multiple emails/names (multi-machine commits, GitHub noreply
   addresses, HPC login-node accounts) and drops bot/CI identities.
+
+Contributor rows are deduplicated by canonical person (unknown emails that
+normalise to the same name collapse to one row) and creator identities never
+leak back into contributors. The historical curated contributor names are
+conserved by aliasing their raw git handles to the canonical name.
 
 The output is a unified diff of the proposed ``.zenodo.json`` against the one
 currently in the repository plus a human-readable resolution table. ORCIDs and
@@ -34,6 +40,7 @@ import json
 import re
 import subprocess
 import sys
+import unicodedata
 from collections import Counter, OrderedDict
 from pathlib import Path
 
@@ -103,14 +110,15 @@ def parse_identity_line(line: str) -> tuple[str, str]:
     return name.strip(), email.strip()
 
 
-def is_skipped(name: str, email: str, data: dict) -> bool:
+def is_skipped(name: str, email: str, data: dict, compiled: list[re.Pattern] | None = None) -> bool:
     """True if this raw identity is a bot/CI/maintenance identity."""
     lower_email = email.lower()
     if lower_email in data.get("skip", {}).get("emails", []):
         return True
-    patterns = _compile_skip_patterns(data.get("skip", {}).get("patterns", []))
+    if compiled is None:
+        compiled = _compile_skip_patterns(data.get("skip", {}).get("patterns", []))
     haystack = f"{name}|{lower_email}"
-    return any(pattern.search(haystack) for pattern in patterns)
+    return any(pattern.search(haystack) for pattern in compiled)
 
 
 def resolve_person_key(name: str, email: str, data: dict) -> str:
@@ -136,6 +144,12 @@ def titlecase_last_first(name: str) -> str:
     return f"{parts[-1]}, {' '.join(parts[:-1])}"
 
 
+def normalize_name(name: str) -> str:
+    """Fold a display name for identity comparison (case + diacritics)."""
+    folded = unicodedata.normalize("NFKD", name)
+    return "".join(ch for ch in folded if not unicodedata.combining(ch)).casefold()
+
+
 def display_name(key: str, raw_names: list[str], data: dict) -> str:
     """Canonical zenodo name for a person key."""
     person = data.get("people", {}).get(key)
@@ -146,6 +160,11 @@ def display_name(key: str, raw_names: list[str], data: dict) -> str:
             return titlecase_last_first(raw_names[0])
         return key  # pragma: no cover - unreachable, kept defensive
     return key
+
+
+def mailmap_enabled(repo: Path, no_mailmap: bool) -> bool:
+    """True if ``--use-mailmap`` should be passed, i.e. a ``.mailmap`` exists."""
+    return not no_mailmap and (repo / ".mailmap").exists()
 
 
 def collect_identities(repo: Path, rev_range: str | None, use_mailmap: bool) -> list:
@@ -174,6 +193,7 @@ def derive_people(identities: list, data: dict) -> dict:
     """
     skipped = Counter()
     people: dict[str, dict] = OrderedDict()
+    compiled = _compile_skip_patterns(data.get("skip", {}).get("patterns", []))
 
     def bump(key: str, name: str, email: str) -> None:
         person = people.setdefault(
@@ -195,7 +215,7 @@ def derive_people(identities: list, data: dict) -> dict:
         person["count"] += 1
 
     for name, email, _sha in identities:
-        if is_skipped(name, email, data):
+        if is_skipped(name, email, data, compiled):
             skipped[(name, email)] += 1
             continue
         key = resolve_person_key(name, email, data)
@@ -270,24 +290,38 @@ def zenodo_diff(repo: Path, proposed: dict) -> str:
     return "".join(diff)
 
 
-def check_release_branch_guard(repo: Path, cand_ref: str) -> list[str]:
+def check_release_branch_guard(repo: Path, cand_ref: str) -> tuple[list[str], bool]:
     """
     Wrong-branch guard (Level 2): warn/demand that the candidate release commit
-    is reachable from a local ``release-*`` branch, i.e. the zenodo update must
+    is reachable from a ``release-*`` branch, i.e. the zenodo update must
     target the release branch, not ``dev`` (historical #5235/#5239 failure).
+
+    Returns (warnings, blocked). ``blocked`` is True when ``release-*``
+    branches exist (local or remote-tracking) but none contain the candidate,
+    which is the "refusing to proceed" condition the docs describe.
     """
     warnings = []
-    branches = [
-        b.strip()
-        for b in (run_git(repo, ["branch", "--format=%(refname:short)"]).splitlines())
-        if b.strip().startswith("release-")
-    ]
+    branches = sorted(
+        {
+            b.strip()
+            for b in run_git(
+                repo,
+                [
+                    "for-each-ref",
+                    "--format=%(refname:short)",
+                    "refs/heads/release-*",
+                    "refs/remotes/*/release-*",
+                ],
+            ).splitlines()
+            if b.strip()
+        }
+    )
     if not branches:
         warnings.append(
-            "guard: no local `release-*` branch found; cannot verify the "
-            "candidate is merged back yet (run from the release branch)."
+            "guard: no `release-*` branch (local or remote) found; cannot verify the "
+            "candidate is merged back yet (run from / against the release branch)."
         )
-        return warnings
+        return warnings, False
     reachable = []
     for branch in branches:
         rc = subprocess.run(
@@ -299,13 +333,13 @@ def check_release_branch_guard(repo: Path, cand_ref: str) -> list[str]:
             reachable.append(branch)
     if reachable:
         warnings.append(f"guard OK: {cand_ref} is reachable from release branch `{reachable[0]}`.")
-    else:
-        warnings.append(
-            f"guard FAILED: {cand_ref} is NOT reachable from any `release-*` "
-            "branch. Refusing to proceed: the .zenodo.json update must land on "
-            f"the release branch, not `dev`. release branches: {branches}"
-        )
-    return warnings
+        return warnings, False
+    warnings.append(
+        f"guard FAILED: {cand_ref} is NOT reachable from any `release-*` "
+        "branch. Refusing to proceed: the .zenodo.json update must land on "
+        f"the release branch, not `dev`. release branches: {branches}"
+    )
+    return warnings, True
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -324,7 +358,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--no-mailmap",
         action="store_true",
-        help="do not apply .mailmap (default: --use-mailmap)",
+        help="do not apply .mailmap even if one exists (default: --use-mailmap when .mailmap present)",
     )
     parser.add_argument(
         "--no-diff",
@@ -336,6 +370,11 @@ def main(argv: list[str] | None = None) -> int:
         metavar="CAND_REF",
         help="wrong-branch guard: require CAND_REF reachable from a release-* branch",
     )
+    parser.add_argument(
+        "--ignore-release-branch",
+        action="store_true",
+        help="proceed even when the wrong-branch guard fails (exit non-zero by default)",
+    )
     args = parser.parse_args(argv)
 
     repo: Path = args.repo.resolve()
@@ -345,20 +384,34 @@ def main(argv: list[str] | None = None) -> int:
     aliases_path = args.aliases or (repo / DEFAULT_ALIASES)
     data = load_aliases(aliases_path)
 
-    candidates = collect_identities(repo, args.range, not args.no_mailmap)
+    use_mailmap = mailmap_enabled(repo, args.no_mailmap)
+    candidates = collect_identities(repo, args.range, use_mailmap)
     summary = derive_people(candidates, data)
     people = sorted(summary["people"].values(), key=lambda p: p["name"].casefold())
 
-    full_hist = collect_identities(repo, None, not args.no_mailmap)
+    full_hist = collect_identities(repo, None, use_mailmap)
     full_summary = derive_people(full_hist, data)
     creator_keys = set(summary["people"])
+    creator_names = {normalize_name(p["name"]) for p in people}
+
+    # Contributors = every other distinct person in history, deduplicated by
+    # canonical person (two unknown emails that title-case to the same name are
+    # one person) and never leaking a creator identity back in.
     contributor_keys = [key for key in full_summary["people"] if key not in creator_keys]
+    seen_contributors: set[str] = set()
+    contributor_rows = []
+    for key in contributor_keys:
+        person = full_summary["people"][key]
+        folded = normalize_name(person["name"])
+        if folded in seen_contributors:
+            continue
+        if folded in creator_names:
+            continue
+        seen_contributors.add(folded)
+        contributor_rows.append(person)
 
     creators = [p["name"] for p in people]
-    contributors_sorted = sorted(
-        (full_summary["people"][k] for k in contributor_keys),
-        key=lambda p: p["name"].casefold(),
-    )
+    contributors_sorted = sorted(contributor_rows, key=lambda p: p["name"].casefold())
     contributors = [p["name"] for p in contributors_sorted]
 
     existing_path = repo / DEFAULT_ZENODO
@@ -380,11 +433,20 @@ def main(argv: list[str] | None = None) -> int:
     for (name, email), count in sorted(summary["skipped"].items()):
         report.append(f"  {name:<20} {email:<45} x{count}")
 
+    blocked = False
     if args.check_release_branch:
-        warnings = check_release_branch_guard(repo, args.check_release_branch)
+        guard_warnings, blocked = check_release_branch_guard(repo, args.check_release_branch)
         report.append("")
         report.append("=== Wrong-branch guard ===")
-        report.extend(f"  {w}" for w in warnings)
+        report.extend(f"  {w}" for w in guard_warnings)
+        if blocked and not args.ignore_release_branch:
+            report.append("")
+            report.append(
+                "RESULT: REFUSED - candidate is not on a `release-*` branch; "
+                "no proposal emitted (override with --ignore-release-branch)."
+            )
+            print("\n".join(report))
+            return 1
 
     if not args.no_diff:
         report.append("")

@@ -3,7 +3,9 @@
   "skip": {
     "emails": [
       "picongpu@hzdr.de",
-      "tools@hzdr.de"
+      "tools@hzdr.de",
+      "noreply@hzdr.de",
+      "dev@example.com"
     ],
     "patterns": [
       "(?i)dependabot",
@@ -27,14 +29,46 @@
     },
     "berceanu-andrei": {
       "aliases": [
-        "andreicberceanu@gmail.com"
+        "andreicberceanu@gmail.com",
+        "berceanu"
       ],
       "email": "andreicberceanu@gmail.com",
       "name": "Berceanu, Andrei"
     },
+    "bastrakova-kseniia": {
+      "aliases": [
+        "Xeinia",
+        "Xeinia Bastrakova",
+        "Bastrakova.Kseinia@gmail.com",
+        "bastrakova.kseinia@gmail.com"
+      ],
+      "email": "Bastrakova.Kseinia@gmail.com",
+      "name": "Bastrakova, Kseniia"
+    },
+    "burau-heiko": {
+      "aliases": [
+        "Heikman",
+        "Heiko Burau",
+        "h.burau@hzdr.de"
+      ],
+      "email": "h.burau@hzdr.de",
+      "name": "Burau, Heiko"
+    },
+    "bussmann-michael": {
+      "aliases": [
+        "Michael Bussmann",
+        "bussmann",
+        "m.bussmann@hzdr.de",
+        "bussmann@users.noreply.github.com"
+      ],
+      "email": "m.bussmann@hzdr.de",
+      "name": "Bussmann, Michael"
+    },
     "carstens-finn-ole": {
       "aliases": [
-        "finn-ole.carstens@mailbox.tu-dresden.de"
+        "Finn-Ole Carstens",
+        "finn-ole.carstens@mailbox.tu-dresden.de",
+        "45068748+finnolec@users.noreply.github.com"
       ],
       "email": "f.carstens@hzdr.de",
       "name": "Carstens, Finn-Ole"
@@ -68,6 +102,38 @@
       "email": "sergey.k.ermakov@gmail.com",
       "name": "Ermakov, Sergey Konstantin"
     },
+    "grund-alexander": {
+      "aliases": [
+        "Alexander Grund",
+        "Flamefire",
+        "a.grund@hzdr.de",
+        "git@grundis.de",
+        "Flamefire@users.noreply.github.com"
+      ],
+      "email": "a.grund@hzdr.de",
+      "name": "Grund, Alexander"
+    },
+    "knespel-maximilian": {
+      "aliases": [
+        "mxmlnkn",
+        "maximilian.knespel@mailbox.tu-dresden.de",
+        "mxmlnkn@github.io"
+      ],
+      "email": "maximilian.knespel@mailbox.tu-dresden.de",
+      "name": "Knespel, Maximilian"
+    },
+    "lebedev-anton": {
+      "aliases": [
+        "Anton Lebedev",
+        "Anton-Le",
+        "le_t@gmx.net",
+        "a.lebedev@hzdr.de",
+        "anton.lebedev@student.uni-tuebingen.de",
+        "50339174+Anton-Le@users.noreply.github.com"
+      ],
+      "email": "le_t@gmx.net",
+      "name": "Lebedev, Anton"
+    },
     "lehmann-max": {
       "aliases": [
         "m.lehmann@hzdr.de"
@@ -87,10 +153,31 @@
     },
     "marre-brian": {
       "aliases": [
-        "BrianMarre"
+        "BrianMarre",
+        "Brian Edward Marré",
+        "brian-edward@web.de"
       ],
       "email": "b.marre@hzdr.de",
       "name": "Marre, Brian Edward"
+    },
+    "matthes-alexander": {
+      "aliases": [
+        "Alexander Matthes",
+        "Matthes",
+        "ziz@mailbox.org",
+        "am6120@hypnos.fz-rossendorf.de"
+      ],
+      "email": "ziz@mailbox.org",
+      "name": "Matthes, Alexander"
+    },
+    "meyer-felix": {
+      "aliases": [
+        "FelixTUD",
+        "f.meyer38@gmail.com",
+        "f.meyer38@googlemail.com"
+      ],
+      "email": "f.meyer38@gmail.com",
+      "name": "Meyer, Felix"
     },
     "narwal-tapish": {
       "aliases": [
@@ -109,9 +196,23 @@
       "email": "filipoptolowicz@gmail.com",
       "name": "Optołowicz, Filip"
     },
+    "ong-jian-fuh": {
+      "aliases": [
+        "StevE-Ong",
+        "Jian Fuh Ong",
+        "jianfuh.ong@eli-np.ro"
+      ],
+      "email": "jianfuh.ong@eli-np.ro",
+      "name": "Ong, Jian Fuh"
+    },
     "ordyna-pawel": {
       "aliases": [
-        "p.ordyna@hzdr.de"
+        "p.ordyna@hzdr.de",
+        "pawel.ordyna@mailbox.tu-dresden.de",
+        "pordyna@hzdr.de",
+        "41141557+pordyna@users.noreply.github.com",
+        "Pawel Ordyna",
+        "pordyna"
       ],
       "email": "p.ordyna@hzdr.de",
       "name": "Ordyna, Paweł"
@@ -119,7 +220,11 @@
     "pausch-richard": {
       "aliases": [
         "PrometheusPi",
-        "r.pausch@hzdr.de"
+        "r.pausch@hzdr.de",
+        "Pausch",
+        "rp6038@hypnos.fz-rossendorf.de",
+        "rp6038@hypnos2.fz-rossendorf.de",
+        "rpausch@login1.ascent.olcf.ornl.gov"
       ],
       "email": "r.pausch@hzdr.de",
       "name": "Pausch, Richard"
@@ -137,6 +242,24 @@
       ],
       "email": "l.sprenger@hzdr.de",
       "name": "Sprenger, Lennert"
+    },
+    "schumann-conrad": {
+      "aliases": [
+        "c-schumann-zih",
+        "conrad.schumann@tu-dresden.de"
+      ],
+      "email": "conrad.schumann@tu-dresden.de",
+      "name": "Schumann, Conrad"
+    },
+    "schmitt-felix": {
+      "aliases": [
+        "Felix Schmitt",
+        "f-schmitt-zih",
+        "felix.schmitt@zih.tu-dresden.de",
+        "f-schmitt-zih@users.noreply.github.com"
+      ],
+      "email": "felix.schmitt@zih.tu-dresden.de",
+      "name": "Schmitt, Felix"
     },
     "steiniger-klaus": {
       "aliases": [
@@ -156,9 +279,41 @@
       "email": "j.tiebel@hzdr.de",
       "name": "Tiebel, Jessica"
     },
+    "thevenet-maxence": {
+      "aliases": [
+        "MaxThevenet",
+        "mthevenet@lbl.gov",
+        "maxence.thevenet@desy.de"
+      ],
+      "email": "mthevenet@lbl.gov",
+      "name": "Thévenet, Maxence"
+    },
+    "trojok-jakob": {
+      "aliases": [
+        "Jakob Trojok",
+        "jtrojok",
+        "j.trojok@hzdr.de",
+        "54057671+jtrojok@users.noreply.github.com"
+      ],
+      "email": "j.trojok@hzdr.de",
+      "name": "Trojok, Jakob"
+    },
+    "voss-mika-soren": {
+      "aliases": [
+        "voss29",
+        "voss29@hemera5.cluster"
+      ],
+      "email": "voss29@hemera5.cluster",
+      "name": "Voß, Mika Soren"
+    },
     "widera-rene": {
       "aliases": [
-        "r.widera@hzdr.de"
+        "r.widera@hzdr.de",
+        "widera@hypnos.fz-rossendorf.de",
+        "widera@fwk175.(none)",
+        "Rene Widera",
+        "René",
+        "psychocoder"
       ],
       "email": "r.widera@hzdr.de",
       "name": "Widera, René"
@@ -172,7 +327,10 @@
     },
     "wrobel-nico": {
       "aliases": [
-        "n.wrobel@hzdr.de"
+        "n.wrobel@hzdr.de",
+        "Nico Wrobel",
+        "nicowrobel",
+        "110536983+nicowrobel@users.noreply.github.com"
       ],
       "email": "n.wrobel@hzdr.de",
       "name": "Wrobel, Nico"

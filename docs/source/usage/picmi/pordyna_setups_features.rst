@@ -13,6 +13,16 @@ PICMI feature gaps from pordyna's ``picongpu-setups-for-picmi-workflows``
    It is **not** a user guide: the "works on dev?" column refers to the state at the time of
    writing, not to the latest released PIConGPU version.
 
+.. note::
+
+   **Snapshot caveat.**  The "works on ``dev``?" verdicts below were verified against a fixed
+   analysis snapshot, the local ``dev`` commit ``b4e4ca5b2``, which the TT-13 analysis recorded
+   as 85 commits behind the fork's ``origin/dev`` at the time (see
+   `#42 <https://github.com/chillenzer/picongpu/issues/42>`_).  E.g. the
+   `#5413 <https://github.com/ComputationalRadiationPhysics/picongpu/pull/5413>`_
+   ``GridedLayout`` fix is not part of this snapshot.  "Absent on analysed ``dev``" therefore
+   does not imply "absent upstream"; check the linked issues for the current status.
+
 The analysis behind this page lives in the project task tracker under
 `TT-13 <https://github.com/chillenzer/picongpu/issues/42>`_ and the companion
 `TT-22 <https://github.com/chillenzer/picongpu/issues/51>`_ (take-over of upstream PR
@@ -55,10 +65,12 @@ exclusively through:
   ``submit_scan_from_cli``), and a parameter scan driver built around a pandas dataframe of
   Coulomb-log values.
 
-Its ``pyproject.toml`` / ``picmi_input.py.lock`` pin ``picongpu`` to pordyna's fork branch
-``production_filaments_created_2026_08_26`` (rev ``3fce3c675e``), i.e. the setup is developed
-against a branch that already contains the not-yet-merged features listed below.  That fork
-divergence is the key fact behind the "no/bug" rows of the table.
+Its ``picmi_input.py.lock`` (the PEP-723 script lock used by the entrypoint's ``uv run``
+shebang) pins ``picongpu`` to pordyna's fork branch ``production_filaments_created_2026_08_26``
+(rev ``3fce3c675e``); the repo's ``pyproject.toml``, by contrast, depends on upstream
+``ComputationalRadiationPhysics/picongpu@dev``.  I.e. the setup is developed against a fork
+branch that already contains the not-yet-merged features listed below.  That fork divergence is
+the key fact behind the "no/bug" rows of the table.
 
 Verified feature-gap table
 --------------------------
@@ -90,7 +102,7 @@ and the upstream PIConGPU issue/PR that tracks the gap.
      - **Deterministic particle-functor C++ struct names** (dedup/reuse/reproducibility of
        derived fields; part of ``#5761``)
      - **No**
-     - ``pypicongpu/particle_functor/particle_functor.py:139`` uses
+     - ``pypicongpu/particle_functor/particle_functor.py:141`` uses
        ``f"{self.name}_{uuid().hex}"`` (non-reproducible); ``#5761`` computes a sha256 of the
        definition instead.  Load-bearing for rows A and H.
    * - C
@@ -130,8 +142,9 @@ and the upstream PIConGPU issue/PR that tracks the gap.
      - Compile-parallelism control for the CWL workflow (``pic-build -j N``)
      - **No** (upstream issue
        `#5766 <https://github.com/ComputationalRadiationPhysics/picongpu/issues/5766>`_)
-     - No config knob in ``pypicongpu/runner.py`` ``PicBuildFlags``/``generate_build_command``
-       (``runner.py:95,303,355``).  Tracked as fork issue
+     - The ``-j``/``jobs`` knob exists in ``PicBuildFlags`` (``runner.py:95-102``, default 4,
+       serialised as ``build_jobs`` -> ``pic-build -j N``), but its default is hardcoded and not
+       configurable via ``picongpurc`` (upstream #5766).  Tracked as fork issue
        `#39 <https://github.com/chillenzer/picongpu/issues/39>`_.
    * - H
      - **Reproducible serialisation of the picmi ``Simulation``** into ``metadata/`` of the
@@ -290,8 +303,10 @@ column.  "no match" means the symbol is absent from ``lib/python/`` on the analy
      - absent (upstream
        `#5773 <https://github.com/ComputationalRadiationPhysics/picongpu/issues/5773>`_)
    * - Compile threads (G)
-     - ``pypicongpu/runner.py:95`` ``PicBuildFlags``, ``:303,355`` build-command generation --
-       no parallelism knob
+     - ``pypicongpu/runner.py:95-102`` ``PicBuildFlags.jobs`` (default 4, serialised to
+       ``build_jobs``) -- the knob exists; only its default is hardcoded, not configurable via
+       ``rc_params``/``picongpurc`` (``runner.py:303`` ``generate_build_command`` ->
+       ``pic-build $@``)
      - absent (upstream
        `#5766 <https://github.com/ComputationalRadiationPhysics/picongpu/issues/5766>`_)
    * - picmi metadata (H)

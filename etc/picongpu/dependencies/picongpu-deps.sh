@@ -33,7 +33,7 @@
 # are on disk (install prefixes, cache, generated env files), so sourcing
 # does not leak build state into your shell.
 
-set -eu -o pipefail
+set -euo pipefail
 
 DEPS_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=picongpu-deps-lib.sh
@@ -70,7 +70,8 @@ Environment variables (all optional):
   DEPS_OFFLINE=1       no network access
   DEPS_QUIET=1         log builds instead of streaming them
   DEPS_CXXSTD          C++ standard passed to boost (default: c++20)
-  DEPS_CC / DEPS_CXX   compilers (default: cc / CC or g++/clang++)
+  DEPS_CC / DEPS_CXX   compilers (default: $CC / $CXX if the toolchain
+                       exports them, else cc / c++)
   DEPS_MPI_C / DEPS_MPI_CXX
                        MPI wrappers (default: $MPI_CC/$MPI_CXX, else
                        mpicc/mpicxx on PATH)
@@ -109,14 +110,14 @@ EOF
 }
 
 deps_list() {
-    printf '%-10s %-12s %-20s %s\n' "key" "version" "root variable" "source"
+    printf '%-10s %-12s %-18s %s\n' "key" "version" "root variable" "source"
     local key
     for key in "${DEPS_KEYS[@]}"; do
-        printf '%-10s %-12s %-20s %s\n' \
+        printf '%-10s %-12s %-18s %s\n' \
             "$key" \
             "$(deps_resolve_version "$key")" \
             "${DEPS_ROOT_VAR[$key]}" \
-            "see README.md"
+            "$(deps_source_desc "$key")"
     done
 }
 
@@ -181,8 +182,10 @@ deps_main() {
     DEPS_PROVIDER=${DEPS_PROVIDER:-source}
     DEPS_JOBS=${jobs:-${DEPS_JOBS:-$(nproc 2>/dev/null || echo 4)}}
     DEPS_CXXSTD=${DEPS_CXXSTD:-c++20}
-    DEPS_CC=${DEPS_CC:-$(command -v cc || command -v gcc || true)}
-    DEPS_CXX=${DEPS_CXX:-$(command -v CC || command -v c++ || command -v g++ || true)}
+    # honour the toolchain's CC/CXX (as exported by cluster modules); only
+    # fall back to the bare names when they are not set
+    DEPS_CC=${DEPS_CC:-${CC:-cc}}
+    DEPS_CXX=${DEPS_CXX:-${CXX:-c++}}
     DEPS_BOOST_LIBRARIES=${DEPS_BOOST_LIBRARIES:-atomic,chrono,context,date_time,fiber,filesystem,math,program_options,serialization,system,thread}
     if [ -n "$prefix" ]; then
         DEPS_INSTALL_ROOT=$prefix
@@ -202,23 +205,31 @@ deps_main() {
         # --- check the toolchain -------------------------------------------
         local missing=0
         local tool
-        for tool in cmake make; do
+        for tool in cmake make "$DEPS_CC" "$DEPS_CXX"; do
             if ! command -v "$tool" >/dev/null 2>&1; then
                 deps_warn "required tool '$tool' not found on PATH"
                 missing=1
             fi
         done
-        if [ -z "$DEPS_CC" ] || [ -z "$DEPS_CXX" ]; then
-            deps_warn "no C/C++ compiler found (set DEPS_CC/DEPS_CXX); the 'source' provider needs a toolchain"
-            missing=1
-        fi
         if [ "$missing" -eq 1 ]; then
-            deps_die "toolchain incomplete; the 'source' provider cannot work here (try --provider=modules to only verify existing installs)"
+            deps_die "toolchain incomplete; the 'source' provider cannot work here (set DEPS_CC/DEPS_CXX, or try --provider=modules to only verify existing installs)"
         fi
 
         deps_detect_mpi
         if [ -z "${DEPS_MPI_CXX:-}" ]; then
-            deps_warn "no MPI wrapper found (mpicxx/mpic++); parallel HDF5/ADIOS2/openPMD cannot be built - fine for a minimal subset like FFTW3+PNGwriter"
+            # parallel-stack dependencies hard-fail later at CMake configure;
+            # abort up front with an actionable message instead
+            local needs_mpi=""
+            local k
+            for k in hdf5 adios2 openpmd; do
+                if deps_dep_requested "$k"; then
+                    needs_mpi="$needs_mpi $k"
+                fi
+            done
+            if [ -n "$needs_mpi" ]; then
+                deps_die "no MPI wrapper found (mpicxx/mpic++/MPI_CXX), but the parallel-stack dependencies$needs_mpi were requested. Load an MPI module or restrict --only to the non-parallel subset (boost,c-blosc2,libpng,pngwriter,fftw3)."
+            fi
+            deps_warn "no MPI wrapper found (mpicxx/mpic++); only the non-parallel subset (boost,c-blosc2,libpng,pngwriter,fftw3) can be built"
         fi
         deps_compute_key
         DEPS_KEY_DIR="$DEPS_INSTALL_ROOT/$DEPS_KEY"
@@ -251,7 +262,7 @@ deps_main() {
 if deps_is_sourced; then
     # keep the user's shell clean: flags, traps and variables stay in a
     # subshell; everything of value is written to disk
-    (set -eu -o pipefail; deps_main "$@")
+    (set -euo pipefail; deps_main "$@")
 else
     trap 'deps_write_summary' EXIT
     deps_main "$@"

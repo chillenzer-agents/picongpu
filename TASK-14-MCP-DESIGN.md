@@ -215,14 +215,40 @@ or `--progressPeriod` [SimulationHelper.cpp:200,245-248,268] a line of the
 form [SimulationHelper.cpp:100-106]:
 
 ```
-  5 % =      500 | time elapsed:         0:01:02:345 | avg time per step: 0:00:01:234
+  5 % =      500 | time elapsed:       1min  2sec 345msec | avg time per step:  1sec 234msec
 ```
+
+The exact stream layout (every right-aligned field is a `std::setw`):
+`setw(3) percent`, `" % = "`, `setw(8) currentStep`,
+`" | time elapsed:"`, `setw(25) interval`, `" | avg time per step: "`,
+`interval`. Both time fields are rendered by
+`pmacc::TimeInterval::printTime` [TimeInterval.hpp:72-102], which emits
+`Hh Mmin Ssec mmm msec` with zero-valued components omitted (e.g.
+`345msec`, `2sec 345msec`, `1min 2sec 345msec`, `1h 0min 0sec 0msec`).
+Both time fields are right-aligned to 25 columns, so a short value is
+preceded by spaces. The step field is right-aligned to 8 columns, so for
+any step count below 10,000,000 there are leading spaces between `= ` and
+the digits.
 
 A best-effort parser regex for the event payload
-(`{step, percent, walltime, avg_per_step, eta}`):
+(`{percent, step, walltime, avg_per_step}`; `eta` is derived on the
+simclient side as `avg_per_step * steps_remaining`):
 
 ```
-^\s{0,3}(\d{1,3}) % = (\d+) \| time elapsed: .+ \| avg time per step:
+^\s*(\d{1,3}) % = \s*(\d+) \| time elapsed:\s*(\S(?:.*\S)?) \| avg time per step:\s*(\S(?:.*\S)?)\s*$
+```
+
+Capture groups: 1=percent, 2=step, 3=walltime, 4=avg_per_step. Each time
+capture takes the whole (space-containing) time token up to the next
+` | ` delimiter, so it does not depend on the exact `h/min/sec/msec`
+spelling. Verified against the exact C++ format for step counts of 1-9
+digits; the previous revision of this document used `= (\d+)`, which
+matched only step counts of 8 digits or more because it did not account
+for the `setw(8)` padding. Worked examples, <10M and >=10M steps:
+
+```
+  5 % =      500 | time elapsed:       1min  2sec 345msec | avg time per step:  1sec 234msec
+ 25 % = 12345678 | time elapsed:  25h  1min  1sec   0msec | avg time per step:  1min 30sec  61msec
 ```
 
 Additional stdout markers the parser may exploit (all on rank 0):

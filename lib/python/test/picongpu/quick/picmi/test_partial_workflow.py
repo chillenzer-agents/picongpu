@@ -9,6 +9,7 @@ import json
 import shutil
 from pathlib import Path
 
+import yaml
 from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Stage, Simulation
 from picongpu.pypicongpu.runner import (
     DEFAULT_STAGE_PLAN,
@@ -18,6 +19,7 @@ from picongpu.pypicongpu.runner import (
     WorkflowPrerequisiteError,
     WorkflowStageError,
 )
+from picongpu.templates import path as tpath
 from pytest import fixture, raises
 
 
@@ -476,6 +478,72 @@ def test_input_change_invalidates_completed_stages(runner):
     assert (run_dir / "tbg" / "bin_from_build").read_text() == "built-v2\n"
 
 
+def test_default_plan_matches_workflow_template():
+    # The stage plan is the single place that knows the current workflow.cwl
+    # layout, but the per-step path never reads workflow.cwl -- so drift
+    # (a renamed step file, a renamed input, an added step) would make full
+    # and partial runs silently diverge. This test pins the default plan to
+    # the real template.
+    workflow = yaml.safe_load((tpath() / "workflow" / "workflow.cwl").read_text())
+    workflow_steps = workflow["steps"]
+    workflow_inputs = set(workflow["inputs"])
+    all_plan_steps = [(stage, spec) for stage, s in DEFAULT_STAGE_PLAN.stages.items() for spec in s.steps]
+
+    def plan_step_of(run_file: str):
+        matches = [(stage, spec) for stage, spec in all_plan_steps if spec.run == run_file]
+        assert len(matches) == 1, f"exactly one plan step must run {run_file!r}, found {len(matches)}"
+        return matches[0]
+
+    for step_id, step in workflow_steps.items():
+        # every workflow step is covered by exactly one plan step (same file)
+        stage, spec = plan_step_of(step["run"])
+
+        # the plan step offers exactly the workflow step's inputs
+        assert set(spec.inputs) == set(step["in"]), (
+            f"plan step {spec.step!r} input names differ from workflow step {step_id!r}: "
+            f"{sorted(set(spec.inputs) ^ set(step['in']))}"
+        )
+        for input_name, source in spec.inputs.items():
+            workflow_source = step["in"][input_name]
+            if "/" not in str(workflow_source):
+                # sourced from a workflow input
+                assert source == workflow_source, (
+                    f"workflow step {step_id!r} input {input_name!r} comes from {workflow_source!r} "
+                    f"in the workflow but from {source!r} in the plan"
+                )
+                assert source in workflow_inputs, f"workflow input {source!r} is not defined in workflow.cwl"
+            else:
+                producer_id, output = str(workflow_source).split("/", 1)
+                producer_stage, producer_spec = plan_step_of(workflow_steps[producer_id]["run"])
+                assert output in producer_spec.outputs.values(), (
+                    f"workflow step {step_id!r} consumes {workflow_source!r}, but plan step "
+                    f"{producer_spec.step!r} records no such output"
+                )
+                if isinstance(source, StageArtifactRef):
+                    assert source.stage == producer_stage and source.artifact == output, (
+                        f"plan step {spec.step!r} input {input_name!r} is {source!r}, but the workflow "
+                        f"takes {workflow_source!r} (stage {producer_stage.value!r})"
+                    )
+                elif isinstance(source, StepOutputRef):
+                    assert producer_stage == stage and source.step == producer_id and source.output == output, (
+                        f"plan step {spec.step!r} input {input_name!r} is {source!r}, but the workflow "
+                        f"takes {workflow_source!r}"
+                    )
+                else:
+                    raise AssertionError(
+                        f"plan step {spec.step!r} input {input_name!r} is {source!r}, expected a "
+                        f"StageArtifactRef or StepOutputRef for the workflow source {workflow_source!r}"
+                    )
+        # every output of the workflow step is recorded by the plan step
+        missing = set(step["out"]) - set(spec.outputs.values())
+        assert not missing, (
+            f"workflow step {step_id!r} outputs {sorted(missing)} are not recorded by plan step {spec.step!r}"
+        )
+
+    # and the plan does not reference step files that are not workflow steps
+    assert {spec.run for _, spec in all_plan_steps} == {step["run"] for step in workflow_steps.values()}
+
+
 def future_stage_plan():
     """A "future" plan where the submit stage gained an extra (upload) step."""
     plan = DEFAULT_STAGE_PLAN.model_copy(deep=True)
@@ -507,10 +575,41 @@ def future_stage_plan():
     return plan
 
 
+def mutate_workflow_cwl(runner) -> str:
+    """
+    Simulate a "future" workflow.cwl in the generated setup: the build step
+    id is renamed and a new upload step is inserted ahead of the submit step.
+
+    The per-step path never reads workflow.cwl; the point is that the stage
+    API keeps working while the workflow file drifts (the plan is updated
+    accordingly, as a maintainer would do).
+    """
+    wf_path = runner.workflow_dir_path / "workflow.cwl"
+    text = wf_path.read_text()
+    text = text.replace("build_step", "compile_step")
+    text = text.replace(
+        "  submit_step:\n",
+        (
+            "  upload_step:\n"
+            "    run: steps/upload.cwl\n"
+            "    in:\n"
+            "      tbg_link: prepare_submission_step/tbg_directory\n"
+            "    out: [uploaded]\n"
+            "  submit_step:\n"
+        ),
+    )
+    wf_path.write_text(text)
+    return text
+
+
 def test_stability_future_workflow(runner):
-    # A future workflow with an extra step inserted inside the submit stage
-    # must keep the public API (stage names, ranges, state file) unchanged.
+    # A future workflow (a mutated scratch workflow.cwl: a renamed step id
+    # and a step inserted inside the submit stage) with a correspondingly
+    # updated plan must keep the public API (stage names, ranges, state
+    # file) unchanged.
     install_dummy_workflow(runner, extra_steps={"upload.cwl": ECHO_UPLOAD_CWL})
+    text = mutate_workflow_cwl(runner)
+    assert "compile_step" in text and "upload_step" in text, "the scratch workflow.cwl must be mutated"
     runner.stage_plan = future_stage_plan()
 
     runner.run_range(up_to=Stage.prepare)

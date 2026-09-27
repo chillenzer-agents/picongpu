@@ -1,0 +1,19 @@
+# The [dependencies] table is opt-in: without it (or with enabled = false)
+# nothing about dependency installation changes. The provider "source" runs
+# the bundled picongpu-deps.sh installer for the compiled C++ dependencies
+# (Boost, c-blosc2, libpng, PNGwriter, HDF5, ADIOS2, openPMD-api, FFTW3).
+[dependencies]
+enabled = true
+provider = "source"
+jobs = 16
+# only the listed dependencies are installed; an empty/absent list means all
+only = ["fftw3", "pngwriter"]
+# managed-mode install root (default: <setup_dir>/deps); on a cluster a
+# profile that exports some <dep>_ROOT variables installs into those prefixes
+prefix = "/scratch/$USER/picongpu-deps"
+# shared source cache; fetch once on a login node, then reuse with offline = true
+cache = "/scratch/$USER/picongpu-deps-sources"
+offline = false
+# per-dependency version overrides (defaults follow the preset's <NAME>_VERSION)
+[dependencies.versions]
+hdf5 = "1.14.6"

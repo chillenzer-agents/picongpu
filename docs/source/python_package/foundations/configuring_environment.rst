@@ -289,6 +289,67 @@ By default it raises an exception.
 The special variable ``pic_src_path`` can be used to refer to
 the installation path of PIConGPU itself (see `configuring_env_pic_src_path`_ above).
 
+Installing the Compiled Dependencies
+------------------------------------
+
+PIConGPU's compiled C++ dependencies
+(Boost, c-blosc2, libpng, PNGwriter, HDF5, ADIOS2, openPMD-api, FFTW3)
+are normally provided by the modules or spack environment of your preset
+(see `Presets`_ above).
+If they are not available on your system,
+the package ships a general, parameterised installer
+(``etc/picongpu/dependencies/picongpu-deps.sh``, see its
+``README.md`` for the command-line interface, the cache layout and the
+per-dependency ``DEPS_*`` environment variables)
+that builds them from source into user-owned prefixes,
+against the toolchain loaded by your profile.
+The individual per-cluster ``dependencies_autoinstall.sh`` scripts
+(e.g. for ``rosi-hzdr``) are thin wrappers around this shared installer.
+
+The generated build script can run the installer automatically
+via an **opt-in** ``[dependencies]`` table in the runtime configuration;
+without it (or with ``enabled = false``, the default)
+the generated scripts are unchanged:
+
+.. literalinclude:: ../snippets/configuring_environment/rc_params_dependencies.toml
+   :language: toml
+
+The keys are:
+
+* ``enabled``: master switch (default ``false``; no behaviour change when off).
+* ``provider``: where the dependencies come from
+  (``"source"`` is implemented; ``"conda"``, ``"modules"`` and
+  ``"container"`` are unimplemented placeholders and only produce a warning).
+* ``prefix``: the install root for dependencies that your profile does *not*
+  already provide a ``<dep>_ROOT`` for
+  (the "managed mode" of the installer; default: ``<setup_dir>/deps``).
+* ``cache``: the shared source cache, so that the tarballs/git checkouts are
+  fetched once and reused (e.g. on a login node, then with ``offline = true``).
+* ``jobs``: parallel build jobs.
+* ``only``: install only the listed dependencies (subset of
+  ``boost``, ``c-blosc2``, ``libpng``, ``pngwriter``, ``hdf5``,
+  ``adios2``, ``openpmd``, ``fftw3``); empty means all.
+* ``force``, ``offline``, ``quiet``: rebuild even if present, never use the
+  network, and log-only output, respectively.
+* ``[dependencies.versions]``: per-dependency version overrides
+  (e.g. ``hdf5 = "1.14.6"``); otherwise the preset's ``<NAME>_VERSION``
+  is used.
+
+When enabled with the ``source`` provider,
+the generated ``build.sh`` first runs ``picongpu-deps.sh``
+(idempotent: already-installed dependencies are skipped)
+and sources the resulting ``current.env`` before ``pic-build``,
+while the run scripts source the same environment,
+so that CMake finds the dependencies through the usual
+``*_ROOT`` and ``CMAKE_PREFIX_PATH`` hints.
+The configuration is parsed by ``picongpu.dependencies.DependenciesConfig``;
+you can inspect what a given setting produces:
+
+.. literalinclude:: ../snippets/configuring_environment/rc_params_dependencies.py
+   :language: python
+   :start-after: BEGIN-RC-DEPENDENCIES
+   :end-before: END-RC-DEPENDENCIES
+
 Setting Up a System Without a Preset
 ------------------------------------
 

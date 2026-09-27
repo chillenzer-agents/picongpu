@@ -16,7 +16,7 @@ costed recommendation for CI integration.
 Not a pytest suite. It is a self-contained **post-simulation validation
 framework** (origin 2022-12-09, last functional commit
 `0e3f64f3f` 2024-02-28 "fix growth rate and charge conservation test tools";
-bachelor-thesis work per file headers). 21 Python files, ~3000 lines, ~75 KB
+bachelor-thesis work per file headers). 21 Python files, ~2600 lines, ~75 KB
 (plus 4 files in `setups/`).
 
 Pipeline: `setups/<case>/main.py` (argparse CLI) ->
@@ -69,7 +69,7 @@ CI is GitLab-based (`.gitlab-ci.yml` + `share/ci/`). Verified facts:
 3. No CI script references KHI:
    `grep -rn KHI .gitlab-ci.yml share/ci/` -> no matches.
 4. The sole consumer of the framework is
-   `share/picongpu/tests/KHI_growthRate/bin/validate.sh:65-66`:
+   `share/picongpu/tests/KHI_growthRate/bin/validate.sh:67`:
    `python $PICSRC/lib/python/test/setups/ESKHI/main.py -p ... -r ... -s ...`,
    which is invoked only by the **manual** `KHI_growthRate/bin/ci.sh`
    (`pic-create` + `pic-build` +
@@ -94,7 +94,9 @@ $ PY -c "import sys; sys.path.insert(0,'lib/python/test'); import numpy as np, t
 0.346574 0.693147   # returned Gamma/2 (ratio 0.5000 in both branches)
 ```
 Skewed the verdict of *both* setups (sim rate measured at half value; a
-simulation matching theory would appear at ~-50 % deviation).
+simulation matching theory would appear at ~+50 % deviation
+(`getDifferenceInPercentage(Gamma, Gamma/2)` = +50, i.e. |deviation|
+50 % > 20 % acceptance -> fail)).
 
 **B2 - `Math/deviation.py::getMinDifference` crashed on scalars, ambiguous on 2-D.**
 `np.abs(min(theory - simulation))` uses the built-in `min()` -- although this
@@ -129,7 +131,7 @@ ReadFiles(".dat", direction="/tmp").setDirection("/tmp")
 `ParamReader.paramInLine` (paramReader.py:193) and
 `CMAKEFlagReader.getAllSetups` (cmakeFlagReader.py:98) opened files without
 closing them. Under the repo's pytest regime (`filterwarnings = ["error"]`
-in `lib/python/pyproject.toml:88`) the resulting `ResourceWarning` fails any
+in `lib/python/pyproject.toml:92`) the resulting `ResourceWarning` fails any
 test exercising the parsers -- one of the reasons the framework has zero
 tests (the global config state, L3, and the missing fixtures are at least
 equally plausible). Both file-handle fixes have regression tests:

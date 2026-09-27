@@ -9,6 +9,7 @@ validation framework (lib/python/test/testsuite/Reader) against small
 fixture files.
 """
 
+import gc
 import json
 import warnings
 
@@ -18,6 +19,7 @@ import pytest
 with warnings.catch_warnings():
     # importing testsuite falls back to the template config and warns
     warnings.simplefilter("ignore")
+    from testsuite.Reader import cmakeFlagReader
     from testsuite.Reader import dataReader
     from testsuite.Reader import jsonReader
     from testsuite.Reader import paramReader
@@ -72,6 +74,38 @@ class TestParamReader:
         reader = self._make_reader(tmp_path, "constexpr float_64 GAMMA = 2.0;\n")
         with pytest.raises(ValueError):
             reader.getValue("MISSING")
+
+
+class TestCMAKEFlagReader:
+    # regression test (task-10 review m2): getAllSetups opened the
+    # cmakeFlags file without closing it; under filterwarnings=error the
+    # resulting ResourceWarning fails any test exercising it
+
+    def _make_reader(self, tmp_path):
+        (tmp_path / "cmakeFlags").write_text(
+            'flags[0]="-DPIC_GAMMA=1.021;-DPIC_DENSITY=1.0e25"\n'
+            'flags[1]="-DPIC_GAMMA=1.0;-DPIC_DENSITY=2.0e25"\n'
+        )
+        (tmp_path / "cmakeFlagsSetup").write_text("selected setup:0\n")
+        return cmakeFlagReader.CMAKEFlagReader(direction=str(tmp_path))
+
+    def test_get_all_setups(self, tmp_path):
+        reader = self._make_reader(tmp_path)
+        assert reader.getAllSetups() == [
+            "-DPIC_GAMMA=1.021;-DPIC_DENSITY=1.0e25",
+            "-DPIC_GAMMA=1.0;-DPIC_DENSITY=2.0e25",
+        ]
+        # force collection of any file handle left open by getAllSetups; an
+        # unclosed handle would raise a ResourceWarning -> error here
+        gc.collect()
+
+    def test_used_setup(self, tmp_path):
+        reader = self._make_reader(tmp_path)
+        assert reader.usedSetup() == 0
+
+    def test_get_value(self, tmp_path):
+        reader = self._make_reader(tmp_path)
+        assert reader.getValue("PIC_GAMMA") == pytest.approx(1.021)
 
 
 class TestDataReader:

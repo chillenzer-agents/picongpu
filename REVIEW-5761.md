@@ -18,7 +18,7 @@ serde / pydantic-metadata work (issues #35, #33, #44, #45, #69).
 | `fileOutput.param.mustache` rewrite | **Accept** (C++ API verified against `include/`; compile CI-pending) |
 | Deterministic `sha256` functor typename | **Accept** (load-bearing for dedup + reproducibility) |
 | Serialisation / schema agreement (`sources` vs `derived_fields`) | **Accept** (deliberate, richer metadata format; round-trip note) |
-| Interaction with round-trip / serde (#35/#33/#44+45/#69) | **Accept** - no material conflict; based on `dev` |
+| Interaction with round-trip / serde (#35/#33/#44+45/#69) | **Accept** - merge with #69 needs a documented, verified two-hunk resolution (no functional conflict) |
 | `EnergyDensityCutoff` excluded | **Accept** (intentionally out of scope) |
 | Two draft test files + tutorial change | **Accept** with minor port adaptations |
 
@@ -43,8 +43,9 @@ rubber-stamping)").
   - one custom functor reused across species -> one functor definition, several solvers
     (`derived_field_functors` dedupes by functor equality; `field_tmp_solvers` by solver
     equality).
-- The `DerivedFieldSolver.typename` computed field (`attribute_typename_species_<filter-or-All>`)
-  is only used for identification; the template consumes the individual fields.
+- The template consumes only `species`, `attribute_type` and `filter_type`; a vestigial
+  `DerivedFieldSolver.typename` computed field was removed post-review (see "Findings from the
+  second-line review"), with `attribute_typename` kept as identification metadata.
 - `Unique` is quadratic but the lists are tiny; not a concern.
 
 ## 2. `fileOutput.param.mustache` rewrite - ACCEPT (compile CI-pending)
@@ -118,10 +119,13 @@ dumps only).
 ## 5. Interaction with round-trip / serde stack (#35/#33/#44+45/#69) - ACCEPT, based on `dev`
 
 - The reviewer's #69 ("TT-15+16", unmerged, base `dev`) touches `openpmd_plugin.py`
-  (`filtername` annotation) and `particle_functor.py` (`name` annotation,
-  `random_number_command`) - **adjacent, non-overlapping lines** vs. this port (which touches
-  `species`/`builtin_solver`/serializer and `typename` resp.). No material conflict => the port
-  is based on `dev` and will merge cleanly after or before #69.
+  (`filtername` annotation) and `particle_functor.py` (`name` annotation /
+  `random_number_command`). Empirically, the two PRs do **not** merge cleanly onto `dev`
+  without hand-resolution (see "Port base decision" below): `git merge #69` followed by
+  `git merge #75` produces trivially-resolvable content conflicts in both files. This does not
+  block the feature and does not force a rebase onto #69, but the integrator must resolve
+  three hunks (see below). The earlier claim in this note ("adjacent, non-overlapping lines",
+  "resolve without conflicts") was made without an empirical merge test and is hereby retracted.
 - The deterministic typename is load-bearing for the round-trip/equality work: it makes
   functor identity comparable across processes, which is exactly what issue #35's metadata
   re-import and #44/#45's serde conventions need.
@@ -151,12 +155,57 @@ correct; it belongs to the future `custom_user_input`/template mechanism (ties t
     Ported with a cleaner, equally meaningful assertion.
 - Tutorial `03.2_particle_functors.py`: adds native density, raw `WeightedVelocity/x` and
   `AverageDerivedFieldDump` of `WeightedVelocity/x` to the diagnostics list - adopted.
+  **Note (pre-existing, honestly flagged):** the example file still constructs the
+  `picmi.Simulation` with the pre-#5639 API (`picongpu_species=` / `picongpu_diagnostics=` /
+  `picongpu_particle_layout=`); those are **not** valid fields of the pydantic-era
+  `PICMI_Simulation` (`Simulation.model_fields` has `species`/`layouts`/`diagnostics` instead,
+  verified), so the file as written cannot demonstrate the new feature end-to-end. Full API
+  migration is out of scope here; the added diagnostics are ported verbatim and consistent
+  with upstream.
+
+## Findings from the second-line review (PR #75, TT-22) - addressed
+
+Independent review confirmed the port and flagged: (i) the #69-merge claim in this note was
+**empirically wrong** - `git merge #69` then `git merge #75` on `dev` conflicts in both
+`openpmd_plugin.py` and `particle_functor.py` (documented + verified resolution below); the
+claim was retracted in section 5 and the "Port base decision"; (ii) `DerivedFieldSolver.typename`
+was dead code (nothing reads it after the `FieldTmpSolverConfig` rewrite) - **removed**, keeping
+`attribute_typename` as documented identification metadata; (iii)
+`AverageDerivedFieldDump` permits semantically odd averages of scalar per-cell/counting fields
+(`Density`/`EnergyDensity`/... map to C++ `AverageAttribute<T> = T/T`, value ~1) - a warning
+validator was added (fields stay legally constructible, `IsWeighted`-consistent); (iv) tutorial
+03.2 non-runnable on the current API - pre-existing, documented above. A CI compile gate
+checklist is added below.
+
+## CI compile gate (pending, must be satisfied before merge)
+
+The generated C++ input is **not compiled in this environment** (no toolchain) - the claim is
+strictly "shape-verified statically", not "compiles". The following checklist is the
+compile-verification gate the integrator/CI must satisfy:
+
+- [ ] A setup with `NativeDerivedFieldDump` scalar (`Density`), directional
+      (`WeightedVelocity<x>`) and combined (`RelativisticDensity`) fields compiles, including
+      per-species `FieldTmpSolverConfig` / `ValidateFieldTmpSolver_t` instantiation
+      (`SpeciesEligibleForSolver<..., FilteredDerivedAttribute<..., Filter>>::type::value`).
+- [ ] `AverageDerivedFieldDump` of `WeightedVelocity`/`Momentum` compiles
+      (`combinedAttributes::AverageAttribute<T>` + `IsWeighted<T>` static_assert path).
+- [ ] A setup **without** any derived fields compiles (empty `FieldTmpSolverConfigs` ->
+      `MakeSeq_t<>` -> empty `FieldTmpSolvers`; shape unchanged vs. pre-change template).
+- [ ] The custom-functor path (`DerivedFieldDump`) still compiles (regression: generated
+      `IsWeighted<custom>` specialisation + `CreateFieldTmpOperation_t`).
+- [ ] A filtered derived field (`filtername`) instantiates correctly (filter-level
+      `SpeciesEligibleForSolver` in `particleFilters.param` is compatible).
+- [ ] An incompatible species/field/filter request fails at compile time with the intended
+      `static_assert` message instead of an empty-solver-list/missing-source runtime error.
 
 ## Clean-up applied (deliberate deviations from the WIP)
 
 - `picmi/simulation.py::_generate_openpmd_plugins`: the walrus-operator expression for
   `builtin_solver` is kept behaviour-identical but written readably (review-approved cleanup).
 - Test assertion above clarified. Everything else is ported as-is.
+- Follow-up from the second-line review: `DerivedFieldSolver.typename` dead computed-field
+  removed; `AverageDerivedFieldDump` semantics-aware warning added (see "Findings from the
+  second-line review").
 
 ## Verification performed in this repo
 
@@ -164,14 +213,50 @@ correct; it belongs to the future `custom_user_input`/template mechanism (ties t
 - After port: see PR description - ported tests green, full quick green, pre-commit green,
   generated `fileOutput.param` / `openPMD_config_*.toml` for the tutorial inspected, and
   byte-identical regeneration verified (deterministic typename).
-- C++ compilation of the generated input is **CI-pending** (no toolchain in this environment).
+- Post-review (TT-22): full quick suite re-run green (**230 passed, 2 xfailed, 1 xpassed** after
+  the P3-1/P3-2 follow-up); **empirical merge test** of `#69` + `#75` on `dev` reproduced the
+  conflicts (below), the hand-resolution was applied in a throwaway and the combined tree
+  re-ran the full quick suite green (**267 passed, 2 xfailed, 1 xpassed**), demonstrating the
+  resolution is complete and regression-free.
+- C++ compilation of the generated input is **CI-pending** (no toolchain in this environment);
+  see the "CI compile gate" checklist above.
 
 ## Port base decision
 
 This port is based on fork `dev` (`5087d5d6c`, merged #5639 pydantic era). Reviewer PR #69
 ("TT-15+16", unmerged, base `dev`) touches the same two modules (`openpmd_plugin.py`:
 `filtername` annotation; `particle_functor.py`: `name` annotation /
-`random_number_command`) but only on lines adjacent to, and not overlapping with, this port's
-`species`/`builtin_solver`/serializer/`typename` changes; therefore it does not conflict
-materially and the port does not need to rebase onto #69's branch. Chosen base: **fork `dev`**.
-On merge, #69 and this port resolve without conflicts (verified by the disjoint line ranges).
+`random_number_command`). **The earlier claim that the two merge cleanly due to disjoint line
+ranges is wrong - it was made without an empirical merge test and is retracted.** An empirical
+`git merge` does conflict:
+
+On clean `dev` `5087d5d6c`: `git merge #69` (ok) then `git merge #75` produces content
+conflicts (all trivially resolvable):
+
+- `lib/python/picongpu/pypicongpu/output/openpmd_plugin.py` - two hunks:
+  1. import block: #69's `from picongpu.pypicongpu.validation import validate_cpp_identifier`
+     (alongside `util.unique`) vs #75's "(empty)" side (based on `dev`, pre-#69);
+  2. `FieldDump.filtername`: `#69` `filtername: None | Annotated[str,
+     AfterValidator(partial(validate_cpp_identifier, field="filtername"))]` vs `#75`
+     `builtin_solver: BuiltinFieldSolver | None = None` + `filtername: None | str`.
+- `lib/python/picongpu/pypicongpu/particle_functor/particle_functor.py` - one hunk, import
+  block: `#69` `from functools import partial` vs `#75` `from hashlib import sha256` +
+  `from json import dumps`.
+
+Resolution (verified by applying it and re-running the quick suite on the combined tree):
+keep **both** sides. `openpmd_plugin.py` keeps `validate_cpp_identifier` (+ `unique`) and uses
+`filtername: None | Annotated[str, AfterValidator(partial(validate_cpp_identifier,
+field="filtername"))]` **plus** `builtin_solver: BuiltinFieldSolver | None = None`.
+`particle_functor.py` keeps `partial` **and** `sha256`/`dumps`; the `from uuid import uuid4 as
+uuid` import that #69 carries is dropped (the deterministic sha256 `typename` from this port
+replaces the uuid-based one, so `uuid` is no longer referenced - the merged tree greps clean).
+
+**Preservation requirement (stated explicitly, per review):** #69's C++-identifier validation
+(`validate_cpp_identifier` on `filtername` and on `ParticleFunctor.name`) must be retained in
+the resolution - `filtername` flows into generated C++ (`fileOutput.param.mustache:84`
+`filter_type = picongpu::particles::filter::{filtername}`) and `name` into the generated
+functor struct name.
+
+Chosen base remains **fork `dev`**; this port deliberately does not re-base onto #69's branch
+(uncoupling the two otherwise-independent features). The integrator merges #69 first, then #75
+(or vice versa) and applies the two-hunk resolution above.

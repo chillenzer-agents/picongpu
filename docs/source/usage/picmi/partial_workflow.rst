@@ -20,9 +20,10 @@ Stage      What it does
 The stages are a *thin* vocabulary: each stage is an alias over the
 corresponding step of ``workflow.cwl`` and over the workflow's top-level
 outputs that expose what that step produces. The Python package only uses
-them to **generate the right cwltool invocation** for the requested subset.
-All actual workflow logic - which steps to run, wiring, skipping completed
-steps, resuming - is performed by cwltool itself, nothing is reimplemented.
+them to **generate the right in-process cwltool invocation** for the
+requested subset. All actual workflow logic - which steps to run, wiring,
+skipping completed steps, resuming - is performed by cwltool itself (invoked
+in-process via its ``WorkflowFactory``), nothing is reimplemented.
 
 Selecting a subset of the workflow
 ----------------------------------
@@ -52,9 +53,9 @@ string value (e.g. ``"build"``). They are mutually exclusive.
 ~~~~~~~~~~~~~~~~~~~~
 
 ``up_to=Stage.X`` executes the given stage and everything before it, in one
-cwltool invocation. The runner hands cwltool the **full** workflow but
-requests *only the outputs of stage X* as the desired final outputs
-(cwltool's ``--target`` option). cwltool then executes exactly the steps
+(in-process) cwltool invocation. The runner hands cwltool the **full**
+workflow but requests *only the outputs of stage X* as the desired final
+outputs (cwltool's ``--target``). cwltool then executes exactly the steps
 that contribute to those outputs and **prunes every step after the stage**,
 so the stages after ``X`` are not run at all.
 
@@ -131,11 +132,14 @@ Semantics
 Implementation note
 -------------------
 
-``Runner.run_command()`` (the package-internal heart of this feature) only
-builds the cwltool command line: the full ``workflow.cwl`` plus
-``--target`` flags for the requested stage's outputs (or none extra for the
-default full run), ``--outdir <run_dir>`` and ``--cachedir
-<run_dir>/.cwl_cache``. The mapping from stages to output names is the small
-``STAGE_OUTPUTS`` table in ``picongpu/pypicongpu/runner.py``; if the
-workflow steps are ever reorganized, only that table (and
-``workflow.cwl``) change, not the invocation logic.
+``Runner.run_invocation()`` (the package-internal heart of this feature) only
+generates the in-process cwltool invocation: cwltool is not started as a
+separate process, but its ``WorkflowFactory`` (``cwltool.factory.Factory``)
+is used to load and execute the workflow in the current process. The
+invocation carries the full ``workflow.cwl`` plus the requested stage's
+outputs as targets (``--target``; none extra for the default full run),
+``--outdir <run_dir>`` and ``--cachedir <run_dir>/.cwl_cache``. The mapping
+from stages to output names is the small ``STAGE_OUTPUTS`` table in
+``picongpu/pypicongpu/runner.py``; if the workflow steps are ever
+reorganized, only that table (and ``workflow.cwl``) change, not the
+invocation logic.

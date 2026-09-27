@@ -61,3 +61,11 @@ by marker so that selection is guaranteed to match the documentation:
 
 Both slow jobs are skipped when the `ci: no-compile` / `CI:no-compile` /
 `ci: no-python-compile` flags are set (see `share/ci/ci_flags.sh`).
+
+## Per-example opt-out
+
+Any example script (`lib/python/examples/*/main.py`) can opt out of the
+compiling suite by declaring a whole-line `# ci: no-compile` comment. Such
+examples are skipped by `pytest -m compiling` (marked `ci_no_compile`, so also
+deselectable with `-m "not ci_no_compile"`) while remaining generatable and
+compilable locally by hand.

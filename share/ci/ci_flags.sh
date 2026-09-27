@@ -41,27 +41,39 @@ if [ -z "${CI_FLAGS_REPO_DIR}" ] || ! git -C "$CI_FLAGS_REPO_DIR" rev-parse --gi
     return 1
 fi
 
-# 0 == false; 1 == true
-ci_no_compile=$(git -C "$CI_FLAGS_REPO_DIR" log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*no-compile[[:blank:]]*$" && echo "1" || echo "0")
-ci_full_compile=$(git -C "$CI_FLAGS_REPO_DIR" log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*full-compile[[:blank:]]*$" && echo "1" || echo "0")
-ci_picongpu=$(git -C "$CI_FLAGS_REPO_DIR" log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*picongpu[[:blank:]]*$" && echo "1" || echo "0")
-ci_pmacc=$(git -C "$CI_FLAGS_REPO_DIR" log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*pmacc[[:blank:]]*$" && echo "1" || echo "0")
-ci_no_python_compile=$(git -C "$CI_FLAGS_REPO_DIR" log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*no-python-compile[[:blank:]]*$" && echo "1" || echo "0")
+# The flags are derived from `git log -1` (the last commit of the branch) and
+# the GitHub label. They are evaluated exactly once per shell: the C++ matrix
+# generator sources this file *before* `git_merge.sh` and
+# `share/ci/generate_reduced_matrix.sh` sources it again *after* that script
+# created a merge commit (a new HEAD whose message would mask the `ci:`
+# commands). Evaluating once keeps the pre-merge view (i.e. the pull-request
+# head) everywhere, so `ci: no-compile` and friends mean the same thing to both
+# the C++ matrix and the Python-layer consumers.
+if [ "${CI_FLAGS_COMPUTED:-0}" != "1" ]; then
+    CI_FLAGS_COMPUTED=1
 
-# GitHub label `CI:no-compile` -- only queried for pull requests in CI.
-# When not in CI (or the label cannot be queried) this stays 0.
-ci_label_no_compile=0
-if [ ! -z ${GITHUB_TOKEN+x} ] && [ ! -z ${CI_COMMIT_REF_NAME+x} ] && echo "$CI_COMMIT_REF_NAME" | grep -q "^pr-" ; then
-    if "$CI_FLAGS_REPO_DIR/share/ci/pr_has_label.sh" "CI:no-compile" >/dev/null 2>&1 ; then
-        ci_label_no_compile=1
+    # 0 == false; 1 == true
+    ci_no_compile=$(git -C "$CI_FLAGS_REPO_DIR" log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*no-compile[[:blank:]]*$" && echo "1" || echo "0")
+    ci_full_compile=$(git -C "$CI_FLAGS_REPO_DIR" log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*full-compile[[:blank:]]*$" && echo "1" || echo "0")
+    ci_picongpu=$(git -C "$CI_FLAGS_REPO_DIR" log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*picongpu[[:blank:]]*$" && echo "1" || echo "0")
+    ci_pmacc=$(git -C "$CI_FLAGS_REPO_DIR" log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*pmacc[[:blank:]]*$" && echo "1" || echo "0")
+    ci_no_python_compile=$(git -C "$CI_FLAGS_REPO_DIR" log -1 | grep -q -i "^[[:blank:]]*ci:[[:blank:]]*no-python-compile[[:blank:]]*$" && echo "1" || echo "0")
+
+    # GitHub label `CI:no-compile` -- only queried for pull requests in CI.
+    # When not in CI (or the label cannot be queried) this stays 0.
+    ci_label_no_compile=0
+    if [ ! -z ${GITHUB_TOKEN+x} ] && [ ! -z ${CI_COMMIT_REF_NAME+x} ] && echo "$CI_COMMIT_REF_NAME" | grep -q "^pr-" ; then
+        if "$CI_FLAGS_REPO_DIR/share/ci/pr_has_label.sh" "CI:no-compile" >/dev/null 2>&1 ; then
+            ci_label_no_compile=1
+        fi
     fi
-fi
 
-# umbrella flag used by the Python-layer jobs (pypicongpu-compiling-test
-# and pypicongpu-end-to-end-test): any no-compile signal skips compilation.
-CI_NO_COMPILE=0
-if [ "$ci_no_compile" -eq 1 ] || [ "$ci_label_no_compile" -eq 1 ] || [ "$ci_no_python_compile" -eq 1 ] ; then
-    CI_NO_COMPILE=1
+    # umbrella flag used by the Python-layer jobs (pypicongpu-compiling-test
+    # and pypicongpu-end-to-end-test): any no-compile signal skips compilation.
+    CI_NO_COMPILE=0
+    if [ "$ci_no_compile" -eq 1 ] || [ "$ci_label_no_compile" -eq 1 ] || [ "$ci_no_python_compile" -eq 1 ] ; then
+        CI_NO_COMPILE=1
+    fi
 fi
 
 # when run standalone (not sourced), print the computed flags

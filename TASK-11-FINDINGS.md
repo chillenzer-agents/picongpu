@@ -1,4 +1,4 @@
-# Task 11 — Running PIConGPU via LEXIS / the EuroHPC Federation Platform (EFP)
+# Task 11 - Running PIConGPU via LEXIS / the EuroHPC Federation Platform (EFP)
 
 **Status:** exploratory draft (design note + draft implementation)
 **Branch:** `task-11-efp-lexis-config` (based on `dev` @ b4e4ca5b2)
@@ -38,17 +38,17 @@ submission:
 
 ## 2. Design note: submission paths (comparison + trade-offs)
 
-### (a) Job script in the target system's batch dialect — **RECOMMENDED (primary)**
+### (a) Job script in the target system's batch dialect - **RECOMMENDED (primary)**
 
 TBG preset `etc/picongpu/efp-<system>/` whose `.tpl` is a **self-contained**
 job script in the target system's batch dialect (SLURM for JSC-family
 systems). The rendered `tbg/submit.start` is uploaded to EFP Workflows (Data
-Management → Job Scripts) with the target system selected; the TBG `input/`
+Management -> Job Scripts) with the target system selected; the TBG `input/`
 directory is uploaded as the input dataset.
 
 - **Pros**
   - Reuses the entire existing TBG/preset/PyPIConGPU machinery: **zero
-    runner changes** (verified, see §5).
+    runner changes** (verified, see section 5).
   - The job script is portable text; per-run overrides (queue, account,
     wall time) keep working through `tbg -o` / `TBGFlags.overwrite_vars`
     without new machinery.
@@ -66,12 +66,12 @@ directory is uploaded as the input dataset.
   - A new preset is needed per EFP target system (mitigated: copy the
     pattern; only the batch dialect + resource parameters differ).
 
-### (b) Apptainer/SIF container — **fallback (documented, not built)**
+### (b) Apptainer/SIF container - **fallback (documented, not built)**
 
 Package `picongpu` + runtime dependencies into an Apptainer-compatible
 image (build PIConGPU inside a CUDA/ROCm base image, e.g.
 `FROM docker://nvidia/cuda:12.x-devel` + PIConGPU deps + `pic-build`),
-upload it to EFP (Data Management → Containers) and run it either through
+upload it to EFP (Data Management -> Containers) and run it either through
 the container workflow type or a thin job script
 (`apptainer exec --bind ... image /picongpu/bin/picongpu ...`).
 
@@ -93,7 +93,7 @@ the container workflow type or a thin job script
     the recipe is documented in the EFP page, building the SIF is out of
     scope for this draft.
 
-### (c) Py4Lexis programmatic submission — **follow-up, not implemented**
+### (c) Py4Lexis programmatic submission - **follow-up, not implemented**
 
 Drive upload (job script + datasets), workflow creation and execution
 creation from the laptop via the LEXIS API/CLI (`Py4Lexis`).
@@ -118,23 +118,23 @@ creation from the laptop via the LEXIS API/CLI (`Py4Lexis`).
 **No runner changes were needed** (the requirement's ideal). The laptop
 flow splits cleanly at the submission boundary:
 
-1. `sim.write_input_file("setup")` (or `Runner.generate()`) — copies the
+1. `sim.write_input_file("setup")` (or `Runner.generate()`) - copies the
    `efp-<system>` preset into the setup, renders `N.cfg` and the bare
    profile. Driven by `preset = "efp-<system>"` in `picongpurc.toml` or
    `RCParams(preset=...)`.
-2. `pic-build` — build the binary for the target architecture.
-3. `tbg -c etc/picongpu/N.cfg [-t <tpl>] <dest>` — renders the self-contained
+2. `pic-build` - build the binary for the target architecture.
+3. `tbg -c etc/picongpu/N.cfg [-t <tpl>] <dest>` - renders the self-contained
    job script (preset defaults from the profile; `-t`/`-o` for
-   overrides). *No `-s` → tbg renders only and does not submit*, which is
+   overrides). *No `-s` -> tbg renders only and does not submit*, which is
    exactly what a laptop without a local scheduler wants.
 4. EFP upload/execution (manual in this draft; Py4Lexis later).
 
-The CWL `run()` path (steps build → prepare_submission → submit) is left
+The CWL `run()` path (steps build -> prepare_submission -> submit) is left
 untouched: with an EFP preset it still works for *local* execution
 (`submit_system="bash"` on a matching local machine), because the template
 degrades gracefully (the `TBG_dstPath="$(pwd)"` line is rewritten by the
-generated `submit.sh`'s `sed` exactly like `TBG_dstPath="!TBG_dstPath"` —
-verified in §5).
+generated `submit.sh`'s `sed` exactly like `TBG_dstPath="!TBG_dstPath"` -
+verified in section 5).
 
 ## 3. Configurability options (compared)
 
@@ -148,7 +148,7 @@ verified in §5).
 through the existing `-o`/`overwrite_vars` mechanism: the overwritable
 template variables are the `.TBG_*` computation lines (`TBG_queue`,
 `TBG_nameProject`, `TBG_wallTime`, `TBG_memPerDevice`, ...), e.g.
-`tbg -o "TBG_queue=debug TBG_wallTime=01:00:00"`. Verified in §5.
+`tbg -o "TBG_queue=debug TBG_wallTime=01:00:00"`. Verified in section 5.
 
 Discovered pre-existing issue (not fixed, out of scope): the Python
 interface exposes the same mechanism as `TBGFlags(overwrite_vars=[...])`
@@ -162,7 +162,7 @@ fix for the runner owners (task 09's area): serialize the list to a
 space-joined string (tbg's `-o` takes one string) or widen the CWL input
 to `Array<string>`.
 
-## 4. Staging compatibility (EFP `/input` ↔ PIConGPU `setup_dir`/`simOutput`)
+## 4. Staging compatibility (EFP `/input` <-> PIConGPU `setup_dir`/`simOutput`)
 
 EFP stages input datasets into `/input` **relative to the HPC job execution
 context** (the job's working directory) and stages output datasets out of
@@ -180,7 +180,7 @@ the same context. PIConGPU's TBG destination layout is:
 
 The mapping is therefore **direct**:
 
-- **Input dataset** = the TBG `input/` directory → staged to `./input` =
+- **Input dataset** = the TBG `input/` directory -> staged to `./input` =
   exactly where the job script expects `input/bin/picongpu` and
   `input/etc`. (The `tbg/` dir may be included for reproducibility; the job
   script does not need it at run time.)
@@ -203,12 +203,12 @@ representative EFP target system: JSC is an EFP hosting entity, JUPITER is
 its current GPU system, and `jupiter-jsc/` is the closest existing
 template):
 
-- `efp_picongpu.profile.example` — adapted from `jupiter-jsc/
+- `efp_picongpu.profile.example` - adapted from `jupiter-jsc/
   gh200_picongpu.profile.example`: same module stack, `jutil`
   project/account auto-detection, `PIC_BACKEND=cuda:90`,
   `getDevice()`/`getNode()`; sets `TBG_SUBMIT=sbatch` and
   `TBG_TPLFILE=etc/picongpu/efp-jupiter-jsc/gh200_efp.tpl`.
-- `gh200_efp.tpl` — self-contained EFP job script template:
+- `gh200_efp.tpl` - self-contained EFP job script template:
   - same `#SBATCH` resource requests and `.TBG_*` computation lines as
     `jupiter-jsc/gh200.tpl` (4 GH200/node, 72 cores blocked per GPU, UCX
     workarounds, `srun --threads-per-core=1 ... --mpiDirect` launch);
@@ -222,23 +222,33 @@ template):
   the CWL templates are untouched.
 
 Note on preset naming: the profile file is named
-`efp_picongpu.profile.example` (not `gh200_...`) deliberately — a
+`efp_picongpu.profile.example` (not `gh200_...`) deliberately - a
 same-named file would make the pre-existing `jupiter-jsc/gh200_picongpu`
 preset selection ambiguous via the substring matcher in
-`_rc_params._preset_path` (regression found and fixed during development).
+`_rc_params._preset_path`. The directory name `efp-jupiter-jsc` likewise
+contains the pre-existing preset name `jupiter-jsc`, which broke
+`preset = "jupiter-jsc"` (and 8 other short forms) with a hard
+"ambiguous" ValueError (review finding C1). Fixed in the rework by
+making `_preset_path` keep the legacy match for every selection it
+already made unique and only breaking ties by specificity (exact
+preset path > full preset directory > path prefix > queue/file prefix).
+The `efp-<system>` naming convention is kept because it matches the task
+spec; a rename (e.g. `efp-gh200-jsc`) would only move the collision to
+the next existing fragment it contains (`gh200` was a valid dev
+selection resolving to `jupiter-jsc`). See TASK-11-RESPONSE.md.
 
 Docs + changelog:
 
-- `docs/source/pypicongpu/running_on_efp.rst` — "Running on the EuroHPC
+- `docs/source/pypicongpu/running_on_efp.rst` - "Running on the EuroHPC
   Federation Platform (EFP)" page (paths + trade-offs, laptop workflow,
   staging, configurability, pending verification), added to the PyPIConGPU
   toctree (`docs/source/index.rst`).
-- `docs/source/install/profile.rst` — "EFP (JUPITER, JSC)" section with
+- `docs/source/install/profile.rst` - "EFP (JUPITER, JSC)" section with
   `literalinclude` of the profile (`docs/source/install/profiles` is a
   symlink to `etc/picongpu`, so no mirroring was needed).
-- `docs/source/usage/tbg.rst` — short EFP note under the batch system
+- `docs/source/usage/tbg.rst` - short EFP note under the batch system
   examples.
-- `CHANGELOG.md` — 0.9.0 entry (features + documentation).
+- `CHANGELOG.md` - 0.9.0 entry (features + documentation).
 
 Tests (`lib/python/test/picongpu/quick/pypicongpu/test_efp_preset.py`, 7
 tests):
@@ -261,39 +271,62 @@ tests):
    no unresolved variables, `bash -n` syntax OK.
 2. **Simulated EFP execution context** (laptop): staged a fake `input/`
    (stub `picongpu` + fake profile) into a rendered TBG dir, executed
-   `tbg/submit.start` with a stub `srun` on `PATH` → profile sourced from
+   `tbg/submit.start` with a stub `srun` on `PATH` -> profile sourced from
    the dataset, `simOutput/` created with the `output` symlink,
    `picongpu` launched with the full parameter list; exit 0. Missing
-   `input/` → clear error, exit 1.
+   `input/` -> clear error, exit 1.
 3. **`-o` overrides**: `TBG_queue=debug`, `TBG_wallTime=01:00:00` reflected
    in the rendered `#SBATCH` lines.
 4. **CWL compatibility**: the generated `submit.sh`'s `sed` rewrite
    (`TBG_dstPath=...` / `--chdir=...`) behaves correctly with the new
    template (line rewritten to the CWL workdir; `--chdir` a no-op).
 5. **Full laptop flow E2E** (without cluster): PICMI script +
-   `picongpurc.toml` (`preset = "efp-jupiter-jsc"`) →
-   `write_input_file()` → setup contains the preset + rendered `N.cfg` +
-   bare profile; `tbg` from the setup renders the job script and assembles
-   `input/`; with the bare profile copied to `input/picongpu.profile`, the
-   simulated run launches `picongpu` with the real generated parameters
+   `picongpurc.toml` (`preset = "efp-jupiter-jsc"`) in the same directory
+   (the CWD discovery route) -> `write_input_file()` -> setup contains
+   the preset + rendered `N.cfg` + bare profile; `tbg` from the setup
+   renders the job script and assembles `input/`; with the bare profile
+   copied to `input/picongpu.profile`, the simulated run launches
+   `picongpu` with the real generated parameters
    (`-d 1 1 1 -g 32 32 32 -s 10 --periodic 0 0 0 ...`).
    (Expected non-fatal `jutil`/`module: command not found` noise on the
-   laptop — both exist on JUPITER nodes; the profile has no `set -e`.)
+   laptop - both exist on JUPITER nodes; the profile has no `set -e`.)
+   Note (rework, review finding M1): the "next to the script" CWD route
+   was originally reproducible only via `$XDG_CONFIG_HOME/picongpu/
+   picongpurc.toml`, because the CWD search glob matched dot-prefixed
+   names only and silently applied no preset. The rework fixed the
+   discovery (plain `picongpurc.toml` is now found in the CWD and parent
+   directories, like the XDG/PIC_RC lookups), so both documented routes
+   work and are test-guarded.
 6. **Preset selection**: `RCParams(preset="efp-jupiter-jsc")`, short name
    `"efp"`, and `picongpurc.toml`-based selection all resolve; profile
    rendering requires `author`/`email`/`pic_libs` as with all presets.
-7. **Test gate:** `pytest quick/` → **181 passed, 2 xfailed, 1 xpassed**
-   (baseline 174/2/1 + 7 new tests). `pre-commit run --all-files` → all
-   hooks passed.
+   Note (rework, review finding C1): the new preset dir had made the
+   pre-existing short forms `preset = "jupiter-jsc"` / `"jupiter"` /
+   `"jup"` raise an "ambiguous" ValueError; the matcher fix restores
+   them to the jupiter-jsc preset (1845-string sweep: no currently-valid
+   selection changes meaning).
+7. **Test gate:** `pytest quick/` -> **187 passed, 2 xfailed, 1 xpassed**
+   after the rework (baseline 174/2/1 + 7 original + 6 rework tests); at
+   the original tip it was 181 passed (baseline + 7). `pre-commit
+   run --all-files` -> all hooks passed after the rework (this doc was
+   ASCII-ified and the require-ascii hook now excludes `TASK-*.md`, since
+   the committed review doc is not modifiable); at the original tip it
+   was red on this doc.
 8. **Docs:** RST of the new/changed pages parses (Sphinx directives check
-   via docutils; full Sphinx build not run here — it requires Doxygen/
-   breathe tooling).
+   via docutils; full Sphinx build not run here - it requires Doxygen/
+   breathe tooling). Note (rework, findings m2/m3): at the original tip
+   `running_on_efp.rst` had an "Unexpected indentation" ERROR and
+   `profile.rst` a "Title underline too short" WARNING; both are fixed,
+   and docutils now reports no structural messages on the touched pages
+   (only Sphinx-only directives, which bare docutils cannot know, and two
+   pre-existing missing-include warnings in `tbg.rst` that are on `dev`
+   as well).
 
-## 7. Pending verification (requires EFP access — OUT OF SCOPE here)
+## 7. Pending verification (requires EFP access - OUT OF SCOPE here)
 
 Plan for the EFP smoke run (JUPITER assumed; adjust per confirmed target):
 
-1. On the laptop: steps 1–5 of §5/§6 with a real build
+1. On the laptop: steps 1-5 of section 5/section 6 with a real build
    (`pic-build`, `PIC_BACKEND=cuda:90`).
 2. EFP Workflows (`workflows.my-eurohpc.eu`, AAI login):
    - upload `tbg/submit.start` as a job script (target system: JUPITER);
@@ -305,14 +338,14 @@ Plan for the EFP smoke run (JUPITER assumed; adjust per confirmed target):
 3. Success criteria: graph completes; HPC job logs show PIConGPU
    initializing and iterating; `simOutput/` (openPMD output, stdout)
    staged back as the output dataset.
-4. Also confirm (see §8): execution-context cwd, `#SBATCH` pass-through,
+4. Also confirm (see section 8): execution-context cwd, `#SBATCH` pass-through,
    `jutil`/modules on compute nodes, account/QoS requirements.
 
 ## 8. Open EFP specifics the requester must confirm
 
 1. **Target system(s)** covered by the allocation and their batch dialects
    (JUPITER/SLURM assumed for the draft; LUMI = SLURM+CPE, Leonardo =
-   SLURM, Discoverer = SLURM, ... — each needs its own
+   SLURM, Discoverer = SLURM, ... - each needs its own
    `efp-<system>` preset following the pattern).
 2. **EFP project/account names**: the JSC project/budget account the EFP
    allocation is charged to (profile `proj`/`account`, auto via `jutil` on
@@ -334,7 +367,7 @@ Plan for the EFP smoke run (JUPITER assumed; adjust per confirmed target):
 
 - **Task 05** (TBG_dstPath/`.cwl_cache` semantics): my template keeps the
   `TBG_dstPath=` line format that `submit.sh`'s `sed` rewrites, and I did
-  not touch `runner.py`, `submit.cwl`, or the `.cwl_cache` handling — no
+  not touch `runner.py`, `submit.cwl`, or the `.cwl_cache` handling - no
   interaction expected.
 - **Task 09** (runner.py stages rework): the draft deliberately keeps
   **zero** runner changes; if task 09's rework changes how the setup/stages
@@ -349,14 +382,22 @@ Plan for the EFP smoke run (JUPITER assumed; adjust per confirmed target):
 
 - **EFP platform behavior unverified**: execution-context cwd, `#SBATCH`
   pass-through, and staging paths are from the EFP/LEXIS documentation,
-  not from a live run (§7/§8).
+  not from a live run (section 7/section 8).
 - **Binary portability**: the laptop-built binary must match the target
   system's GPU architecture *and* its runtime libraries; if the profile's
   module-provided libraries (openPMD, Blosc, ...) differ from what the
-  laptop build linked against, the staged binary may not load — the
+  laptop build linked against, the staged binary may not load - the
   documented mitigation is to build on an EFP interactive node.
 - **JUPITER specifics** (partition name `booster`, 4 GH200/node, 72
   cores/GPU, UCX workarounds) are copied from the current `jupiter-jsc`
   preset and may drift with system updates.
 - **Docs build** was not run end-to-end locally (Doxygen/breathe tooling
   not available in this environment); RST syntax was checked only.
+
+## 11. Rework after independent review (2026-08-31)
+
+The review (TASK-11-REVIEW.md, verdict REQUEST CHANGES) was addressed in
+follow-up commits on top of the review commit: C1 (preset matcher
+disambiguation), M1 (CWD rc-file discovery), m1 (ASCII + hook exclusion),
+m2/m3 (RST defects), n1/n2 (doc clarifications). Dispositions, before/
+after evidence and the final gate results are in TASK-11-RESPONSE.md.

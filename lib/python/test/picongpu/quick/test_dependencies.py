@@ -5,12 +5,16 @@ Authors: PIConGPU contributors
 License: GPLv3+
 """
 
+import subprocess
 from pathlib import Path
 
 from picongpu import rc_params
 from picongpu.dependencies import DependenciesConfig
 from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation
 from pytest import fixture, raises
+
+REPO_ROOT = Path(__file__).resolve().parents[5]
+DEPS_LIB = REPO_ROOT / "etc" / "picongpu" / "dependencies" / "picongpu-deps-lib.sh"
 
 
 def test_default_is_disabled():
@@ -139,3 +143,57 @@ def test_run_scripts_unchanged_by_default(sim):
     submit = sim.picongpu_get_runner().submission_script_path.read_text()
     assert "current.env" not in prepare
     assert "current.env" not in submit
+
+
+def test_build_script_warns_for_unwired_provider(sim):
+    # enabled + a provider that the generated scripts do not wire in yet
+    # must be visible, not a silent no-op
+    runner = sim.picongpu_get_runner()
+    with rc_params.set_temporarily(**{"dependencies": {"enabled": True, "provider": "conda"}}):
+        runner.generate_build_command()
+        content = runner.build_script_path.read_text()
+    assert "not wired into the generated scripts yet" in content
+
+
+def test_provider_dispatch_covers_all_keys():
+    # regression test for the key->function lookup: "deps_install_$key"
+    # can never match a key containing a dash (c-blosc2), so the mapping
+    # must be explicit and complete for every key
+    code = r"""
+        set -euo pipefail
+        source "$1"
+        for key in "${DEPS_KEYS[@]}"; do
+            fn="${DEPS_FN[$key]:-}"
+            if [ -z "$fn" ] || [ "$(type -t "$fn" 2>/dev/null)" != "function" ]; then
+                echo "no install function for key: $key (fn='$fn')" >&2
+                exit 1
+            fi
+        done
+    """
+    result = subprocess.run(["bash", "-c", code, "bash", str(DEPS_LIB)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_provider_loop_records_failure_and_stops(tmp_path):
+    # a failing dependency must be reported in the summary, must not be
+    # stamped as installed, and must abort the remaining dependencies
+    code = r"""
+        set -euo pipefail
+        source "$1"
+        DEPS_KEY_DIR="$2"
+        mkdir -p "$DEPS_KEY_DIR/logs"
+        DEPS_ONLY="boost,c-blosc2,libpng"
+        deps_install_boost() { deps_record boost 0 0; }
+        deps_install_c_blosc2() { return 1; }
+        deps_install_libpng() { echo "SHOULD-NOT-REACH-LIBPNG" >&2; return 0; }
+        rc=0
+        deps_provider_source || rc=$?
+        echo "RC=$rc"
+    """
+    key_dir = tmp_path / "key1"
+    result = subprocess.run(["bash", "-c", code, "bash", str(DEPS_LIB), str(key_dir)], capture_output=True, text=True)
+    assert "RC=1" in result.stdout
+    assert "boost: built in" in result.stdout
+    assert "c-blosc2: FAILED after" in result.stdout
+    assert "SHOULD-NOT-REACH-LIBPNG" not in result.stderr
+    assert not list(tmp_path.rglob(".picongpu-deps.stamp"))

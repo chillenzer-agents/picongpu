@@ -122,6 +122,21 @@ Semantics
   a setup that has not been generated yet; changing them afterwards would
   invalidate the recorded state and is rejected with an error.
 
+.. note::
+
+   For the default local (``bash``) submit system the submitted job runs
+   ``<run_dir>/input/bin/picongpu`` from the run directory. The submit stage
+   pre-stages the ``bin/`` and ``etc/`` subdirectories there, but the rest
+   of the input (metadata, ``.build``, ``ro-crate.json``, ...) is only
+   copied into the run directory by the ``collect`` stage. A run that stops
+   after ``submit`` (e.g. ``picongpu_run(up_to=Stage.submit)``) therefore
+   leaves a *partial* ``input/`` directory: the local job can find its
+   binary, but it runs against the partial input, and the organized
+   artifacts (``tbg/``, the ``simOutput`` link, the submission information)
+   only appear in the run directory after ``collect``. Let the job finish
+   before running ``collect`` (or stage the remaining inputs by hand) if
+   the job needs the complete input directory.
+
 The workflow state file
 -----------------------
 

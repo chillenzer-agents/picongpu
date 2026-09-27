@@ -1,6 +1,20 @@
 Changelog
 =========
 
+0.9.0
+-----
+
+**Date:** TBD
+
+**Features:**
+- other:
+    - general, parameterised autoinstall of the compiled C++ dependencies (PNGwriter, FFTW3, openPMD-api, ...) with a shared, toolchain-keyed cache; per-cluster scripts become thin wrappers around it (draft)
+    - opt-in `[dependencies]` section in `.picongpurc.toml` (provider: source/conda/modules/container) that makes the workflow install the dependencies before `pic-build` (draft)
+
+**Documentation:**
+- other:
+    - document the automatic dependency installation (draft)
+
 0.8.0
 -----
 

@@ -119,12 +119,17 @@ verified in the working venv; versions in :ref:`the appendix <units-appendix>`):
 ``pint``
     Lightweight, pure-Python unit system built around a central
     ``UnitRegistry``. Parses arbitrary unit *strings* (``"m"``, ``"m**-3"``,
-    ``"keV"``, ``"V/m"``, ``"m_species*c"``) and exposes each unit's
-    dimensionality as a ``{base_name: exponent}`` dict over exactly the seven
-    SI base measures: ``[length]``, ``[mass]``, ``[time]``, ``[current]``,
-    ``[temperature]``, ``[substance]``, ``[luminosity]``. The order matches the
-    canonical PIConGPU/openPMD ``L M T I Θ N J`` vector **without any
-    reordering**. Numeric conversion is ``ureg.Quantity(v, "keV").to("J")`` or
+    ``"keV"``, ``"V/m"``; custom symbols such as ``"m_species"`` only once
+    registered via ``registry.define(...)``, see open question 6) and exposes
+    each unit's dimensionality as a ``{base_name: exponent}`` dict over
+    exactly the seven SI base measures: ``[length]``, ``[mass]``, ``[time]``,
+    ``[current]``, ``[temperature]``, ``[substance]``, ``[luminosity]``. The
+    dict is *insertion-ordered* (e.g. ``parse_units("keV").dimensionality``
+    yields ``{'[time]': -2, '[mass]': 1, '[length]': 2}``), so it does **not**
+    arrive in the canonical PIConGPU/openPMD ``L M T I Θ N J`` vector order;
+    lookups into it must be **name-keyed** (as ``to_unit_dimension`` does via
+    ``dict.get``), never positional, or the exponents would land in the wrong
+    slots. Numeric conversion is ``ureg.Quantity(v, "keV").to("J")`` or
     ``ureg.convert(v, "keV", "J")``. Uses the post-2019 exact SI relationships
     (``1 keV == 1.602176634e-16 J``).
 
@@ -170,7 +175,7 @@ Legend: ``+`` native/smooth, ``~`` needs a thin mapping layer, ``-`` poor/absent
      - picmi units (conversion lambdas)
    * - ``pint``
      - ``+`` - dimensionality is a dict over exactly the seven SI base
-       measures; direct index map into the 7-vector
+       measures; name-keyed map into the 7-vector
      - ``+`` - identical base measures/ordering as openPMD
        ``unitDimension``; ``unit_dimension(unit)`` is the 7-vector;
        ``unitSI`` stays C++-side
@@ -194,12 +199,21 @@ Legend: ``+`` native/smooth, ``~`` needs a thin mapping layer, ``-`` poor/absent
      - ``-`` - mostly unmaintained; pre-2019 constants
 
 On every axis that matters here the deciding rows are the first: pint's base
-dimension set **is** the openPMD/PIConGPU 7-vector with identical ordering and
-semantics, its string parser covers the *exact* unit spellings the codebase
-already uses (``keV``, ``[m^-3]``, ``V/m``, ``rad`` as dimensionless), and it
-brings the runtime conversion that the picmi bridge currently hard-codes
-by hand - all without dragging in astronomy-specific or ndarray-coupled
-semantics that would need to be undone to talk to openPMD.
+dimension set **is** the openPMD/PIConGPU 7-vector with identical name set and
+semantics, its string parser covers the unit spellings the codebase uses once
+written in canonical pint form (``keV``, ``V/m``, ``rad`` as dimensionless),
+and it brings the runtime conversion that the picmi bridge currently
+hard-codes by hand - all without dragging in astronomy-specific or
+ndarray-coupled semantics that would need to be undone to talk to openPMD.
+
+.. note:: **Canonical unit spellings.** pint needs *pint* spellings, not the
+   prose-idiom ones used in the codebase's docstrings. The bracket notation
+   ``[m^-3]`` (as in ``GaussianDistribution.density: "...[m^-3]"``) is **not**
+   pint-parsable (a ``TokenError``) - use the canonical ``m**-3`` instead.
+   Custom call-site symbols (``m_species*c``) are undefined until registered
+   in a configured registry (open question 6). The PoC guards against this:
+   ``to_unit_dimension`` (and hence ``Unit`` schema emission) raises a clear
+   ``ValueError`` for such strings instead of surfacing the raw pint error.
 
 Recommended mechanism
 ---------------------
@@ -214,6 +228,13 @@ Combine two cooperating layers:
      (``to_unit_dimension("kg") == [0, 1, 0, 0, 0, 0, 0]``).
    * ``scale`` - the *value convention* (``"SI"`` default; ``"keV"`` for the
      code-interface units the picmi bridge converts to).
+
+   The PoC enforces the *unit/scale consistency invariant*: ``unit`` must be
+   pint-parsable, and ``scale="SI"`` requires an SI-convention unit string
+   (no residual scale factor, so ``Unit("keV", scale="SI")`` raises a
+   ``ValueError`` instead of emitting contradictory schema metadata). Non-``SI``
+   ``scale`` values are documentative convention markers and deliberately left
+   unchecked (subject to open question 3).
 
    It is metadata-only: it adds **no** validation or serialisation, so
    ``model_dump(mode="json")`` output and the task-07 round-trip corpus are
@@ -251,8 +272,11 @@ Implemented on this branch (clearly marked **EXPLORATORY PoC**, module
 ``lib/python/picongpu/pypicongpu/units/``):
 
 * ``Unit`` - the pydantic metadata marker (unit string + ``scale``), with JSON-
-  schema emission of ``unit``/``unit_scale``/``unit_dimension``.
-* ``to_unit_dimension(unit)`` - seven-SI-vector derivation via pint.
+  schema emission of ``unit``/``unit_scale``/``unit_dimension``. Construction
+  is guarded by a PoC-level consistency check: ``unit`` must be pint-parsable
+  and ``scale="SI"`` must pair with an SI-convention unit (see above).
+* ``to_unit_dimension(unit)`` - seven-SI-vector derivation via pint; raises a
+  clear ``ValueError`` for unparseable (e.g. prose-bracket) unit strings.
 * ``convert(value, from_unit, to_unit)`` - pint conversion.
 * One pilot field: ``species.constant.mass.Mass.mass_si`` annotated
   ``Annotated[float, Field(ge=0.0), Unit("kg")]``. Verified:
@@ -264,9 +288,13 @@ Implemented on this branch (clearly marked **EXPLORATORY PoC**, module
 
 Tests (``lib/python/test/picongpu/quick/pypicongpu/test_units.py``, free-
 function pytest): dimension derivation for ``m``, ``m**-3``, ``keV`` and
-dimensionless; keV->J conversion; metadata round-trip of ``Unit``; the pilot
-field's schema emission; value-dump/round-trip invariance; the pint-derived
-vector feeding the existing functor ``UnitDimension``.
+dimensionless (plus a clear error for unparseable spellings); keV->J
+conversion; metadata round-trip of ``Unit``; the ``scale="SI"``-vs-unit
+consistency check; the pilot field's schema emission in both pydantic's
+``mode="validation"`` (default) and ``mode="serialization"`` - the latter is
+what the real schema consumer ``renderedobject.py`` uses; value-dump/round-trip
+invariance; the pint-derived vector feeding the existing functor
+``UnitDimension``.
 
 Deliberately out of scope (future work): annotating the full model corpus
 (lasers, grid, all species constants), openPMD-read-side consumption, a

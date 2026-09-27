@@ -37,6 +37,16 @@ def test_dimension_of_dimensionless():
     assert to_unit_dimension("1") == [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 
+def test_to_unit_dimension_unparseable_raises_clear_error():
+    # the prose-idiom bracket spelling is not pint-parsable; a clear ValueError
+    # (not a raw pint TokenError) is expected
+    with pytest.raises(ValueError):
+        to_unit_dimension("[m^-3]")
+    # undefined custom symbols likewise, until registered in the registry
+    with pytest.raises(ValueError):
+        to_unit_dimension("m_species*c")
+
+
 def test_to_unit_dimension_fed_to_particle_functor_unit_dimension():
     # the pint-derived 7-vector slots directly into the existing, C++-consumed
     # pypicongpu UnitDimension (functor unification direction of the design)
@@ -70,7 +80,24 @@ def test_unit_metadata_roundtrip():
 def test_unit_metadata_distinguishes_scale():
     # scale is part of the machine-readable payload
     assert Unit("keV", scale="keV").scale == "keV"
-    assert Unit("keV", scale="keV") != Unit("keV", scale="SI")
+    assert Unit("J", scale="SI") != Unit("J", scale="keV")
+
+
+def test_unit_scale_si_requires_si_convention_unit():
+    # scale="SI" must pair with an SI-convention unit: a residual-scale-factor
+    # unit (keV, cm) under an "SI" claim would emit contradictory metadata
+    with pytest.raises(ValueError):
+        Unit("keV", scale="SI")
+    with pytest.raises(ValueError):
+        Unit("cm")
+    # J (base-unit magnitude 1) and the default SI scales are fine
+    assert Unit("J", scale="SI").scale == "SI"
+    assert Unit("kg").scale == "SI"
+
+
+def test_unit_unparseable_unit_raises_clear_error():
+    with pytest.raises(ValueError):
+        Unit("[m^-3]")
 
 
 def test_annotated_unit_is_metadata_only():
@@ -82,6 +109,16 @@ def test_annotated_unit_is_metadata_only():
 
 def test_pilot_field_schema_carries_unit():
     schema = Mass.model_json_schema()
+    mass_schema = schema["properties"]["mass_si"]
+    assert mass_schema["unit"] == "kg"
+    assert mass_schema["unit_scale"] == "SI"
+    assert mass_schema["unit_dimension"] == [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+
+def test_pilot_field_schema_carries_unit_serialization_mode():
+    # the real in-package consumer reads the schema in serialization mode
+    # (rendering/renderedobject.py), not the default validation mode
+    schema = Mass.model_json_schema(mode="serialization", by_alias=False)
     mass_schema = schema["properties"]["mass_si"]
     assert mass_schema["unit"] == "kg"
     assert mass_schema["unit_scale"] == "SI"

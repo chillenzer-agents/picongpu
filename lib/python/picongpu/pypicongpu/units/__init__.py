@@ -47,8 +47,11 @@ N_UNIT_DIMENSION = 7
 
 # pint's internal base-dimension *names*, in the canonical LMTIThetaNJ order
 # shared by PIConGPU (include/picongpu/traits/SIBaseUnits.hpp) and openPMD.
-# Indexing a pint dimensionality (a dict {base_name: exponent}) by this tuple
-# yields the openPMD-compatible unit-dimension vector with no reordering.
+# A pint dimensionality is a dict {base_name: exponent} whose *insertion*
+# order is NOT the LMTIThetaNJ order (e.g. parse_units("keV").dimensionality
+# lists [time] first). Lookups must therefore be *name-keyed* via dict.get
+# (as to_unit_dimension does), never positional -- positional indexing would
+# silently yield a wrongly ordered vector.
 _PINT_DIMENSION_ORDER = (
     "[length]",  # L  length
     "[mass]",  # M  mass
@@ -89,9 +92,25 @@ def to_unit_dimension(unit: str) -> list[float]:
     :param unit: pint-parsable unit expression, e.g. ``"m"``, ``"m**-3"`` or
         ``"keV"``. ``"dimensionless"``/``"1"`` yields the null vector.
     :return: 7-vector of exponents in LMTIThetaNJ order.
+    :raises ValueError: if ``unit`` is not a pint-parsable unit string. The
+        prose-idiom bracket spelling ``"[m^-3]"`` is not parseable (use the
+        canonical ``"m**-3"``), and custom symbols such as ``"m_species"`` are
+        undefined unless registered in the registry first.
     """
+    from tokenize import TokenError
+
+    import pint.errors as pint_errors
+
     ureg = _ureg()
-    dimensionality = ureg.parse_units(unit).dimensionality
+    try:
+        dimensionality = ureg.parse_units(unit).dimensionality
+    except (pint_errors.PintError, TokenError) as exc:
+        raise ValueError(
+            f"unit string {unit!r} is not parseable by pint ({exc}); "
+            "use canonical pint spellings, e.g. 'm**-3' instead of the "
+            "prose-idiom '[m^-3]', and register custom symbols (e.g. "
+            "'m_species') in the unit registry"
+        ) from exc
     return [float(dimensionality.get(name, 0.0)) for name in _PINT_DIMENSION_ORDER]
 
 
@@ -127,11 +146,25 @@ class Unit:
       conversion lambdas that live in the picmi bridge today).
     * ``unit_dimension`` -- the openPMD/PIConGPU 7-vector derived via pint.
 
+    PoC-level consistency check (construction time): ``unit`` must be
+    pint-parsable, and ``scale="SI"`` requires ``unit`` to be expressed in SI
+    units (no residual scale factor, e.g. ``"keV"`` is rejected, since
+    storing-SI-vs-unit-keV would emit contradictory schema metadata).
+
     EXPERIMENTAL - PoC surface; the final API is subject to
     ``docs/source/dev/units_design.rst``.
     """
 
     def __init__(self, unit: str, scale: str = "SI"):
+        # PoC-level consistency check (see units_design.rst, finding 3):
+        to_unit_dimension(unit)
+        if scale == "SI" and _ureg().Quantity(1, unit).to_base_units().magnitude != 1:
+            raise ValueError(
+                f"scale='SI' is inconsistent with unit={unit!r}: the value "
+                "would be declared SI while the unit string carries a residual "
+                f"scale factor; use an SI-convention unit (e.g. 'kg') or set "
+                f"scale={unit!r}"
+            )
         self.unit = unit
         self.scale = scale
 

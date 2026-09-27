@@ -1014,8 +1014,9 @@ class Runner(BaseModel):
         workflow inputs it consumed have not changed since it ran (each
         stage records a digest of them); changed inputs invalidate the
         affected stages and the stages that depend on them. Returns the
-        artifacts of the last executed stage, or ``None`` if everything was
-        already up to date.
+        artifacts of the last executed stage (for the legacy single-invocation
+        full run, the artifacts recorded for the final stage), or ``None`` if
+        everything was already up to date.
         """
         plan = self.stage_plan
         up_to = Stage(up_to) if up_to is not None else None
@@ -1057,7 +1058,10 @@ class Runner(BaseModel):
             # Historical full-run path: single cwltool invocation of workflow.cwl
             outputs = self.run()
             self._record_full_run(state, outputs)
-            return outputs
+            # Same contract as the per-step path: the artifacts of the last
+            # executed stage, here the final stage of the plan.
+            last_stage = state.stages.get(plan.order[-1])
+            return last_stage.artifacts if last_stage is not None else None
 
         low = order.index(from_) if from_ is not None else 0
         high = order.index(up_to) if up_to is not None else len(order) - 1

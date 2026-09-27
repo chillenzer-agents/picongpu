@@ -16,7 +16,9 @@ from .binning import BinningAxis as BinningAxis
 from .binning import BinSpec as BinSpec
 from .checkpoint import Checkpoint as Checkpoint
 from .energy_histogram import EnergyHistogram as EnergyHistogram
+from .field_dump import AverageDerivedFieldDump as AverageDerivedFieldDump
 from .field_dump import DerivedFieldDump as DerivedFieldDump
+from .field_dump import NativeDerivedFieldDump as NativeDerivedFieldDump
 from .field_dump import NativeFieldDump as NativeFieldDump
 from .field_energy_monitor import FieldEnergyMonitor as FieldEnergyMonitor
 from .macro_particle_count import MacroParticleCount as MacroParticleCount
@@ -33,6 +35,8 @@ AnyDiagnostic = (
     | Checkpoint
     | EnergyHistogram
     | DerivedFieldDump
+    | NativeDerivedFieldDump
+    | AverageDerivedFieldDump
     | NativeFieldDump
     | FieldEnergyMonitor
     | MacroParticleCount

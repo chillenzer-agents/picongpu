@@ -734,12 +734,24 @@ class Runner(BaseModel):
             return WorkflowState()
         try:
             with self.workflow_state_path.open("r") as file:
-                return WorkflowState.model_validate(json.load(file))
+                state = WorkflowState.model_validate(json.load(file))
         except (OSError, ValueError) as error:
             logging.warning(
                 "could not read workflow state %s: %s; starting with an empty state", self.workflow_state_path, error
             )
             return WorkflowState()
+        if state.version != 1:
+            # version 1 is the only format this runner writes and reads; an
+            # unknown version is ignored (treated as empty) rather than
+            # guessed at -- a future format change starts from a clean state
+            logging.warning(
+                "workflow state %s has version %s, but this runner only supports version 1; "
+                "the recorded progress is ignored",
+                self.workflow_state_path,
+                state.version,
+            )
+            return WorkflowState()
+        return state
 
     def _save_workflow_state(self, state: WorkflowState):
         state.updated_at = datetime.datetime.now()

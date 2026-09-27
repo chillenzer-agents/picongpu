@@ -91,7 +91,7 @@ class ReadFiles:
         ------
         If a directiontype was specified, it must first be reset
         """
-        direction = cD.checkDirection(variable=self.directiontype, direction=direction)
+        direction = cD.checkDirection(variable=self._directiontype, direction=direction)
 
         self._direction = direction + "/"
 

@@ -19,12 +19,21 @@
 # If not, see <http://www.gnu.org/licenses/>.
 #
 
-# search recursive inside a folder if the keyword `__global__` is used
-# @param $1 path to the folder
+# search recursive inside a folder if the keyword `__global__` is used.
+# Alternatively '"-"' as first argument will search the files given on stdin
+# (one per line) instead, using a single batched grep.
+# @param $1 path to the folder, or "-" to read a list of files from stdin
 # @result 0 if keyword is not found else 1
 
 folderName=$1
-result=`grep -rn "__global__" $folderName`
+
+if [ "$folderName" = "-" ] ; then
+    mapfile -t fileList
+else
+    mapfile -t fileList < <(find "$folderName" -type f)
+fi
+
+result=`grep -nH "__global__" "${fileList[@]}"`
 if [ $? -eq 0 ] ; then
     echo "Not allowed keyword __global__ found in the following files:" >&2
     echo "$result" | cut -f1-2 -d":" >&2

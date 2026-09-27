@@ -229,7 +229,7 @@ runs".
 - While a stage runs, the state is updated `running` -> (on success)
   `completed` with artifacts; on failure the stage is marked `failed` and
   the exception propagates (wrapped in `WorkflowStageError` for cwltool
-  failures).
+  load and execution failures).
 - `force=True`: re-run every stage of the range. `force=Stage`/list: re-run
   those stages; **all transitive dependents are invalidated** (marked
   `invalidated` in the state, persisted) and re-run if they are in the

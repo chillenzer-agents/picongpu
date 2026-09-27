@@ -897,6 +897,11 @@ class Runner(BaseModel):
             )
         except WorkflowStatus as error:
             raise WorkflowStageError(f"running CWL step {step_path.name} failed: {error}") from error
+        except Exception as error:
+            # cwltool load/validation failures (e.g. a renamed or missing step
+            # file) surface here; wrap them so stage execution has a single
+            # documented error type
+            raise WorkflowStageError(f"loading/running CWL step {step_path} failed: {error}") from error
 
     def _resolve_step_inputs(self, step_spec: StageStepSpec, state: WorkflowState, step_outputs: dict) -> dict:
         with self.workflow_input_path.open("r") as file:

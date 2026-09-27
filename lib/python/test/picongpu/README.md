@@ -49,3 +49,23 @@ pytest -m end_to_end
 - `end_to_end` - full simulation tests with reference comparison
 
 Markers are automatically applied based on test directory location via `conftest.py`.
+
+## How CI selects the suites
+
+All Python CI jobs run the quick suite via the directory path (`pytest quick/`),
+which is the default and cannot pick up slow tests. The slow suites are selected
+by marker so that selection is guaranteed to match the documentation:
+
+- `pypicongpu-compiling-test` (`PYTHON_COMPILING_TEST=ON`) -> `pytest -m compiling`
+- `pypicongpu-end-to-end-test` (`PYTHON_END_TO_END_TEST=ON`) -> `pytest -m end_to_end`
+
+Both slow jobs are skipped when the `ci: no-compile` / `CI:no-compile` /
+`ci: no-python-compile` flags are set (see `share/ci/ci_flags.sh`).
+
+## Per-example opt-out
+
+Any example script (`lib/python/examples/*/main.py`) can opt out of the
+compiling suite by declaring a whole-line `# ci: no-compile` comment. Such
+examples are skipped by `pytest -m compiling` (marked `ci_no_compile`, so also
+deselectable with `-m "not ci_no_compile"`) while remaining generatable and
+compilable locally by hand.

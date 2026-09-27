@@ -37,6 +37,19 @@ class MultiSpecies(picmistandard.PICMI_MultiSpecies):
     with the same layout. Members whose layouts differ (in particular
     ``PseudoRandomLayout`` with different ``seed``) are deliberately initialised
     independently (force-independent discriminator, non-neutral on purpose).
+
+    .. note::
+
+       The grouping is tracked by a private per-member marker
+       (``Species._multi_species``). It survives deep-copies of a
+       :class:`picmi.Simulation` (all members reference the same
+       ``MultiSpecies`` instance) but is **not** part of any serialized
+       representation of a species: a pydantic ``model_dump``/``model_validate``
+       round-trip does not preserve it. The picmi layer has no such
+       serialization surface today; the pypicongpu layer is the serialization
+       surface and stores the *result* of the grouping (the ``created`` species
+       plus the ``derived`` members) explicitly, so a round-trip through
+       pypicongpu keeps the merged/charge-neutral setup intact.
     """
 
     def __init__(self, *args, **kwargs):

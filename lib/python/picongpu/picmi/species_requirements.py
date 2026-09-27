@@ -7,6 +7,8 @@ License: GPLv3+
 
 from types import UnionType
 from typing import Any, Callable
+import warnings
+
 from scipy.constants import electron_volt
 
 import numpy as np
@@ -275,6 +277,51 @@ class SimpleDensityOperation(DelayedConstruction):
         operators = {"constructor": constructor, "try_update_with": try_update_with}
 
         return super().__init__(metadata=metadata, operators=operators)
+
+
+def warn_would_have_merged_species(operations):
+    """Warn about independent density operations that the legacy heuristic would have merged.
+
+    Since the switch to picmi-standard semantics (Option B) each species is
+    initialised independently unless it is an explicit member of a
+    ``MultiSpecies``. Species that are *not* wrapped in a ``MultiSpecies`` but
+    share the same full ``initial_distribution`` AND the same ``layout`` are
+    exactly the ones the removed implicit-derive heuristic used to merge
+    (collective/charge-neutral in-cell positions). This detection only makes the
+    semantic change loud for the affected setups; it does not (re-)introduce the
+    heuristic. One warning is emitted per affected group.
+    """
+    density_ops = [
+        op
+        for op in operations
+        if isinstance(op, SimpleDensityOperation) and op.metadata.kwargs["species"][0]._multi_species is None
+    ]
+    clusters = []
+    for op in density_ops:
+        for cluster in clusters:
+            rep = cluster[0]
+            if (
+                rep.metadata.kwargs["profile"] == op.metadata.kwargs["profile"]
+                and rep.metadata.kwargs["layout"] == op.metadata.kwargs["layout"]
+            ):
+                cluster.append(op)
+                break
+        else:
+            clusters.append([op])
+
+    for cluster in clusters:
+        if len(cluster) < 2:
+            continue
+        names = ", ".join(sorted(op.metadata.kwargs["species"][0].name for op in cluster))
+        warnings.warn(
+            "Species {} share the same initial density distribution and layout and are "
+            "initialised independently (picmi-standard semantics). Previously such "
+            "species were initialised collectively (identical in-cell positions, e.g. "
+            "charge-neutral setups); to restore collective initialisation, group them "
+            "in a picongpu.picmi.MultiSpecies.".format(names),
+            UserWarning,
+            stacklevel=3,
+        )
 
 
 class SimpleMomentumOperation(DelayedConstruction):

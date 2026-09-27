@@ -139,8 +139,6 @@ inputs:
     type: Directory
   submit_system:
     type: string?
-  destination_path:
-    type: string?
 outputs:
   submission_information:
     type: File
@@ -563,7 +561,6 @@ def future_stage_plan():
                 "etc_directory": "run_etc_directory",
                 "tbg_link": StepOutputRef(step="upload_step", output="uploaded"),
                 "submit_system": "run_submit_system",
-                "destination_path": "destination_path",
             },
             outputs={
                 "submission_information": "submission_information",

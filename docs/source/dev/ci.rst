@@ -52,3 +52,24 @@ commands:
 * ``ci: full-compile`` will execute for a PR all tests the CI is performing when PRs get merged to the dev branch.
 * ``ci: picongpu`` only PIConGPU compile and runtime tests will be performed
 * ``ci: pmacc`` only PMacc compile and runtime tests will be performed
+* ``ci: no-python-compile`` disables only the Python-layer compile and end-to-end tests
+  (``pypicongpu-compiling-test`` and ``pypicongpu-end-to-end-test``) while keeping the
+  C++ compile/runtime matrix and the Python quick tests enabled. This is the
+  fine-grained counterpart of ``ci: no-compile`` for contributors touching only
+  the Python layer.
+
+In addition to the commit-message commands the GitHub label ``CI:no-compile`` is honoured;
+it behaves like ``ci: no-compile``.
+
+All flags are computed by the shared script ``share/ci/ci_flags.sh``, which is the single
+source of truth for both the C++ test matrix generator
+(``share/ci/generate_reduced_matrix.sh``) and the Python-layer jobs
+(``.base_pypicongpu_compile_test``). The Python-layer jobs skip compilation whenever
+``CI_NO_COMPILE`` is set, i.e. for ``ci: no-compile``, the ``CI:no-compile`` label and
+``ci: no-python-compile``.
+
+The Python quick-test matrix (``pypicongpu-full-matrix``) runs only pure-Python unit and
+integration tests and does *not* compile PIConGPU, so it is unaffected by the no-compile
+flags. ``ci: picongpu`` keeps the Python-layer tests enabled: for the Python jobs the
+PIConGPU layer *is* the Python layer, so there is no independent PMacc counterpart that
+could be deselected by ``ci: pmacc``.

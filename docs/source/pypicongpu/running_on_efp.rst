@@ -3,23 +3,25 @@
 Running on the EuroHPC Federation Platform (EFP)
 ================================================
 
-.. sectionauthor:: AI agent (task 11, exploratory draft)
+.. sectionauthor:: AI agent (task 11, rework)
 
 This page describes how to run a PIConGPU simulation on the
 `EuroHPC Federation Platform (EFP) <https://www.eurohpc-ju.europa.eu/supercomputers/eurohpc-federation-platform_en>`_
 through the `EFP Workflows <https://docs.my-eurohpc.eu/workflows/quickstart/>`__
 (``workflows.my-eurohpc.eu``), which are implemented on the
 `LEXIS platform <https://docs.lexis.tech>`__.
-The EFP Workflows execute **job scripts** or **Apptainer containers** on the
-participating EuroHPC systems; this page focuses on the job script path,
-which reuses PIConGPU's existing
-:ref:`TBG <usage-tbg>`/:ref:`profile <install-profile>` machinery.
+The EFP Workflows execute **job scripts**, **Apptainer containers**, or
+**custom LEXIS Workflow Definitions (LWD)** on the participating EuroHPC
+systems. This page focuses on the **LWD + Py4Lexis** path (the recommended,
+proof-of-concept primary) and documents the **job script** path (a working
+fallback that reuses PIConGPU's existing
+:ref:`TBG <usage-tbg>`/:ref:`profile <install-profile>` machinery).
 
 .. note::
 
-   This is an exploratory draft (task 11).
+   This is a proof of concept (task 11, rework).
    It covers the submission configuration and the local part of the workflow;
-   the final EFP smoke run (upload, workflow execution, output retrieval)
+   the final EFP smoke run (workflow creation, execution, output retrieval)
    requires EFP access and is documented as a pending verification step.
 
 Prerequisites
@@ -37,10 +39,20 @@ Prerequisites
 Submission paths
 ----------------
 
-Three paths were evaluated; this draft implements the job script path and
-documents the others:
+Three paths were evaluated; the **LWD + Py4Lexis** path is the recommended,
+proof-of-concept primary and the **job script** path is a working fallback:
 
-1. **Job script (recommended, implemented).**
+1. **LEXIS Workflow Definition (LWD) + Py4Lexis (recommended, proof of concept).**
+   The runner emits a `LEXIS Workflow Definition
+   <https://docs.lexis.tech/user_interfaces/lexis_workflow_definition.html>`__
+   (``workflow.lwd.yaml``) instead of the CWL workflow, and
+   `Py4Lexis <https://docs.lexis.tech/user_interfaces/py4lexis.html>`__
+   submits it to the EFP (create workflow → execute → poll), using EFP
+   **dataset staging** for inputs/outputs. Configured via
+   ``workflow_backend = "lexis"`` and a ``[lexis]`` table in
+   ``picongpurc.toml``. See "Running via the LEXIS workflow definition"
+   below.
+2. **Job script (fallback, implemented).**
    A preset (``etc/picongpu/efp-<system>/``) renders a self-contained job
    script in the target system's batch dialect via :ref:`TBG <usage-tbg>`.
    The rendered script is uploaded to the EFP Workflows (Data Management →
@@ -49,8 +61,9 @@ documents the others:
    No changes to the PyPIConGPU runner are required: the preset mechanism
    (``picongpurc.toml`` / ``RCParams(preset=...)``, see the
    :ref:`PyPIConGPU API documentation <pypicongpu-misc-apidoc>`)
-   selects the template, and ``tbg`` renders the script.
-2. **Apptainer/SIF container (fallback, documented only).**
+   selects the template, and ``tbg`` renders the script. This path needs no
+   Py4Lexis and is useful where programmatic submission is not available.
+3. **Apptainer/SIF container (fallback, documented only).**
    Package the ``picongpu`` binary and its runtime dependencies into an
    Apptainer-compatible image (build inside a CUDA/ROCm base image) and
    upload it to the EFP Workflows (Data Management → Containers), running it
@@ -59,20 +72,87 @@ documents the others:
    Trade-off: a reproducible environment without relying on the target
    system's modules, but a large upload, one image per GPU architecture, and
    GPU pass-through must be supported by Apptainer on the target system.
-3. **Py4Lexis programmatic submission (follow-up).**
-   The `Py4Lexis <https://docs.lexis.tech/user_interfaces/py4lexis.html>`__
-   CLI/API could automate upload, workflow creation and execution from the
-   laptop. The job script and dataset produced by path 1 are exactly its
-   inputs, so this is a natural extension, not a different design.
-   It is not implemented in this draft (extra dependency, platform
-   credentials, API surface).
 
-Running via the job script path (laptop flow)
----------------------------------------------
+Running via the LEXIS workflow definition (recommended)
+---------------------------------------------------------
 
-The target user flow: you have a ``picongpurc.toml`` and a PICMI input
-script on your laptop; running the script prepares everything that the EFP
-Workflows need.
+The recommended path (proof of concept) makes the runner emit a **LEXIS
+Workflow Definition** (``workflow.lwd.yaml``) instead of the CWL workflow,
+and submits it to the EFP through **Py4Lexis**.
+
+1. **Configure the LEXIS backend in ``picongpurc.toml``**:
+
+   .. code-block:: toml
+
+      workflow_backend = "lexis"
+      author = "Your Name"
+      email = "you@example.com"
+
+      [lexis]
+      project_shortname = "your-efp-project"
+      command_template_name = "picongpu"   # a template registered in the project
+      location_name = "jupiter"            # target cluster
+      location_resource = "gh200"          # optional
+      walltime_limit = 7200
+      max_cores = 64                       # optional
+      input_dataset = "ddi://~/your-picongpu-setup"
+
+   ``workflow_backend`` defaults to ``"cwl"`` (the existing behavior); set it
+   to ``"lexis"`` to switch. The ``[lexis]`` table describes the HPC job node
+   (cluster, command template, resources) and the input/output dataset
+   staging. A ``[lexis.build]`` sub-table enables a two-node build → run
+   workflow that shares the compiled binary.
+
+2. **Generate the setup** with your PICMI script (``sim.write_input_file()``
+   or ``Runner.generate()``). With ``workflow_backend = "lexis"`` the runner
+   writes ``workflow/workflow.lwd.yaml`` (alongside the usual CWL files):
+
+   .. code-block:: yaml
+
+      id: picongpu-...
+      project_shortname: your-efp-project
+      jobs:
+        picongpu:
+          requirements:
+            command_template_name: picongpu
+            locations: [{location_name: jupiter, location_resource: gh200}]
+            walltime_limit: 7200
+            policy: preferred
+          data_inputs: [{source: ddi://~/your-picongpu-setup, target: input/}]
+          data_outputs:
+            - source: output/
+              target: ddi://~
+              metadata: {$name: picongpu_output, access: project}
+
+3. **Stage the setup as a dataset** (upload the generated ``setup_dir`` to the
+   EFP as the input dataset referenced by ``input_dataset``).
+
+4. **Submit via Py4Lexis** (install ``py4lexis[efp]`` and apply
+   ``patches/py4lexis-create-workflow.diff`` to add the missing
+   ``create_workflow`` method):
+
+   .. code-block:: python
+
+      from picongpu.pypicongpu.lexis_submit import submit
+      submit("setup/workflow/workflow.lwd.yaml", dry_run=True)  # plan only
+      # live: submit(..., dry_run=False, session=<logged-in LexisSession>)
+
+   The submission plan is create workflow → execute → poll. ``dry_run=True``
+   (the default) builds the plan without any network call.
+
+.. note::
+
+   The LWD is a portable artifact independent of the submission mechanism: it
+   can also be uploaded directly in the EFP portal (Applications → User
+   Workflows) and run there. The live create/execute/poll path requires EFP
+   access and a registered command template (see "Pending verification").
+
+Running via the job script path (fallback, laptop flow)
+---------------------------------------------------------
+
+The fallback flow: you have a ``picongpurc.toml`` and a PICMI input script
+on your laptop; running the script prepares everything that the EFP Workflows
+need (a self-contained job script to upload by hand).
 
 1. **Select the EFP preset in ``picongpurc.toml``** (in the directory you
    run the PICMI script from — typically next to the script — or in

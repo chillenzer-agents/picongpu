@@ -126,7 +126,7 @@ namespace picongpu
         HDINLINE float3_X operator()(DataSpace<simDim> const& cellIdx, uint32_t const currentStep) const
         {
             {{#user_defined_kw}}
-            constexpr float_64 {{{name}}} = {{{value}}};
+            [[maybe_unused]] constexpr float_64 {{{name}}} = {{{value}}};
             {{/user_defined_kw}}
             /* calculate cells -> SI [m] and steps -> SI [s] */
             [[maybe_unused]] float_64 const x = cellIdx.x() * sim.si.getCellSize().x();
@@ -164,7 +164,7 @@ namespace picongpu
         HDINLINE float3_X operator()(DataSpace<simDim> const& cellIdx, uint32_t const currentStep) const
         {
             {{#user_defined_kw}}
-            constexpr float_64 {{{name}}} = {{{value}}};
+            [[maybe_unused]] constexpr float_64 {{{name}}} = {{{value}}};
             {{/user_defined_kw}}
             /* calculate cells -> SI [m] and steps -> SI [s] */
             [[maybe_unused]] float_64 const x = cellIdx.x() * sim.si.getCellSize().x();

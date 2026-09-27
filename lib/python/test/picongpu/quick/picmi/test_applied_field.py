@@ -72,6 +72,35 @@ class TestAnalyticAppliedField(TestCase):
         assert "b0" in background.ex
         assert "wl" in background.ex
 
+    def test_undefined_symbol_rejected(self):
+        applied_field = picmi.AnalyticAppliedField(Ex_expression="wl*sin(x)")
+        with pytest.raises(ValueError, match="wl"):
+            applied_field.get_as_pypicongpu()
+
+    def test_colliding_parameter_name_rejected(self):
+        applied_field = picmi.AnalyticAppliedField(Ex_expression="x/L", x=2.0, L=3.0)
+        with pytest.raises(ValueError, match="collides"):
+            applied_field.get_as_pypicongpu()
+
+    def test_cpp_keyword_parameter_name_rejected(self):
+        applied_field = picmi.AnalyticAppliedField(Ex_expression="float*x", float=2.0)
+        with pytest.raises(ValueError, match="C\\+\\+ keyword"):
+            applied_field.get_as_pypicongpu()
+
+    def test_lower_upper_bound_none_accepted(self):
+        applied_field = picmi.AnalyticAppliedField(Ex_expression="x", lower_bound=None, upper_bound=None)
+        background = applied_field.get_as_pypicongpu()
+        assert background.ex == "x"
+
+
+class TestBackgroundFieldRoundTrip(TestCase):
+    def test_json_roundtrip_idempotent(self):
+        background = picmi.AnalyticAppliedField(Ex_expression="sin(x)*cos(t)").get_as_pypicongpu()
+        restored = BackgroundField.model_validate_json(background.model_dump_json())
+        assert restored.ex == background.ex
+        assert restored.bz == "0"
+        assert restored.user_defined_kw == background.user_defined_kw
+
 
 class TestSimulationBackgroundField(TestCase):
     def test_no_applied_field(self):
@@ -133,6 +162,30 @@ class TestSimulationBackgroundField(TestCase):
         # the renderer only accepts the standard leaf types
         assert isinstance(context["background_field"]["ey"], str)
 
+    def test_applied_field_from_constructor(self):
+        grid = picmi.Cartesian3DGrid(
+            number_of_cells=[16, 16, 16],
+            lower_bound=[0, 0, 0],
+            upper_bound=[16e-6, 16e-6, 16e-6],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+        )
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        sim = picmi.Simulation(
+            time_step_size=1e-14,
+            max_steps=4,
+            solver=solver,
+            applied_fields=[picmi.ConstantAppliedField(Ez=3e6)],
+        )
+        background = sim.get_as_pypicongpu().background_field
+        assert isinstance(background, BackgroundField)
+        assert background.ez == "3000000.0"
+
+    def test_constant_lower_upper_bound_none_accepted(self):
+        applied_field = picmi.ConstantAppliedField(Ez=1.0, lower_bound=None, upper_bound=None)
+        background = applied_field.get_as_pypicongpu()
+        assert background.ez == "1.0"
+
 
 class TestRenderedParamFunctionallyEqual(TestCase):
     """Render an input setup and compare the generated fieldBackground.param to the static one.
@@ -164,3 +217,19 @@ class TestRenderedParamFunctionallyEqual(TestCase):
         # the J background stays off
         assert "FieldBackgroundJ" in rendered
         assert "activated = false" in rendered
+
+    def test_configured_rendering_contains_analytic_expression(self):
+        applied_field = picmi.AnalyticAppliedField(Ex_expression="1e5*sin(2*pi*y/wl)", wl=800e-9)
+        rendered = self._render_setup(applied_field)
+        assert "InfluenceParticlePusher = true" in rendered
+        assert "pmacc::math::sin" in rendered
+        # the parameter is rendered as a compile-time constant in the functors
+        assert "constexpr float_64 wl =" in rendered
+
+    def test_analytic_parameters_guarded_in_both_functors(self):
+        # a parameter used only in the E expression must not trigger -Wunused-variable
+        # in FieldBackgroundB (all parameter declarations carry [[maybe_unused]])
+        applied_field = picmi.AnalyticAppliedField(Ex_expression="b0*cos(2*pi*y/wl)", b0=1e6, wl=800e-9)
+        rendered = self._render_setup(applied_field)
+        assert rendered.count("[[maybe_unused]] constexpr float_64 b0") == 2
+        assert rendered.count("[[maybe_unused]] constexpr float_64 wl") == 2

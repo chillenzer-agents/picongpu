@@ -99,7 +99,7 @@ class DataReader(rF.ReadFiles):
             raise ValueError("The passed parameter file is not a .dat file.")
 
         with open(file) as fi:
-            line = fi.readlines()[0].split(" ")
+            line = fi.readlines()[0].split()
 
         result = [entry.split("[")[0] for entry in line]
         if "step" in result[0]:

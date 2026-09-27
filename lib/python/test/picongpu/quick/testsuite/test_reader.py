@@ -75,8 +75,6 @@ class TestParamReader:
 
 
 class TestDataReader:
-    # "Bx" must not be the last header column: the parser keeps the trailing
-    # newline of the header line on the last column name
     def _make_reader(self, tmp_path):
         data = np.column_stack((np.arange(4.0), 2.0 ** np.arange(4.0), 3.0 ** np.arange(4.0)))
         with open(tmp_path / "fields_energy.dat", "w") as fh:
@@ -100,6 +98,32 @@ class TestDataReader:
         reader = self._make_reader(tmp_path)
         assert reader.getDatwithParam("Bx") == ["fields_energy.dat"]
         assert reader.getDatwithParam("Bz") == []
+
+
+class TestDataReaderTrailingColumn:
+    # regression test (task-10 review m1): allParamsinFile used to keep the
+    # trailing newline of the header line on the last column name
+    # ("Bx\n" != "Bx"), so a sought parameter that is the last header column
+    # was never found and getValue raised "could not be found"
+
+    def _make_reader(self, tmp_path):
+        data = np.column_stack((np.arange(4.0), 2.0 ** np.arange(4.0)))
+        with open(tmp_path / "fields_energy.dat", "w") as fh:
+            fh.write("step Bx\n")
+            np.savetxt(fh, data)
+        return dataReader.DataReader(direction=str(tmp_path))
+
+    def test_all_params_in_file(self, tmp_path):
+        reader = self._make_reader(tmp_path)
+        assert reader.allParamsinFile(str(tmp_path / "fields_energy.dat")) == ["step", "Bx"]
+
+    def test_get_datwith_param(self, tmp_path):
+        reader = self._make_reader(tmp_path)
+        assert reader.getDatwithParam("Bx") == ["fields_energy.dat"]
+
+    def test_get_value_trailing_column(self, tmp_path):
+        reader = self._make_reader(tmp_path)
+        np.testing.assert_allclose(reader.getValue("Bx"), [1.0, 2.0, 4.0, 8.0])
 
 
 class TestJSONReader:

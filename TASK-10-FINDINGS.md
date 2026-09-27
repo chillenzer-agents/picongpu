@@ -144,7 +144,14 @@ headerless file -> getValue('Bx'): ValueError: The given Parameter could not be 
 i.e. the "simulation data" leg of the whole pipeline was dead for both
 possible on-disk formats. Fixed with `skiprows=1` (only reachable via
 headered files, since the sought parameter name is non-numeric, so no data
-row can ever be dropped).
+row can ever be dropped). The review (m1) found one residual edge case of
+that fix: `allParamsinFile` split the header line on single spaces, so the
+*last* column name kept its trailing newline (`"Bx\n" != "Bx"`) and a
+sought parameter that is the last header column was never found (a 2-column
+`step Bx` file made `getValue('Bx')` raise "could not be found" even on the
+fixed branch). Also fixed: the header is now split on whitespace
+(`split()`), with a 2-column-header regression test
+(`TestDataReaderTrailingColumn`).
 
 ### 3.2 Latent defects (documented, NOT fixed -- see scope note)
 

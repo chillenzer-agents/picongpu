@@ -175,7 +175,7 @@ For direct (interactive/SSH) submission on JUPITER, use the ``jupiter-jsc`` pres
 See :ref:`running on EFP <pypicongpu-running-efp>` for the full workflow.
 
 Queue: booster (4 x Nvidia GH200 per node)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. literalinclude:: profiles/efp-jupiter-jsc/efp_picongpu.profile.example
    :language: bash

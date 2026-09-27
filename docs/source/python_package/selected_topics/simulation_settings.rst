@@ -16,14 +16,37 @@ Moving window
 
 For simulations that follow a structure moving through the box
 (e.g. a laser wakefield), the moving window slides the simulation window
-along the positive ``y`` direction at the speed of light.
-Configure it on the simulation:
+along the positive ``y`` direction at the speed of light. It is configured
+on the grid via the PICMI-standard ``Grid.moving_window_velocity``:
+
+.. code-block:: python
+
+   from picongpu.picmi import constants
+
+   grid = picmi.Cartesian3DGrid(
+       ...,
+       # enable the window: slide at +c along y (the only supported motion):
+       moving_window_velocity=[0, constants.c, 0],
+       # optional PIConGPU extensions:
+       picongpu_moving_window_move_point=0.9,
+       picongpu_moving_window_stop_iteration=800,
+   )
+
+PIConGPU slides only along ``+y`` at exactly the speed of light, so the
+velocity must be ``[0, c, 0]`` (3D) or ``[0, c]`` (2D); ``None`` disables
+the window. Any other vector (sub-``c``, negative, or a non-zero ``x``/``z``
+component) raises an error rather than silently changing the motion.
+
+The two ``picongpu_moving_window_*`` knobs are PIConGPU extensions refining
+the velocity; both are optional:
 
 * ``picongpu_moving_window_move_point``:
   the point a light ray reaches, measured from the left border in multiples
   of the simulation window size, until the window starts moving.
+  Default: ``0.9``.
 * ``picongpu_moving_window_stop_iteration``:
   the iteration at which to stop moving the window.
+  Default: never stop.
 
 .. warning::
 

@@ -5,11 +5,13 @@ Authors: Hannes Troepgen, Brian Edward Marre, Richard Pausch, Julian Lenz
 License: GPLv3+
 """
 
+import math
 from typing import Annotated, Sequence
 import picmistandard
 from pydantic import AfterValidator, BeforeValidator, Field, computed_field, model_validator
 
 from ..pypicongpu import grid, util
+from . import constants
 from .copy_attributes import converts_to
 
 
@@ -82,10 +84,47 @@ def _check_cartesian_grid(self, dim_name):
     _reject_unsupported_cartesian_grid_features(self)
     _check_grid_distribution(self, dim_name)
     _check_super_cell_size(self, dim_name)
+    _check_moving_window(self, len(dim_name))
+
+
+def _check_moving_window(self, n_dimensions):
+    """Validate the PICMI-standard moving-window velocity and the extension knobs.
+
+    PIConGPU slides the simulation window at the speed of light along +y only
+    (``MovingWindow.hpp``, ``moveDirection = 1``), so the standard
+    ``moving_window_velocity`` (a per-dimension vector in m/s) is accepted only
+    when it means exactly that. Anything else is rejected with a clear error.
+    ``None`` disables the moving window.
+    """
+    velocity = self.moving_window_velocity
+    if velocity is not None:
+        if len(velocity) != n_dimensions:
+            util.unsupported(
+                f"a moving_window_velocity of length {len(velocity)} "
+                f"(a {n_dimensions}D grid takes a {n_dimensions}-component vector)",
+                velocity,
+            )
+        if velocity[0] != 0 or (n_dimensions == 3 and velocity[2] != 0):
+            util.unsupported("moving window motion in x/z (PIConGPU slides along +y only)", velocity)
+        if not math.isclose(velocity[1], constants.c, rel_tol=1e-6):
+            util.unsupported(
+                "a moving-window velocity different from +c in y "
+                "(PIConGPU slides at the speed of light, hence the standard value is [0, c, 0])",
+                velocity,
+            )
+
+    if self.picongpu_moving_window_move_point is not None and self.picongpu_moving_window_move_point < 0:
+        raise ValueError(
+            "picongpu_moving_window_move_point must be >= 0 "
+            f"(fraction of the window size). You gave {self.picongpu_moving_window_move_point}."
+        )
+    if self.picongpu_moving_window_stop_iteration is not None and self.picongpu_moving_window_stop_iteration <= 0:
+        raise ValueError(
+            f"picongpu_moving_window_stop_iteration must be > 0. You gave {self.picongpu_moving_window_stop_iteration}."
+        )
 
 
 def _reject_unsupported_cartesian_grid_features(self):
-    util.unsupported("moving window", self.moving_window_velocity)
     util.unsupported("refined regions", self.refined_regions, [])
     util.unsupported("lower bound (particles)", self.lower_bound_particles, self.lower_bound)
     util.unsupported("upper bound (particles)", self.upper_bound_particles, self.upper_bound)
@@ -189,6 +228,16 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
     ] = Field(default=(1, 1, 1))
     picongpu_grid_dist: None | list[list[int]] = Field(default=None)
     picongpu_super_cell_size: tuple[int, int, int] = Field(default=(8, 8, 4))
+    # PIConGPU extension: start point of the moving window (fraction of the
+    # window size). Only meaningful together with moving_window_velocity; the
+    # C++ default of 0.9 is applied at conversion time when left as None.
+    picongpu_moving_window_move_point: float | None = Field(default=None)
+    """point a light ray reaches in y from the left border until we begin sliding
+    the simulation window with the speed of light, in multiples of the window size"""
+    # PIConGPU extension: iteration at which to stop moving the window. No
+    # PICMI-standard equivalent exists.
+    picongpu_moving_window_stop_iteration: int | None = Field(default=None)
+    """iteration at which to stop moving the simulation window"""
 
     @computed_field
     def picongpu_cell_size(self) -> tuple[int, int, int]:
@@ -262,6 +311,12 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
             kwargs["picongpu_n_gpus"] = self.picongpu_n_gpus[:2]
         if self.picongpu_grid_dist is not None:
             kwargs["picongpu_grid_dist"] = self.picongpu_grid_dist[:2]
+        if self.moving_window_velocity is not None:
+            kwargs["moving_window_velocity"] = self.moving_window_velocity[:2]
+        if self.picongpu_moving_window_move_point is not None:
+            kwargs["picongpu_moving_window_move_point"] = self.picongpu_moving_window_move_point
+        if self.picongpu_moving_window_stop_iteration is not None:
+            kwargs["picongpu_moving_window_stop_iteration"] = self.picongpu_moving_window_stop_iteration
         grid_2d = Cartesian2DGrid(**kwargs)
         grid_2d.check()
         return grid_2d
@@ -303,6 +358,16 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
     picongpu_grid_dist: None | list[list[int]] = Field(default=None)
     # PIConGPU's 2D setups (e.g. the FoilLCT example) use a <16, 16> super cell.
     picongpu_super_cell_size: tuple[int, int] = Field(default=(16, 16))
+    # PIConGPU extension: start point of the moving window (fraction of the
+    # window size). Only meaningful together with moving_window_velocity; the
+    # C++ default of 0.9 is applied at conversion time when left as None.
+    picongpu_moving_window_move_point: float | None = Field(default=None)
+    """point a light ray reaches in y from the left border until we begin sliding
+    the simulation window with the speed of light, in multiples of the window size"""
+    # PIConGPU extension: iteration at which to stop moving the window. No
+    # PICMI-standard equivalent exists.
+    picongpu_moving_window_stop_iteration: int | None = Field(default=None)
+    """iteration at which to stop moving the simulation window"""
     # In 2D3V the Z cell length (CELL_DEPTH_SI) is the wire-particle integration
     # length used to normalize densities. When left as None, the conversion falls
     # back to the x cell size (dx); set it to override the slab thickness.

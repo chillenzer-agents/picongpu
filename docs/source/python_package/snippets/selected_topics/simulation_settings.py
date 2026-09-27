@@ -19,6 +19,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from picongpu import picmi
+from picongpu.picmi import constants
 
 grid = picmi.Cartesian3DGrid(
     number_of_cells=[64, 128, 64],
@@ -26,6 +27,12 @@ grid = picmi.Cartesian3DGrid(
     upper_bound=[1e-6, 2e-6, 1e-6],
     lower_boundary_conditions=["open", "open", "open"],
     upper_boundary_conditions=["open", "open", "open"],
+    # move the window at the speed of light along +y (the only supported direction):
+    moving_window_velocity=[0, constants.c, 0],
+    # start moving once a light ray has crossed 90% of the box (the default):
+    picongpu_moving_window_move_point=0.9,
+    # stop moving it after this iteration (PIConGPU-only; default: never stop):
+    picongpu_moving_window_stop_iteration=800,
 )
 solver = picmi.ElectromagneticSolver(method="Yee", cfl=0.95, grid=grid)
 
@@ -40,10 +47,6 @@ simulation = picmi.Simulation(
     solver=solver,
     species=[electrons],
     layouts=[picmi.PseudoRandomLayout(n_macroparticles_per_cell=4)],
-    # start moving the window once a light ray has crossed 90% of the box:
-    picongpu_moving_window_move_point=0.9,
-    # stop moving it after this iteration:
-    picongpu_moving_window_stop_iteration=800,
     # normalization reference density (default 1.0e25 m^-3) and typical ppc:
     picongpu_base_density=1.0e25,
     picongpu_typical_ppc=4,

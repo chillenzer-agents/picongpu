@@ -67,7 +67,7 @@ def write_synthetic_energy_histogram(
     )
 
 
-def _fake_runner_run(self):
+def _fake_runner_run(self, **_kwargs):
     write_synthetic_energy_histogram(self.run_dir, emulated_electron_count(self.run_dir))
 
 

@@ -87,31 +87,55 @@ def _check_cartesian_grid(self, dim_name):
     _check_moving_window(self, len(dim_name))
 
 
-def _check_moving_window(self, n_dimensions):
-    """Validate the PICMI-standard moving-window velocity and the extension knobs.
+def _check_moving_window_velocity(velocity, n_dimensions):
+    """Validate a PICMI-standard moving-window velocity for ``n_dimensions``.
 
     PIConGPU slides the simulation window at the speed of light along +y only
-    (``MovingWindow.hpp``, ``moveDirection = 1``), so the standard
-    ``moving_window_velocity`` (a per-dimension vector in m/s) is accepted only
-    when it means exactly that. Anything else is rejected with a clear error.
+    (``MovingWindow.hpp``, ``moveDirection = 1``), so the velocity (a
+    per-dimension vector in m/s) is accepted only when it means exactly that.
     ``None`` disables the moving window.
     """
-    velocity = self.moving_window_velocity
-    if velocity is not None:
-        if len(velocity) != n_dimensions:
-            util.unsupported(
-                f"a moving_window_velocity of length {len(velocity)} "
-                f"(a {n_dimensions}D grid takes a {n_dimensions}-component vector)",
-                velocity,
-            )
-        if velocity[0] != 0 or (n_dimensions == 3 and velocity[2] != 0):
-            util.unsupported("moving window motion in x/z (PIConGPU slides along +y only)", velocity)
-        if not math.isclose(velocity[1], constants.c, rel_tol=1e-6):
-            util.unsupported(
-                "a moving-window velocity different from +c in y "
-                "(PIConGPU slides at the speed of light, hence the standard value is [0, c, 0])",
-                velocity,
-            )
+    if velocity is None:
+        return
+    if len(velocity) != n_dimensions:
+        util.unsupported(
+            f"a moving_window_velocity of length {len(velocity)} "
+            f"(a {n_dimensions}D grid takes a {n_dimensions}-component vector)",
+            velocity,
+        )
+    if velocity[0] != 0 or (n_dimensions == 3 and velocity[2] != 0):
+        util.unsupported("moving window motion in x/z (PIConGPU slides along +y only)", velocity)
+    if not math.isclose(velocity[1], constants.c, rel_tol=1e-6):
+        util.unsupported(
+            "a moving-window velocity different from +c in y "
+            "(PIConGPU slides at the speed of light, hence the standard value is [0, c, 0])",
+            velocity,
+        )
+
+
+def _check_moving_window_extensions_require_velocity(velocity, move_point, stop_iteration):
+    """Reject the extension knobs when the standard enabling velocity is unset.
+
+    The ``picongpu_moving_window_*`` knobs refine the standard
+    ``Grid.moving_window_velocity``; without it the moving window is disabled
+    and the knobs would otherwise be silently ignored.
+    """
+    if velocity is None and (move_point is not None or stop_iteration is not None):
+        raise ValueError(
+            "picongpu_moving_window_move_point and picongpu_moving_window_stop_iteration "
+            "require moving_window_velocity to be set: the PIConGPU extensions refine the "
+            "standard Grid.moving_window_velocity (e.g. [0, c, 0]), which also enables the window."
+        )
+
+
+def _check_moving_window(self, n_dimensions):
+    """Validate the PICMI-standard moving-window velocity and the extension knobs."""
+    _check_moving_window_velocity(self.moving_window_velocity, n_dimensions)
+    _check_moving_window_extensions_require_velocity(
+        self.moving_window_velocity,
+        self.picongpu_moving_window_move_point,
+        self.picongpu_moving_window_stop_iteration,
+    )
 
     if self.picongpu_moving_window_move_point is not None and self.picongpu_moving_window_move_point < 0:
         raise ValueError(
@@ -287,6 +311,11 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         upper_bound = self.upper_bound[:2]
         lower_boundary_conditions = self.lower_boundary_conditions[:2]
         upper_boundary_conditions = self.upper_boundary_conditions[:2]
+
+        # Validate the full 3D velocity *before* truncating it: otherwise z
+        # motion that the 3D grid rejects (e.g. [0, c, c]) would be silently
+        # dropped and only the reduced [0, c] would be checked.
+        _check_moving_window_velocity(self.moving_window_velocity, 3)
 
         # The 3D default super cell maps to the 2D default; an explicitly-set
         # super cell (including a deliberate ``(8, 8, 4)``) keeps its (x, y).

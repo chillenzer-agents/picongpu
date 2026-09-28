@@ -443,6 +443,28 @@ class TestPicmiSimulation(TestCase):
         sim = picmi.Simulation(time_step_size=1.39e-16, max_steps=int(2048), solver=solver)
         assert sim.get_as_pypicongpu().moving_window is None
 
+    def test_moving_window_extension_without_velocity_raises(self):
+        """the extension knobs require the standard enabling velocity"""
+        base = dict(
+            number_of_cells=[192, 2048, 12],
+            lower_bound=[0, 0, 0],
+            upper_bound=[3.40992e-5, 9.07264e-5, 2.1312e-6],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+        )
+        for knobs in (
+            dict(picongpu_moving_window_move_point=0.5),
+            dict(picongpu_moving_window_stop_iteration=100),
+        ):
+            grid = picmi.Cartesian3DGrid(**base, **knobs)
+            sim = picmi.Simulation(
+                time_step_size=1.39e-16,
+                max_steps=8,
+                solver=picmi.ElectromagneticSolver(method="Yee", grid=grid),
+            )
+            with pytest.raises(ValueError, match="moving_window_velocity"):
+                sim.get_as_pypicongpu()
+
     def test_moving_window_unsupported_velocities(self):
         """only [0, c, 0] is accepted; sub-c, negative, x/z motion and wrong length raise"""
         base = dict(

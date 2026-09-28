@@ -19,18 +19,10 @@ For simulations that follow a structure moving through the box
 along the positive ``y`` direction at the speed of light. It is configured
 on the grid via the PICMI-standard ``Grid.moving_window_velocity``:
 
-.. code-block:: python
-
-   from picongpu.picmi import constants
-
-   grid = picmi.Cartesian3DGrid(
-       ...,
-       # enable the window: slide at +c along y (the only supported motion):
-       moving_window_velocity=[0, constants.c, 0],
-       # optional PIConGPU extensions:
-       picongpu_moving_window_move_point=0.9,
-       picongpu_moving_window_stop_iteration=800,
-   )
+.. literalinclude:: ../snippets/selected_topics/simulation_settings.py
+   :language: python
+   :start-after: BEGIN-MOVING-WINDOW
+   :end-before: END-MOVING-WINDOW
 
 PIConGPU slides only along ``+y`` at exactly the speed of light, so the
 velocity must be ``[0, c, 0]`` (3D) or ``[0, c]`` (2D); ``None`` disables

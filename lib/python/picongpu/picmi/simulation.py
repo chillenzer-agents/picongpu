@@ -524,7 +524,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         point (defaulting to the C++ ``0.9``) and the stop iteration.
         """
         grid = self.solver.grid if self.solver is not None else None
-        if grid is None or getattr(grid, "moving_window_velocity", None) is None:
+        if grid is None or grid.moving_window_velocity is None:
             return None
         move_point = grid.picongpu_moving_window_move_point
         if move_point is None:

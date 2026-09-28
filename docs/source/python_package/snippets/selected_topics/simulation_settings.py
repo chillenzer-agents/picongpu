@@ -19,6 +19,8 @@ from datetime import timedelta
 from pathlib import Path
 
 from picongpu import picmi
+
+# BEGIN-MOVING-WINDOW
 from picongpu.picmi import constants
 
 grid = picmi.Cartesian3DGrid(
@@ -35,6 +37,7 @@ grid = picmi.Cartesian3DGrid(
     picongpu_moving_window_stop_iteration=800,
 )
 solver = picmi.ElectromagneticSolver(method="Yee", cfl=0.95, grid=grid)
+# END-MOVING-WINDOW
 
 electrons = picmi.Species(
     name="electrons",

@@ -230,6 +230,7 @@ the run directory looks like this::
   │   └── submit.cfg              #   the configuration file it was generated from
   ├── submission_information.txt  # the id of the submitted job
   ├── link_results.sh             # links the simulation output to a location of your choice
+  ├── provenance/                 # the cwltool Research Object of the run (see below)
   └── .cwl_cache/                 # the step cache of the workflow engine (see below)
 
 The simulation itself is executed by the batch script in its working directory,
@@ -264,6 +265,11 @@ of itself, so that it stays self-contained and reusable:
   This is what makes the setup understandable to (and processable by)
   tools that speak RO-Crate,
   independently of the PIConGPU Python package.
+
+In addition to the setup metadata, the run itself is recorded as a cwltool
+Research Object in ``run_dir/provenance/`` (on by default, configurable via
+the ``provenance`` table of the runtime configuration); see
+:ref:`Run Provenance <serialization_provenance>`.
 
 Resubmitting and Restarting
 ---------------------------

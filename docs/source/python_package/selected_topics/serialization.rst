@@ -57,6 +57,43 @@ and descriptions of the ``etc/``, ``include/``, ``metadata/`` and
 This makes the setup understandable to (and processable by) tools that
 speak RO-Crate, independently of the PIConGPU Python package.
 
+.. _serialization_provenance:
+
+Run Provenance (cwltool Research Object)
+----------------------------------------
+
+Beyond the setup metadata above, ``simulation.run()`` records what actually
+happened during the workflow as a
+`cwltool <https://github.com/common-workflow-language/cwltool>`__
+provenance `Research Object <https://www.researchobject.org/>`__.
+It is written into ``provenance/`` in the run directory
+(``<run_dir>/provenance/``) and contains the packed workflow, the primary
+job and its outputs, a snapshot of the workflow, the per-activity log and
+the `PROV <https://www.w3.org/TR/prov-overview/>`__ profiles, i.e. a
+`BagIt <https://datatracker.ietf.org/doc/html/rfc8493>`__ research object
+that documents the run for later inspection.
+
+Provenance tracking is **on by default** and configured through the
+``provenance`` table of the :ref:`runtime configuration
+<configuring_env_rc_params>` (the ``.picongpurc.toml`` file):
+
+.. literalinclude:: ../snippets/configuring_environment/rc_params_provenance.toml
+   :language: toml
+
+The keys are:
+
+* ``enabled`` (default ``true``): set to ``false`` to opt out and run the
+  workflow without provenance tracking.
+* ``full_name`` / ``orcid``: who to attribute the run to in the provenance
+  record; each falls back to the ``CWL_FULL_NAME`` resp. ``ORCID``
+  environment variable if unset.
+* ``host`` (default ``true``) / ``user`` (default ``false``): whether to
+  additionally capture host resp. user environment provenance.
+
+A failure in the provenance machinery is logged as a warning and never fails
+the run: the simulation result is always returned, at worst without a
+finalized Research Object. ``provenance/`` is overwritten on the next run.
+
 Reproducibility
 ---------------
 

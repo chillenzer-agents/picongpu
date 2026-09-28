@@ -12,6 +12,7 @@ import math
 from pydantic import BaseModel, Field, computed_field, model_validator
 
 from ...pypicongpu import laser
+from ...pypicongpu.validation import validate_huygens_surface_positions
 from ..copy_attributes import default_converts_to
 from .base_laser import BaseLaser, PositiveFloat
 from .polarization_type import PolarizationType
@@ -78,6 +79,7 @@ class PlaneWaveLaser(BaseModel, BaseLaser):
     @model_validator(mode="after")
     def _validate(self):
         self.a0, self.E0 = self._compute_E0_and_a0(self.k0, self.E0, self.a0)
+        validate_huygens_surface_positions(self.picongpu_huygens_surface_positions)
         self._validate_common_properties()
         return self
 

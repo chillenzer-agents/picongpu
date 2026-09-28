@@ -5,9 +5,10 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from ...pypicongpu import laser
+from ...pypicongpu.validation import validate_huygens_surface_positions
 from ..copy_attributes import default_converts_to
 
 
@@ -27,3 +28,8 @@ class FromOpenPMDPulseLaser(BaseModel):
     picongpu_huygens_surface_positions: list[list[int]] = Field(
         default_factory=lambda: [[16, -16], [16, -16], [16, -16]]
     )
+
+    @model_validator(mode="after")
+    def _validate(self):
+        validate_huygens_surface_positions(self.picongpu_huygens_surface_positions)
+        return self

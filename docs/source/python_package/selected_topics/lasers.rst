@@ -88,8 +88,34 @@ Laser types
    The PICMI-standard laser *injection method* is not supported:
    the injection method must be left at ``None``.
 
-   ``picongpu_huygens_surface_positions`` optionally sets, per axis, the
-   distance (in cells) from the global domain boundary at which the laser
-   is injected; the distance must be at least the absorbing boundary size.
-   The default is ``[[16, -16], [16, -16], [16, -16]]`` and rarely needs
-   changing.
+Huygens surface positions
+-------------------------
+
+Each incident-field laser is injected through a Huygens surface.
+``picongpu_huygens_surface_positions`` sets, per axis, the position of that
+surface as one ``[min, max]`` pair of cell indices; the default is
+``[[16, -16], [16, -16], [16, -16]]`` and rarely needs changing:
+
+.. literalinclude:: ../snippets/selected_topics/huygens_surface.py
+   :language: python
+   :start-after: BEGIN-HUYGENS-SURFACE
+   :end-before: END-HUYGENS-SURFACE
+
+A positive ``min`` counts cells in from the low edge of the global domain,
+so it must be ``> 0``.
+A negative ``max`` counts cells in from the high edge;
+a non-negative ``max`` is an absolute coordinate in cells, for which you are
+responsible for the grid-size arithmetic.
+The surface must lie inside the global domain and the volume it bounds must
+span at least two cells on every axis.
+Because a single Huygens surface is rendered per simulation, all lasers of a
+simulation must use the same ``picongpu_huygens_surface_positions``.
+For a moving-window simulation the upper ``y`` surface may lie outside the
+initially simulated volume.
+
+The frontend rejects malformed positions already at construction time
+(and, against the grid, when the simulation is built), so these mistakes no
+longer surface only as a runtime error of the PIConGPU binary.
+The minimum distance from the absorbing boundary
+(``absorber_thickness + FDTD_spatial_order / 2 - 1``) is still enforced by
+PIConGPU itself and is not checked by the frontend.

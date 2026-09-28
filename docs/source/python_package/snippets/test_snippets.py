@@ -311,6 +311,9 @@ EXPECTED_FILES = {
             ("grids_and_solvers_setup/etc/picongpu/N.cfg", 'TBG_gridSize="128 128 128"'),
         ],
     },
+    "selected_topics/huygens_surface.py": {
+        "stdout_contains": ["accepted Huygens surface positions"],
+    },
     "selected_topics/lasers.py": {
         "no_run": True,
         "files": [

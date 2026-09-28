@@ -20,19 +20,28 @@ In order to then clearly present the result obtained to the user, an output is a
 | | ├── math.py
 | | └── _searchData.py
 | ├── Output
-| | ├── Log.py 
+| | ├── Log.py
 | | └── Viewer.py
 | ├── Reader
-| | ├── dataReader.py   
+| | ├── cmakeFlagReader.py
+| | ├── dataReader.py
 | | ├── jsonReader.py
-| | └── paramReader.py
+| | ├── paramReader.py
+| | └── readFiles.py
 | ├── Template
-| | ├── Data.py 
-| | └── main.py
+| | └── config.py
 | └── _checkData.py
 |
+| ./lib/python/test/setups
+| ├── MI
+| | ├── config.py
+| | └── main.py
+| └── ESKHI
+|   ├── config.py
+|   └── main.py
 
 In the above overview, all ``__init__.py`` and ``_manager.py`` files have been left out for the sake of clarity.
+Each case under ``lib/python/test/setups`` is a concrete test case built on the framework: ``config.py`` defines the case (paths, parameters, acceptance, theory/simulation evaluation), while ``main.py`` is the command-line entry point wrapping ``testsuite._manager.run_testsuite``.
 
 The subpackage reader reads out the data.
 It does not matter whether this data is used for the theory part or data from the simulation.

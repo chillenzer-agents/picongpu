@@ -86,16 +86,10 @@ All distributions take
 The available distributions are:
 
 :class:`~picongpu.picmi.distribution.UniformDistribution`
-   A constant density throughout the box (``density`` in m⁻³).
-
-   .. note::
-
-      The ``lower_bound``/``upper_bound`` and ``fill_in`` parameters
-      are not supported: setting them to non-default values raises an
-      ``UnsupportedFeatureError`` at input-file generation, while the
-      density fills the entire simulation box. For sub-volume densities
-      use ``AnalyticDistribution``, ``GaussianDistribution`` or
-      ``FoilDistribution`` instead.
+   A constant density (``density`` in m⁻³) throughout the box, optionally
+   restricted to a sub-volume via ``lower_bound``/``upper_bound`` and
+   continued under a moving window via ``fill_in``
+   (see `Uniform density in a sub-volume`_).
 
 :class:`~picongpu.picmi.distribution.GaussianDistribution`
    A constant-density region with Gaussian ramps at the front and the rear
@@ -125,6 +119,42 @@ The available distributions are:
 
 The reference density used to normalize the code units is
 ``simulation.picongpu_base_density`` (default ``1.0e25`` m⁻³).
+
+.. _uniform_subvolume:
+
+Uniform density in a sub-volume
+-------------------------------
+
+``UniformDistribution`` accepts two optional 3-component bounds of the form
+``[x, y, z]`` (in metres), each axis independently ``None`` for "unbounded":
+
+* ``lower_bound``: the lower corner of the sub-volume,
+* ``upper_bound``: the upper corner of the sub-volume,
+* ``fill_in``: whether the density is continued (re-filled) into space that a
+  :ref:`moving window <simulation_settings>` exposes at the front of the
+  simulation box.
+
+The subscript of a bound being ``None`` is equivalent to passing no bound at
+all for that axis. Bounds must have exactly three components, or
+:class:`ValueError` is raised.
+
+.. literalinclude:: ../snippets/selected_topics/uniform_subvolume.py
+   :language: python
+   :start-after: # BEGIN-UNIFORM-SUBVOLUME
+   :end-before: # END-UNIFORM-SUBVOLUME
+
+.. note::
+
+   The bounds and ``fill_in`` are carried through the Python layer and
+   rendered into the generated species definition, but are **not yet honoured
+   by the C++ homogeneous density profile**: the current runtime still fills
+   the entire simulation box with ``density``. Honouring the sub-volume at
+   runtime is a tracked C++ follow-up (``@todo respect bounding box`` in
+   ``density.param``). The rendered comments state this explicitly. For a
+   density that is actually confined at runtime, use
+   :class:`~picongpu.picmi.distribution.AnalyticDistribution`,
+   :class:`~picongpu.picmi.distribution.GaussianDistribution` or
+   :class:`~picongpu.picmi.distribution.FoilDistribution`.
 
 Layouts
 -------

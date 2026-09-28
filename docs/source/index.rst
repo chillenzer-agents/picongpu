@@ -131,6 +131,7 @@ In case you are already fluent in compiling C++ projects and HPC, running PIC si
    dev/picongpu
    dev/pmacc
    dev/py_postprocessing
+   dev/picmi_feature_gaps
    dev/debugging
    dev/doxyindex
    dev/PlantUML

@@ -279,17 +279,62 @@ and the steps after them, run again).
 If you want to force a full re-execution,
 delete ``.cwl_cache/`` first.
 
-Regarding restarting a simulation that has already been started:
-the Python interface currently runs simulations from scratch only.
-In particular, ``simulation.step(n)``
-is not a way to run a simulation in increments:
-it requires ``n`` to be the full length of the simulation (``max_steps``)
-and executes the complete workflow for it.
-(There is a pending effort in the code to support incremental runs/restarts
-through the runner;
-until then, a checkpoint-based restart
-in the sense of the C++ code
-has to be arranged outside of the Python interface.)
+Stepwise Running
+^^^^^^^^^^^^^^^^
+
+``simulation.run()`` executes the whole simulation ``[0, max_steps)`` in one
+batched run.
+:meth:`~picongpu.picmi.simulation.Simulation.step` instead runs the simulation
+in the **foreground**, chunk by chunk. Each call covers exactly the steps
+requested -- ``step()`` one step, ``step(nsteps=N)`` exactly ``N`` steps, or
+``step(start=s, end=e)`` the explicit range ``[s, e)`` -- and resumes from the
+checkpoint written at the end of the previous chunk. The steps can be split up
+in either of two equivalent ways, and a chunk may overrun ``max_steps`` (the
+chunking is decoupled from it):
+
+.. literalinclude:: ../snippets/running_simulation/stepwise_running.py
+   :language: python
+   :start-after: BEGIN-STEPWISE-RUNNING
+   :end-before: END-STEPWISE-RUNNING
+
+All chunks share the same ``setup_dir`` / ``run_dir`` (the ``setup_dir`` /
+``run_dir`` keyword arguments of ``step()`` / ``picongpu_get_runner()``); their
+outputs and checkpoints accumulate in the same ``simOutput`` rather than being
+merged afterwards, so a subsequent chunk keeps running next to the previous
+one's results. ``step()`` also accumulates the steps it has completed in the
+``Simulation``: an implicit follow-up call starts where the previous chunk
+ended; ``simulation.run()`` resets that counter.
+
+Resuming an existing run
+""""""""""""""""""""""""
+
+A fresh ``step()`` on a re-run (a new ``Simulation`` object, no steps completed
+yet) defaults its start to the **latest checkpoint found on disk** in the shared
+``run_dir`` --
+the same discovery the C++ restart machinery uses -- so you can continue a run
+from where it stopped without repeating the history.
+The checkpoint directory is the one chosen via
+:class:`~picongpu.picmi.diagnostics.Checkpoint` (``directory``; default
+``"checkpoints"``), see :ref:`checkpoint`.
+
+So that the next chunk can resume, ``step()`` schedules a checkpoint at the
+chunk's final step if none is already covered by a user-supplied
+:class:`~picongpu.picmi.diagnostics.Checkpoint`. Because this is implicit, a
+warning is emitted when it happens; it is silenced either by passing
+``step(add_checkpoint=False)`` or by configuring a ``Checkpoint`` whose period
+covers that step (in which case no extra checkpoint is scheduled).
+For a fresh start with no prior checkpoint, the chunk uses ``tryRestart``, so
+it degrades cleanly into a normal run rather than failing.
+
+.. note::
+
+   A full run always covers ``[0, max_steps)`` as one batched run; ``run()`` is
+   the right entry point if you don't need to split the simulation. ``step()``
+   is the chunked, foreground alternative and is the way to resume a run from a
+   checkpoint through the Python interface. The C++ restart options
+   (``restart``, ``restartStep``, ``restartDirectory``, ...) remain available as
+   :class:`~picongpu.picmi.diagnostics.Checkpoint` parameters (see
+   :ref:`checkpoint`) and are what ``step()`` drives under the hood.
 
 .. _running_simulation_from_installation:
 

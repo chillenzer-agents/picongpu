@@ -186,6 +186,23 @@ EXPECTED_FILES = {
             (r"maximal electron count: ([0-9]+)", "maximal_count"),
         ],
     },
+    "running_simulation/stepwise_running.py": {
+        "no_run": True,
+        "files": [
+            "stepwise_setup/etc/picongpu/N-step-0-10.cfg",
+            "stepwise_setup/etc/picongpu/N-step-10-20.cfg",
+            "stepwise_setup/etc/picongpu/N-step-20-25.cfg",
+        ],
+        "file_contains": [
+            # each chunk carries its own absolute stop step (TBG_steps)
+            ("stepwise_setup/etc/picongpu/N-step-0-10.cfg", 'TBG_steps="10"'),
+            ("stepwise_setup/etc/picongpu/N-step-10-20.cfg", 'TBG_steps="20"'),
+            ("stepwise_setup/etc/picongpu/N-step-20-25.cfg", 'TBG_steps="25"'),
+            # a later chunk restarts from the previous chunk's end
+            ("stepwise_setup/etc/picongpu/N-step-10-20.cfg", "--checkpoint.restart.step 10"),
+            ("stepwise_setup/etc/picongpu/N-step-10-20.cfg", "--checkpoint.period 20:20:1"),
+        ],
+    },
     "selected_topics/time_steps.py": {
         "stdout_contains": [
             "slice(None, None, 10)",

@@ -53,6 +53,10 @@ grid = picmi.Cartesian3DGrid(
     upper_bound=(numberCells * cellSize).tolist(),
     lower_boundary_conditions=["open", "open", "open"],
     upper_boundary_conditions=["open", "open", "open"],
+    # slide the window at the speed of light along +y (PIConGPU's move direction):
+    moving_window_velocity=[0, c, 0],
+    # start sliding once a light ray has crossed 90% of the window:
+    picongpu_moving_window_move_point=0.9,
 )
 
 gaussianProfile = picmi.distribution.GaussianDistribution(
@@ -142,7 +146,6 @@ sim = picmi.Simulation(
     solver=solver,
     max_steps=4000,
     time_step_size=1.39e-16,
-    picongpu_moving_window_move_point=0.9,
     picongpu_walltime=datetime.timedelta(hours=2.0),
     picongpu_interaction=interaction,
 )

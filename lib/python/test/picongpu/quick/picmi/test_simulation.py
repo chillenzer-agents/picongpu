@@ -15,9 +15,11 @@ from unittest import TestCase
 import pytest
 from pydantic import ValidationError
 from picongpu import picmi
+from picongpu.picmi import constants
 from picongpu.picmi.interaction.ionization.fieldionization import ADK, ADKVariant
 from picongpu.pypicongpu import customuserinput, species
 from picongpu.pypicongpu.field_solver import ArbitraryOrderFDTDSolver
+from picongpu.pypicongpu.util import UnsupportedFeatureError
 
 
 def get_grid(delta_x: float, delta_y: float, delta_z: float, n: int):
@@ -392,7 +394,44 @@ class TestPicmiSimulation(TestCase):
         assert abs(mom_op.drift.gamma - 1.491037242289643) < 1e-10
 
     def test_moving_window(self):
-        """test that the user may set moving window"""
+        """test that the user may set the moving window via the standard grid field"""
+        grid = picmi.Cartesian3DGrid(
+            number_of_cells=[192, 2048, 12],
+            lower_bound=[0, 0, 0],
+            upper_bound=[3.40992e-5, 9.07264e-5, 2.1312e-6],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+            moving_window_velocity=[0, constants.c, 0],
+            picongpu_moving_window_stop_iteration=800,
+        )
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        sim = picmi.Simulation(time_step_size=1.39e-16, max_steps=int(2048), solver=solver)
+        pypic = sim.get_as_pypicongpu()
+
+        # no move point given -> the C++ default 0.9 is used
+        assert abs(pypic.moving_window.move_point - 0.9) < 1e-10
+        assert pypic.moving_window.stop_iteration == 800
+
+    def test_moving_window_move_point_passthrough(self):
+        """an explicit extension move point is passed through unchanged"""
+        grid = picmi.Cartesian3DGrid(
+            number_of_cells=[192, 2048, 12],
+            lower_bound=[0, 0, 0],
+            upper_bound=[3.40992e-5, 9.07264e-5, 2.1312e-6],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+            moving_window_velocity=[0, constants.c, 0],
+            picongpu_moving_window_move_point=0.5,
+        )
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        sim = picmi.Simulation(time_step_size=1.39e-16, max_steps=int(2048), solver=solver)
+        pypic = sim.get_as_pypicongpu()
+
+        assert abs(pypic.moving_window.move_point - 0.5) < 1e-10
+        assert pypic.moving_window.stop_iteration is None
+
+    def test_moving_window_none_disables(self):
+        """an unset standard velocity disables the moving window"""
         grid = picmi.Cartesian3DGrid(
             number_of_cells=[192, 2048, 12],
             lower_bound=[0, 0, 0],
@@ -401,13 +440,105 @@ class TestPicmiSimulation(TestCase):
             upper_boundary_conditions=["open", "open", "periodic"],
         )
         solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
-        sim = picmi.Simulation(
-            time_step_size=1.39e-16, max_steps=int(2048), solver=solver, picongpu_moving_window_move_point=0.9
-        )
-        pypic = sim.get_as_pypicongpu()
+        sim = picmi.Simulation(time_step_size=1.39e-16, max_steps=int(2048), solver=solver)
+        assert sim.get_as_pypicongpu().moving_window is None
 
-        assert abs(pypic.moving_window.move_point - 0.9) < 1e-10
-        assert pypic.moving_window.stop_iteration is None
+    def test_moving_window_extension_without_velocity_raises(self):
+        """the extension knobs require the standard enabling velocity"""
+        base = dict(
+            number_of_cells=[192, 2048, 12],
+            lower_bound=[0, 0, 0],
+            upper_bound=[3.40992e-5, 9.07264e-5, 2.1312e-6],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+        )
+        for knobs in (
+            dict(picongpu_moving_window_move_point=0.5),
+            dict(picongpu_moving_window_stop_iteration=100),
+        ):
+            grid = picmi.Cartesian3DGrid(**base, **knobs)
+            sim = picmi.Simulation(
+                time_step_size=1.39e-16,
+                max_steps=8,
+                solver=picmi.ElectromagneticSolver(method="Yee", grid=grid),
+            )
+            with pytest.raises(ValueError, match="moving_window_velocity"):
+                sim.get_as_pypicongpu()
+
+    def test_moving_window_unsupported_velocities(self):
+        """only [0, c, 0] is accepted; sub-c, negative, x/z motion and wrong length raise"""
+        base = dict(
+            number_of_cells=[192, 2048, 12],
+            lower_bound=[0, 0, 0],
+            upper_bound=[3.40992e-5, 9.07264e-5, 2.1312e-6],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+        )
+        c = constants.c
+        for bad in ([c, 0, 0], [0, 0.5 * c, 0], [0, -c, 0], [0, 0, c], [0, c], [0, 0, 0]):
+            grid = picmi.Cartesian3DGrid(**base, moving_window_velocity=bad)
+            solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+            sim = picmi.Simulation(time_step_size=1.39e-16, max_steps=8, solver=solver)
+            with pytest.raises(UnsupportedFeatureError):
+                sim.get_as_pypicongpu()
+
+    def test_moving_window_2d(self):
+        """the 2D grid mirrors the 3D behaviour: [0, c] enables, other vectors raise"""
+        base = dict(
+            number_of_cells=[192, 2048],
+            lower_bound=[0, 0],
+            upper_bound=[3.40992e-5, 9.07264e-5],
+            lower_boundary_conditions=["open", "open"],
+            upper_boundary_conditions=["open", "open"],
+        )
+        grid = picmi.Cartesian2DGrid(
+            **base,
+            moving_window_velocity=[0, constants.c],
+            picongpu_moving_window_move_point=0.3,
+            picongpu_moving_window_stop_iteration=400,
+        )
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        sim = picmi.Simulation(time_step_size=1.39e-16, max_steps=8, solver=solver)
+        pypic = sim.get_as_pypicongpu()
+        assert abs(pypic.moving_window.move_point - 0.3) < 1e-10
+        assert pypic.moving_window.stop_iteration == 400
+
+        bad_grid = picmi.Cartesian2DGrid(**base, moving_window_velocity=[constants.c, 0])
+        bad_sim = picmi.Simulation(
+            time_step_size=1.39e-16,
+            max_steps=8,
+            solver=picmi.ElectromagneticSolver(method="Yee", grid=bad_grid),
+        )
+        with pytest.raises(UnsupportedFeatureError):
+            bad_sim.get_as_pypicongpu()
+
+    def test_moving_window_extension_ranges(self):
+        """move_point must be >= 0 and stop_iteration > 0 when given"""
+        base = dict(
+            number_of_cells=[192, 2048, 12],
+            lower_bound=[0, 0, 0],
+            upper_bound=[3.40992e-5, 9.07264e-5, 2.1312e-6],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+            moving_window_velocity=[0, constants.c, 0],
+        )
+        grid = picmi.Cartesian3DGrid(**base, picongpu_moving_window_move_point=-0.1)
+        sim = picmi.Simulation(
+            time_step_size=1.39e-16,
+            max_steps=8,
+            solver=picmi.ElectromagneticSolver(method="Yee", grid=grid),
+        )
+        with pytest.raises(ValueError, match="move_point"):
+            sim.get_as_pypicongpu()
+
+        grid = picmi.Cartesian3DGrid(**base, picongpu_moving_window_stop_iteration=0)
+        sim = picmi.Simulation(
+            time_step_size=1.39e-16,
+            max_steps=8,
+            solver=picmi.ElectromagneticSolver(method="Yee", grid=grid),
+        )
+        with pytest.raises(ValueError, match="stop_iteration"):
+            sim.get_as_pypicongpu()
 
     def test_add_ionization_model(self):
         """ionization model is added correctly"""

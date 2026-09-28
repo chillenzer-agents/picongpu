@@ -188,20 +188,6 @@ class Simulation(picmistandard.PICMI_Simulation):
     picongpu_template_dir: Annotated[tuple[Path, ...], BeforeValidator(_normalise_template_dir)] = Field(default=())
     """directory containing templates to use for generating picongpu setups"""
 
-    picongpu_moving_window_move_point: float | None = Field(default=None)
-    """
-    point a light ray reaches in y from the left border until we begin sliding the simulation window with the speed of
-    light
-
-    in multiples of the simulation window size
-
-    @attention if moving window is active, one gpu in y direction is reserved for initializing new spaces,
-        thereby reducing the simulation window size accordingrelative spot at which to start moving the simulation window
-    """
-
-    picongpu_moving_window_stop_iteration: int | None = Field(default=None)
-    """iteration, at which to stop moving the simulation window"""
-
     picongpu_base_density: float | None = Field(default=None)
     """value to normalise densities with"""
 
@@ -482,14 +468,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             if self.picongpu_typical_ppc is not None
             else _mid_window(map(lambda op: op.layout.ppc, filter(lambda op: hasattr(op, "layout"), init_operations)))
         )
-        moving_window = (
-            None
-            if self.picongpu_moving_window_move_point is None
-            else pypicongpu.movingwindow.MovingWindow(
-                move_point=self.picongpu_moving_window_move_point,
-                stop_iteration=self.picongpu_moving_window_stop_iteration,
-            )
-        )
+        moving_window = self._get_moving_window()
         walltime = (
             None if self.picongpu_walltime is None else pypicongpu.walltime.Walltime(walltime=self.picongpu_walltime)
         )
@@ -535,6 +514,25 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     def _get_base_density(self) -> float:
         return self.picongpu_base_density or 1.0e25
+
+    def _get_moving_window(self) -> pypicongpu.movingwindow.MovingWindow | None:
+        """Build the pypicongpu moving window from the grid configuration.
+
+        The PICMI-standard ``Grid.moving_window_velocity`` enables and directs
+        the window (accepted only as "slide at c along +y", validated on the
+        grid). The PIConGPU-extension knobs on the grid refine it: the start
+        point (defaulting to the C++ ``0.9``) and the stop iteration.
+        """
+        grid = self.solver.grid if self.solver is not None else None
+        if grid is None or grid.moving_window_velocity is None:
+            return None
+        move_point = grid.picongpu_moving_window_move_point
+        if move_point is None:
+            move_point = 0.9
+        return pypicongpu.movingwindow.MovingWindow(
+            move_point=move_point,
+            stop_iteration=grid.picongpu_moving_window_stop_iteration,
+        )
 
     def run(self, *args, **kwargs) -> None:
         return self.picongpu_run(*args, **kwargs)

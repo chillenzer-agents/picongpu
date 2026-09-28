@@ -14,6 +14,7 @@ from picongpu import templates
 from picongpu.picmi import constants
 from picongpu.picmi.diagnostics import PhaseSpace, TS
 from picongpu.pypicongpu.rendering.renderer import Renderer
+from picongpu.pypicongpu.util import UnsupportedFeatureError
 
 
 def get_grid_2d(delta_x: float, delta_y: float, n: int = 100):
@@ -443,3 +444,29 @@ class TestCartesian3DGridTo2D(TestCase):
         grid_3d.check()
         with pytest.raises(ValueError, match="super cell size"):
             grid_3d.to_2d()
+
+    def test_to_2d_validates_full_3d_velocity(self):
+        # A z-velocity the 3D grid rejects must not be silently dropped by the
+        # truncation: [0, c, c] is invalid in 3D, so to_2d() must reject it
+        # instead of validating only the reduced [0, c].
+        grid_3d = picmi.Cartesian3DGrid(
+            number_of_cells=[128, 128, 4],
+            lower_bound=[0, 0, 0],
+            upper_bound=[128e-6, 128e-6, 4e-6],
+            lower_boundary_conditions=["open", "open", "open"],
+            upper_boundary_conditions=["open", "open", "open"],
+            moving_window_velocity=[0, constants.c, constants.c],
+        )
+        with pytest.raises(UnsupportedFeatureError, match="x/z"):
+            grid_3d.to_2d()
+
+        # the supported [0, c, 0] still reduces to [0, c]
+        grid_3d = picmi.Cartesian3DGrid(
+            number_of_cells=[128, 128, 4],
+            lower_bound=[0, 0, 0],
+            upper_bound=[128e-6, 128e-6, 4e-6],
+            lower_boundary_conditions=["open", "open", "open"],
+            upper_boundary_conditions=["open", "open", "open"],
+            moving_window_velocity=[0, constants.c, 0],
+        )
+        assert grid_3d.to_2d().moving_window_velocity == [0.0, constants.c]

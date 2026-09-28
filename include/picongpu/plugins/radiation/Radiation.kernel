@@ -61,6 +61,59 @@ namespace picongpu
              *
              * If \p T_dependenciesFulfilled is false a dummy kernel without functionality is created
              */
+            namespace acc
+            {
+                /** read the `radiationMask` attribute of a particle
+                 *
+                 * Default selection of the radiation kernel if no
+                 * `--<species>_radiation.filter` is given on the command line:
+                 * all particles whose (possibly absent) `radiationMask` attribute is
+                 * set (e.g. by the gamma filter).
+                 */
+                struct ReadRadiationMask
+                {
+                    template<typename T_Particle, typename T_Worker>
+                    HDINLINE bool operator()(T_Worker const&, T_Particle const& particle) const
+                    {
+                        return getRadiationMask(particle);
+                    }
+                };
+            } // namespace acc
+
+            /** default filter of the radiation kernel
+             *
+             * Used when no `--<species>_radiation.filter` option is given. It
+             * preserves the historic behavior: all particles of a species without a
+             * `radiationMask` attribute and, for species with the attribute, only
+             * those that were selected by the (gamma) filter executed beforehand.
+             */
+            struct ReadRadiationMaskFilter
+            {
+                template<typename T_SpeciesType>
+                struct apply
+                {
+                    using type = ReadRadiationMaskFilter;
+                };
+
+                template<typename T_Worker>
+                HDINLINE acc::ReadRadiationMask operator()(T_Worker const&, DataSpace<simDim> const&) const
+                {
+                    return acc::ReadRadiationMask{};
+                }
+
+                HINLINE static std::string getName()
+                {
+                    return "radiationMask";
+                }
+
+                /** A filter is deterministic if the filter outcome is equal between evaluations. If so, set this
+                 * variable to true, otherwise to false.
+                 *
+                 * Example: A filter were results depend on a random number generator must return false.
+                 */
+                static constexpr bool isDeterministic = true;
+            };
+
             struct KernelRadiationParticles
             {
                 /**
@@ -82,6 +135,9 @@ namespace picongpu
                  * exists therefor a unique space within the shared memory.
                  * After that, a thread calculates for a specific frequency the emitted
                  * radiation of all particles.
+                 *
+                 * Only particles selected by the particle filter \p filter contribute
+                 * to the radiation (e.g. the default `ReadRadiationMaskFilter`).
                  * @param pb
                  * @param radiation
                  * @param globalOffset
@@ -89,8 +145,9 @@ namespace picongpu
                  * @param mapper
                  * @param freqFkt
                  * @param simBoxSize
+                 * @param filter particle filter (e.g. `particles::filter::IUnary<T_Filter>`)
                  */
-                template<typename ParBox, typename DBox, typename Mapping, typename T_Worker>
+                template<typename ParBox, typename DBox, typename Mapping, typename T_Filter, typename T_Worker>
                 DINLINE
                     /*__launch_bounds__(256, 4)*/
                     void
@@ -102,7 +159,8 @@ namespace picongpu
                         uint32_t currentStep,
                         Mapping mapper,
                         radiation_frequencies::FreqFunctor freqFkt,
-                        DataSpace<simDim> simBoxSize) const
+                        DataSpace<simDim> simBoxSize,
+                        T_Filter filter) const
                 {
                     namespace po = boost::program_options;
                     using Amplitude = picongpu::plugins::radiation::Amplitude<>;
@@ -182,6 +240,8 @@ namespace picongpu
                         if(!forEachFrameInSupercell.hasParticles())
                             continue;
 
+                        // select the particles of this super cell by the current particle filter
+                        auto accFilter = filter(worker, superCellIdx - guardingSuperCells);
                         forEachFrameInSupercell(
                             /* iterate over the frame list of the current supercell */
                             [&](auto const& lockstepWorker, auto& frameCtx)
@@ -225,7 +285,7 @@ namespace picongpu
                                          */
                                         if(particle_momentumNow != particle_momentumOld)
                                         {
-                                            if(getRadiationMask(par))
+                                            if(accFilter(lockstepWorker, par))
                                                 saveParticleAt = kernel::atomicAllInc(
                                                     worker,
                                                     &counter_s,

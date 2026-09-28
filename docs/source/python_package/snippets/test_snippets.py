@@ -321,6 +321,13 @@ EXPECTED_FILES = {
             ("lasers_setup/include/picongpu/param/incidentField.param", "GaussianPulse"),
         ],
     },
+    "selected_topics/laser_fields.py": {
+        "stdout_contains": [
+            "on-axis, in-focus amplitude",
+            "envelope at x",
+            "It worked!",
+        ],
+    },
     "selected_topics/simulation_settings.py": {
         "no_run": True,
         "files": [

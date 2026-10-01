@@ -5,6 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import warnings
 from pathlib import Path
 from unittest import TestCase
 
@@ -57,16 +58,39 @@ class TestConstantAppliedField(TestCase):
         assert background.influences_dumps is True
 
     def test_influence_knobs_forwarded(self):
-        applied_field = picmi.ConstantAppliedField(
-            Ex=1e6,
-            picongpu_influence_particle_pusher=False,
-            picongpu_influences_plugins=False,
-            picongpu_influences_dumps=True,
-        )
+        with pytest.warns(UserWarning, match="has no effect"):
+            applied_field = picmi.ConstantAppliedField(
+                Ex=1e6,
+                picongpu_influence_particle_pusher=False,
+                picongpu_influences_plugins=False,
+                picongpu_influences_dumps=True,
+            )
         background = applied_field.get_as_pypicongpu()
         assert background.influence_particle_pusher is False
         assert background.influences_plugins is False
         assert background.influences_dumps is True
+
+    def test_moot_visibility_knobs_warn_when_pusher_disabled(self):
+        # pusher=False disables the whole background, so explicitly setting the
+        # visibility knobs is moot and must be surfaced instead of silently ignored
+        with pytest.warns(UserWarning, match="has no effect"):
+            picmi.ConstantAppliedField(
+                Ex=1e6,
+                picongpu_influence_particle_pusher=False,
+                picongpu_influences_plugins=False,
+            )
+        with pytest.warns(UserWarning, match="has no effect"):
+            picmi.ConstantAppliedField(
+                Ex=1e6,
+                picongpu_influence_particle_pusher=False,
+                picongpu_influences_dumps=True,
+            )
+
+    def test_no_warning_for_default_visibility_knobs(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            picmi.ConstantAppliedField(Ex=1e6, picongpu_influence_particle_pusher=False)
+            picmi.ConstantAppliedField(Ex=1e6, picongpu_influences_plugins=False)
 
 
 class TestAnalyticAppliedField(TestCase):
@@ -93,13 +117,14 @@ class TestAnalyticAppliedField(TestCase):
     def test_influence_knobs_are_not_expression_parameters(self):
         # the picongpu_* extension kwargs must be intercepted before the standard
         # base class funnels unknown kwargs into user_defined_kw
-        applied_field = picmi.AnalyticAppliedField(
-            Ex_expression="b0*x",
-            b0=2.0,
-            picongpu_influence_particle_pusher=False,
-            picongpu_influences_plugins=False,
-            picongpu_influences_dumps=False,
-        )
+        with pytest.warns(UserWarning, match="has no effect"):
+            applied_field = picmi.AnalyticAppliedField(
+                Ex_expression="b0*x",
+                b0=2.0,
+                picongpu_influence_particle_pusher=False,
+                picongpu_influences_plugins=False,
+                picongpu_influences_dumps=False,
+            )
         background = applied_field.get_as_pypicongpu()
         assert [p.name for p in background.user_defined_kw] == ["b0"]
         assert background.influence_particle_pusher is False
@@ -289,12 +314,13 @@ class TestRenderedParamFunctionallyEqual(TestCase):
         assert "--fieldBackground.influencesDumps true" in cfg
 
     def test_configured_rendering_honours_influence_knobs(self):
-        applied_field = picmi.ConstantAppliedField(
-            Ey=1e6,
-            picongpu_influence_particle_pusher=False,
-            picongpu_influences_plugins=False,
-            picongpu_influences_dumps=False,
-        )
+        with pytest.warns(UserWarning, match="has no effect"):
+            applied_field = picmi.ConstantAppliedField(
+                Ey=1e6,
+                picongpu_influence_particle_pusher=False,
+                picongpu_influences_plugins=False,
+                picongpu_influences_dumps=False,
+            )
         rendered = self._render_setup(applied_field)
         # both functors render the configured value
         assert rendered.count("InfluenceParticlePusher = true") == 0

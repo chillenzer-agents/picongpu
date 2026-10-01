@@ -53,7 +53,7 @@ their defaults.
 Macro-particle weighting
 ------------------------
 
-Serialized PIConGPU runs never create a macro-particle whose weighting is
+PIConGPU's particle initialization never creates a macro-particle whose weighting is
 below a floor: such particles are skipped at initialization and removed
 during the run. This floor is exposed as
 :attr:`~picongpu.picmi.simulation.Simulation.picongpu_min_weighting`:
@@ -62,9 +62,6 @@ during the run. This floor is exposed as
   a bare ``float`` in PIConGPU code units (``unit: none``, i.e. **not** SI).
   It must be finite and strictly positive. If unset, PIConGPU's default of
   ``10.0`` is used (this matches the C++ ``MIN_WEIGHTING`` default).
-
-It is rendered as ``MIN_WEIGHTING`` into the generated
-``include/picongpu/param/particle.param``.
 
 Numerical precision
 -------------------

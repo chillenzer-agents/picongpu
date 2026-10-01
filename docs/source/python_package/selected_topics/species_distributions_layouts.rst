@@ -148,7 +148,9 @@ The available distributions are:
    plus an optional rigid ``centroid_velocity`` (given as ``gamma * v``)
    and a thermal ``rms_velocity``.
    The correlated ``velocity_divergence`` is not supported
-   (a non-zero value raises an ``UnsupportedFeatureError``).
+   (a non-zero value raises an ``UnsupportedFeatureError``), and
+   because the bunch is inherently three-dimensional it is rejected on a
+   2D grid (an ``UnsupportedFeatureError`` at input-file generation).
 
    .. literalinclude:: ../snippets/selected_topics/gaussian_bunch.py
       :language: python

@@ -10,7 +10,7 @@ from unittest import TestCase
 import numpy as np
 import pytest
 from picongpu import picmi
-from picongpu.picmi.grid import Cartesian3DGrid
+from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid
 from picongpu.picmi.species import Species
 from picongpu.picmi.species_requirements import SimpleMomentumOperation, run_construction
 from picongpu.pypicongpu import species
@@ -406,6 +406,18 @@ class TestPicmiGaussianBunchDistribution(TestCase):
     def test_rms_bunch_size_zero_raises(self):
         with pytest.raises(ValidationError):
             self._get_distribution(rms_bunch_size=[0.0, 1.0e-6, 1.0e-6])
+
+    def test_rejected_on_2d_grid(self):
+        """the standard bunch is 3D; a 2D grid would render a dead z term and a wrong 3D n0"""
+        grid_2d = Cartesian2DGrid(
+            lower_bound=[0, 0],
+            upper_bound=[1, 1],
+            number_of_cells=[1, 1],
+            lower_boundary_conditions=["periodic", "periodic"],
+            upper_boundary_conditions=["periodic", "periodic"],
+        )
+        with pytest.raises(UnsupportedFeatureError, match="non-3D grid"):
+            self._get_distribution().get_as_pypicongpu(grid_2d)
 
 
 class TestPicmiCylindricalDistribution(TestCase, HelperTestPicmiBoundaries):

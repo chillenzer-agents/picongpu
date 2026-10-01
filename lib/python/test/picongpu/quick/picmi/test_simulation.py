@@ -283,6 +283,13 @@ class TestPicmiSimulation(TestCase):
             with pytest.raises(ValidationError, match="Minimum weighting must be finite and > 0"):
                 picmi.Simulation(time_step_size=17, max_steps=4, solver=solver, picongpu_min_weighting=value)
 
+    def test_pypicongpu_min_weighting_rejects_non_positive_and_non_finite(self):
+        """the pypicongpu model validates directly, not only via the PICMI surface"""
+        pypic = self.sim.get_as_pypicongpu()
+        for value in (0.0, -1.0, math.inf, -math.inf, math.nan):
+            with pytest.raises(ValidationError, match="Minimum weighting must be finite and > 0"):
+                type(pypic)(**{**pypic.__dict__, "min_weighting": value})
+
     def test_invalid_placement(self):
         profile = picmi.UniformDistribution(density=42)
         layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)

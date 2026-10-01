@@ -14,8 +14,8 @@ from inspect import Parameter, signature
 import numpy as np
 from picmistandard import PICMI_AnalyticDistribution
 from picmistandard.base import Expression
-from pydantic import ConfigDict, PrivateAttr, model_validator
-from sympy import Expr, Symbol, lambdify, symbols, sympify
+from pydantic import ConfigDict, PrivateAttr, computed_field, model_validator
+from sympy import Expr, Symbol, lambdify, sstr, symbols, sympify
 
 from picongpu.pypicongpu import species
 from picongpu.pypicongpu.util import decorating_class, unsupported
@@ -55,7 +55,8 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
     PIConGPU-specific extension: in addition to the standard ``density_expression: str`` you may
     provide a sympy based ``density_function`` callable (or the equivalent ``@AnalyticDistribution``
     decorator) instead of a string. Exactly one of ``density_function`` / ``density_expression``
-    must be given.
+    must be given; the other is computed from it, so after construction **both** fields are
+    available and consistent. The parsed sympy expression is exposed as ``density_sympy``.
 
     The standard's ``momentum_expressions`` (analytic ``gamma * velocity`` per axis [m/s]) and
     ``momentum_spread_expressions`` (Gaussian thermal spread sigma per axis [m/s]) are supported in
@@ -140,11 +141,11 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
             supplied, construction raises.
     """
 
-    # The standard makes this required; PIConGPU additionally allows a sympy based
-    # density_function, so make it optional and enforce exactly-one in a validator.
-    # Keep the standard's Expression field type (newline normalisation + number
-    # coercion) and only relax it to optional.
-    density_expression: Expression | None = None
+    # The standard makes density_expression required; PIConGPU additionally allows a
+    # sympy based density_function. Both fields are always available after construction:
+    # a before validator computes whichever one was not given from the other, and still
+    # enforces the standard's "exactly one input" rule for the user-facing construction.
+    density_expression: Expression
     density_function: Callable[[Symbol, Symbol, Symbol], Expr]
     _warned_about_lambdify_failure: bool = PrivateAttr(False)
 
@@ -157,20 +158,31 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
     def _resolve_density(cls, data):
         if not isinstance(data, dict):
             return data
+        data = dict(data)
         has_function = data.get("density_function") is not None
         has_expression = data.get("density_expression") is not None
         if has_function == has_expression:
             raise ValueError("exactly one of density_function or density_expression must be provided")
         if has_expression:
-            # Normalise like the PICMI standard does, then sympify into the
-            # equivalent callable so the rendered density is identical.
+            # Normalise like the PICMI standard does (the field type does this on
+            # assignment too, but we need the normalised string here already), then
+            # sympify into the equivalent callable so the rendered density is identical.
             sx, sy, sz = symbols("x,y,z")
             parsed = sympify(f"{data['density_expression']}".replace("\n", ""))
             data["density_function"] = lambda x, y, z: parsed.subs({sx: x, sy: y, sz: z})
-        elif has_function:
+        else:
             cls._collect_callable_user_defined_kw(data)
         cls._collect_spread_user_defined_kw(data)
         cls._reject_conflicting_drift(data)
+        if not has_expression:
+            # Compute the missing string field from the function so that both fields
+            # are always available. Extra parameters are bound and user_defined_kw
+            # substituted in, so the expression is self-contained (like the standard's).
+            x, y, z = symbols("x,y,z")
+            substituted = cls._bind_density_function(data["density_function"], data.get("user_defined_kw") or {})(
+                x, y, z
+            )
+            data["density_expression"] = sstr(substituted, order="none").replace("\n", "")
         return data
 
     @staticmethod
@@ -326,32 +338,46 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
         # Slower but more reliable in some cases of difficult broadcasting.
         return np.vectorize(self._density_function())(*args, **kwargs)
 
-    def _density_function(self) -> Callable[[Symbol, Symbol, Symbol], Expr]:
-        """The density function with any user_defined_kw parameters substituted."""
-        density_function = self.density_function
-        parameters = self._density_callable_parameters(density_function)
+    @classmethod
+    def _bind_density_function(cls, density_function, user_defined_kw):
+        """A density function with its extra (beyond x, y, z) parameters bound.
+
+        Parameters named in ``user_defined_kw`` are passed by name and any remaining
+        parameters are substituted into the result. A parameter whose value was never
+        supplied is simply not passed, so the underlying call reports the usual
+        (arity) error.
+        """
+        parameters = cls._density_callable_parameters(density_function)
         if not parameters:
             # A plain f(x, y, z); user_defined_kw (if any) come from another expression
             # and still need to be substituted into the result.
-            if not self.user_defined_kw:
+            if not user_defined_kw:
                 return density_function
-            return lambda x, y, z: density_function(x, y, z).subs(self.user_defined_kw)
+            return lambda x, y, z: density_function(x, y, z).subs(user_defined_kw)
         # f(x, y, z, *user_defined_kw): bind the coordinate symbols and pass the
-        # collected constants by name, then substitute any remaining parameters. A
-        # parameter whose value was never supplied is simply not passed, so the
-        # underlying call reports the usual (arity) error.
-        kwargs = {name: self.user_defined_kw[name] for name in parameters if name in self.user_defined_kw}
-        return lambda x, y, z: density_function(x, y, z, **kwargs).subs(self.user_defined_kw)
+        # collected constants by name, then substitute any remaining parameters.
+        kwargs = {name: user_defined_kw[name] for name in parameters if name in user_defined_kw}
+        return lambda x, y, z: density_function(x, y, z, **kwargs).subs(user_defined_kw)
+
+    def _density_function(self) -> Callable[[Symbol, Symbol, Symbol], Expr]:
+        """The density function with any user_defined_kw parameters substituted."""
+        return self._bind_density_function(self.density_function, self.user_defined_kw)
 
     def _density_expression(self) -> Expr:
         x, y, z = symbols("x,y,z")
         return self._density_function()(x, y, z) + (0 * x * y * z)
 
+    @computed_field
+    @property
+    def density_sympy(self) -> Expr:
+        """The density as a sympy expression of x, y and z (public counterpart of ``density_function``)."""
+        return self._density_expression()
+
     @property
     def dim(self) -> int:
         """The number of spatial dimensions the density depends on (2 or 3)."""
         z = Symbol("z")
-        return 2 if z not in self._density_expression().free_symbols else 3
+        return 2 if z not in self.density_sympy.free_symbols else 3
 
     def _equality_key(self):
         """Semantic identity: the rendered density plus the standard surface.

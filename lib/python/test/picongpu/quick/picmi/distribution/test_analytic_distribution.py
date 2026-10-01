@@ -120,6 +120,27 @@ class TestAnalyticDistributionFromExpression(TestCase):
                     callable_dist.get_as_pypicongpu(None).function_body,
                 )
 
+    def test_both_density_fields_are_always_available(self):
+        x, y, z = symbols("x, y, z")
+        for expression, callable_density in self.CASES:
+            with self.subTest(expression=expression):
+                from_expression = AnalyticDistribution(density_expression=expression)
+                from_callable = AnalyticDistribution(callable_density)
+                # whichever input was given, both the string and the callable are populated
+                for dist in (from_expression, from_callable):
+                    self.assertEqual(dist.density_function(x, y, z), sympify(expression))
+                    self.assertEqual(sympify(dist.density_expression), sympify(expression))
+                    self.assertEqual(dist.density_sympy, sympify(expression))
+
+    def test_density_sympy_is_public_counterpart_of_density_function(self):
+        # density_sympy needs no symbols/arguments and matches the rendered density
+        distribution = AnalyticDistribution(density_expression="x**2 + y**2")
+        self.assertEqual(distribution.density_sympy, symbols("x") ** 2 + symbols("y") ** 2)
+        self.assertEqual(
+            distribution.get_as_pypicongpu(None).function_body,
+            AnalyticDistribution(distribution.density_function).get_as_pypicongpu(None).function_body,
+        )
+
     def test_expression_is_normalised_before_sympify(self):
         # the standard string normalisation removes newlines, so an
         # indented / line-broken expression parses to the same density.
@@ -221,6 +242,28 @@ class TestAnalyticDistributionFullSurface(TestCase):
         self.assertEqual(distribution.user_defined_kw, {"vx": 3.0e7})
         self.assertLess(math.sqrt(1 + (3.0e7 / c) ** 2) - distribution.get_picongpu_drift().gamma, 1e-9)
 
+    def test_momentum_and_spread_reach_species_operations(self):
+        # the standard momentum/spread expressions (with their user_defined_kw
+        # substituted) must reach the pypicongpu species operations: a constant
+        # gamma*velocity along y and a Gaussian sigma along z.
+        distribution = AnalyticDistribution(
+            density_expression="n0",
+            n0=1.0e25,
+            momentum_expressions=[None, "vx", None],
+            momentum_spread_expressions=[None, None, "vth"],
+            vx=3.0e7,
+            vth=1.0e5,
+        )
+        momentum = _momentum_of(distribution)
+        self.assertIsNotNone(momentum.drift)
+        self.assertEqual(momentum.drift.direction_normalized, (0.0, 1.0, 0.0))
+        self.assertLess(math.sqrt(1 + (3.0e7 / c) ** 2) - momentum.drift.gamma, 1e-9)
+        self.assertIsNotNone(momentum.temperature)
+        self.assertIsNone(momentum.temperature.temperature_kev)
+        self.assertEqual(momentum.temperature.temperature_kev_directional[0], 0.0)
+        self.assertEqual(momentum.temperature.temperature_kev_directional[1], 0.0)
+        self.assertEqual(momentum.temperature.temperature_kev_directional[2], 5.685630111285689e-05)
+
     def test_user_defined_kw_in_momentum_spread_expression(self):
         # a constant referenced *only* in a momentum_spread_expression is collected and substituted
         distribution = AnalyticDistribution(
@@ -291,8 +334,8 @@ class TestAnalyticDistributionFullSurface(TestCase):
         self.assertEqual(expression, callable_)
 
         x, y, z = symbols("x, y, z")
-        self.assertEqual(decorated._density_expression(), expression._density_expression())
-        self.assertEqual(decorated._density_expression(), callable_._density_expression())
+        self.assertEqual(decorated.density_sympy, expression.density_sympy)
+        self.assertEqual(decorated.density_sympy, callable_.density_sympy)
         self.assertEqual(decorated.user_defined_kw, {"a": 1, "b": 2})
         self.assertEqual(expression.user_defined_kw, {"a": 1, "b": 2})
         # the rendered C++ is identical for all three spellings
@@ -310,7 +353,7 @@ class TestAnalyticDistributionFullSurface(TestCase):
         # a parameter without a supplied value is not substituted, so rendering the
         # density fails with the usual arity error rather than silently dropping it
         with pytest.raises(TypeError):
-            AnalyticDistribution(density_function=lambda x, y, z, a: x + y + z + a)._density_expression()
+            AnalyticDistribution(density_function=lambda x, y, z, a: x + y + z + a)
 
     def test_dim_property(self):
         # the dimensionality is derived from the density expression itself

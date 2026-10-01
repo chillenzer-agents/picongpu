@@ -37,7 +37,10 @@ equivalent to the matching ``density_function``:
    :start-after: BEGIN-DENSITY-EXPRESSION
    :end-before: END-DENSITY-EXPRESSION
 
-Provide exactly one of ``density_function`` or ``density_expression``.
+Provide exactly one of ``density_function`` or ``density_expression``;
+the other is computed from it, so after construction both are available and
+consistent. The parsed sympy expression is exposed as the public
+``density_sympy`` property (e.g. for inspection or LaTeX export).
 
 Constants used in the expressions may be passed as additional keyword
 arguments; they are collected automatically into ``user_defined_kw`` and

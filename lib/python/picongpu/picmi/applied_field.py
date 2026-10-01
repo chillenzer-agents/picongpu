@@ -7,10 +7,40 @@ License: GPLv3+
 
 import sympy
 from picmistandard import PICMI_AnalyticAppliedField, PICMI_ConstantAppliedField
+from pydantic import BaseModel, Field
 
 from picongpu.pypicongpu.backgroundfield import BackgroundField
 
 _ANALYTIC_FREE_VARIABLES = frozenset({"x", "y", "z", "t"})
+
+
+class _InfluenceOptions(BaseModel):
+    """
+    PIConGPU-specific influence knobs shared by the applied-field classes.
+
+    The PICMI standard has no notion of field-background visibility, so these
+    are PIConGPU extensions. They are declared as real fields (rather than left
+    to the standard ``user_defined_kw`` catch-all) so that they are not silently
+    treated as expression parameters. The names carry the ``picongpu_`` prefix
+    as required for code-specific PICMI inputs.
+    """
+
+    picongpu_influence_particle_pusher: bool = Field(
+        default=True,
+        description=(
+            "Whether particles feel the background (C++ ``InfluenceParticlePusher``). "
+            "With ``False`` the whole background is disabled in the core, exactly like "
+            "the legacy ``fieldBackground.param``."
+        ),
+    )
+    picongpu_influences_plugins: bool = Field(
+        default=True,
+        description="Whether plugins see the background (C++ ``fieldBackground.influencesPlugins``).",
+    )
+    picongpu_influences_dumps: bool = Field(
+        default=True,
+        description="Whether dumps (incl. checkpoints) include the background (C++ ``fieldBackground.influencesDumps``).",
+    )
 
 
 def _check_only_full_domain(applied_field) -> None:
@@ -63,7 +93,7 @@ def _check_expression_symbols(applied_field, user_defined_kw) -> None:
         )
 
 
-class ConstantAppliedField(PICMI_ConstantAppliedField):
+class ConstantAppliedField(_InfluenceOptions, PICMI_ConstantAppliedField):
     """
     PIConGPU implementation of the PICMI ``ConstantAppliedField``.
 
@@ -87,10 +117,13 @@ class ConstantAppliedField(PICMI_ConstantAppliedField):
             bx=self.Bx,
             by=self.By,
             bz=self.Bz,
+            influence_particle_pusher=self.picongpu_influence_particle_pusher,
+            influences_plugins=self.picongpu_influences_plugins,
+            influences_dumps=self.picongpu_influences_dumps,
         )
 
 
-class AnalyticAppliedField(PICMI_AnalyticAppliedField):
+class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
     """
     PIConGPU implementation of the PICMI ``AnalyticAppliedField``.
 
@@ -118,6 +151,9 @@ class AnalyticAppliedField(PICMI_AnalyticAppliedField):
             bx=self.Bx_expression,
             by=self.By_expression,
             bz=self.Bz_expression,
+            influence_particle_pusher=self.picongpu_influence_particle_pusher,
+            influences_plugins=self.picongpu_influences_plugins,
+            influences_dumps=self.picongpu_influences_dumps,
             user_defined_kw=user_defined_kw,
         )
 

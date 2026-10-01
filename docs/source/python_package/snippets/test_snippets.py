@@ -347,12 +347,16 @@ EXPECTED_FILES = {
         "no_run": True,
         "files": [
             "applied_fields_setup/include/picongpu/param/fieldBackground.param",
+            "applied_fields_setup/etc/picongpu/N.cfg",
         ],
         "file_contains": [
             ("applied_fields_setup/include/picongpu/param/fieldBackground.param", "FieldBackgroundE"),
             # the analytic expression is rendered into the C++ functor:
             ("applied_fields_setup/include/picongpu/param/fieldBackground.param", "pmacc::math::sin"),
             ("applied_fields_setup/include/picongpu/param/fieldBackground.param", "wavelength"),
+            # the default influence knobs are rendered explicitly
+            ("applied_fields_setup/etc/picongpu/N.cfg", "--fieldBackground.influencesPlugins true"),
+            ("applied_fields_setup/etc/picongpu/N.cfg", "--fieldBackground.influencesDumps true"),
         ],
     },
     "selected_topics/simulation_settings.py": {

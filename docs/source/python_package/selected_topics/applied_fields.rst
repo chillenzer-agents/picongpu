@@ -35,6 +35,40 @@ Construct the field, then attach it to the simulation with
    :start-at: BEGIN-APPLIED-FIELD-ADD
    :end-before: END-APPLIED-FIELD-ADD
 
+Influence (visibility)
+----------------------
+
+A background field is **added** to the grid ``E`` and ``B`` fields around the
+particle push, so the particles feel it, while the field solver itself does not
+evolve it.
+Both applied-field classes accept three PIConGPU-specific influence knobs that
+control *who sees* the background. They mirror the knobs of the PIConGPU core
+and carry the ``picongpu_`` prefix that marks code-specific PICMI inputs:
+
+``picongpu_influence_particle_pusher`` (default ``True``)
+   Whether the particles feel the background, i.e. whether it is added around
+   the particle push. This is the C++ ``InfluenceParticlePusher`` flag of the
+   generated ``FieldBackgroundE``/``FieldBackgroundB`` functors. With ``False``
+   the core disables the whole background, exactly like setting
+   ``InfluenceParticlePusher = false`` in a hand-written
+   ``fieldBackground.param``.
+
+``picongpu_influences_plugins`` (default ``True``)
+   Whether plugins see the background (C++
+   ``fieldBackground.influencesPlugins``).
+
+``picongpu_influences_dumps`` (default ``True``)
+   Whether dumps, including checkpoints, include the background (C++
+   ``fieldBackground.influencesDumps``).
+
+.. literalinclude:: ../snippets/selected_topics/applied_fields.py
+   :language: python
+   :start-at: BEGIN-APPLIED-FIELD-INFLUENCE
+   :end-before: END-APPLIED-FIELD-INFLUENCE
+
+When no background field is configured, the plugin/dump options are not written
+to the generated run configuration at all, so the core defaults apply unchanged.
+
 Semantics
 ---------
 

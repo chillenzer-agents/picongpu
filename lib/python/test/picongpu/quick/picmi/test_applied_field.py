@@ -50,6 +50,24 @@ class TestConstantAppliedField(TestCase):
         background = picmi.ConstantAppliedField(Ez=2.5).get_as_pypicongpu()
         assert background.ez == "2.5"
 
+    def test_influence_defaults(self):
+        background = picmi.ConstantAppliedField(Ex=1e6).get_as_pypicongpu()
+        assert background.influence_particle_pusher is True
+        assert background.influences_plugins is True
+        assert background.influences_dumps is True
+
+    def test_influence_knobs_forwarded(self):
+        applied_field = picmi.ConstantAppliedField(
+            Ex=1e6,
+            picongpu_influence_particle_pusher=False,
+            picongpu_influences_plugins=False,
+            picongpu_influences_dumps=True,
+        )
+        background = applied_field.get_as_pypicongpu()
+        assert background.influence_particle_pusher is False
+        assert background.influences_plugins is False
+        assert background.influences_dumps is True
+
 
 class TestAnalyticAppliedField(TestCase):
     def test_translation_renders_expression_via_pmaccprinter(self):
@@ -71,6 +89,22 @@ class TestAnalyticAppliedField(TestCase):
         # parameters are resolved inside the rendered expression
         assert "b0" in background.ex
         assert "wl" in background.ex
+
+    def test_influence_knobs_are_not_expression_parameters(self):
+        # the picongpu_* extension kwargs must be intercepted before the standard
+        # base class funnels unknown kwargs into user_defined_kw
+        applied_field = picmi.AnalyticAppliedField(
+            Ex_expression="b0*x",
+            b0=2.0,
+            picongpu_influence_particle_pusher=False,
+            picongpu_influences_plugins=False,
+            picongpu_influences_dumps=False,
+        )
+        background = applied_field.get_as_pypicongpu()
+        assert [p.name for p in background.user_defined_kw] == ["b0"]
+        assert background.influence_particle_pusher is False
+        assert background.influences_plugins is False
+        assert background.influences_dumps is False
 
     def test_undefined_symbol_rejected(self):
         applied_field = picmi.AnalyticAppliedField(Ex_expression="wl*sin(x)")
@@ -158,10 +192,21 @@ class TestSimulationBackgroundField(TestCase):
         sim.add_applied_field(picmi.ConstantAppliedField(Ey=1e6))
         context = sim.get_as_pypicongpu().get_rendering_context()
         assert context["background_field"] is not None
-        for key in ("ex", "ey", "ez", "bx", "by", "bz"):
+        for key in (
+            "ex",
+            "ey",
+            "ez",
+            "bx",
+            "by",
+            "bz",
+            "influence_particle_pusher",
+            "influences_plugins",
+            "influences_dumps",
+        ):
             assert key in context["background_field"]
         # the renderer only accepts the standard leaf types
         assert isinstance(context["background_field"]["ey"], str)
+        assert isinstance(context["background_field"]["influence_particle_pusher"], bool)
 
     def test_applied_field_from_constructor(self):
         grid = picmi.Cartesian3DGrid(
@@ -207,10 +252,25 @@ class TestRenderedParamFunctionallyEqual(TestCase):
             param_path = Path(tmpdir) / "setup" / "include" / "picongpu" / "param" / "fieldBackground.param"
             return param_path.read_text()
 
+    def _render_n_cfg(self, applied_field=None):
+        import tempfile
+
+        sim = _get_sim()
+        if applied_field is not None:
+            sim.add_applied_field(applied_field)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sim.write_input_file(Path(tmpdir) / "setup")
+            cfg_path = Path(tmpdir) / "setup" / "etc" / "picongpu" / "N.cfg"
+            return cfg_path.read_text()
+
     def test_default_rendering_equivalent_to_static_param(self):
         rendered = self._render_setup()
         static = STATIC_FIELDBACKGROUND_PARAM.read_text()
         assert _nonblank_lines(rendered) == _nonblank_lines(static)
+
+    def test_default_rendering_n_cfg_has_no_field_background_option(self):
+        # without a background the compatibility options are not rendered at all
+        assert "fieldBackground.influences" not in self._render_n_cfg()
 
     def test_configured_rendering_enables_background(self):
         rendered = self._render_setup(picmi.ConstantAppliedField(Ey=1e6))
@@ -219,6 +279,29 @@ class TestRenderedParamFunctionallyEqual(TestCase):
         # the J background stays off
         assert "FieldBackgroundJ" in rendered
         assert "activated = false" in rendered
+
+    def test_configured_rendering_defaults_keep_pusher_plugins_dumps_on(self):
+        rendered = self._render_setup(picmi.ConstantAppliedField(Ey=1e6))
+        # both functors default to influence the pusher
+        assert rendered.count("InfluenceParticlePusher = true") == 2
+        cfg = self._render_n_cfg(picmi.ConstantAppliedField(Ey=1e6))
+        assert "--fieldBackground.influencesPlugins true" in cfg
+        assert "--fieldBackground.influencesDumps true" in cfg
+
+    def test_configured_rendering_honours_influence_knobs(self):
+        applied_field = picmi.ConstantAppliedField(
+            Ey=1e6,
+            picongpu_influence_particle_pusher=False,
+            picongpu_influences_plugins=False,
+            picongpu_influences_dumps=False,
+        )
+        rendered = self._render_setup(applied_field)
+        # both functors render the configured value
+        assert rendered.count("InfluenceParticlePusher = true") == 0
+        assert rendered.count("InfluenceParticlePusher = false") == 2
+        cfg = self._render_n_cfg(applied_field)
+        assert "--fieldBackground.influencesPlugins false" in cfg
+        assert "--fieldBackground.influencesDumps false" in cfg
 
     def test_configured_rendering_contains_analytic_expression(self):
         applied_field = picmi.AnalyticAppliedField(Ex_expression="1e5*sin(2*pi*y/wl)", wl=800e-9)

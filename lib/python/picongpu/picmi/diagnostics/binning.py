@@ -8,7 +8,7 @@ License: GPLv3+
 import warnings
 from pathlib import Path
 
-from picmistandard import PICMI_DiagnosticExtension, resolve_once
+from picmistandard import PICMI_Diagnostic, resolve_once
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from picongpu.picmi.diagnostics.backend_config import OpenPMDConfig
@@ -59,7 +59,7 @@ class BinningAxis(BaseModel):
         )
 
 
-class Binning(PICMI_DiagnosticExtension):
+class Binning(PICMI_Diagnostic):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str

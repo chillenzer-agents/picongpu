@@ -9,7 +9,7 @@ from collections.abc import Sequence
 
 import math
 
-from picmistandard import PICMI_LaserExtension, resolve_once
+from picmistandard import PICMI_Laser, resolve_once
 from pydantic import Field, computed_field, model_validator
 
 from ...pypicongpu import laser
@@ -25,7 +25,7 @@ from .polarization_type import PolarizationType
         "laser_nofocus_constant_si": lambda self: 0.0,
     },
 )
-class PlaneWaveLaser(PICMI_LaserExtension, BaseLaser):
+class PlaneWaveLaser(PICMI_Laser, BaseLaser):
     """
     Specifies a plane wave with a temporal shape
 

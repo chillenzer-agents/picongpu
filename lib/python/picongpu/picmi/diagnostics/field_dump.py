@@ -9,7 +9,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Literal
 
-from picmistandard import PICMI_DiagnosticExtension
+from picmistandard import PICMI_Diagnostic
 from pydantic import ConfigDict, computed_field
 
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
@@ -20,7 +20,7 @@ from .timestepspec import TimeStepSpec
 from picongpu.picmi.particle_functor import ParticleFunctor
 
 
-class _FieldDump(PICMI_DiagnosticExtension):
+class _FieldDump(PICMI_Diagnostic):
     period: TimeStepSpec = TimeStepSpec[:]("steps")
     options: BackendConfig = OpenPMDConfig(file="simData")
 

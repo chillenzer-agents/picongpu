@@ -5,7 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from picmistandard import PICMI_DiagnosticExtension
+from picmistandard import PICMI_Diagnostic
 from pydantic import ConfigDict
 
 from picongpu.picmi.copy_attributes import default_converts_to
@@ -17,7 +17,7 @@ from .timestepspec import TimeStepSpec
 
 
 @default_converts_to(PyPIConGPUFieldEnergyMonitor)
-class FieldEnergyMonitor(PICMI_DiagnosticExtension):
+class FieldEnergyMonitor(PICMI_Diagnostic):
     """
     Specifies the parameters for monitoring the total energy of the electromagnetic fields.
 

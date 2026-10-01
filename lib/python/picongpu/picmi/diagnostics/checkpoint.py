@@ -7,7 +7,7 @@ License: GPLv3+
 
 from pathlib import Path
 
-from picmistandard import PICMI_DiagnosticExtension
+from picmistandard import PICMI_Diagnostic
 from pydantic import Field, model_validator
 
 from picongpu.picmi.copy_attributes import default_converts_to
@@ -17,7 +17,7 @@ from .timestepspec import TimeStepSpec
 
 
 @default_converts_to(PyPIConGPUCheckpoint)
-class Checkpoint(PICMI_DiagnosticExtension):
+class Checkpoint(PICMI_Diagnostic):
     model_config = {"arbitrary_types_allowed": True}
     """
     Specifies the parameters for creating checkpoints in PIConGPU simulations.

@@ -5,7 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from picmistandard import PICMI_LaserExtension
+from picmistandard import PICMI_Laser
 from pydantic import Field
 
 from ...pypicongpu import laser
@@ -13,7 +13,7 @@ from ..copy_attributes import default_converts_to
 
 
 @default_converts_to(laser.FromOpenPMDPulseLaser)
-class FromOpenPMDPulseLaser(PICMI_LaserExtension):
+class FromOpenPMDPulseLaser(PICMI_Laser):
     """PICMI object for FromOpenPMDPulseLaser"""
 
     propagation_direction: list[float]

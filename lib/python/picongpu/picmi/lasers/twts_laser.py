@@ -8,7 +8,7 @@ License: GPLv3+
 import math
 from collections.abc import Sequence
 
-from picmistandard import PICMI_LaserExtension, resolve_once
+from picmistandard import PICMI_Laser, resolve_once
 from pydantic import Field, computed_field, model_validator
 
 from ...pypicongpu import laser
@@ -20,7 +20,7 @@ from .. import constants
 
 
 @default_converts_to(laser.TWTSLaser)
-class TWTSLaser(PICMI_LaserExtension, BaseLaser):
+class TWTSLaser(PICMI_Laser, BaseLaser):
     """
     Specifies a Traveling-Wave Thomson Scattering (TWTS) laser
 

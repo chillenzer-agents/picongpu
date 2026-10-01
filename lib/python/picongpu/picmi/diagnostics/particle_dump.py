@@ -8,7 +8,7 @@ License: GPLv3+
 from os import PathLike
 from pathlib import Path
 
-from picmistandard import PICMI_DiagnosticExtension
+from picmistandard import PICMI_Diagnostic
 from pydantic import ConfigDict
 
 from picongpu.picmi.diagnostics.backend_config import BackendConfig, OpenPMDConfig
@@ -17,7 +17,7 @@ from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species
 
 
-class ParticleDump(PICMI_DiagnosticExtension):
+class ParticleDump(PICMI_Diagnostic):
     species: Species | FilteredSpecies
     period: TimeStepSpec = TimeStepSpec[:]("steps")
     options: BackendConfig = OpenPMDConfig(file="simData")

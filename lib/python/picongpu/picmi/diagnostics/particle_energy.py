@@ -5,7 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from picmistandard import PICMI_DiagnosticExtension
+from picmistandard import PICMI_Diagnostic
 from pydantic import ConfigDict
 
 from picongpu.picmi.copy_attributes import default_converts_to
@@ -16,7 +16,7 @@ from picongpu.pypicongpu.output.particle_energy import ParticleEnergy as PyPICon
 
 
 @default_converts_to(PyPIConGPUParticleEnergy)
-class ParticleEnergy(PICMI_DiagnosticExtension):
+class ParticleEnergy(PICMI_Diagnostic):
     """
     Specifies the parameters for the per-species particle-energy diagnostic.
 

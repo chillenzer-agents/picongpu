@@ -54,7 +54,7 @@ def decorated_density(x, y, z, n0, width):
     return n0 * exp(-(((x - 1e-6) / width) ** 2))
 
 
-assert decorated_density._density_expression() == density_kwargs._density_expression()
+assert decorated_density.density_sympy == density_kwargs.density_sympy
 # END-DENSITY-KWARGS
 
 # BEGIN-MOMENTUM-EXPRESSIONS

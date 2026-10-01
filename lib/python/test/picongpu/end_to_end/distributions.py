@@ -222,6 +222,29 @@ class LinearExponential:
         return density * sympy.Piecewise(vacuum, linear_slope, exponential_slope)
 
 
+# A PICMI-standard Gaussian bunch, rendered through the analytic path.
+class GaussianBunch:
+    def __init__(self):
+        self.parameters = dict(
+            n_physical_particles=1.0e10,
+            rms_bunch_size=[1.0, 2.0, 3.0],
+            centroid_position=[10.0, 40.0, 35.0],
+            rms_velocity=[1.0e5, 1.0e5, 1.0e5],
+            centroid_velocity=[0.0, 0.0, 0.0],
+        )
+        self.distributions = {
+            "predefined": picmi.GaussianBunchDistribution(**self.parameters),
+            "free_form": picmi.AnalyticDistribution(lambda x, y, z: self.free_form(x, y, z, **self.parameters)),
+        }
+
+    @staticmethod
+    def free_form(x, y, z, n_physical_particles, rms_bunch_size, centroid_position, rms_velocity, centroid_velocity):
+        sx, sy, sz = rms_bunch_size
+        cx, cy, cz = centroid_position
+        n0 = n_physical_particles / ((2.0 * sympy.pi) ** 1.5 * sx * sy * sz)
+        return n0 * sympy.exp(-0.5 * (((x - cx) / sx) ** 2 + ((y - cy) / sy) ** 2 + ((z - cz) / sz) ** 2))
+
+
 # This is a predefined setup within PIConGPU but not PICMI.
 class SphereFlanks:
     def __init__(self):
@@ -263,5 +286,6 @@ DISTRIBUTIONS = {
     "LinearExponential": LinearExponential().distributions,
     "SphereFlanks": SphereFlanks().distributions,
     "Cylinder": Cylinder().distributions,
+    "GaussianBunch": GaussianBunch().distributions,
     "Uniformdec": {"predefined": Uniform().distributions["predefined"], "free_form": uniformdec},
 }

@@ -7,6 +7,7 @@ License: GPLv3+
 
 from unittest import TestCase
 
+import numpy as np
 import pytest
 from picongpu import picmi
 from picongpu.picmi.grid import Cartesian3DGrid
@@ -342,6 +343,69 @@ class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
         assert abs(drift.direction_normalized[0] - 0.9370354841199405) < 1e-10
         assert abs(drift.direction_normalized[1] - 0.34920746753855203) < 1e-10
         assert abs(drift.direction_normalized[2] - 0.004318114799291135) < 1e-10
+
+
+class TestPicmiGaussianBunchDistribution(TestCase):
+    values = {
+        "n_physical_particles": 1.0e10,
+        "rms_bunch_size": [1.0e-6, 2.0e-6, 3.0e-6],
+        "centroid_position": [1.0e-6, 2.0e-6, 3.0e-6],
+        "rms_velocity": [1.0e6, 2.0e6, 3.0e6],
+    }
+
+    def _get_distribution(self, **kwargs):
+        return picmi.GaussianBunchDistribution(**dict(self.values) | kwargs)
+
+    def test_full(self):
+        """full paramset renders an analytic FreeFormula profile"""
+        dist = self._get_distribution()
+        pypic = dist.get_as_pypicongpu(ARBITRARY_GRID)
+        assert isinstance(pypic, species.operation.densityprofile.FreeFormula)
+
+    def test_peak_density_and_call(self):
+        """the rendered profile carries the derived absolute peak density n0"""
+        dist = self._get_distribution()
+        n0 = self.values["n_physical_particles"] / ((2.0 * 3.141592653589793) ** 1.5 * 1.0e-6 * 2.0e-6 * 3.0e-6)
+        np.testing.assert_allclose(dist._peak_density(), n0)
+        # at the centroid the density equals n0
+        np.testing.assert_allclose(dist(*self.values["centroid_position"]), n0)
+        # one sigma away in x only drops to n0 * exp(-0.5)
+        np.testing.assert_allclose(
+            dist(
+                self.values["centroid_position"][0] + self.values["rms_bunch_size"][0],
+                *self.values["centroid_position"][1:],
+            ),
+            n0 * np.exp(-0.5),
+        )
+
+    def test_rms_velocity(self):
+        assert self._get_distribution().picongpu_get_rms_velocity_si() == tuple(self.values["rms_velocity"])
+
+    def test_drift_uses_gamma_velocity(self):
+        """centroid_velocity is gamma*v and maps through from_gamma_velocity"""
+        dist = self._get_distribution(centroid_velocity=[0.0, 0.0, 0.0])
+        assert dist.get_picongpu_drift() is None
+
+        gamma_velocity = np.array([278487224.0, 103784563.0, 1283345.0])
+        drift = self._get_distribution(centroid_velocity=list(gamma_velocity)).get_picongpu_drift()
+        assert drift is not None
+        # gamma = sqrt(1 + (gamma*v)^2/c^2), the standard's gamma*v convention
+        from scipy.constants import speed_of_light
+
+        expected_gamma = np.sqrt(1.0 + np.linalg.norm(gamma_velocity) ** 2 / speed_of_light**2)
+        assert abs(drift.gamma - expected_gamma) < 1e-10
+        np.testing.assert_allclose(
+            gamma_velocity / np.linalg.norm(gamma_velocity), drift.direction_normalized, rtol=1e-12
+        )
+
+    def test_velocity_divergence_raises(self):
+        """velocity_divergence is not expressible and any non-zero value raises"""
+        with pytest.raises(ValidationError, match=".*velocity_divergence.*"):
+            self._get_distribution(velocity_divergence=[1.0, 0.0, 0.0])
+
+    def test_rms_bunch_size_zero_raises(self):
+        with pytest.raises(ValidationError):
+            self._get_distribution(rms_bunch_size=[0.0, 1.0e-6, 1.0e-6])
 
 
 class TestPicmiCylindricalDistribution(TestCase, HelperTestPicmiBoundaries):

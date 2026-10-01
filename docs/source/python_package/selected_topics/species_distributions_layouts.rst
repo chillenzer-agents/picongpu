@@ -139,6 +139,22 @@ The available distributions are:
    A density given by an analytic expression
    (see :ref:`the functors page <functors>`).
 
+:class:`~picongpu.picmi.distribution.GaussianBunchDistribution`
+   A finite 3D Gaussian particle bunch (the PICMI-standard
+   ``GaussianBunchDistribution``).
+   It is described by the number of physical particles
+   ``n_physical_particles``, the per-axis RMS size ``rms_bunch_size``
+   and the ``centroid_position`` of the bunch,
+   plus an optional rigid ``centroid_velocity`` (given as ``gamma * v``)
+   and a thermal ``rms_velocity``.
+   The correlated ``velocity_divergence`` is not supported
+   (a non-zero value raises an ``UnsupportedFeatureError``).
+
+   .. literalinclude:: ../snippets/selected_topics/gaussian_bunch.py
+      :language: python
+      :start-at: bunch = picmi.GaussianBunchDistribution
+      :end-before: electrons = picmi.Species
+
 The reference density used to normalize the code units is
 ``simulation.picongpu_base_density`` (default ``1.0e25`` m⁻³).
 

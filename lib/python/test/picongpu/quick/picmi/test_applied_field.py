@@ -88,7 +88,8 @@ class TestAnalyticAppliedField(TestCase):
             applied_field.get_as_pypicongpu()
 
     def test_lower_upper_bound_none_accepted(self):
-        applied_field = picmi.AnalyticAppliedField(Ex_expression="x", lower_bound=None, upper_bound=None)
+        # the whole-domain case is the default (all-None bounds)
+        applied_field = picmi.AnalyticAppliedField(Ex_expression="x")
         background = applied_field.get_as_pypicongpu()
         assert background.ex == "x"
 
@@ -182,7 +183,8 @@ class TestSimulationBackgroundField(TestCase):
         assert background.ez == "3000000.0"
 
     def test_constant_lower_upper_bound_none_accepted(self):
-        applied_field = picmi.ConstantAppliedField(Ez=1.0, lower_bound=None, upper_bound=None)
+        # the whole-domain case is the default (all-None bounds)
+        applied_field = picmi.ConstantAppliedField(Ez=1.0)
         background = applied_field.get_as_pypicongpu()
         assert background.ez == "1.0"
 

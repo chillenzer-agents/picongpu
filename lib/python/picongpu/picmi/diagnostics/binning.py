@@ -124,12 +124,15 @@ class Binning(BaseModel):
         self,
         time_step_size,
         num_steps,
+        default_particle_shape=None,
     ) -> PyPIConGPUBinning:
         return PyPIConGPUBinning(
             name=self.name,
             deposition_functor=self.deposition_functor.get_as_pypicongpu(mode="Binning"),
             axes=list(map(BinningAxis.get_as_pypicongpu, self.axes)),
-            species=[s.get_as_pypicongpu(mode="Binning") for s in self.species],
+            species=[
+                s.get_as_pypicongpu(mode="Binning", default_particle_shape=default_particle_shape) for s in self.species
+            ],
             period=self.period.get_as_pypicongpu(time_step_size, num_steps),
             openPMDBackendConfig=self.openPMDBackendConfig,
             openPMDExt=self.openPMDExt,

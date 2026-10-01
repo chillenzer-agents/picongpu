@@ -42,17 +42,26 @@ Provide exactly one of ``density_function`` or ``density_expression``.
 Constants used in the expressions may be passed as additional keyword
 arguments; they are collected automatically into ``user_defined_kw`` and
 substituted before rendering (both in the density and in the momentum
-expressions), mirroring the PICMI standard.
+expressions), mirroring the PICMI standard. The same mechanism works for the
+callable: any arguments of ``density_function`` beyond ``x``, ``y`` and ``z``
+name parameters, and the matching keyword arguments on the decorator or the
+constructor give their values:
+
+.. literalinclude:: ../snippets/selected_topics/analytic_distribution.py
+   :language: python
+   :start-after: BEGIN-DENSITY-KWARGS
+   :end-before: END-DENSITY-KWARGS
 
 Momentum and thermal spread
 ---------------------------
 
-The standard :class:`~picongpu.picmi.distribution.AnalyticDistribution`
-surface is implemented. Its ``momentum_expressions`` give the analytic
-``gamma * velocity`` per axis in m/s and are rendered to the pypicongpu
-``Drift`` operation, while ``momentum_spread_expressions`` give a Gaussian
-thermal spread sigma per axis in m/s and are rendered to the ``Temperature``
-operation. Both are supported in their **constant** form only: expressions
+We follow the standardized interface from
+:class:`~picongpu.picmi.distribution.AnalyticDistribution`.
+``momentum_expressions`` give the analytic
+``gamma * velocity`` per axis in m/s,
+while ``momentum_spread_expressions`` give a Gaussian
+thermal spread sigma per axis in m/s.
+Both are supported in their **constant** form only: expressions
 that depend on ``x``, ``y`` or ``z`` raise an ``UnsupportedFeatureError`` at
 input-file generation.
 
@@ -61,8 +70,8 @@ input-file generation.
    :start-after: BEGIN-MOMENTUM-EXPRESSIONS
    :end-before: END-MOMENTUM-EXPRESSIONS
 
-The legacy ``directed_velocity`` (a plain velocity) and ``rms_velocity``
-remain available and are combined with the standard parameters
+``directed_velocity`` (a plain velocity) and ``rms_velocity``
+are combined with the standard parameters
 (``rms_velocity`` takes the per-axis maximum of itself and the constant
 spread expressions). ``directed_velocity`` and ``momentum_expressions``
 are mutually exclusive ways of setting the drift; supplying a non-zero

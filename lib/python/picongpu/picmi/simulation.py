@@ -31,7 +31,7 @@ from sympy import Symbol
 
 from picongpu import pypicongpu, templates
 from picongpu.picmi import constants
-from picongpu.picmi.applied_field import AnyAppliedField
+from picongpu.picmi.applied_field import AnyAppliedField, combine_applied_fields
 from picongpu.picmi.diagnostics.field_dump import NativeFieldDump, _FieldDump
 from picongpu.picmi.diagnostics.particle_dump import ParticleDump
 from picongpu.picmi.diagnostics.phase_space import PhaseSpace
@@ -50,6 +50,7 @@ from picongpu.picmi.species_requirements import (
 )
 from picongpu.picmi.memory_config import MemoryConfig
 from picongpu.picmi.precision_config import PrecisionConfig
+from picongpu.pypicongpu.backgroundfield import BackgroundField as PyPIConGPUBackgroundField
 from picongpu.pypicongpu.output.openpmd_plugin import FieldDump as PyPIConGPUFieldDump
 from picongpu.pypicongpu.output.openpmd_plugin import OpenPMDPlugin
 from picongpu.pypicongpu.runner import Runner
@@ -634,21 +635,23 @@ class Simulation(picmistandard.PICMI_Simulation):
     def _get_base_density(self) -> float:
         return self.picongpu_base_density or 1.0e25
 
-    def _get_background_field(self) -> "pypicongpu.backgroundfield.BackgroundField | None":
-        """Translate the configured applied fields into a single pypicongpu background field."""
+    def _get_background_field(self) -> PyPIConGPUBackgroundField | None:
+        """
+        Translate the configured applied fields into a single pypicongpu background field.
+
+        The C++ core only evaluates one ``FieldBackgroundE``/``FieldBackgroundB``
+        functor pair, so the contributions of all applied fields are summed per
+        component. The influence knobs of the individual fields must agree, as
+        they configure that single pair.
+        """
         unsupported = [f for f in self.applied_fields if not isinstance(f, AnyAppliedField)]
         if unsupported:
-            raise NotImplementedError(
-                "The following applied field(s) cannot be used as PIConGPU background fields "
-                f"(only ConstantAppliedField and AnalyticAppliedField are supported): {unsupported=}"
-            )
-        if len(self.applied_fields) > 1:
-            raise NotImplementedError(
-                f"PIConGPU currently supports at most one applied/background field, got {len(self.applied_fields)}."
+            pypicongpu.util.unsupported(
+                "applied fields other than ConstantAppliedField and AnalyticAppliedField", unsupported
             )
         if not self.applied_fields:
             return None
-        return self.applied_fields[0].get_as_pypicongpu()
+        return combine_applied_fields(self.applied_fields)
 
     def run(self, *args, **kwargs) -> None:
         return self.picongpu_run(*args, **kwargs)

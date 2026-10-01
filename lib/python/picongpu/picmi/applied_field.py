@@ -6,14 +6,25 @@ License: GPLv3+
 """
 
 import warnings
+from collections.abc import Callable
 
 import sympy
 from picmistandard import PICMI_AnalyticAppliedField, PICMI_ConstantAppliedField
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from picongpu.pypicongpu import util
+from picongpu.pypicongpu._field_functor import (
+    check_allowed_symbols,
+    check_parameter_names,
+    expression_from_callable,
+    sympify_expression,
+)
 from picongpu.pypicongpu.backgroundfield import BackgroundField
 
-_ANALYTIC_FREE_VARIABLES = frozenset({"x", "y", "z", "t"})
+#: Component keys shared by the pypicongpu background field and the PICMI fields.
+COMPONENTS = ("Ex", "Ey", "Ez", "Bx", "By", "Bz")
+
+_ANALYTIC_FREE_VARIABLES = ("x", "y", "z", "t")
 
 
 class _InfluenceOptions(BaseModel):
@@ -71,43 +82,66 @@ def _check_only_full_domain(applied_field) -> None:
     """
     for bound in (applied_field.lower_bound, applied_field.upper_bound):
         if any(component is not None for component in (bound or [])):
-            raise NotImplementedError(
-                "PIConGPU background fields are currently only supported over the whole "
-                f"simulation domain, but {type(applied_field).__name__} got {bound=} with "
-                "non-None entries. Region restriction via lower_bound/upper_bound is not "
-                "implemented yet."
-            )
+            util.unsupported("applied-field region restriction (lower_bound/upper_bound)", bound)
 
 
-def _check_expression_symbols(applied_field, user_defined_kw) -> None:
+def _influence_kwargs(applied_field) -> dict:
+    return dict(
+        influence_particle_pusher=applied_field.picongpu_influence_particle_pusher,
+        influences_plugins=applied_field.picongpu_influences_plugins,
+        influences_dumps=applied_field.picongpu_influences_dumps,
+    )
+
+
+def merge_influence(applied_fields) -> dict:
     """
-    Reject expressions that reference symbols we cannot resolve.
+    Combine the influence knobs of several applied fields.
 
-    The generated C++ functors only define the free variables ``x``/``y``/``z``
-    (position in m) and ``t`` (time in s) plus the user-defined parameters, so
-    any other symbol would be rendered as undefined C++ and only fail
-    (cryptically) at device-compile time. Fail in Python instead.
+    The knobs configure the *single* C++ ``FieldBackgroundE``/``FieldBackgroundB``
+    pair, so all applied fields must agree on them.
     """
-    allowed = _ANALYTIC_FREE_VARIABLES | {parameter["name"] for parameter in user_defined_kw}
-    undefined: set[str] = set()
-    for component in (
-        "Ex_expression",
-        "Ey_expression",
-        "Ez_expression",
-        "Bx_expression",
-        "By_expression",
-        "Bz_expression",
-    ):
-        expression = getattr(applied_field, component)
-        if expression is None:
-            continue
-        undefined |= {str(symbol) for symbol in sympy.sympify(expression).free_symbols} - allowed
-    if undefined:
-        raise ValueError(
-            "AnalyticAppliedField expression(s) reference undefined symbol(s) "
-            f"{sorted(undefined)}; the generated C++ functors only know the position (x/y/z), "
-            "the time (t) and the parameters passed as additional keyword arguments."
-        )
+    merged = None
+    for applied_field in applied_fields:
+        influence = _influence_kwargs(applied_field)
+        if merged is None:
+            merged = influence
+        elif merged != influence:
+            util.unsupported("applied fields with conflicting influence knobs", influence)
+    return merged
+
+
+def _check_expression_symbols(expressions: dict[str, sympy.Expr], parameters: list[dict]) -> None:
+    allowed = set(_ANALYTIC_FREE_VARIABLES) | {parameter["name"] for parameter in parameters}
+    check_allowed_symbols(expressions, allowed, "AnalyticAppliedField")
+
+
+def combine_applied_fields(applied_fields) -> BackgroundField:
+    """
+    Combine several applied fields into the single pypicongpu background field.
+
+    The C++ core evaluates a single ``FieldBackgroundE``/``FieldBackgroundB``
+    functor pair, so the individual E/B contributions are summed per component
+    (constants and expressions alike) and the parameters are merged.
+    """
+    applied_fields = list(applied_fields)
+    influence = merge_influence(applied_fields)
+    combined: dict[str, sympy.Expr] = {component: sympy.Integer(0) for component in COMPONENTS}
+    parameters: dict[str, float] = {}
+    for applied_field in applied_fields:
+        _check_only_full_domain(applied_field)
+        for component, expression in applied_field.get_components().items():
+            if expression is not None:
+                combined[component] = combined[component] + expression
+        for parameter in applied_field.get_parameters():
+            name, value = parameter["name"], parameter["value"]
+            if name in parameters and parameters[name] != value:
+                util.unsupported(f"redefining parameter {name!r} with a different value", value)
+            parameters[name] = value
+    return BackgroundField(
+        **{component.lower(): expression for component, expression in combined.items()},
+        user_defined_kw=[{"name": name, "value": value} for name, value in sorted(parameters.items())],
+        **influence,
+    )
 
 
 class ConstantAppliedField(_InfluenceOptions, PICMI_ConstantAppliedField):
@@ -125,18 +159,21 @@ class ConstantAppliedField(_InfluenceOptions, PICMI_ConstantAppliedField):
     ``Bx``, ``By``, ``Bz`` in T) are used verbatim.
     """
 
+    def get_components(self) -> dict[str, sympy.Expr | None]:
+        """The constant E/B components as sympy expressions (``None`` is zero)."""
+        return {
+            component: None if getattr(self, component) is None else sympify_expression(getattr(self, component))
+            for component in COMPONENTS
+        }
+
+    def get_parameters(self) -> list[dict]:
+        return []
+
     def get_as_pypicongpu(self) -> BackgroundField:
         _check_only_full_domain(self)
         return BackgroundField(
-            ex=self.Ex,
-            ey=self.Ey,
-            ez=self.Ez,
-            bx=self.Bx,
-            by=self.By,
-            bz=self.Bz,
-            influence_particle_pusher=self.picongpu_influence_particle_pusher,
-            influences_plugins=self.picongpu_influences_plugins,
-            influences_dumps=self.picongpu_influences_dumps,
+            **{component.lower(): expression for component, expression in self.get_components().items()},
+            **_influence_kwargs(self),
         )
 
 
@@ -148,30 +185,94 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
     push: particles feel it, but the field solver does not evolve it (see the
     C++ ``fieldBackground.param`` + ``FieldBackground.hpp``).
 
-    The expressions use the variables ``x``, ``y``, ``z`` (position in m) and
-    ``t`` (time in s) and may reference user-defined parameters given as
-    additional keyword arguments (as in the PICMI standard). ``Ex_expression``
-    etc. are in V/m and ``Bx_expression`` etc. in T.
+    The field mirrors the interface of
+    :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`
+    (see :doc:`/python_package/selected_topics/functors`): each of the six
+    components may be given either as a sympy-parseable ``<component>_expression``
+    string or as a ``<component>_function`` callable of ``x``, ``y``, ``z`` and
+    ``t``. Named parameters used by either form are supplied as additional
+    keyword arguments and rendered as compile-time constants.
 
-    Only whole-domain fields are supported so far, so ``lower_bound`` and
-    ``upper_bound`` must be left as their default (all ``None``).
+    ``Ex`` etc. are in V/m and ``Bx`` etc. in T. Only whole-domain fields are
+    supported so far, so ``lower_bound`` and ``upper_bound`` must be left as
+    their default (all ``None``).
     """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    Ex_function: Callable | None = None
+    Ey_function: Callable | None = None
+    Ez_function: Callable | None = None
+    Bx_function: Callable | None = None
+    By_function: Callable | None = None
+    Bz_function: Callable | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _collect_function_parameters(cls, data):
+        """
+        Fold the extra kwargs of ``*_function`` into ``user_defined_kw``.
+
+        The PICMI-standard collector only inspects ``*_expression`` strings, so
+        a parameter used solely inside a ``*_function`` would be rejected as an
+        unknown input. When at least one function is given, every extra kwarg is
+        registered as a parameter (the same catch-all the standard uses for
+        expressions). For expression-only inputs the standard collector is left
+        in charge, so unreferenced kwargs are still rejected.
+        """
+        if not isinstance(data, dict):
+            return data
+        function_fields = [f"{component}_function" for component in COMPONENTS]
+        if not any(data.get(field) is not None for field in function_fields):
+            return data
+        data = dict(data)
+        known = set(cls.model_fields)
+        user_defined_kw = dict(data.get("user_defined_kw") or {})
+        for key in list(data):
+            if key in known:
+                continue
+            user_defined_kw[key] = data.pop(key)
+        if user_defined_kw or "user_defined_kw" in data:
+            data["user_defined_kw"] = user_defined_kw
+        return data
+
+    def _component_expression(self, component: str) -> sympy.Expr | None:
+        expression = getattr(self, f"{component}_expression")
+        function = getattr(self, f"{component}_function")
+        if expression is not None and function is not None:
+            raise ValueError(
+                f"AnalyticAppliedField got both {component}_expression and {component}_function; "
+                "provide exactly one of them."
+            )
+        if expression is None and function is None:
+            return None
+        if function is not None:
+            return expression_from_callable(
+                function,
+                {name: sympy.Symbol(name) for name in _ANALYTIC_FREE_VARIABLES},
+                self.user_defined_kw,
+            )
+        return sympify_expression(expression)
+
+    def get_components(self) -> dict[str, sympy.Expr | None]:
+        return {component: self._component_expression(component) for component in COMPONENTS}
+
+    def get_parameters(self) -> list[dict]:
+        return [{"name": name, "value": value} for name, value in sorted(self.user_defined_kw.items())]
 
     def get_as_pypicongpu(self) -> BackgroundField:
         _check_only_full_domain(self)
-        user_defined_kw = [{"name": name, "value": value} for name, value in sorted(self.user_defined_kw.items())]
-        _check_expression_symbols(self, user_defined_kw)
+        parameters = self.get_parameters()
+        components = self.get_components()
+        check_parameter_names(parameter["name"] for parameter in parameters)
+        _check_expression_symbols(
+            {component: expression for component, expression in components.items() if expression is not None},
+            parameters,
+        )
         return BackgroundField(
-            ex=self.Ex_expression,
-            ey=self.Ey_expression,
-            ez=self.Ez_expression,
-            bx=self.Bx_expression,
-            by=self.By_expression,
-            bz=self.Bz_expression,
-            influence_particle_pusher=self.picongpu_influence_particle_pusher,
-            influences_plugins=self.picongpu_influences_plugins,
-            influences_dumps=self.picongpu_influences_dumps,
-            user_defined_kw=user_defined_kw,
+            **{component.lower(): expression for component, expression in components.items()},
+            user_defined_kw=parameters,
+            **_influence_kwargs(self),
         )
 
 

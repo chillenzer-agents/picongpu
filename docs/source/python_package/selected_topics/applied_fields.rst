@@ -15,10 +15,16 @@ PIConGPU supports the PICMI-standard *applied fields*, which it implements as
    A field given by Python expressions.
    Use the variables ``x``, ``y``, ``z`` (position in m) and ``t`` (time in s);
    additional keyword arguments become named parameters inside the expressions.
-   The ``*_expression`` arguments are in V/m for ``E`` and T for ``B``.
+   As in :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`,
+   each component accepts either a sympy-parseable ``<component>_expression``
+   string or a ``<component>_function`` callable (see
+   :doc:`functors`), for all six components.
+   The expressions are in V/m for ``E`` and T for ``B``.
 
 Construct the field, then attach it to the simulation with
-:meth:`~picongpu.picmi.simulation.Simulation.add_applied_field`:
+:meth:`~picongpu.picmi.simulation.Simulation.add_applied_field`.
+Several applied fields may be added; their contributions are summed per
+component into the single background field that the C++ core evaluates:
 
 .. literalinclude:: ../snippets/selected_topics/applied_fields.py
    :language: python
@@ -94,9 +100,11 @@ Constraints
 * Only the **whole simulation domain** is supported so far:
   ``lower_bound`` and ``upper_bound`` must be left at their default
   (all ``None``).
-  Region restriction is rejected with a ``NotImplementedError``.
-* At most **one** applied field may be added to a simulation;
-  a second one is rejected with a ``NotImplementedError``.
+  Region restriction is rejected with an ``UnsupportedFeatureError``.
+* Several applied fields may be added; they are summed per component.
+  All of them must agree on the influence knobs, since those configure the
+  single C++ background functor pair; a mismatch is rejected with an
+  ``UnsupportedFeatureError``.
 * The expressions of an :class:`~picongpu.picmi.applied_field.AnalyticAppliedField`
   may only reference the free variables ``x``, ``y``, ``z`` and ``t``
   plus the named parameters passed as additional keyword arguments.

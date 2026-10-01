@@ -5,9 +5,11 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import warnings
+
 import sympy
 from picmistandard import PICMI_AnalyticAppliedField, PICMI_ConstantAppliedField
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from picongpu.pypicongpu.backgroundfield import BackgroundField
 
@@ -41,6 +43,21 @@ class _InfluenceOptions(BaseModel):
         default=True,
         description="Whether dumps (incl. checkpoints) include the background (C++ ``fieldBackground.influencesDumps``).",
     )
+
+    @model_validator(mode="after")
+    def _warn_on_moot_visibility_knobs(self):
+        if self.picongpu_influence_particle_pusher:
+            return self
+        explicitly_set = {"picongpu_influences_plugins", "picongpu_influences_dumps"} & self.model_fields_set
+        if explicitly_set:
+            warnings.warn(
+                "picongpu_influence_particle_pusher=False disables the whole background, so "
+                f"{' and '.join(sorted(explicitly_set))} has no effect: nothing adds the "
+                "background to the fields. The pusher knob takes precedence.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return self
 
 
 def _check_only_full_domain(applied_field) -> None:

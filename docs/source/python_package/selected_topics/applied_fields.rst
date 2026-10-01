@@ -41,25 +41,31 @@ Influence (visibility)
 A background field is **added** to the grid ``E`` and ``B`` fields around the
 particle push, so the particles feel it, while the field solver itself does not
 evolve it.
-Both applied-field classes accept three PIConGPU-specific influence knobs that
-control *who sees* the background. They mirror the knobs of the PIConGPU core
-and carry the ``picongpu_`` prefix that marks code-specific PICMI inputs:
+Both applied-field classes accept three PIConGPU-specific influence knobs.
+They carry the ``picongpu_`` prefix that marks code-specific PICMI inputs and
+correspond to options of the generated PIConGPU run configuration:
 
 ``picongpu_influence_particle_pusher`` (default ``True``)
    Whether the particles feel the background, i.e. whether it is added around
-   the particle push. This is the C++ ``InfluenceParticlePusher`` flag of the
-   generated ``FieldBackgroundE``/``FieldBackgroundB`` functors. With ``False``
-   the core disables the whole background, exactly like setting
-   ``InfluenceParticlePusher = false`` in a hand-written
-   ``fieldBackground.param``.
+   the particle push.
 
 ``picongpu_influences_plugins`` (default ``True``)
-   Whether plugins see the background (C++
-   ``fieldBackground.influencesPlugins``).
+   Whether plugins see the background.
 
 ``picongpu_influences_dumps`` (default ``True``)
-   Whether dumps, including checkpoints, include the background (C++
-   ``fieldBackground.influencesDumps``).
+   Whether dumps, including checkpoints, include the background.
+
+.. warning::
+
+   The three knobs are **not independent**.
+   Setting ``picongpu_influence_particle_pusher=False`` disables the *whole*
+   background, so ``picongpu_influences_plugins`` and
+   ``picongpu_influences_dumps`` then have no effect: nothing adds the
+   background to the fields, and no plugin or dump can see it.
+   The two visibility knobs only take effect while the pusher knob is ``True``.
+   (This mirrors the underlying PIConGPU behaviour, which the Python layer
+   reproduces faithfully; separating "who sees it" from "is it active" is
+   deliberately left for a later change.)
 
 .. literalinclude:: ../snippets/selected_topics/applied_fields.py
    :language: python
@@ -78,10 +84,6 @@ itself does not evolve it.
 The expressions of an :class:`~picongpu.picmi.applied_field.AnalyticAppliedField`
 are evaluated in SI units and converted to PIConGPU's internal units
 (see :ref:`units`).
-
-The Python layer renders the field expressions into the C++
-``fieldBackground.param`` functors
-(see ``FieldBackground.hpp``).
 
 Constraints
 -----------

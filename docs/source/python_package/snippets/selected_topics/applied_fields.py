@@ -50,11 +50,11 @@ analytic_field = picmi.AnalyticAppliedField(
 # BEGIN-APPLIED-FIELD-INFLUENCE
 # PIConGPU-specific influence knobs (the picongpu_ prefix marks code-specific
 # PICMI inputs): whether particles feel the background, and whether plugins and
-# dumps see it. These map onto the C++ InfluenceParticlePusher flag and the
-# fieldBackground.influencesPlugins/influencesDumps runtime options.
-background_only_field = picmi.AnalyticAppliedField(
+# dumps see it. The pusher knob takes precedence: with it False the whole
+# background is disabled and the other two knobs have no effect.
+plugin_blind_field = picmi.AnalyticAppliedField(
     Ex_expression="1.0e5 * y",
-    picongpu_influence_particle_pusher=False,
+    picongpu_influence_particle_pusher=True,
     picongpu_influences_plugins=False,
     picongpu_influences_dumps=True,
 )

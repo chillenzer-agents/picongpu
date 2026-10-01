@@ -5,6 +5,8 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+from copy import copy, deepcopy
+
 import picmistandard
 
 from picongpu.picmi.species import Species
@@ -60,6 +62,26 @@ class MultiSpecies(picmistandard.PICMI_MultiSpecies):
             # all members reference the same instance); the merged result is what
             # survives serialization on the pypicongpu level.
             member._multi_species = self
+
+    def __deepcopy__(self, memo=None):
+        # pydantic's ``BaseModel.__deepcopy__`` does not register the new
+        # instance in ``memo`` before copying its private attributes, so the
+        # ``_multi_species`` marker (which points back at this object) would be
+        # deep-copied once per member. Each member would then reference a
+        # *different* copy of the group, and the operation-merging layer would
+        # no longer recognise them as coordinated. Register the copy up-front
+        # and re-point every copied member at it.
+        memo = {} if memo is None else memo
+        cls = type(self)
+        new = cls.__new__(cls)
+        memo[id(self)] = new
+        object.__setattr__(new, "__dict__", deepcopy(self.__dict__, memo))
+        object.__setattr__(new, "__pydantic_extra__", deepcopy(self.__pydantic_extra__, memo))
+        object.__setattr__(new, "__pydantic_fields_set__", copy(self.__pydantic_fields_set__))
+        object.__setattr__(new, "__pydantic_private__", deepcopy(self.__pydantic_private__, memo))
+        for member in new.species_instances_list:
+            member._multi_species = new
+        return new
 
     def __iter__(self):
         return iter(self.species_instances_list)

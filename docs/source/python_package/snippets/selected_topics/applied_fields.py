@@ -17,6 +17,8 @@ and attaches one of them to a simulation.
 
 from pathlib import Path
 
+from sympy import pi, sin
+
 from picongpu import picmi
 
 grid = picmi.Cartesian3DGrid(
@@ -37,11 +39,15 @@ constant_field = picmi.ConstantAppliedField(
 # END-APPLIED-FIELD-CONSTANT
 
 # BEGIN-APPLIED-FIELD-ANALYTIC
-# x, y, z (position in m) and t (time in s) are the free variables;
-# named parameters are passed as additional keyword arguments
+# x, y, z (position in m) and t (time in s) are the free variables.
+# Each component accepts a sympy-parseable ``*_expression`` string or a
+# ``*_function`` callable, exactly like AnalyticDistribution. Named parameters
+# are passed as additional keyword arguments.
 analytic_field = picmi.AnalyticAppliedField(
     Ex_expression="E0 * sin(2 * pi * y / wavelength) * cos(2 * pi * t / period)",
+    Ey_function=lambda x, y, z, t, E1, period: E1 * sin(2 * pi * t / period),
     E0=1.0e5,
+    E1=2.0e5,
     wavelength=0.8e-6,
     period=50.0e-15,
 )
@@ -63,7 +69,9 @@ plugin_blind_field = picmi.AnalyticAppliedField(
 simulation = picmi.Simulation(max_steps=100, solver=solver)
 
 # BEGIN-APPLIED-FIELD-ADD
-# at most one applied field is supported so far
+# several applied fields may be added; their contributions are summed into the
+# single background field the C++ core evaluates
+simulation.add_applied_field(constant_field)
 simulation.add_applied_field(analytic_field)
 # END-APPLIED-FIELD-ADD
 

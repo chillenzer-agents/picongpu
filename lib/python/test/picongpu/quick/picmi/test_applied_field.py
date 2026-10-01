@@ -10,8 +10,10 @@ from pathlib import Path
 from unittest import TestCase
 
 import pytest
+import sympy
 from picongpu import picmi
 from picongpu.pypicongpu.backgroundfield import BackgroundField
+from picongpu.pypicongpu.util import UnsupportedFeatureError
 
 REPO_ROOT = Path(__file__).resolve().parents[6]
 STATIC_FIELDBACKGROUND_PARAM = REPO_ROOT / "include" / "picongpu" / "param" / "fieldBackground.param"
@@ -153,6 +155,87 @@ class TestAnalyticAppliedField(TestCase):
         assert background.ex == "x"
 
 
+class TestAnalyticAppliedFieldFunctionInterface(TestCase):
+    """The AnalyticDistribution-equivalent ``*_function`` spelling for all six components."""
+
+    CASES = [
+        ("Ex", lambda x, y, z, t: sympy.sin(x)),
+        ("Ey", lambda x, y, z, t: sympy.cos(y)),
+        ("Ez", lambda x, y, z, t: x + y + z),
+        ("Bx", lambda x, y, z, t: sympy.exp(-t)),
+        ("By", lambda x, y, z, t: sympy.Abs(z)),
+        ("Bz", lambda x, y, z, t: 2.0 * t),
+    ]
+
+    def test_all_components_accept_functions(self):
+        for component, function in self.CASES:
+            with self.subTest(component=component):
+                applied_field = picmi.AnalyticAppliedField(**{f"{component}_function": function})
+                background = applied_field.get_as_pypicongpu()
+                assert getattr(background, component.lower()) != "0"
+
+    def test_function_and_expression_are_equivalent(self):
+        for component, function in self.CASES:
+            with self.subTest(component=component):
+                x, y, z, t = sympy.symbols("x y z t")
+                via_function = picmi.AnalyticAppliedField(**{f"{component}_function": function}).get_as_pypicongpu()
+                expected = picmi.AnalyticAppliedField(
+                    **{f"{component}_expression": str(function(x, y, z, t))}
+                ).get_as_pypicongpu()
+                assert getattr(via_function, component.lower()) == getattr(expected, component.lower())
+
+    def test_function_extra_kwargs_become_parameters(self):
+        applied_field = picmi.AnalyticAppliedField(
+            Ex_function=lambda x, y, z, t, E0, wl: E0 * sympy.sin(2 * sympy.pi * y / wl),
+            E0=1.0e5,
+            wl=800e-9,
+        )
+        background = applied_field.get_as_pypicongpu()
+        params = {p.name: p.value for p in background.user_defined_kw}
+        assert params == {"E0": 1.0e5, "wl": 800e-9}
+        assert "E0" in background.ex
+        assert "wl" in background.ex
+
+    def test_expression_and_function_for_same_component_rejected(self):
+        applied_field = picmi.AnalyticAppliedField(Ex_expression="1.0", Ex_function=lambda x, y, z, t: sympy.Integer(1))
+        with pytest.raises(ValueError, match="both Ex_expression and Ex_function"):
+            applied_field.get_as_pypicongpu()
+
+    def test_function_undefined_symbol_rejected(self):
+        unknown = sympy.Symbol("unknown")
+        applied_field = picmi.AnalyticAppliedField(Ex_function=lambda x, y, z, t: unknown * x)
+        with pytest.raises(ValueError, match="unknown"):
+            applied_field.get_as_pypicongpu()
+
+    def test_expression_only_unreferenced_kwarg_still_rejected(self):
+        # the standard collector stays in charge for pure-expression inputs
+        with pytest.raises(Exception, match="bogus"):
+            picmi.AnalyticAppliedField(Ex_expression="x", bogus=3.0)
+
+    def test_mixed_expression_and_function_parameters(self):
+        applied_field = picmi.AnalyticAppliedField(
+            Ex_expression="q*x",
+            Ey_function=lambda x, y, z, t, r: r * y,
+            q=1.0,
+            r=2.0,
+        )
+        background = applied_field.get_as_pypicongpu()
+        params = {p.name: p.value for p in background.user_defined_kw}
+        assert params == {"q": 1.0, "r": 2.0}
+        assert "q" in background.ex
+        assert "r" in background.ey
+
+    def test_unrelated_parameter_is_not_forced_into_function(self):
+        # a function that does not use an expression's parameter must still work
+        applied_field = picmi.AnalyticAppliedField(
+            Ex_expression="q*x",
+            Ey_function=lambda x, y, z, t: sympy.Integer(5),
+            q=1.0,
+        )
+        background = applied_field.get_as_pypicongpu()
+        assert background.ey == "5"
+
+
 class TestBackgroundFieldRoundTrip(TestCase):
     def test_json_roundtrip_idempotent(self):
         background = picmi.AnalyticAppliedField(Ex_expression="sin(x)*cos(t)").get_as_pypicongpu()
@@ -182,11 +265,49 @@ class TestSimulationBackgroundField(TestCase):
         assert "0.1" in background.bx
         assert "L" in background.bx
 
-    def test_multiple_applied_fields_rejected(self):
+    def test_multiple_constant_applied_fields_are_summed(self):
         sim = _get_sim()
         sim.add_applied_field(picmi.ConstantAppliedField(Ez=1.0))
-        sim.add_applied_field(picmi.ConstantAppliedField(Bz=1.0))
-        with pytest.raises(NotImplementedError):
+        sim.add_applied_field(picmi.ConstantAppliedField(Ez=2.0, Bz=3.0))
+        background = sim.get_as_pypicongpu().background_field
+        assert isinstance(background, BackgroundField)
+        assert background.ez == "3.0"
+        assert background.bz == "3.0"
+        assert background.ex == "0"
+
+    def test_constant_and_analytic_applied_fields_are_summed(self):
+        sim = _get_sim()
+        sim.add_applied_field(picmi.ConstantAppliedField(Ez=1.0, By=2.0))
+        sim.add_applied_field(
+            picmi.AnalyticAppliedField(Ez_expression="3.0", Bx_function=lambda x, y, z, t: sympy.sin(x))
+        )
+        background = sim.get_as_pypicongpu().background_field
+        assert background.ez == "4.0"
+        assert background.by == "2.0"
+        assert background.bx == "pmacc::math::sin(x)"
+
+    def test_combined_parameters_are_merged(self):
+        sim = _get_sim()
+        sim.add_applied_field(picmi.AnalyticAppliedField(Ex_expression="a*x", a=2.0))
+        sim.add_applied_field(picmi.AnalyticAppliedField(Ey_expression="b*y", b=3.0))
+        background = sim.get_as_pypicongpu().background_field
+        params = {p.name: p.value for p in background.user_defined_kw}
+        assert params == {"a": 2.0, "b": 3.0}
+        assert "a*x" in background.ex
+        assert "b*y" in background.ey
+
+    def test_conflicting_parameter_values_rejected(self):
+        sim = _get_sim()
+        sim.add_applied_field(picmi.AnalyticAppliedField(Ex_expression="a*x", a=2.0))
+        sim.add_applied_field(picmi.AnalyticAppliedField(Ey_expression="a*y", a=3.0))
+        with pytest.raises(UnsupportedFeatureError):
+            sim.get_as_pypicongpu()
+
+    def test_conflicting_influence_knobs_rejected(self):
+        sim = _get_sim()
+        sim.add_applied_field(picmi.ConstantAppliedField(Ez=1.0))
+        sim.add_applied_field(picmi.ConstantAppliedField(Bz=1.0, picongpu_influences_dumps=False))
+        with pytest.raises(UnsupportedFeatureError):
             sim.get_as_pypicongpu()
 
     def test_unsupported_applied_field_type_rejected(self):
@@ -197,13 +318,13 @@ class TestSimulationBackgroundField(TestCase):
         # (injection/initialization) are not supported as background fields yet.
         sim.add_applied_field(picmi.AnalyticAppliedField(Ex_expression="1.0"))
         sim.add_applied_field(PICMI_LoadGriddedField(read_fields_from_path="/tmp/dummy.h5"))
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(UnsupportedFeatureError):
             sim.get_as_pypicongpu()
 
     def test_region_bounds_rejected(self):
         sim = _get_sim()
         sim.add_applied_field(picmi.ConstantAppliedField(Ez=1.0, lower_bound=[0, 0, 0], upper_bound=[1e-6, 1e-6, 1e-6]))
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(UnsupportedFeatureError):
             sim.get_as_pypicongpu()
 
     def test_render_context_is_none_without_applied_field(self):

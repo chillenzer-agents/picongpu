@@ -8,7 +8,7 @@ License: GPLv3+
 from typing import Annotated, Literal
 from uuid import uuid4 as uuid
 
-from pydantic import BaseModel, BeforeValidator, Field, computed_field, model_validator
+from pydantic import BaseModel, BeforeValidator, computed_field, model_validator
 
 from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_to_cpp_type
 from picongpu.pypicongpu.particle_functor.rng_info import RNGInfo
@@ -107,54 +107,6 @@ ACCESSORS = {
 }
 
 
-# Maps each particle attribute a functor may access to the C++ requirement that
-# a species' particle frame must satisfy for the corresponding accessor to be
-# usable. ``identifiers`` are particle attributes checked with
-# ``pmacc::traits::HasIdentifiers`` (``value_identifier`` attributes are named
-# bare, ``alias`` attributes are named with ``<>``); ``flags`` are boolean
-# capabilities checked with ``pmacc::traits::HasFlag`` (always ``alias``, hence
-# the ``<>`` suffix). The strings are stored in their exact C++ spelling.
-_ATTRIBUTE_REQUIREMENTS = {
-    # Mass is resolved through the `massRatio<>` flag (see `frame::getMass`), so every
-    # attribute whose accessor reads `getMass` (mass / gamma / kinetic energy / velocity)
-    # must require it, exactly like the built-in `Energy` / `LarmorPower` /
-    # `WeightedVelocity` / `MidCurrentDensityComponent` traits do.
-    "mass": {"identifiers": ["weighting"], "flags": ["massRatio<>"]},
-    "momentum": {"identifiers": ["momentum"]},
-    "momentumPrev1": {"identifiers": ["momentumPrev1"]},
-    "charge": {"identifiers": ["weighting"], "flags": ["chargeRatio<>"]},
-    "charge_state": {"identifiers": ["boundElectrons"], "flags": ["atomicNumbers<>"]},
-    "damped_weighting": {"identifiers": ["weighting"]},
-    "gamma": {"identifiers": ["weighting", "momentum"], "flags": ["massRatio<>"]},
-    "kinetic energy": {"identifiers": ["weighting", "momentum"], "flags": ["massRatio<>"]},
-    "velocity": {"identifiers": ["weighting", "momentum"], "flags": ["massRatio<>"]},
-}
-_NO_REQUIREMENT = {"identifiers": [], "flags": []}
-
-
-def derive_requirements(attribute_mapping):
-    """Derive the C++ identifiers and flags a species must carry.
-
-    Combines :data:`_ATTRIBUTE_REQUIREMENTS` over the particle attributes a
-    functor touches, returning a de-duplicated, sorted ``(identifiers, flags)``
-    pair of C++-spelled strings that can be rendered into a
-    ``SpeciesEligibleForSolver`` trait.
-
-    ``position`` (any origin/precision/unit) and ``random_number`` require no
-    attribute because the particle's cell offset and the RNG are always
-    available.
-    """
-    identifiers, flags = set(), set()
-    for value in attribute_mapping.values():
-        attribute = value[0] if isinstance(value, tuple) else value
-        if attribute in ("position", "random_number"):
-            continue
-        requirement = _ATTRIBUTE_REQUIREMENTS.get(attribute, _NO_REQUIREMENT)
-        identifiers.update(requirement.get("identifiers", []))
-        flags.update(requirement.get("flags", []))
-    return sorted(identifiers), sorted(flags)
-
-
 def _format_exponent(exponent):
     value = float(exponent)
     return f"{int(value)}.0" if value == int(value) else repr(value)
@@ -233,36 +185,10 @@ class ParticleFunctor(RenderedObject, BaseModel):
     unit_factor: str | None = None
     needs_total_position: bool = False
     rng_info: RNGInfo | None = None
-    required_identifiers: list[str] = Field(default_factory=list, exclude=True)
-    required_flags: list[str] = Field(default_factory=list, exclude=True)
 
     @computed_field
     def typename(self) -> str:
         return f"{self.name}_{uuid().hex}"
-
-    @computed_field
-    def identifier_requirement_cpp(self) -> str:
-        """Render the ``HasIdentifiers`` check for the eligibility trait.
-
-        Emits ``pmacc::mp_bool<true>`` when the functor touches no particle
-        attribute, otherwise the (single) ``HasIdentifiers`` expression.
-        """
-        if not self.required_identifiers:
-            return "pmacc::mp_bool<true>"
-        identifiers = ", ".join(self.required_identifiers)
-        return f"typename pmacc::traits::HasIdentifiers<FrameType, MakeSeq_t<{identifiers}>>::type"
-
-    @computed_field
-    def flag_requirement_cpp(self) -> str:
-        """Render the ``HasFlag`` check(s) for the eligibility trait.
-
-        Emits ``pmacc::mp_bool<true>`` when no flag is required, otherwise a
-        single ``HasFlag`` expression or an ``mp_and`` of them.
-        """
-        if not self.required_flags:
-            return "pmacc::mp_bool<true>"
-        checks = [f"typename pmacc::traits::HasFlag<FrameType, {flag}>::type" for flag in self.required_flags]
-        return checks[0] if len(checks) == 1 else f"pmacc::mp_and<{', '.join(checks)}>"
 
     @computed_field
     def unit_dimension_cpp(self) -> str:

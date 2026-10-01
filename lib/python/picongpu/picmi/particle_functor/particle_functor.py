@@ -17,10 +17,29 @@ from picongpu.picmi.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.particle_functor import (
     ParticleFunctor as PyPIConGPUParticleFunctor,
     UnitDimension as PyPIConGPUUnitDimension,
-    derive_requirements,
     generate_preamble,
 )
+from picongpu.pypicongpu.species.attribute.attribute import Attribute
+from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
+from picongpu.pypicongpu.species.attribute.momentum import Momentum
+from picongpu.pypicongpu.species.attribute.momentum_prev_1 import MomentumPrev1
+from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.util import alt, decorating_class, is_iterable
+
+# Maps each particle attribute a functor may access to the pypicongpu species
+# attribute (if any) that must be present on the owning species for the accessor
+# to be usable. Registering these on the species via
+# ``Species.register_requirements`` makes the generated
+# ``SpeciesEligibleForSolver`` trait include the species instead of excluding it.
+# ``position`` and ``random_number`` need no attribute (the cell offset and the
+# RNG are always available); attributes absent from this map are not
+# registerable as an ``Attribute`` and would have to be requested explicitly.
+_ATTRIBUTE_BY_NAME = {
+    "weighting": Weighting,
+    "momentum": Momentum,
+    "momentumPrev1": MomentumPrev1,
+    "charge_state": BoundElectrons,
+}
 
 _COORDINATE_SYSTEM = {
     (
@@ -59,11 +78,9 @@ class Particle:
         return expression
 
 
-class MacroParticle(Particle):
-    """A functor operating directly on macroparticles.
-
-    The returned quantity is a macro-particle (weighting-scaled) property,
-    which is what the accessors produce as-is.
+class AbstractParticle(Particle):
+    """
+    Particle implementation that tracks attribute access and returns sympy symbols.
     """
 
     needs_total_position = False
@@ -114,6 +131,14 @@ class MacroParticle(Particle):
         return my_symbols
 
 
+class MacroParticle(AbstractParticle):
+    """A functor operating directly on macroparticles.
+
+    The returned quantity is a macro-particle (weighting-scaled) property,
+    which is what the accessors produce as-is.
+    """
+
+
 # Symbols whose value scales linearly with the macroparticle weighting, and thus
 # must be rescaled by ``weighting ** -1`` to obtain the single-particle value.
 # Any symbol not listed here is already a per-particle quantity (e.g. momentum,
@@ -121,7 +146,7 @@ class MacroParticle(Particle):
 _SCALING = {Symbol("mass"): 1, Symbol("Ekin"): 1, Symbol("charge"): 1}
 
 
-class PhysicalParticle(MacroParticle):
+class PhysicalParticle(AbstractParticle):
     """A functor operating on single (physical) particles.
 
     The implementation still acts on macroparticles, but the returned quantity
@@ -230,6 +255,33 @@ class ParticleFunctor(BaseModel):
             )
         return self
 
+    def get_required_attributes(self) -> list[Attribute]:
+        """The pypicongpu species attributes this functor accesses.
+
+        Drives ``Species.register_requirements`` so a species used with this
+        functor actually carries the attributes it reads (e.g. ``momentumPrev1``)
+        rather than being excluded as ineligible. Attributes that are not a
+        concrete ``Attribute`` (e.g. ``mass``/``charge``, which come from species
+        constants, or positions, which are always available) are omitted.
+        """
+        particle = (
+            self._particle_class()(self.scales_with_weighting)
+            if self._particle_class() is PhysicalParticle
+            else self._particle_class()()
+        )
+        rng = self.rng_class()
+        if rng is not None:
+            self(particle, rng)
+        else:
+            self(particle)
+        attribute_map = particle.get_attribute_map() | alt(lambda: rng.get_attribute_map(), {})
+        requirements = {
+            _ATTRIBUTE_BY_NAME[name]
+            for value in attribute_map.values()
+            if (name := value[0] if isinstance(value, tuple) else value) in _ATTRIBUTE_BY_NAME
+        }
+        return [attribute_type() for attribute_type in sorted(requirements, key=lambda cls: cls.__name__)]
+
     def get_as_pypicongpu(self, mode) -> PyPIConGPUParticleFunctor:
         particle = (
             self._particle_class()(self.scales_with_weighting)
@@ -239,7 +291,6 @@ class ParticleFunctor(BaseModel):
         rng = self.rng_class()
         functor_expression = self(particle) if rng is None else self(particle, rng)
         attribute_map = particle.get_attribute_map() | alt(lambda: rng.get_attribute_map(), {})
-        identifiers, flags = derive_requirements(attribute_map)
         return PyPIConGPUParticleFunctor(
             name=self.name,
             functor_expression=functor_expression,
@@ -248,8 +299,6 @@ class ParticleFunctor(BaseModel):
             unit_dimension=PyPIConGPUUnitDimension(unit_dimension=self.unit_dimension.unit_vector.tolist()),
             unit_factor=self.unit_factor,
             needs_total_position=particle.needs_total_position,
-            required_identifiers=identifiers,
-            required_flags=flags,
             rng_info=alt(lambda: rng.model_dump(mode="python"), None),
         )
 

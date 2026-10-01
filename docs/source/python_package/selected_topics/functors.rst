@@ -130,28 +130,42 @@ its first argument declares what the returned quantity *means*:
 
 A quantity that is *not* a pure per-particle property but still scales with a
 known power of the weighting (e.g. a density) can set
-``scales_with_weighting`` on a ``PhysicalParticle`` functor; the whole result
-is then multiplied by the weighting to that power.
-This is only allowed on ``PhysicalParticle`` functors, and the scaling is a
-manual override for quantities the automatic per-symbol rescaling cannot
-express.
+``scales_with_weighting`` on a ``PhysicalParticle`` functor.
+Setting it **replaces** the automatic per-symbol rescaling described above
+rather than adding to it: the automatic ``/weighting`` of ``"mass"``,
+``"charge"`` and ``"kinetic energy"`` is switched off and, instead, the
+*whole* returned expression is scaled by ``weighting**(-scales_with_weighting)``.
+In the example in this section, adding ``scales_with_weighting=2`` to the mass
+functor therefore yields ``mass/weighting**2`` -- **not**
+``weighting**2 * mass/weighting``: the automatic division is *not* applied in
+addition.
+``scales_with_weighting`` is only allowed on ``PhysicalParticle`` functors and
+is the manual escape hatch for quantities the automatic per-symbol rescaling
+cannot express.
 
 If the functor's result has a physical unit, declare it with the
 ``unit_dimension`` (see :ref:`units`); the generated derived-field trait then
 reports it through ``getUnit()`` / ``getUnitDimension()``.
 For pure monomial quantities these are derived automatically from the
 7-component unit vector, matching the built-in derived attributes.
-A dimension that is not a pure monomial (it has a temperature,
-amount-of-substance or luminous-intensity component, or a non-integer
-exponent) cannot be derived; set the explicit ``unit_factor`` string
-instead, or input-file generation raises.
+``unit_factor`` is an optional escape hatch for the cases the automatic
+derivation cannot handle: it is a string of C++ code giving the numeric scale
+factor returned by ``getUnit()`` (the openPMD ``unitSI`` factor, i.e. the value
+of one internal unit in SI units). It defaults to ``None``, meaning "derive the
+``sim.unit.*`` monomial from ``unit_dimension``"; setting it overrides that
+derivation verbatim. Use it when the dimension is not a pure monomial -- it has
+a temperature, amount-of-substance or luminous-intensity component, or a
+non-integer exponent -- because such a dimension cannot be turned into a
+numeric scale, and input-file generation raises instead.
+A typical case is a count/density quantity whose unit carries the
+macro-particle weighting ``N_ppm``, which is not representable in the
+7-component unit vector.
 
-Because functors and filters touch concrete particle attributes, the generated
-``SpeciesEligibleForSolver`` trait registers those requirements
-(``HasIdentifiers`` / ``HasFlag``, e.g. ``momentum`` or the ``massRatio<>``
-flag): a species that lacks an attribute a functor or filter needs is excluded
-at compile time instead of failing to build.
-This is automatic and needs no user action.
+Because a functor or filter accesses concrete particle attributes, using one
+with a species registers those attributes on that species (via
+``Species.register_requirements``): a functor reading ``"momentumPrev1"``, for
+instance, adds the ``momentumPrev1`` attribute to the species it is used with,
+so the attribute need not be declared by hand.
 
 .. _particle-filters:
 

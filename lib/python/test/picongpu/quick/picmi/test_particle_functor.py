@@ -10,99 +10,60 @@ from unittest import TestCase
 from picongpu.picmi import ParticleFunctor
 from picongpu.picmi.particle_functor.particle_functor import MacroParticle, PhysicalParticle
 from picongpu.picmi.particle_functor.unit_dimension import UnitDimension
-from picongpu.pypicongpu.particle_functor import derive_requirements
+from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
+from picongpu.pypicongpu.species.attribute.momentum import Momentum
+from picongpu.pypicongpu.species.attribute.momentum_prev_1 import MomentumPrev1
+from picongpu.pypicongpu.species.attribute.weighting import Weighting
 
 
 def render(functor, mode="DerivedField"):
     return functor.get_as_pypicongpu(mode)
 
 
-class TestRequirementDerivation(TestCase):
-    """The C++ eligibility trait a functor emits (QA #1)."""
+class TestRequiredAttributes(TestCase):
+    """Attributes a functor asks ``Species.register_requirements`` to register."""
 
-    def _ident_and_flag(self, functor):
-        model = render(functor)
-        return model.identifier_requirement_cpp, model.flag_requirement_cpp
-
-    def test_mass_requires_mass_ratio_flag(self):
+    def test_momentum_requires_momentum_attribute(self):
         @ParticleFunctor
-        def mass(particle: MacroParticle):
-            return particle.get("mass")
+        def momentum(particle: MacroParticle):
+            return particle.get("momentum")[0]
 
-        identifiers, flag = self._ident_and_flag(mass)
-        self.assertIn("MakeSeq_t<weighting>", identifiers)
-        self.assertIn("HasFlag<FrameType, massRatio<>>", flag)
+        self.assertEqual(momentum.get_required_attributes(), [Momentum()])
 
-    def test_velocity_requires_mass_ratio_flag(self):
+    def test_momentum_prev_1_requires_its_attribute(self):
         @ParticleFunctor
-        def velocity(particle: MacroParticle):
-            return particle.get("velocity")[0]
+        def damped(particle: MacroParticle):
+            return particle.get("momentumPrev1")
 
-        identifiers, flag = self._ident_and_flag(velocity)
-        self.assertIn("momentum", identifiers)
-        self.assertIn("weighting", identifiers)
-        self.assertIn("HasFlag<FrameType, massRatio<>>", flag)
+        self.assertEqual(damped.get_required_attributes(), [MomentumPrev1()])
 
-    def test_gamma_and_kinetic_energy_require_mass_ratio_flag(self):
-        @ParticleFunctor
-        def gamma(particle: MacroParticle):
-            return particle.get("gamma")
-
-        @ParticleFunctor
-        def kinetic_energy(particle: MacroParticle):
-            return particle.get("kinetic energy")
-
-        for functor in (gamma, kinetic_energy):
-            _, flag = self._ident_and_flag(functor)
-            self.assertIn("HasFlag<FrameType, massRatio<>>", flag)
-
-    def test_charge_requires_charge_ratio_flag(self):
-        @ParticleFunctor
-        def charge(particle: MacroParticle):
-            return particle.get("charge")
-
-        _, flag = self._ident_and_flag(charge)
-        self.assertIn("HasFlag<FrameType, chargeRatio<>>", flag)
-
-    def test_mass_over_charge_combines_both_flags(self):
+    def test_mass_and_charge_need_no_attribute(self):
         @ParticleFunctor
         def ratio(particle: MacroParticle):
             return particle.get("mass") / particle.get("charge")
 
-        _, flag = self._ident_and_flag(ratio)
-        self.assertIn("pmacc::mp_and<", flag)
-        self.assertIn("HasFlag<FrameType, massRatio<>>::type", flag)
-        self.assertIn("HasFlag<FrameType, chargeRatio<>>::type", flag)
+        self.assertEqual(ratio.get_required_attributes(), [])
 
-    def test_attribute_free_functor_emits_true(self):
+    def test_charge_state_requires_bound_electrons(self):
+        @ParticleFunctor
+        def state(particle: MacroParticle):
+            return particle.get("charge_state")
+
+        self.assertEqual(state.get_required_attributes(), [BoundElectrons()])
+
+    def test_weighting_requires_weighting_attribute(self):
+        @ParticleFunctor
+        def weight(particle: MacroParticle):
+            return particle.get("weighting")
+
+        self.assertEqual(weight.get_required_attributes(), [Weighting()])
+
+    def test_attribute_free_functor_requires_nothing(self):
         @ParticleFunctor
         def nothing(particle: MacroParticle) -> float:
             return 1.0
 
-        identifiers, flag = self._ident_and_flag(nothing)
-        self.assertEqual(identifiers, "pmacc::mp_bool<true>")
-        self.assertEqual(flag, "pmacc::mp_bool<true>")
-
-    def test_derive_requirements_combines_and_dedups(self):
-        identifiers, flags = derive_requirements({1: "mass", 2: "charge"})
-        self.assertEqual(identifiers, ["weighting"])
-        self.assertEqual(flags, ["chargeRatio<>", "massRatio<>"])
-
-    def test_derive_requirements_ignores_position_and_random_number(self):
-        identifiers, flags = derive_requirements(
-            {
-                1: ("position", "total", "cell", "cell"),
-                2: "mass",
-                3: "random_number",
-            }
-        )
-        self.assertEqual(identifiers, ["weighting"])
-        self.assertEqual(flags, ["massRatio<>"])
-
-    def test_derive_requirements_empty(self):
-        identifiers, flags = derive_requirements({})
-        self.assertEqual(identifiers, [])
-        self.assertEqual(flags, [])
+        self.assertEqual(nothing.get_required_attributes(), [])
 
 
 class TestUnitDerivation(TestCase):

@@ -59,14 +59,15 @@ class GaussianBunchDistribution(PICMI_GaussianBunchDistribution):
         * ``velocity_divergence``:
           PIConGPU has no correlated position-momentum initializer, so any
           non-zero value raises an ``UnsupportedFeatureError`` at construction.
+        * non-3D grids:
+          the profile is a 3D tri-Gaussian and would render a dead ``z`` term with
+          a 3D-normalized ``n0`` on a 2D grid, so any non-3D grid raises an
+          ``UnsupportedFeatureError`` at input-file generation.
     """
 
     velocity_divergence: Annotated[
         list[float], util.rejects_unsupported("velocity_divergence", default=[0.0, 0.0, 0.0])
     ] = Field(default_factory=lambda: [0.0, 0.0, 0.0], min_length=3, max_length=3)
-
-    cell_size: tuple[float, float, float] | None = None
-    """cell size, filled in from the grid; kept for homogeneity with our other distributions"""
 
     @model_validator(mode="after")
     def _validate(self):
@@ -86,13 +87,17 @@ class GaussianBunchDistribution(PICMI_GaussianBunchDistribution):
         cx, cy, cz = self.centroid_position
 
         def density_function(x, y, z):
-            return n0 * sympy.exp(
-                -0.5 * (((x - cx) / sx) ** 2 + ((y - cy) / sy) ** 2 + ((z - cz) / sz) ** 2)
-            )
+            return n0 * sympy.exp(-0.5 * (((x - cx) / sx) ** 2 + ((y - cy) / sy) ** 2 + ((z - cz) / sz) ** 2))
 
         return {"density_function": density_function}
 
     def get_as_pypicongpu(self, grid):
+        # The standard GaussianBunchDistribution is a 3D tri-Gaussian: it always
+        # carries a z term and normalizes n0 over three dimensions. Rendering it on
+        # a 2D grid would emit a dead z term and a physically wrong 3D normalization,
+        # so reject it just like the 2D z-guard rejects a z-dependent AnalyticDistribution.
+        if grid.number_of_dimensions != 3:
+            raise util.UnsupportedFeatureError("GaussianBunchDistribution on a non-3D grid", grid.number_of_dimensions)
         kwargs = self._derive_analytic_distribution_kwargs()
         return AnalyticDistribution(**kwargs).get_as_pypicongpu(grid)
 

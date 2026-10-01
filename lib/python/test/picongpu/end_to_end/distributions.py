@@ -225,11 +225,22 @@ class LinearExponential:
 # A PICMI-standard Gaussian bunch, rendered through the analytic path.
 class GaussianBunch:
     def __init__(self):
+        # The bunch must be resolved by the grid: an unbounded Gaussian whose
+        # peak number density is far below BASE_DENSITY leaves the tails below
+        # MIN_WEIGHTING, so those cells get no macro-particles and the comparison
+        # against the analytic profile fails. Choose a large, well-resolved bunch
+        # (peak density ~ BASE_DENSITY) centered in the box instead.
+        #
+        # The thermal spread is kept at zero, like every other setup in this
+        # module: with a non-zero rms_velocity the momenta are drawn from a
+        # random distribution and the pairwise particle comparison across the
+        # two implementations would not match. The rms_velocity and
+        # centroid_velocity plumbing is covered by the quick distribution tests.
         self.parameters = dict(
-            n_physical_particles=1.0e10,
-            rms_bunch_size=[1.0, 2.0, 3.0],
-            centroid_position=[10.0, 40.0, 35.0],
-            rms_velocity=[1.0e5, 1.0e5, 1.0e5],
+            n_physical_particles=4.0e29,
+            rms_bunch_size=[16.0, 16.0, 10.0],
+            centroid_position=[32.0, 33.0, 37.0],
+            rms_velocity=[0.0, 0.0, 0.0],
             centroid_velocity=[0.0, 0.0, 0.0],
         )
         self.distributions = {

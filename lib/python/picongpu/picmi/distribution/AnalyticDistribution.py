@@ -9,6 +9,7 @@ import logging
 import re
 import traceback
 from collections.abc import Callable
+from inspect import Parameter, signature
 
 import numpy as np
 from picmistandard import PICMI_AnalyticDistribution
@@ -41,7 +42,7 @@ this method returns None.
 """
 
 
-@decorating_class("density_function", keyword_construction=True)
+@decorating_class("density_function", keyword_construction=("density_expression",))
 class AnalyticDistribution(PICMI_AnalyticDistribution):
     """
     This class represents a plasma with a density defined by an analytic expression.
@@ -120,6 +121,9 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
             A Python function that takes x, y, z coordinates (in SI units)
             and returns the density (in SI units) at that point.
             It should use sympy functionality.
+            Further parameters (beyond x, y and z) are substituted from matching
+            keyword arguments given to the constructor or the decorator, exactly
+            like the constants collected from a `density_expression`.
             Provide exactly one of `density_function` or `density_expression`.
         density_expression (str):
             A sympy-parseable string expression of the density in terms of
@@ -163,9 +167,34 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
             sx, sy, sz = symbols("x,y,z")
             parsed = sympify(f"{data['density_expression']}".replace("\n", ""))
             data["density_function"] = lambda x, y, z: parsed.subs({sx: x, sy: y, sz: z})
+        elif has_function:
+            cls._collect_callable_user_defined_kw(data)
         cls._collect_spread_user_defined_kw(data)
         cls._reject_conflicting_drift(data)
         return data
+
+    @staticmethod
+    def _density_callable_parameters(density_function) -> list[str]:
+        """The names of the extra (beyond x, y, z) parameters of a density function."""
+        named = (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
+        parameters = list(signature(density_function).parameters.values())
+        return [p.name for i, p in enumerate(parameters) if i >= 3 and p.kind in named]
+
+    @classmethod
+    def _collect_callable_user_defined_kw(cls, data):
+        # For a density_function callable, any supplied keyword argument named like an
+        # argument beyond the three position coordinates is a parameter to substitute,
+        # exactly like the constants collected from a density_expression string. This
+        # is what lets ``@AnalyticDistribution(a=1, b=2)`` carry constants into a
+        # ``density_function(x, y, z, a, b)``. Unknown keywords are still rejected by
+        # the ``extra="forbid"`` model config.
+        parameters = set(cls._density_callable_parameters(data["density_function"]))
+        user_defined_kw = dict(data.get("user_defined_kw", {}))
+        for name in parameters:
+            if name in data:
+                user_defined_kw[name] = data.pop(name)
+        if user_defined_kw:
+            data["user_defined_kw"] = user_defined_kw
 
     @classmethod
     def _reject_conflicting_drift(cls, data):
@@ -300,10 +329,52 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
     def _density_function(self) -> Callable[[Symbol, Symbol, Symbol], Expr]:
         """The density function with any user_defined_kw parameters substituted."""
         density_function = self.density_function
-        if not self.user_defined_kw:
-            return density_function
-        return lambda x, y, z: density_function(x, y, z).subs(self.user_defined_kw)
+        parameters = self._density_callable_parameters(density_function)
+        if not parameters:
+            # A plain f(x, y, z); user_defined_kw (if any) come from another expression
+            # and still need to be substituted into the result.
+            if not self.user_defined_kw:
+                return density_function
+            return lambda x, y, z: density_function(x, y, z).subs(self.user_defined_kw)
+        # f(x, y, z, *user_defined_kw): bind the coordinate symbols and pass the
+        # collected constants by name, then substitute any remaining parameters. A
+        # parameter whose value was never supplied is simply not passed, so the
+        # underlying call reports the usual (arity) error.
+        kwargs = {name: self.user_defined_kw[name] for name in parameters if name in self.user_defined_kw}
+        return lambda x, y, z: density_function(x, y, z, **kwargs).subs(self.user_defined_kw)
 
     def _density_expression(self) -> Expr:
         x, y, z = symbols("x,y,z")
         return self._density_function()(x, y, z) + (0 * x * y * z)
+
+    @property
+    def dim(self) -> int:
+        """The number of spatial dimensions the density depends on (2 or 3)."""
+        z = Symbol("z")
+        return 2 if z not in self._density_expression().free_symbols else 3
+
+    def _equality_key(self):
+        """Semantic identity: the rendered density plus the standard surface.
+
+        The density_function is deliberately excluded, so the equivalent spellings
+        (decorator with constants, density_expression string, density_function
+        callable) compare equal.
+        """
+        return (
+            self._density_expression(),
+            tuple(self.momentum_expressions),
+            tuple(self.momentum_spread_expressions),
+            tuple(self.rms_velocity),
+            tuple(self.directed_velocity),
+            tuple(self.lower_bound),
+            tuple(self.upper_bound),
+            self.fill_in,
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, AnalyticDistribution):
+            return NotImplemented
+        return self._equality_key() == other._equality_key()
+
+    def __hash__(self):
+        return hash(self._equality_key())

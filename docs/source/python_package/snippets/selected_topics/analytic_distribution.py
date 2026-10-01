@@ -38,6 +38,25 @@ def density(x, y, z):
 density_string = picmi.AnalyticDistribution(density_expression="1e25 * exp(-((x - 1e-6) / 1e-7) ** 2)")
 # END-DENSITY-EXPRESSION
 
+# BEGIN-DENSITY-KWARGS
+# constants used in the density may be passed as keyword arguments, both to a
+# callable and to the decorator; they are collected into `user_defined_kw` and
+# substituted, exactly as for the `density_expression` string above:
+density_kwargs = picmi.AnalyticDistribution(
+    density_function=lambda x, y, z, n0, width: n0 * exp(-(((x - 1e-6) / width) ** 2)),
+    n0=1e25,
+    width=1e-7,
+)
+
+
+@picmi.AnalyticDistribution(n0=1e25, width=1e-7)
+def decorated_density(x, y, z, n0, width):
+    return n0 * exp(-(((x - 1e-6) / width) ** 2))
+
+
+assert decorated_density._density_expression() == density_kwargs._density_expression()
+# END-DENSITY-KWARGS
+
 # BEGIN-MOMENTUM-EXPRESSIONS
 # a constant drift (gamma * velocity [m/s]) along z and a Gaussian
 # thermal spread sigma [m/s] along the same axis; `n0`, `vz` and `vth`

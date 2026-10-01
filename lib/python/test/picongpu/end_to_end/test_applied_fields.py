@@ -93,9 +93,7 @@ def _read_field_components(path: Path, field_name: str):
     """
     series = opmd.Series(str(path), opmd.Access.read_only)
     mesh = series.iterations[0].meshes[field_name]
-    components = {
-        component: mesh[component].load_chunk() * mesh[component].unit_SI for component in ("x", "y", "z")
-    }
+    components = {component: mesh[component].load_chunk() * mesh[component].unit_SI for component in ("x", "y", "z")}
     grid_spacing = np.asarray(mesh.grid_spacing) * mesh.grid_unit_SI
     grid_global_offset = np.asarray(mesh.grid_global_offset) * mesh.grid_unit_SI
     series.flush()
@@ -111,9 +109,7 @@ def _cell_centers(shape, grid_spacing, grid_global_offset):
     field order ``(z, y, x)`` (the writer stores them that way), so we build the
     three axis coordinates without reordering.
     """
-    z, y, x = (
-        grid_global_offset[axis] + np.arange(shape[axis]) * grid_spacing[axis] for axis in range(3)
-    )
+    z, y, x = (grid_global_offset[axis] + np.arange(shape[axis]) * grid_spacing[axis] for axis in range(3))
     z, y, x = np.meshgrid(z, y, x, indexing="ij")
     return x, y, z
 

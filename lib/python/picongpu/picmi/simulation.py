@@ -18,7 +18,6 @@ from typing import Annotated, Literal
 
 import picmistandard
 from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, PrivateAttr, model_validator
-from sympy import Symbol
 
 from picongpu import pypicongpu, templates
 from picongpu.picmi import constants
@@ -428,7 +427,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                     )
             for species in self.species:
                 if isinstance(species.initial_distribution, AnalyticDistribution):
-                    if Symbol("z") in species.initial_distribution._density_expression().free_symbols:
+                    if species.initial_distribution.dim == 3:
                         raise ValueError(
                             "A z-dependent AnalyticDistribution density is not supported on a 2D grid. "
                             f"You gave a density formula depending on 'z' for species {species.name!r} on a 2D grid."

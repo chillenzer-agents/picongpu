@@ -274,3 +274,49 @@ class TestAnalyticDistributionFullSurface(TestCase):
         positional = AnalyticDistribution(lambda x, y, z: x + y + z, directed_velocity=(1.0, 2.0, 3.0))
         self.assertEqual(positional.directed_velocity, [1.0, 2.0, 3.0])
         self.assertIsNotNone(positional.get_picongpu_drift())
+
+    def test_decorator_kwargs_match_expression_and_callable(self):
+        # the same constants can be supplied to the decorator, to density_expression
+        # and to density_function; all three render the identical density
+        @AnalyticDistribution(a=1, b=2)
+        def decorated(x, y, z, a, b):
+            return x + y + z + a + b
+
+        expression = AnalyticDistribution(density_expression="x+y+z+a+b", a=1, b=2)
+        callable_ = AnalyticDistribution(density_function=lambda x, y, z, a, b: x + y + z + a + b, a=1, b=2)
+
+        # the three spellings are semantically equal (same rendered density + surface)
+        self.assertEqual(decorated, expression)
+        self.assertEqual(decorated, callable_)
+        self.assertEqual(expression, callable_)
+
+        x, y, z = symbols("x, y, z")
+        self.assertEqual(decorated._density_expression(), expression._density_expression())
+        self.assertEqual(decorated._density_expression(), callable_._density_expression())
+        self.assertEqual(decorated.user_defined_kw, {"a": 1, "b": 2})
+        self.assertEqual(expression.user_defined_kw, {"a": 1, "b": 2})
+        # the rendered C++ is identical for all three spellings
+        self.assertEqual(
+            decorated.get_as_pypicongpu(None).function_body,
+            expression.get_as_pypicongpu(None).function_body,
+        )
+        self.assertEqual(
+            decorated.get_as_pypicongpu(None).function_body,
+            callable_.get_as_pypicongpu(None).function_body,
+        )
+        self.assertEqual(decorated.density_function(x, y, z, a=1, b=2), x + y + z + 3)
+
+    def test_decorator_kwargs_missing_value_rejected(self):
+        # a parameter without a supplied value is not substituted, so rendering the
+        # density fails with the usual arity error rather than silently dropping it
+        with pytest.raises(TypeError):
+            AnalyticDistribution(density_function=lambda x, y, z, a: x + y + z + a)._density_expression()
+
+    def test_dim_property(self):
+        # the dimensionality is derived from the density expression itself
+        self.assertEqual(AnalyticDistribution(lambda x, y, z: x + y).dim, 2)
+        self.assertEqual(AnalyticDistribution(lambda x, y, z: x + y + z).dim, 3)
+        self.assertEqual(AnalyticDistribution(density_expression="x+y+z").dim, 3)
+        self.assertEqual(AnalyticDistribution(density_expression="x+y").dim, 2)
+        # a constant density is 2D (no z dependence)
+        self.assertEqual(AnalyticDistribution(density_expression="1").dim, 2)

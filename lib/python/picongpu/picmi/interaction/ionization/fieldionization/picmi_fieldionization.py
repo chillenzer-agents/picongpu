@@ -7,8 +7,9 @@ License: GPLv3+
 
 from picmistandard import PICMI_FieldIonization as _PICMIStandardFieldIonization
 
-from .ADK import ADK
-from .BSI import BSI
+from .ADK import ADK, ADKVariant
+from .BSI import BSI, BSIExtension
+from .ionizationcurrent import IonizationCurrent
 from .keldysh import Keldysh
 
 
@@ -41,13 +42,14 @@ class PICMI_FieldIonization(_PICMIStandardFieldIonization):
     requires `ADK_variant` and the BSI model requires `BSI_extensions`.
     """
 
-    def __init__(self, model, ionized_species, product_species, **kw):
-        # Pull the PIConGPU-specific knobs out of **kw before the standard
-        # handle_init() rejects them as unexpected keyword arguments.
-        self.ionization_current = kw.pop("ionization_current", None)
-        self.ADK_variant = kw.pop("ADK_variant", None)
-        self.BSI_extensions = kw.pop("BSI_extensions", None)
-        super().__init__(model, ionized_species, product_species, **kw)
+    ionization_current: IonizationCurrent | None = None
+    """energy-conserving ionization current; `None` uses the C++ `current::None` default"""
+
+    ADK_variant: ADKVariant | None = None
+    """ADK model variant (required when `model` selects ADK)"""
+
+    BSI_extensions: tuple[BSIExtension, ...] | None = None
+    """BSI extensions (required when `model` selects BSI)"""
 
     def get_concrete(self):
         """

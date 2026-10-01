@@ -1121,10 +1121,10 @@ class TestAddInteraction:
 
     def test_concrete_models_are_picmi_extensions(self):
         """the concrete ionization models are usable as PIConGPU PICMI extensions"""
-        from picmistandard.base import _PICMI_Extension
+        from picmistandard.base import PICMI_Extension
 
         for model_class in (ADK, BSI, Keldysh):
-            assert issubclass(model_class, _PICMI_Extension)
+            assert issubclass(model_class, PICMI_Extension)
 
     def test_unknown_model_raises(self):
         sim, ion, e = _interaction_sim()

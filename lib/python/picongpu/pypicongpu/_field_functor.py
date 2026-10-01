@@ -261,6 +261,3 @@ def check_allowed_symbols(expressions: Mapping[str, sympy.Expr], allowed: set[st
             "generated C++ functors only know the position (x/y/z), the time (t) and the "
             "parameters passed as additional keyword arguments."
         )
-
-
-

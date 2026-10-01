@@ -67,6 +67,9 @@ correspond to options of the generated PIConGPU run configuration:
    reproduces faithfully; separating "who sees it" from "is it active" is
    deliberately left for a later change.)
 
+The pusher knob covers the electric **and** magnetic background together;
+there is no per-component switch (e.g. pushing particles in ``B`` only).
+
 .. literalinclude:: ../snippets/selected_topics/applied_fields.py
    :language: python
    :start-at: BEGIN-APPLIED-FIELD-INFLUENCE

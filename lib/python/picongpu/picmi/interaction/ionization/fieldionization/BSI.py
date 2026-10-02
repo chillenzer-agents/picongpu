@@ -5,7 +5,7 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
-from .fieldionization import FieldIonization
+from .fieldionization import _FieldIonizationModel
 
 from ..... import pypicongpu
 from .....pypicongpu.species.constant import ionizationmodel
@@ -19,7 +19,7 @@ class BSIExtension(enum.Enum):
     # add additional extensions here
 
 
-class BSI(FieldIonization):
+class BSI(_FieldIonizationModel):
     """Barrier Suppression Ionization model"""
 
     MODEL_NAME: str = "BSI"

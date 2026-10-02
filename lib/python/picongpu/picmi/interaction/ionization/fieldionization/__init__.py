@@ -1,13 +1,13 @@
-from .fieldionization import FieldIonization
+from .fieldionization import _FieldIonizationModel
 from .keldysh import Keldysh
 from .ADK import ADK, ADKVariant
 from .BSI import BSI, BSIExtension
-from .picmi_fieldionization import PICMI_FieldIonization
+from .fieldionization_adapter import FieldIonization
 from . import ionizationcurrent
 
 __all__ = [
+    "_FieldIonizationModel",
     "FieldIonization",
-    "PICMI_FieldIonization",
     "Keldysh",
     "ADK",
     "ADKVariant",

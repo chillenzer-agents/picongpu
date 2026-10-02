@@ -5,7 +5,7 @@ Authors: Brian Edward Marre
 License: GPLv3+
 """
 
-from picmistandard.base import PICMI_Extension
+from picmistandard import PICMI_Interaction
 
 from ..groundstateionizationmodel import GroundStateIonizationModel
 from .ionizationcurrent import IonizationCurrent
@@ -14,15 +14,14 @@ from .....pypicongpu.species.constant.ionizationcurrent import IonizationCurrent
 from .....pypicongpu.species.constant.ionizationcurrent import None_
 
 
-class FieldIonization(GroundStateIonizationModel, PICMI_Extension):
-    """common interface of all field ionization models
+class _FieldIonizationModel(GroundStateIonizationModel, PICMI_Interaction):
+    """common interface of all concrete field ionization models
 
-    Inheriting from ``PICMI_Extension`` marks the concrete field ionization
-    models (ADK, BSI, Keldysh) as code-specific PIConGPU extensions. Note that
-    ``PICMI_Extension`` is *not* a subclass of ``PICMI_Interaction``, so the
-    standard ``PICMI_AnyInteraction`` union does not accept the concrete
-    models; the standard-facing :class:`PICMI_FieldIonization` is the entry
-    point for standard code.
+    This is an internal base class: users select a concrete model through the
+    public :class:`picongpu.picmi.FieldIonization` standard-facing adapter.
+    The concrete models (``ADK``, ``BSI``, ``Keldysh``) derive from it and are
+    therefore accepted by the standard ``Simulation.interactions`` field just
+    like the standard interaction classes.
     """
 
     ionization_current: IonizationCurrent | None
@@ -31,11 +30,10 @@ class FieldIonization(GroundStateIonizationModel, PICMI_Extension):
     def _get_ionization_current(self) -> PypicongpuIonizationCurrent:
         """bridge the ionization current to the pypicongpu model
 
-        None maps to the pypicongpu None_ current (the C++ default
-        current::None). A concrete current is converted via its
-        get_as_pypicongpu method and must result in a pypicongpu
-        ionization current model; otherwise an error is raised instead of
-        silently dropping the current.
+        None maps to the pypicongpu None_ current (the default no-current
+        choice). A concrete current is converted via its get_as_pypicongpu
+        method and must result in a pypicongpu ionization current model;
+        otherwise an error is raised instead of silently dropping the current.
         """
         if self.ionization_current is None:
             return None_()

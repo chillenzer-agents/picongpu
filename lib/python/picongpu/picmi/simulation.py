@@ -36,9 +36,14 @@ from picongpu.picmi.diagnostics.particle_dump import ParticleDump
 from picongpu.picmi.diagnostics.phase_space import PhaseSpace
 from picongpu.picmi.distribution.AnalyticDistribution import AnalyticDistribution
 from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid, AnyGrid
-from picongpu.picmi.interaction import Interaction, Synchrotron
+from picongpu.picmi.interaction import (
+    SUPPORTED_INTERACTION_TYPES,
+    Interaction,
+    PICMI_Interaction,
+    Synchrotron,
+)
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
-from picongpu.picmi.interaction.ionization.fieldionization import PICMI_FieldIonization
+from picongpu.picmi.interaction.ionization.fieldionization import FieldIonization
 from picongpu.picmi.layout import AnyLayout
 from picongpu.picmi.species import _STANDARD_SHAPES, Species
 from picongpu.picmi.species_requirements import (
@@ -159,6 +164,40 @@ def handled_via_openpmd(diagnostic):
     return isinstance(diagnostic, (ParticleDump, _FieldDump))
 
 
+def _normalise_interaction(interaction):
+    """Map a standard interaction onto the equivalent PIConGPU interaction.
+
+    ``picmi.FieldIonization`` (and the plain standard
+    ``picmistandard.PICMI_FieldIonization``) are converted to the matching
+    concrete PIConGPU field ionization model. Everything else is returned
+    unchanged and validated below.
+    """
+    if isinstance(interaction, FieldIonization):
+        return interaction.get_as_pypicongpu()
+    if isinstance(interaction, picmistandard.PICMI_FieldIonization):
+        # A plain standard object carries only model/ionized_species/product_species;
+        # the conversion reports the required-knob errors for ADK/BSI.
+        return FieldIonization(
+            model=interaction.model,
+            ionized_species=interaction.ionized_species,
+            product_species=interaction.product_species,
+        ).get_as_pypicongpu()
+    if isinstance(interaction, PICMI_Interaction) and not isinstance(interaction, SUPPORTED_INTERACTION_TYPES):
+        pypicongpu.util.unsupported("This PICMI interaction type is not supported by PIConGPU", interaction)
+    return interaction
+
+
+def _prepare_interactions(interactions):
+    """Normalise and validate the interaction list.
+
+    This is the single pipeline shared by the constructor ``interactions=[...]``
+    parameter and :meth:`add_interaction`: standard field ionization is mapped
+    to PIConGPU's concrete model, and bare collisions are merged into a
+    ``CollisionalPhysicsSetup``.
+    """
+    return _validate_collisional_physics_setup([_normalise_interaction(x) for x in interactions])
+
+
 def _validate_collisional_physics_setup(interactions):
     # Validation is meant in the pydantic sense of checking correctness AND constructing.
     def by_type(x):
@@ -234,10 +273,28 @@ class Simulation(picmistandard.PICMI_Simulation):
     update using picongpu_add_custom_user_input() or by direct setting
     """
 
-    picongpu_interaction: Annotated[list[Interaction], BeforeValidator(_validate_collisional_physics_setup)] = Field(
+    interactions: Annotated[list[Interaction | PICMI_Interaction], BeforeValidator(_prepare_interactions)] = Field(
         default_factory=list
     )
-    """Interaction instance containing all particle interactions of the simulation, set to None to have no interactions"""
+    """
+    All particle interactions of the simulation.
+
+    The standard ``interactions=[...]`` constructor parameter and
+    :meth:`add_interaction` are the entry points. They accept every interaction
+    type PIConGPU supports: field ionization (``picmi.FieldIonization``),
+    collisions (``picmi.Collision``/``picmi.CollisionalPhysicsSetup``),
+    synchrotron radiation (``picmi.Synchrotron``) and the concrete ionization
+    models.
+    """
+
+    @property
+    def picongpu_interaction(self) -> list[Interaction]:
+        """Back-compat alias for :attr:`interactions`."""
+        return self.interactions
+
+    @picongpu_interaction.setter
+    def picongpu_interaction(self, value) -> None:
+        self.interactions = value
 
     def _validate_typical_ppc(value: int | None) -> int | None:
         if value is not None and value <= 0:
@@ -458,24 +515,16 @@ class Simulation(picmistandard.PICMI_Simulation):
         """
         Add an interaction to the simulation.
 
-        Accepts the standard `picmistandard.PICMI_FieldIonization` (which is
-        converted to the matching PIConGPU concrete ionization model at add
-        time), PIConGPU's `PICMI_FieldIonization` adapter (with the
-        PIConGPU-specific knobs) and PIConGPU's own `Interaction` types. The
-        standard object is converted so that the single `picongpu_interaction`
-        pipeline is preserved.
+        Accepts every interaction type PIConGPU supports: field ionization
+        (``picmi.FieldIonization`` or the plain standard
+        ``picmistandard.PICMI_FieldIonization``, both converted to the matching
+        concrete model) as well as PIConGPU's own collision,
+        collisional-physics-setup and synchrotron objects.
 
-        This is the only entry point for interactions: the inherited standard
-        `interactions=[...]` constructor parameter is accepted but ignored
-        (pre-existing behaviour), so always use `add_interaction` here.
+        Equivalent to appending to the ``interactions=[...]`` constructor
+        parameter; both go through the same pipeline.
         """
-        if isinstance(interaction, PICMI_FieldIonization):
-            interaction = interaction.get_concrete()
-        elif isinstance(interaction, picmistandard.PICMI_FieldIonization):
-            interaction = PICMI_FieldIonization.from_standard(interaction).get_concrete()
-        elif not isinstance(interaction, Interaction):
-            pypicongpu.util.unsupported("This PICMI interaction type is not supported by PIConGPU", interaction)
-        self.picongpu_interaction = (self.picongpu_interaction or []) + [interaction]
+        self.interactions = [*(self.interactions or []), interaction]
 
     # @todo add refactor once restarts are supported by the Runner, Brian Marre, 2024
     def step(self, nsteps: int = 1, **flags):

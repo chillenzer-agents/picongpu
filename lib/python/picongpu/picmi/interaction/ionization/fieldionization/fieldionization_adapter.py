@@ -22,25 +22,20 @@ _FIELD_IONIZATION_MODELS = {model.model_fields["MODEL_NAME"].default.lower(): mo
 _FIELD_IONIZATION_MODEL_NAMES = [model.model_fields["MODEL_NAME"].default for model in (ADK, BSI, Keldysh)]
 
 
-class PICMI_FieldIonization(_PICMIStandardFieldIonization):
+class FieldIonization(_PICMIStandardFieldIonization):
     """
-    PIConGPU implementation of the PICMI standard field ionization interface.
+    PIConGPU's field ionization, following the PICMI standard interface.
 
-    This is a thin, standard-compatible adapter. It carries the standard
-    arguments (`model`, `ionized_species`, `product_species`) together with the
-    PIConGPU-specific knobs (`ionization_current`, `ADK_variant`,
-    `BSI_extensions`) and converts to one of PIConGPU's concrete field
-    ionization models (`ADK`, `BSI`, `Keldysh`) at add time.
-
-    A plain `picmistandard.PICMI_FieldIonization` passed to
-    `Simulation.add_interaction` is adapted via `from_standard` and converted
-    the same way.
+    This is PIConGPU's public, code-specific subclass of the standard
+    ``PICMI_FieldIonization``. It carries the standard arguments (`model`,
+    `ionized_species`, `product_species`) together with the PIConGPU-specific
+    knobs (`ionization_current`, `ADK_variant`, `BSI_extensions`) and converts
+    to one of PIConGPU's concrete field ionization models (`ADK`, `BSI`,
+    `Keldysh`) at translation time. Users should reach for this class rather
+    than the ``PICMI_*`` base classes.
 
     `model` is matched case-insensitively against the concrete models'
-    `MODEL_NAME` (e.g. "adk", "Adk" and "ADK" all select the ADK model). A bare
-    standard field ionization uses `ionization_current=None` (the C++
-    `current::None` default); the energy-conserving current remains a
-    PIConGPU-specific opt-in.
+    `MODEL_NAME` (e.g. "adk", "Adk" and "ADK" all select the ADK model).
 
     Model-specific knobs are required rather than defaulted: the ADK model
     requires `ADK_variant` and the BSI model requires `BSI_extensions` (pass
@@ -49,7 +44,7 @@ class PICMI_FieldIonization(_PICMIStandardFieldIonization):
     """
 
     ionization_current: IonizationCurrent | None = None
-    """energy-conserving ionization current; `None` uses the C++ `current::None` default"""
+    """energy-conserving ionization current; `None` disables it"""
 
     ADK_variant: ADKVariant | None = None
     """ADK model variant (required when `model` selects ADK)"""
@@ -57,28 +52,11 @@ class PICMI_FieldIonization(_PICMIStandardFieldIonization):
     BSI_extensions: tuple[BSIExtension, ...] | None = None
     """BSI extensions (required when `model` selects BSI)"""
 
-    @classmethod
-    def from_standard(cls, interaction: _PICMIStandardFieldIonization) -> "PICMI_FieldIonization":
+    def get_as_pypicongpu(self):
         """
-        Adapt a plain `picmistandard.PICMI_FieldIonization` (which carries only
-        `model`, `ionized_species` and `product_species`) to this PIConGPU
-        adapter, leaving the PIConGPU-specific knobs at their defaults.
-
-        Model-specific knobs are not available on the standard object, so
-        selecting ADK or BSI this way raises the same required-knob error as an
-        adapter without the knob; use the adapter directly to configure them.
-        """
-        return cls(
-            model=interaction.model,
-            ionized_species=interaction.ionized_species,
-            product_species=interaction.product_species,
-        )
-
-    def get_concrete(self):
-        """
-        Convert this standard-facing field ionization to PIConGPU's concrete
-        model, returning an `ADK`, `BSI` or `Keldysh` instance that plugs into
-        the existing `picongpu_interaction` pipeline.
+        Return PIConGPU's concrete model (`ADK`, `BSI` or `Keldysh`) matching
+        the selected `model` string, so that the standard entry point plugs
+        into the same rendering pipeline as PIConGPU's own interaction objects.
         """
         model_class = self._resolve_model_class()
         self._reject_irrelevant_knobs(model_class)

@@ -15,12 +15,10 @@ Defines four small simulations demonstrating the supported interactions:
 ADK tunnel ionization of hydrogen,
 BSI (with the Stark-shift extension) ionization of hydrogen,
 synchrotron radiation from electrons,
-and the standard ``add_interaction`` entry point with ``PICMI_FieldIonization``.
+and the standard field-ionization entry point ``picmi.FieldIonization``.
 """
 
 from pathlib import Path
-
-import picmistandard
 
 from picongpu import picmi
 
@@ -60,7 +58,7 @@ sim_adk = picmi.Simulation(
     solver=solver,
     species=[hydrogen, electrons],
     layouts=[layout, None],
-    picongpu_interaction=[adk],
+    interactions=[adk],
 )
 sim_adk.run(setup_dir=Path("adk_setup"), run_dir=Path("adk_run"))
 # END-INTERACTIONS-ADK
@@ -90,7 +88,7 @@ sim_bsi = picmi.Simulation(
     solver=solver,
     species=[bsi_hydrogen, bsi_electrons],
     layouts=[layout, None],
-    picongpu_interaction=[bsi],
+    interactions=[bsi],
 )
 sim_bsi.run(setup_dir=Path("bsi_setup"), run_dir=Path("bsi_run"))
 # END-INTERACTIONS-BSI
@@ -114,7 +112,7 @@ sim_sync = picmi.Simulation(
     solver=solver,
     species=[sync_electrons, photons],
     layouts=[layout, None],
-    picongpu_interaction=[synchrotron],
+    interactions=[synchrotron],
 )
 sim_sync.run(setup_dir=Path("synchrotron_setup"), run_dir=Path("synchrotron_run"))
 # END-INTERACTIONS-SYNCHROTRON
@@ -137,13 +135,13 @@ sim_standard = picmi.Simulation(
     solver=solver,
     species=[standard_hydrogen, standard_electrons],
     layouts=[layout, None],
-)
-sim_standard.add_interaction(
-    picmistandard.PICMI_FieldIonization(
-        model="Keldysh",
-        ionized_species=standard_hydrogen,
-        product_species=standard_electrons,
-    )
+    interactions=[
+        picmi.FieldIonization(
+            model="Keldysh",
+            ionized_species=standard_hydrogen,
+            product_species=standard_electrons,
+        )
+    ],
 )
 sim_standard.run(setup_dir=Path("standard_setup"), run_dir=Path("standard_run"))
 # END-INTERACTIONS-STANDARD

@@ -18,6 +18,7 @@ import pytest
 from pydantic import ValidationError
 from picongpu import picmi
 from picongpu import templates
+from picongpu.picmi.interaction.collision import CollisionalPhysicsSetup
 from picongpu.picmi.interaction.ionization.fieldionization import ADK, ADKVariant, BSI, BSIExtension, Keldysh
 from picongpu.pypicongpu import customuserinput, species
 from picongpu.pypicongpu.field_solver import ArbitraryOrderFDTDSolver
@@ -643,7 +644,7 @@ class TestPicmiSimulation(TestCase):
         sim.add_species(ion2, None)
 
         # in use should be set via simulation constructor
-        sim.picongpu_interaction = interaction
+        sim.interactions = interaction
 
         pypic_sim = sim.get_as_pypicongpu()
         operations = pypic_sim.init_operations
@@ -1053,9 +1054,9 @@ class TestAddInteraction:
     def test_keldysh_bare(self):
         """a bare standard FieldIonization with model=Keldysh renders the Keldysh model"""
         sim, ion, e = _interaction_sim()
-        sim.add_interaction(picmi.PICMI_FieldIonization(model="Keldysh", ionized_species=ion, product_species=e))
+        sim.add_interaction(picmi.FieldIonization(model="Keldysh", ionized_species=ion, product_species=e))
 
-        model = sim.picongpu_interaction[0]
+        model = sim.interactions[0]
         assert isinstance(model, Keldysh)
         # the standard names are mapped onto the concrete model
         assert model.ion_species is ion
@@ -1071,11 +1072,11 @@ class TestAddInteraction:
         """the ADK model carries the supplied ADK variant"""
         sim, ion, e = _interaction_sim()
         sim.add_interaction(
-            picmi.PICMI_FieldIonization(
+            picmi.FieldIonization(
                 model="ADK", ionized_species=ion, product_species=e, ADK_variant=ADKVariant.LinearPolarization
             )
         )
-        model = sim.picongpu_interaction[0]
+        model = sim.interactions[0]
         assert isinstance(model, ADK)
         assert model.ADK_variant is ADKVariant.LinearPolarization
 
@@ -1083,11 +1084,11 @@ class TestAddInteraction:
         """the BSI model carries the supplied BSI extensions"""
         sim, ion, e = _interaction_sim()
         sim.add_interaction(
-            picmi.PICMI_FieldIonization(
+            picmi.FieldIonization(
                 model="BSI", ionized_species=ion, product_species=e, BSI_extensions=[BSIExtension.StarkShift]
             )
         )
-        model = sim.picongpu_interaction[0]
+        model = sim.interactions[0]
         assert isinstance(model, BSI)
         assert model.BSI_extensions == (BSIExtension.StarkShift,)
 
@@ -1095,13 +1096,13 @@ class TestAddInteraction:
         """the ADK model requires an ADK variant and raises a clear error without one"""
         sim, ion, e = _interaction_sim()
         with pytest.raises(ValueError, match="ADK_variant"):
-            sim.add_interaction(picmi.PICMI_FieldIonization(model="ADK", ionized_species=ion, product_species=e))
+            sim.add_interaction(picmi.FieldIonization(model="ADK", ionized_species=ion, product_species=e))
 
     def test_bsi_missing_extensions_raises(self):
         """the BSI model requires extensions and raises a clear error without them"""
         sim, ion, e = _interaction_sim()
         with pytest.raises(ValueError, match="BSI_extensions"):
-            sim.add_interaction(picmi.PICMI_FieldIonization(model="BSI", ionized_species=ion, product_species=e))
+            sim.add_interaction(picmi.FieldIonization(model="BSI", ionized_species=ion, product_species=e))
 
     @pytest.mark.parametrize(
         "model_name",
@@ -1110,7 +1111,7 @@ class TestAddInteraction:
     def test_model_name_case_insensitive(self, model_name):
         """model selection matches the MODEL_NAME constants case-insensitively"""
         _, ion, e = _interaction_sim()
-        field_ionization = picmi.PICMI_FieldIonization(
+        field_ionization = picmi.FieldIonization(
             model=model_name,
             ionized_species=ion,
             product_species=e,
@@ -1120,23 +1121,93 @@ class TestAddInteraction:
         expected = {"adk": ADK, "bsi": BSI, "keldysh": Keldysh}[model_name.lower()]
         assert field_ionization._resolve_model_class() is expected
 
-    def test_concrete_models_are_picmi_extensions(self):
-        """the concrete ionization models are usable as PIConGPU PICMI extensions"""
-        from picmistandard.base import PICMI_Extension
+    def test_concrete_models_are_picmi_interactions(self):
+        """the concrete ionization models are accepted by the standard interactions field"""
+        from picmistandard import PICMI_Interaction
 
         for model_class in (ADK, BSI, Keldysh):
-            assert issubclass(model_class, PICMI_Extension)
+            assert issubclass(model_class, PICMI_Interaction)
+        assert issubclass(picmi.FieldIonization, picmistandard.PICMI_FieldIonization)
+
+    def test_constructor_interactions_accepts_field_ionization(self):
+        """the standard interactions=[...] constructor parameter is a first-class entry point"""
+        e = picmi.Species(name="e", particle_type="electron")
+        ion = picmi.Species(name="hydrogen", particle_type="H", charge_state=+1)
+        sim = picmi.Simulation(
+            time_step_size=17,
+            max_steps=4,
+            solver=picmi.ElectromagneticSolver(method="Yee", grid=get_grid(1, 1, 1, 32)),
+            species=[ion, e],
+            layouts=[None, None],
+            interactions=[picmi.FieldIonization(model="Keldysh", ionized_species=ion, product_species=e)],
+        )
+        assert isinstance(sim.interactions[0], Keldysh)
+        assert "Keldysh" in _render_species_definition(sim)
+
+    def test_constructor_interactions_accepts_plain_standard(self):
+        """a plain picmistandard.PICMI_FieldIonization in the constructor list is mapped too"""
+        e = picmi.Species(name="e", particle_type="electron")
+        ion = picmi.Species(name="hydrogen", particle_type="H", charge_state=+1)
+        sim = picmi.Simulation(
+            time_step_size=17,
+            max_steps=4,
+            solver=picmi.ElectromagneticSolver(method="Yee", grid=get_grid(1, 1, 1, 32)),
+            species=[ion, e],
+            layouts=[None, None],
+            interactions=[picmistandard.PICMI_FieldIonization(model="Keldysh", ionized_species=ion, product_species=e)],
+        )
+        assert isinstance(sim.interactions[0], Keldysh)
+
+    def test_add_interaction_accepts_collisions_and_synchrotron(self):
+        """add_interaction accepts the same types as the constructor list, not only field ionization"""
+        sim, ion, e = _interaction_sim()
+        photon = picmi.Species(name="photons", particle_type="photon")
+        sim.add_species(photon, None)
+
+        synchrotron = picmi.Synchrotron(electron_species=e, photon_species=photon)
+        sim.add_interaction(synchrotron)
+        assert sim.interactions == [synchrotron]
+
+        collision = picmi.Collision.construct_all_to_all([e, ion], functor=picmi.ConstLogCollision(coulomb_log=2.0))
+        sim.add_interaction(collision)
+        # the bare collision is merged into a CollisionalPhysicsSetup by the shared pipeline
+        assert isinstance(sim.interactions[-1], CollisionalPhysicsSetup)
+        assert sim.interactions[-1].collisions == [collision]
+
+    def test_unsupported_standard_interaction_raises(self):
+        """a standard interaction type PIConGPU does not support is rejected, not silently dropped"""
+        from picmistandard import PICMI_Interaction
+
+        class _UnsupportedInteraction(PICMI_Interaction):
+            pass
+
+        sim, _, _ = _interaction_sim()
+        with pytest.raises(ValueError, match="not .* implemented by PIConGPU|not supported by PIConGPU"):
+            sim.add_interaction(_UnsupportedInteraction())
+
+    def test_picongpu_interaction_back_compat_alias(self):
+        """the old picongpu_interaction name still reads and writes the same list"""
+        sim, ion, e = _interaction_sim()
+        model = ADK(
+            ADK_variant=ADKVariant.LinearPolarization,
+            ionization_current=None,
+            ion_species=ion,
+            ionization_electron_species=e,
+        )
+        sim.picongpu_interaction = [model]
+        assert sim.interactions[0] is model
+        assert sim.picongpu_interaction is sim.interactions
 
     def test_standard_base_field_ionization_keldysh(self):
         """a plain picmistandard.PICMI_FieldIonization is accepted and mapped to the concrete model"""
         sim, ion, e = _interaction_sim()
         standard = picmistandard.PICMI_FieldIonization(model="Keldysh", ionized_species=ion, product_species=e)
         # the base class is not an instance of the PIConGPU adapter
-        assert not isinstance(standard, picmi.PICMI_FieldIonization)
+        assert not isinstance(standard, picmi.FieldIonization)
 
         sim.add_interaction(standard)
 
-        model = sim.picongpu_interaction[0]
+        model = sim.interactions[0]
         assert isinstance(model, Keldysh)
         assert model.ion_species is ion
         assert model.ionization_electron_species is e
@@ -1161,9 +1232,9 @@ class TestAddInteraction:
         """BSI_extensions=() selects the plain BSI model without extensions"""
         sim, ion, e = _interaction_sim()
         sim.add_interaction(
-            picmi.PICMI_FieldIonization(model="BSI", ionized_species=ion, product_species=e, BSI_extensions=())
+            picmi.FieldIonization(model="BSI", ionized_species=ion, product_species=e, BSI_extensions=())
         )
-        model = sim.picongpu_interaction[0]
+        model = sim.interactions[0]
         assert isinstance(model, BSI)
         assert model.BSI_extensions == ()
         assert "BSI" in _render_species_definition(sim)
@@ -1173,7 +1244,7 @@ class TestAddInteraction:
         sim, ion, e = _interaction_sim()
         with pytest.raises(ValueError, match="ADK_variant is only valid for the ADK model"):
             sim.add_interaction(
-                picmi.PICMI_FieldIonization(
+                picmi.FieldIonization(
                     model="Keldysh",
                     ionized_species=ion,
                     product_species=e,
@@ -1183,7 +1254,7 @@ class TestAddInteraction:
         sim, ion, e = _interaction_sim()
         with pytest.raises(ValueError, match="BSI_extensions is only valid for the BSI model"):
             sim.add_interaction(
-                picmi.PICMI_FieldIonization(
+                picmi.FieldIonization(
                     model="Keldysh",
                     ionized_species=ion,
                     product_species=e,
@@ -1194,6 +1265,4 @@ class TestAddInteraction:
     def test_unknown_model_raises(self):
         sim, ion, e = _interaction_sim()
         with pytest.raises(ValueError, match="Unsupported field ionization model"):
-            sim.add_interaction(
-                picmi.PICMI_FieldIonization(model="ThomasFermi", ionized_species=ion, product_species=e)
-            )
+            sim.add_interaction(picmi.FieldIonization(model="ThomasFermi", ionized_species=ion, product_species=e))

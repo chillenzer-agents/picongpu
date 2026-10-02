@@ -75,6 +75,20 @@ input-file generation.
    :start-after: BEGIN-MOMENTUM-EXPRESSIONS
    :end-before: END-MOMENTUM-EXPRESSIONS
 
+The full interface, validation and keyword machinery apply equally to the
+per-axis momentum and spread fields: each axis may instead be given as a sympy
+callable in ``momentum_functions`` / ``momentum_spread_functions`` (aligned per
+axis, with ``None`` marking an axis that is not supplied), exactly mirroring
+``density_function`` versus ``density_expression``. The two spellings are
+interchangeable and both are available after construction, and the parsed
+per-axis expressions are exposed as the public ``momentum_sympy`` and
+``momentum_spread_sympy`` properties:
+
+.. literalinclude:: ../snippets/selected_topics/analytic_distribution.py
+   :language: python
+   :start-after: BEGIN-MOMENTUM-FUNCTIONS
+   :end-before: END-MOMENTUM-FUNCTIONS
+
 ``directed_velocity`` (a plain velocity) and ``rms_velocity``
 are combined with the standard parameters
 (``rms_velocity`` takes the per-axis maximum of itself and the constant

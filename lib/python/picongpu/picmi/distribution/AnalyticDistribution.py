@@ -14,7 +14,7 @@ from inspect import Parameter, signature
 import numpy as np
 from picmistandard import PICMI_AnalyticDistribution
 from picmistandard.base import Expression
-from pydantic import ConfigDict, PrivateAttr, computed_field, model_validator
+from pydantic import ConfigDict, Field, PrivateAttr, computed_field, model_validator
 from sympy import Expr, Symbol, lambdify, sstr, symbols, sympify
 
 from picongpu.pypicongpu import species
@@ -63,6 +63,12 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
     their **constant** form only and are rendered to the constant pypicongpu ``Drift`` and
     ``Temperature`` operations. Position-dependent (function of ``x``/``y``/``z``) momentum and
     spread expressions are not implemented yet.
+
+    Like the density, each of these per-axis fields also has a sympy based
+    ``momentum_functions`` / ``momentum_spread_functions`` callable counterpart (aligned per
+    axis; ``None`` marks an unsupplied axis). The string and the callable spelling are
+    interchangeable and both are available after construction. The parsed per-axis sympy
+    expressions are exposed as ``momentum_sympy`` / ``momentum_spread_sympy``.
 
     Writing such functions (or rather writing sympy in general)
     comes with a few pitfalls but also advantages as listed below.
@@ -134,6 +140,17 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
             yields a constant density) rather than rejected. It is equivalent to
             the matching `density_function`.
             Provide exactly one of `density_function` or `density_expression`.
+        momentum_functions (list of Callable, optional):
+            The per-axis sympy callables equivalent to `momentum_expressions`
+            (gamma * velocity in SI units, per axis). Each entry takes x, y, z and
+            returns the axis expression, or is None for an axis that is not
+            supplied. Extra (beyond x, y and z) parameters are substituted from
+            matching keyword arguments, exactly like `density_function`.
+        momentum_spread_functions (list of Callable, optional):
+            The per-axis sympy callables equivalent to
+            `momentum_spread_expressions` (Gaussian thermal spread sigma in SI
+            units, per axis), with the same per-axis/convention as
+            `momentum_functions`.
         directed_velocity (3-tuple of float):
             A collective velocity for the particle distribution, interpreted as a plain velocity.
             Mutually exclusive with ``momentum_expressions``: if either a non-zero
@@ -147,6 +164,22 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
     # enforces the standard's "exactly one input" rule for the user-facing construction.
     density_expression: Expression
     density_function: Callable[[Symbol, Symbol, Symbol], Expr]
+
+    # PIConGPU extensions mirroring the density callable for the momentum/spread
+    # surface. Each list is aligned per axis with its ``*_expressions`` sibling:
+    # a callable in axis ``i`` is the sympy equivalent of the string expression
+    # in ``momentum_expressions[i]`` / ``momentum_spread_expressions[i]`` (``None``
+    # marks an axis that is not supplied). Exactly as for the density, the string
+    # and the callable form are interchangeable and both are available after
+    # construction. The parsed sympy expressions are exposed via
+    # ``momentum_sympy`` / ``momentum_spread_sympy``.
+    momentum_functions: list[Callable[[Symbol, Symbol, Symbol], Expr] | None] = Field(
+        default_factory=lambda: [None, None, None]
+    )
+    momentum_spread_functions: list[Callable[[Symbol, Symbol, Symbol], Expr] | None] = Field(
+        default_factory=lambda: [None, None, None]
+    )
+
     _warned_about_lambdify_failure: bool = PrivateAttr(False)
 
     model_config = ConfigDict(
@@ -199,11 +232,112 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
             cls._derive_density_function(data)
         else:
             cls._collect_callable_user_defined_kw(data)
+        cls._collect_axis_function_user_defined_kw(data, "momentum_functions")
+        cls._collect_axis_function_user_defined_kw(data, "momentum_spread_functions")
+        cls._resolve_momentum_and_spread(data)
         cls._collect_spread_user_defined_kw(data)
         cls._reject_conflicting_drift(data)
         if not has_expression:
             cls._derive_density_expression(data)
         return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_axis_functions(cls, data, info):
+        # ``validate_assignment=True`` re-enters the nested list field validator
+        # on every direct assignment. Bring the assigned axis's ``*_expressions``
+        # and ``*_functions`` counterparts back in sync, exactly like the density
+        # fields, so the two spellings stay interchangeable per axis.
+        field = info.field_name
+        pairs = {
+            "momentum_expressions": ("momentum_expressions", "momentum_functions"),
+            "momentum_functions": ("momentum_expressions", "momentum_functions"),
+            "momentum_spread_expressions": ("momentum_spread_expressions", "momentum_spread_functions"),
+            "momentum_spread_functions": ("momentum_spread_expressions", "momentum_spread_functions"),
+        }
+        if field not in pairs or not isinstance(data, dict):
+            return data
+        data = dict(data)
+        assigned = data.get(field)
+        if assigned is None:
+            return data
+        # Drop the *other* spelling's stale value and recompute it from what is
+        # being assigned, so a direct assignment cannot leave the pair inconsistent.
+        expressions_field, functions_field = pairs[field]
+        data.pop(functions_field if field == expressions_field else expressions_field, None)
+        cls._resolve_momentum_and_spread(data)
+        return data
+
+    @classmethod
+    def _collect_axis_function_user_defined_kw(cls, data, functions_field):
+        # A momentum/spread callable mirrors the density callable: extra (beyond
+        # x, y, z) parameters named as keyword arguments are collected for
+        # substitution, exactly like the constants in a ``*_expressions`` string.
+        functions = data.get(functions_field)
+        if not functions:
+            return
+        user_defined_kw = dict(data.get("user_defined_kw", {}))
+        for function in functions:
+            if function is None:
+                continue
+            for name in cls._density_callable_parameters(function):
+                if name in data:
+                    user_defined_kw[name] = data.pop(name)
+        if user_defined_kw:
+            data["user_defined_kw"] = user_defined_kw
+
+    @classmethod
+    def _resolve_momentum_and_spread(cls, data):
+        # Apply the density mechanism ("both string and callable are available
+        # after construction") to the standard momentum/spread surface, so the
+        # full interface, validation and machinery apply equally to every
+        # expression/function that can be given.
+        user_defined_kw = data.get("user_defined_kw") or {}
+        x, y, z = symbols("x,y,z")
+        for expressions_field, functions_field in (
+            ("momentum_expressions", "momentum_functions"),
+            ("momentum_spread_expressions", "momentum_spread_functions"),
+        ):
+            expressions_in = data.get(expressions_field)
+            functions_in = data.get(functions_field)
+            if expressions_in is None and functions_in is None:
+                continue
+            expressions = list(expressions_in) if expressions_in is not None else []
+            functions = list(functions_in) if functions_in is not None else []
+            resolved_expressions = []
+            resolved_functions = []
+            for i in range(max(len(expressions), len(functions))):
+                expression = expressions[i] if i < len(expressions) else None
+                function = functions[i] if i < len(functions) else None
+                if expression is None and function is None:
+                    resolved_expressions.append(None)
+                    resolved_functions.append(None)
+                    continue
+                target = None if expression is None else sympify(f"{expression}".replace("\n", ""))
+                bound = None if function is None else cls._bind_density_function(function, user_defined_kw)
+                if bound is not None:
+                    function_value = sympify(bound(x, y, z))
+                    if target is not None:
+                        shifted = function_value - target
+                        if shifted.free_symbols <= {x, y, z} and shifted != 0:
+                            raise ValueError(
+                                f"{expressions_field} and {functions_field} disagree on an axis; "
+                                "provide one form, or matching string and callable forms."
+                            )
+                    else:
+                        target = function_value
+                if target is None:
+                    raise ValueError(f"{expressions_field}[{i}] must not be empty")
+                resolved_expressions.append(sstr(target, order="none").replace("\n", ""))
+                resolved_functions.append(cls._as_axis_callable(target))
+            data[expressions_field] = resolved_expressions
+            data[functions_field] = resolved_functions
+
+    @staticmethod
+    def _as_axis_callable(expression: Expr) -> Callable[[Symbol, Symbol, Symbol], Expr]:
+        """The callable form of a per-axis momentum/spread sympy expression."""
+        sx, sy, sz = symbols("x,y,z")
+        return lambda x, y, z, _expression=expression: _expression.subs({sx: x, sy: y, sz: z})
 
     @staticmethod
     def _density_callable_parameters(density_function) -> list[str]:
@@ -372,12 +506,12 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
             # A plain f(x, y, z); user_defined_kw (if any) come from another expression
             # and still need to be substituted into the result.
             if not user_defined_kw:
-                return density_function
-            return lambda x, y, z: density_function(x, y, z).subs(user_defined_kw)
+                return lambda x, y, z: sympify(density_function(x, y, z))
+            return lambda x, y, z: sympify(density_function(x, y, z)).subs(user_defined_kw)
         # f(x, y, z, *user_defined_kw): bind the coordinate symbols and pass the
         # collected constants by name, then substitute any remaining parameters.
         kwargs = {name: user_defined_kw[name] for name in parameters if name in user_defined_kw}
-        return lambda x, y, z: density_function(x, y, z, **kwargs).subs(user_defined_kw)
+        return lambda x, y, z: sympify(density_function(x, y, z, **kwargs)).subs(user_defined_kw)
 
     def _density_function(self) -> Callable[[Symbol, Symbol, Symbol], Expr]:
         """The density function with any user_defined_kw parameters substituted."""
@@ -392,6 +526,33 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
     def density_sympy(self) -> Expr:
         """The density as a sympy expression of x, y and z (public counterpart of ``density_function``)."""
         return self._density_expression()
+
+    @computed_field
+    @property
+    def momentum_sympy(self) -> list[Expr | None]:
+        """The per-axis momentum expressions as sympy expressions (constants substituted).
+
+        Public counterpart of ``momentum_functions``; ``None`` marks an axis that
+        was not supplied. The ``user_defined_kw`` constants are substituted, just
+        like in ``density_sympy``.
+        """
+        return [
+            None if e in (None, "None") else sympify(e).subs(self.user_defined_kw) for e in self.momentum_expressions
+        ]
+
+    @computed_field
+    @property
+    def momentum_spread_sympy(self) -> list[Expr | None]:
+        """The per-axis thermal spread expressions as sympy expressions (constants substituted).
+
+        Public counterpart of ``momentum_spread_functions``; ``None`` marks an axis
+        that was not supplied. The ``user_defined_kw`` constants are substituted,
+        just like in ``density_sympy``.
+        """
+        return [
+            None if e in (None, "None") else sympify(e).subs(self.user_defined_kw)
+            for e in self.momentum_spread_expressions
+        ]
 
     @property
     def dim(self) -> int:

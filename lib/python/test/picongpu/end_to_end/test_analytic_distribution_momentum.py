@@ -57,6 +57,17 @@ SPREAD_DISTRIBUTION = AnalyticDistribution(
     vthy=SPREAD_Y,
 )
 
+# the same surface, but with the per-axis callable forms and their keyword
+# substitution instead of the string expressions
+FUNCTION_DISTRIBUTION = AnalyticDistribution(
+    density_expression="1",
+    momentum_functions=[None, lambda x, y, z, vdrift: vdrift, None],
+    momentum_spread_functions=[lambda x, y, z, vthx: vthx, lambda x, y, z, vthy: vthy, None],
+    vdrift=GAMMA_VELOCITY_Y,
+    vthx=SPREAD_X,
+    vthy=SPREAD_Y,
+)
+
 
 def basic_simulation():
     return Simulation(
@@ -84,6 +95,10 @@ def setup_sim():
     )
     sim.add_species(
         Species(name="spread", particle_type="electron", initial_distribution=SPREAD_DISTRIBUTION),
+        PseudoRandomLayout(n_macroparticles_per_cell=2),
+    )
+    sim.add_species(
+        Species(name="function", particle_type="electron", initial_distribution=FUNCTION_DISTRIBUTION),
         PseudoRandomLayout(n_macroparticles_per_cell=2),
     )
     sim.diagnostics = [Checkpoint(period=TS[:])]
@@ -145,3 +160,18 @@ class TestAnalyticDistributionMomentum(TestCase):
         np.testing.assert_allclose(std_y / std_x, SPREAD_Y / SPREAD_X, rtol=0.05)
         # the thermal spread is centred: the mean is small on the sigma scale
         np.testing.assert_allclose(momenta[:, :2].mean(axis=0), 0.0, atol=0.05 * std_x)
+
+    def test_momentum_function_reaches_species(self):
+        # the per-axis callable forms (with keyword-substituted drift and spread)
+        # must reach the particle species exactly like the string expressions
+        drift = self.particles.loc(axis=0)["function"]
+        momenta = drift[["momentum_x", "momentum_y", "momentum_z"]].to_numpy()
+        assert len(momenta) > 0
+        np.testing.assert_allclose(momenta[:, 0], 0.0, atol=0.0)
+        np.testing.assert_allclose(momenta[:, 2], 0.0, atol=0.0)
+        # anisotropic spread: y is three times as broad as x
+        std_x = momenta[:, 0].std()
+        std_y = momenta[:, 1].std()
+        assert std_x > 0.0
+        assert std_y > 0.0
+        np.testing.assert_allclose(std_y / std_x, SPREAD_Y / SPREAD_X, rtol=0.05)

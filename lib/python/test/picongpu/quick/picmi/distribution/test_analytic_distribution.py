@@ -18,6 +18,8 @@ from picongpu.picmi.species_requirements import SimpleMomentumOperation, run_con
 from picongpu.pypicongpu.util import UnsupportedFeatureError
 import pytest
 
+x, y, z = symbols("x, y, z")
+
 # allow numpy broadcasting (see https://numpy.org/doc/stable/user/basics.broadcasting.html)
 # some examples to check:
 VALID_CALLS = [
@@ -286,6 +288,105 @@ class TestAnalyticDistributionFullSurface(TestCase):
         self.assertEqual(momentum.temperature.temperature_kev_directional[0], 0.0)
         self.assertEqual(momentum.temperature.temperature_kev_directional[1], 0.0)
         self.assertEqual(momentum.temperature.temperature_kev_directional[2], 5.685630111285689e-05)
+
+    def test_momentum_function_matches_expression_and_is_available(self):
+        # the per-axis momentum callable is the sympy equivalent of the string
+        # expression: both spellings are accepted and both fields are populated
+        from_expression = AnalyticDistribution(
+            density_expression="1", momentum_expressions=[None, "vx", None], vx=3.0e7
+        )
+        from_function = AnalyticDistribution(
+            density_expression="1", momentum_functions=[None, lambda x, y, z: 3.0e7, None]
+        )
+        # both reference forms and both sympy views agree
+        self.assertEqual(from_function.momentum_sympy, from_expression.momentum_sympy)
+        self.assertEqual(from_function.momentum_functions[1](x, y, z), 3.0e7)
+        self.assertEqual(sympify(from_function.momentum_expressions[1]), from_expression.momentum_sympy[1])
+        self.assertEqual(
+            from_function.get_picongpu_drift().direction_normalized,
+            from_expression.get_picongpu_drift().direction_normalized,
+        )
+        self.assertLess(
+            abs(from_function.get_picongpu_drift().gamma - from_expression.get_picongpu_drift().gamma), 1e-9
+        )
+
+    def test_momentum_spread_function_matches_expression_and_is_available(self):
+        from_expression = AnalyticDistribution(
+            density_expression="1", momentum_spread_expressions=[None, None, "vth"], vth=1.0e5
+        )
+        from_function = AnalyticDistribution(
+            density_expression="1", momentum_spread_functions=[None, None, lambda x, y, z: 1.0e5]
+        )
+        self.assertEqual(from_function.momentum_spread_sympy, from_expression.momentum_spread_sympy)
+        self.assertEqual(from_function.momentum_spread_functions[2](x, y, z), 1.0e5)
+        self.assertEqual(
+            sympify(from_function.momentum_spread_expressions[2]), from_expression.momentum_spread_sympy[2]
+        )
+        self.assertEqual(from_function.picongpu_get_rms_velocity_si(), from_expression.picongpu_get_rms_velocity_si())
+        temperature = _momentum_of(from_function).temperature
+        self.assertEqual(temperature.temperature_kev_directional[2], 5.685630111285689e-05)
+
+    def test_momentum_function_kwargs_substituted(self):
+        # a momentum/spread callable takes the same extra keyword arguments as density_function
+        distribution = AnalyticDistribution(
+            density_expression="1",
+            momentum_functions=[None, None, lambda x, y, z, vz: vz],
+            momentum_spread_functions=[None, None, lambda x, y, z, vth: vth],
+            vz=2.0e7,
+            vth=1.0e5,
+        )
+        self.assertEqual(distribution.user_defined_kw, {"vz": 2.0e7, "vth": 1.0e5})
+        self.assertEqual(distribution.momentum_sympy, [None, None, sympify("2.0e7")])
+        self.assertEqual(distribution.momentum_spread_sympy, [None, None, sympify("1.0e5")])
+        self.assertEqual(distribution.picongpu_get_rms_velocity_si(), (0.0, 0.0, 1.0e5))
+        self.assertLess(abs(distribution.get_picongpu_drift().gamma - math.sqrt(1 + (2.0e7 / c) ** 2)), 1e-9)
+
+    def test_momentum_function_and_expression_must_agree(self):
+        # supplying both spellings with different values for one axis is rejected
+        with pytest.raises(ValueError, match="disagree"):
+            AnalyticDistribution(
+                density_expression="1",
+                momentum_expressions=[None, None, "2e7"],
+                momentum_functions=[None, None, lambda x, y, z: 3.0e7],
+            )
+        # equal spellings are accepted and collapse to the same surface
+        distribution = AnalyticDistribution(
+            density_expression="1",
+            momentum_spread_expressions=[None, None, "1e5"],
+            momentum_spread_functions=[None, None, lambda x, y, z: 1.0e5],
+        )
+        self.assertEqual(distribution.picongpu_get_rms_velocity_si(), (0.0, 0.0, 1.0e5))
+
+    def test_position_dependent_momentum_function_rejected(self):
+        with self.assertRaises(UnsupportedFeatureError):
+            AnalyticDistribution(
+                density_expression="1", momentum_functions=[lambda x, y, z: x, None, None]
+            ).get_picongpu_drift()
+        with self.assertRaises(UnsupportedFeatureError):
+            AnalyticDistribution(
+                density_expression="1", momentum_spread_functions=[None, None, lambda x, y, z: z]
+            ).picongpu_get_rms_velocity_si()
+
+    def test_momentum_sympy_public_properties(self):
+        distribution = AnalyticDistribution(
+            density_expression="1",
+            momentum_expressions=[None, "vx", None],
+            momentum_spread_expressions=[None, None, "vth"],
+            vx=3.0e7,
+            vth=1.0e5,
+        )
+        self.assertEqual(distribution.momentum_sympy, [None, sympify("3.0e7"), None])
+        self.assertEqual(distribution.momentum_spread_sympy, [None, None, sympify("1.0e5")])
+
+    def test_assigning_axis_function_keeps_the_expression_in_sync(self):
+        distribution = AnalyticDistribution(density_expression="1")
+        distribution.momentum_functions = [None, None, lambda x, y, z: 3.0e7]
+        self.assertEqual(distribution.momentum_expressions[0:2], [None, None])
+        self.assertEqual(sympify(distribution.momentum_expressions[2]), sympify("3.0e7"))
+        self.assertEqual(distribution.momentum_sympy, [None, None, sympify("3.0e7")])
+        distribution.momentum_spread_expressions = [None, None, "1e5"]
+        self.assertEqual(distribution.momentum_spread_sympy, [None, None, sympify("1.0e5")])
+        self.assertEqual(distribution.picongpu_get_rms_velocity_si(), (0.0, 0.0, 1.0e5))
 
     def test_user_defined_kw_in_momentum_spread_expression(self):
         # a constant referenced *only* in a momentum_spread_expression is collected and substituted

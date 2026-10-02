@@ -15,7 +15,8 @@ Defines an analytic density profile in two equivalent ways:
 as a sympy function handed over as a decorator, and as a
 sympy-parseable ``density_expression`` string, and adds a
 constant drift and thermal spread via the standard
-``momentum_expressions`` / ``momentum_spread_expressions``.
+``momentum_expressions`` / ``momentum_spread_expressions`` (or their
+equivalent ``momentum_functions`` / ``momentum_spread_functions`` callables).
 """
 
 from pathlib import Path
@@ -70,6 +71,23 @@ drifting = picmi.AnalyticDistribution(
     vth=1.0e5,
 )
 # END-MOMENTUM-EXPRESSIONS
+
+# BEGIN-MOMENTUM-FUNCTIONS
+# the momentum and spread surface mirrors the density exactly: each per-axis
+# expression can equally be given as a sympy callable (`None` marks an axis that
+# is not supplied), with the same keyword substitution, and the parsed
+# expressions are exposed as `momentum_sympy` / `momentum_spread_sympy`:
+drifting_function = picmi.AnalyticDistribution(
+    density_expression="n0 * exp(-(((x - 1e-6) / 1e-7) ** 2))",
+    n0=1e25,
+    momentum_functions=[None, None, lambda x, y, z, vz: vz],
+    momentum_spread_functions=[None, None, lambda x, y, z, vth: vth],
+    vz=1.0e6,
+    vth=1.0e5,
+)
+assert drifting_function.momentum_sympy == drifting.momentum_sympy
+assert drifting_function.momentum_spread_sympy == drifting.momentum_spread_sympy
+# END-MOMENTUM-FUNCTIONS
 
 grid = picmi.Cartesian3DGrid(
     number_of_cells=[32, 32, 32],

@@ -6,18 +6,34 @@ License: GPLv3+
 """
 
 import copy
+import math
 import os
 import shutil
 import tempfile
 from pathlib import Path
 from unittest import TestCase
 
+import picmistandard
 import pytest
 from pydantic import ValidationError
 from picongpu import picmi
-from picongpu.picmi.interaction.ionization.fieldionization import ADK, ADKVariant
+from picongpu import templates
+from picongpu.picmi.interaction.collision import CollisionalPhysicsSetup
+from picongpu.picmi.interaction.ionization.fieldionization import ADK, ADKVariant, BSI, BSIExtension, Keldysh
 from picongpu.pypicongpu import customuserinput, species
 from picongpu.pypicongpu.field_solver import ArbitraryOrderFDTDSolver
+from picongpu.pypicongpu.rendering.renderer import Renderer
+
+
+def render_min_weighting(sim) -> str:
+    """Render the production particle.param template and return its MIN_WEIGHTING line."""
+    pypic = sim.get_as_pypicongpu()
+    context = pypic.get_rendering_context()
+    Renderer.check_rendering_context(context)
+    preprocessed = Renderer.get_context_preprocessed(context)
+    template = (templates.path() / "include" / "picongpu" / "param" / "particle.param.mustache").read_text()
+    rendered = Renderer.get_rendered_template(preprocessed, template)
+    return next(line.strip() for line in rendered.splitlines() if "MIN_WEIGHTING =" in line)
 
 
 def get_grid(delta_x: float, delta_y: float, delta_z: float, n: int):
@@ -213,6 +229,174 @@ class TestPicmiSimulation(TestCase):
         # check typical ppc is derived
         assert picongpu.typical_ppc == 3
 
+    def test_declarative_species_registers_density(self):
+        """constructor species/layouts must register the same density init as add_species (https://github.com/chillenzer-agents/picongpu/issues/189)"""
+        profile = picmi.UniformDistribution(density=42)
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
+
+        grid = get_grid(1, 1, 1, 64)
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+
+        def new_species():
+            return picmi.Species(name="declarative", mass=3, charge=4, initial_distribution=profile)
+
+        declarative = picmi.Simulation(
+            time_step_size=17, max_steps=4, solver=solver, species=[new_species()], layouts=[layout]
+        )
+        imperative = picmi.Simulation(time_step_size=17, max_steps=4, solver=solver)
+        imperative.add_species(new_species(), layout)
+
+        assert len(declarative.picongpu_distributions) == 1
+        declarative_ops = declarative.get_as_pypicongpu().init_operations
+        imperative_ops = imperative.get_as_pypicongpu().init_operations
+        assert declarative_ops != []
+        assert [type(op).__name__ for op in declarative_ops] == [type(op).__name__ for op in imperative_ops]
+
+    def test_declarative_species_skips_none_distribution(self):
+        """a None initial_distribution is skipped and layout-less species stay unplaced (https://github.com/chillenzer-agents/picongpu/issues/189)"""
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
+        placed = picmi.Species(name="placed", mass=1, initial_distribution=picmi.UniformDistribution(density=42))
+        not_placed = picmi.Species(name="not_placed", mass=1)
+
+        grid = get_grid(1, 1, 1, 64)
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        sim = picmi.Simulation(
+            time_step_size=17, max_steps=4, solver=solver, species=[placed, not_placed], layouts=[layout, None]
+        )
+
+        assert len(sim.picongpu_distributions) == 1
+        assert len(sim.species) == 2
+        assert len(sim.layouts) == 2
+        assert sim.get_as_pypicongpu().init_operations != []
+
+    def test_declarative_species_layout_without_distribution_raises(self):
+        """a layout with no initial distribution is rejected as in add_species (https://github.com/chillenzer-agents/picongpu/issues/189)"""
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
+        grid = get_grid(1, 1, 1, 64)
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        with pytest.raises(Exception, match=".*initial.*distribution.*"):
+            picmi.Simulation(
+                time_step_size=17,
+                max_steps=4,
+                solver=solver,
+                species=[picmi.Species(name="dummy")],
+                layouts=[layout],
+            )
+
+    def test_declarative_species_length_mismatch_raises(self):
+        """species and layouts must have equal length (https://github.com/chillenzer-agents/picongpu/issues/189)"""
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
+        grid = get_grid(1, 1, 1, 64)
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        with pytest.raises(Exception, match=".*same length.*"):
+            picmi.Simulation(
+                time_step_size=17,
+                max_steps=4,
+                solver=solver,
+                species=[
+                    picmi.Species(name="a", initial_distribution=picmi.UniformDistribution(density=42)),
+                    picmi.Species(name="b", initial_distribution=picmi.UniformDistribution(density=42)),
+                ],
+                layouts=[layout],
+            )
+
+    def test_declarative_species_then_add_species_appends(self):
+        """a later add_species appends to the declarative lists without double registering (https://github.com/chillenzer-agents/picongpu/issues/189)"""
+        profile = picmi.UniformDistribution(density=42)
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
+        grid = get_grid(1, 1, 1, 64)
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+
+        sim = picmi.Simulation(
+            time_step_size=17,
+            max_steps=4,
+            solver=solver,
+            species=[picmi.Species(name="declarative", mass=1, initial_distribution=profile)],
+            layouts=[layout],
+        )
+        sim.add_species(picmi.Species(name="imperative", mass=1, initial_distribution=profile), layout)
+
+        assert len(sim.picongpu_distributions) == 2
+        assert len(sim.species) == 2
+        assert len(sim.layouts) == 2
+
+    def test_add_species_through_plane_after_construction(self):
+        """the inherited add_species_through_plane still appends after construction (https://github.com/chillenzer-agents/picongpu/issues/189)"""
+        grid = get_grid(1, 1, 1, 64)
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        sim = picmi.Simulation(time_step_size=17, max_steps=4, solver=solver)
+
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
+        injection = picmi.Species(
+            name="injected", mass=1, charge=1, initial_distribution=picmi.UniformDistribution(density=42)
+        )
+        sim.add_species_through_plane(injection, layout, [0, 0, 0], [1, 0, 0])
+
+        assert len(sim.species) == 1
+        assert len(sim.layouts) == 1
+
+    def test_declarative_species_2d(self):
+        """the declarative registration also works with a 2D grid (https://github.com/chillenzer-agents/picongpu/issues/189)"""
+        grid = picmi.Cartesian2DGrid(
+            number_of_cells=[64, 64],
+            lower_bound=[0, 0],
+            upper_bound=[64, 64],
+            lower_boundary_conditions=["open", "open"],
+            upper_boundary_conditions=["open", "open"],
+        )
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
+
+        sim = picmi.Simulation(
+            time_step_size=17,
+            max_steps=4,
+            solver=solver,
+            species=[
+                picmi.Species(name="declarative2d", mass=1, initial_distribution=picmi.UniformDistribution(density=42))
+            ],
+            layouts=[layout],
+        )
+
+        assert len(sim.picongpu_distributions) == 1
+        assert sim.get_as_pypicongpu().init_operations != []
+
+    def test_declarative_species_oneposition_layout(self):
+        """OnePositionLayout is accepted by the declarative constructor too (https://github.com/chillenzer-agents/picongpu/issues/189)"""
+        grid = get_grid(1, 1, 1, 64)
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        sim = picmi.Simulation(
+            time_step_size=17,
+            max_steps=4,
+            solver=solver,
+            species=[
+                picmi.Species(name="oneposition", mass=1, initial_distribution=picmi.UniformDistribution(density=42))
+            ],
+            layouts=[picmi.OnePositionLayout(n_macroparticles_per_cell=2)],
+        )
+
+        assert len(sim.picongpu_distributions) == 1
+        assert sim.get_as_pypicongpu().init_operations != []
+
+    def test_declarative_registration_is_stateless(self):
+        """later assignments do not re-run or mutate the declarative registration (https://github.com/chillenzer-agents/picongpu/issues/189)"""
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
+        grid = get_grid(1, 1, 1, 64)
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        sim = picmi.Simulation(
+            time_step_size=17,
+            max_steps=4,
+            solver=solver,
+            species=[
+                picmi.Species(name="declarative", mass=1, initial_distribution=picmi.UniformDistribution(density=42))
+            ],
+            layouts=[layout],
+        )
+        registered = list(sim.picongpu_distributions)
+
+        # Re-validating the model (any assignment) must not add or drop entries.
+        sim.max_steps = 5
+        assert sim.picongpu_distributions == registered
+
     def test_explicit_typical_ppc(self):
         grid = get_grid(1, 1, 1, 64)
         solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
@@ -250,6 +434,31 @@ class TestPicmiSimulation(TestCase):
         for value in wrongTypes:
             with pytest.raises(ValueError, match="Typical ppc should be > 0"):
                 picmi.Simulation(time_step_size=17, max_steps=4, solver=solver, picongpu_typical_ppc=value)
+
+    def test_min_weighting_default_renders_as_float(self):
+        """unset picongpu_min_weighting falls back to the C++ default 10.0 (float literal)"""
+        assert render_min_weighting(self.sim) == "constexpr float_X MIN_WEIGHTING = 10.0;"
+
+    def test_min_weighting_explicit_renders_as_float(self):
+        """an explicit picongpu_min_weighting is threaded into the rendered MIN_WEIGHTING"""
+        grid = get_grid(1, 1, 1, 32)
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        sim = picmi.Simulation(time_step_size=17, max_steps=4, solver=solver, picongpu_min_weighting=2.0)
+        assert render_min_weighting(sim) == "constexpr float_X MIN_WEIGHTING = 2.0;"
+
+    def test_min_weighting_rejects_non_positive_and_non_finite(self):
+        grid = get_grid(1, 1, 1, 32)
+        solver = picmi.ElectromagneticSolver(method="Yee", grid=grid)
+        for value in (0.0, -1.0, math.inf, -math.inf, math.nan):
+            with pytest.raises(ValidationError, match="Minimum weighting must be finite and > 0"):
+                picmi.Simulation(time_step_size=17, max_steps=4, solver=solver, picongpu_min_weighting=value)
+
+    def test_pypicongpu_min_weighting_rejects_non_positive_and_non_finite(self):
+        """the pypicongpu model validates directly, not only via the PICMI surface"""
+        pypic = self.sim.get_as_pypicongpu()
+        for value in (0.0, -1.0, math.inf, -math.inf, math.nan):
+            with pytest.raises(ValidationError, match="Minimum weighting must be finite and > 0"):
+                type(pypic)(**{**pypic.__dict__, "min_weighting": value})
 
     def test_invalid_placement(self):
         profile = picmi.UniformDistribution(density=42)
@@ -435,7 +644,7 @@ class TestPicmiSimulation(TestCase):
         sim.add_species(ion2, None)
 
         # in use should be set via simulation constructor
-        sim.picongpu_interaction = interaction
+        sim.interactions = interaction
 
         pypic_sim = sim.get_as_pypicongpu()
         operations = pypic_sim.init_operations
@@ -816,3 +1025,231 @@ class TestPicmiSimulation(TestCase):
             time_step_size=good.time_step_size,
             solver=picmi.ElectromagneticSolver(method="CKC", grid=get_grid(*delta_3d, n=n), cfl=0.9),
         )
+
+
+def _interaction_sim():
+    """Build a minimal simulation with one ion and its electron product species."""
+    sim = picmi.Simulation(
+        time_step_size=17,
+        max_steps=4,
+        solver=picmi.ElectromagneticSolver(method="Yee", grid=get_grid(1, 1, 1, 32)),
+    )
+    e = picmi.Species(name="e", particle_type="electron")
+    ion = picmi.Species(name="hydrogen", particle_type="H", charge_state=+1)
+    sim.add_species(e, None)
+    sim.add_species(ion, None)
+    return sim, ion, e
+
+
+def _render_species_definition(sim) -> str:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_dir = os.path.join(tmpdir, "input")
+        sim.write_input_file(output_dir)
+        rendered_path = os.path.join(output_dir, "include", "picongpu", "param", "speciesDefinition.param")
+        with open(rendered_path) as rendered_file:
+            return rendered_file.read()
+
+
+class TestAddInteraction:
+    def test_keldysh_bare(self):
+        """a bare standard FieldIonization with model=Keldysh renders the Keldysh model"""
+        sim, ion, e = _interaction_sim()
+        sim.add_interaction(picmi.FieldIonization(model="Keldysh", ionized_species=ion, product_species=e))
+
+        model = sim.interactions[0]
+        assert isinstance(model, Keldysh)
+        # the standard names are mapped onto the concrete model
+        assert model.ion_species is ion
+        assert model.ionization_electron_species is e
+        # a bare standard field ionization defaults to the C++ current::None
+        assert model.ionization_current is None
+
+        rendered = _render_species_definition(sim)
+        assert "Keldysh" in rendered
+        assert "particles::ionization::current::None" in rendered
+
+    def test_adk_with_variant(self):
+        """the ADK model carries the supplied ADK variant"""
+        sim, ion, e = _interaction_sim()
+        sim.add_interaction(
+            picmi.FieldIonization(
+                model="ADK", ionized_species=ion, product_species=e, ADK_variant=ADKVariant.LinearPolarization
+            )
+        )
+        model = sim.interactions[0]
+        assert isinstance(model, ADK)
+        assert model.ADK_variant is ADKVariant.LinearPolarization
+
+    def test_bsi_with_extensions(self):
+        """the BSI model carries the supplied BSI extensions"""
+        sim, ion, e = _interaction_sim()
+        sim.add_interaction(
+            picmi.FieldIonization(
+                model="BSI", ionized_species=ion, product_species=e, BSI_extensions=[BSIExtension.StarkShift]
+            )
+        )
+        model = sim.interactions[0]
+        assert isinstance(model, BSI)
+        assert model.BSI_extensions == (BSIExtension.StarkShift,)
+
+    def test_adk_missing_variant_raises(self):
+        """the ADK model requires an ADK variant and raises a clear error without one"""
+        sim, ion, e = _interaction_sim()
+        with pytest.raises(ValueError, match="ADK_variant"):
+            sim.add_interaction(picmi.FieldIonization(model="ADK", ionized_species=ion, product_species=e))
+
+    def test_bsi_missing_extensions_raises(self):
+        """the BSI model requires extensions and raises a clear error without them"""
+        sim, ion, e = _interaction_sim()
+        with pytest.raises(ValueError, match="BSI_extensions"):
+            sim.add_interaction(picmi.FieldIonization(model="BSI", ionized_species=ion, product_species=e))
+
+    @pytest.mark.parametrize(
+        "model_name",
+        ["ADK", "adk", "Adk", "BSI", "bsi", "Keldysh", "keldysh", "KeLDySh"],
+    )
+    def test_model_name_case_insensitive(self, model_name):
+        """model selection matches the MODEL_NAME constants case-insensitively"""
+        _, ion, e = _interaction_sim()
+        field_ionization = picmi.FieldIonization(
+            model=model_name,
+            ionized_species=ion,
+            product_species=e,
+            ADK_variant=ADKVariant.LinearPolarization,
+            BSI_extensions=[BSIExtension.StarkShift],
+        )
+        expected = {"adk": ADK, "bsi": BSI, "keldysh": Keldysh}[model_name.lower()]
+        assert field_ionization._resolve_model_class() is expected
+
+    def test_concrete_models_are_picmi_interactions(self):
+        """the concrete ionization models are accepted by the standard interactions field"""
+        from picmistandard import PICMI_Interaction
+
+        for model_class in (ADK, BSI, Keldysh):
+            assert issubclass(model_class, PICMI_Interaction)
+        assert issubclass(picmi.FieldIonization, picmistandard.PICMI_FieldIonization)
+
+    def test_constructor_interactions_accepts_field_ionization(self):
+        """the standard interactions=[...] constructor parameter is a first-class entry point"""
+        e = picmi.Species(name="e", particle_type="electron")
+        ion = picmi.Species(name="hydrogen", particle_type="H", charge_state=+1)
+        sim = picmi.Simulation(
+            time_step_size=17,
+            max_steps=4,
+            solver=picmi.ElectromagneticSolver(method="Yee", grid=get_grid(1, 1, 1, 32)),
+            species=[ion, e],
+            layouts=[None, None],
+            interactions=[picmi.FieldIonization(model="Keldysh", ionized_species=ion, product_species=e)],
+        )
+        assert isinstance(sim.interactions[0], Keldysh)
+        assert "Keldysh" in _render_species_definition(sim)
+
+    def test_constructor_interactions_accepts_plain_standard(self):
+        """a plain picmistandard.PICMI_FieldIonization in the constructor list is mapped too"""
+        e = picmi.Species(name="e", particle_type="electron")
+        ion = picmi.Species(name="hydrogen", particle_type="H", charge_state=+1)
+        sim = picmi.Simulation(
+            time_step_size=17,
+            max_steps=4,
+            solver=picmi.ElectromagneticSolver(method="Yee", grid=get_grid(1, 1, 1, 32)),
+            species=[ion, e],
+            layouts=[None, None],
+            interactions=[picmistandard.PICMI_FieldIonization(model="Keldysh", ionized_species=ion, product_species=e)],
+        )
+        assert isinstance(sim.interactions[0], Keldysh)
+
+    def test_add_interaction_accepts_collisions_and_synchrotron(self):
+        """add_interaction accepts the same types as the constructor list, not only field ionization"""
+        sim, ion, e = _interaction_sim()
+        photon = picmi.Species(name="photons", particle_type="photon")
+        sim.add_species(photon, None)
+
+        synchrotron = picmi.Synchrotron(electron_species=e, photon_species=photon)
+        sim.add_interaction(synchrotron)
+        assert sim.interactions == [synchrotron]
+
+        collision = picmi.Collision.construct_all_to_all([e, ion], functor=picmi.ConstLogCollision(coulomb_log=2.0))
+        sim.add_interaction(collision)
+        # the bare collision is merged into a CollisionalPhysicsSetup by the shared pipeline
+        assert isinstance(sim.interactions[-1], CollisionalPhysicsSetup)
+        assert sim.interactions[-1].collisions == [collision]
+
+    def test_unsupported_standard_interaction_raises(self):
+        """a standard interaction type PIConGPU does not support is rejected, not silently dropped"""
+        from picmistandard import PICMI_Interaction
+
+        class _UnsupportedInteraction(PICMI_Interaction):
+            pass
+
+        sim, _, _ = _interaction_sim()
+        with pytest.raises(ValueError, match="not .* implemented by PIConGPU|not supported by PIConGPU"):
+            sim.add_interaction(_UnsupportedInteraction())
+
+    def test_standard_base_field_ionization_keldysh(self):
+        """a plain picmistandard.PICMI_FieldIonization is accepted and mapped to the concrete model"""
+        sim, ion, e = _interaction_sim()
+        standard = picmistandard.PICMI_FieldIonization(model="Keldysh", ionized_species=ion, product_species=e)
+        # the base class is not an instance of the PIConGPU adapter
+        assert not isinstance(standard, picmi.FieldIonization)
+
+        sim.add_interaction(standard)
+
+        model = sim.interactions[0]
+        assert isinstance(model, Keldysh)
+        assert model.ion_species is ion
+        assert model.ionization_electron_species is e
+        rendered = _render_species_definition(sim)
+        assert "Keldysh" in rendered
+
+    def test_standard_base_field_ionization_adk_needs_variant(self):
+        """a plain standard ADK request raises the actionable ADK_variant error (no knob on the standard object)"""
+        sim, ion, e = _interaction_sim()
+        standard = picmistandard.PICMI_FieldIonization(model="ADK", ionized_species=ion, product_species=e)
+        with pytest.raises(ValueError, match="ADK_variant"):
+            sim.add_interaction(standard)
+
+    def test_standard_base_field_ionization_unknown_model(self):
+        """a plain standard object with an unsupported model raises the clear model error"""
+        sim, ion, e = _interaction_sim()
+        standard = picmistandard.PICMI_FieldIonization(model="ThomasFermi", ionized_species=ion, product_species=e)
+        with pytest.raises(ValueError, match="Unsupported field ionization model"):
+            sim.add_interaction(standard)
+
+    def test_plain_bsi_with_empty_extensions_renders(self):
+        """BSI_extensions=() selects the plain BSI model without extensions"""
+        sim, ion, e = _interaction_sim()
+        sim.add_interaction(
+            picmi.FieldIonization(model="BSI", ionized_species=ion, product_species=e, BSI_extensions=())
+        )
+        model = sim.interactions[0]
+        assert isinstance(model, BSI)
+        assert model.BSI_extensions == ()
+        assert "BSI" in _render_species_definition(sim)
+
+    def test_irrelevant_knobs_are_rejected(self):
+        """a knob that does not belong to the selected model is rejected, not silently ignored"""
+        sim, ion, e = _interaction_sim()
+        with pytest.raises(ValueError, match="ADK_variant is only valid for the ADK model"):
+            sim.add_interaction(
+                picmi.FieldIonization(
+                    model="Keldysh",
+                    ionized_species=ion,
+                    product_species=e,
+                    ADK_variant=ADKVariant.LinearPolarization,
+                )
+            )
+        sim, ion, e = _interaction_sim()
+        with pytest.raises(ValueError, match="BSI_extensions is only valid for the BSI model"):
+            sim.add_interaction(
+                picmi.FieldIonization(
+                    model="Keldysh",
+                    ionized_species=ion,
+                    product_species=e,
+                    BSI_extensions=[BSIExtension.StarkShift],
+                )
+            )
+
+    def test_unknown_model_raises(self):
+        sim, ion, e = _interaction_sim()
+        with pytest.raises(ValueError, match="Unsupported field ionization model"):
+            sim.add_interaction(picmi.FieldIonization(model="ThomasFermi", ionized_species=ion, product_species=e))

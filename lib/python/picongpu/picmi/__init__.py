@@ -12,6 +12,7 @@ from .distribution import (
     AnalyticDistribution,
     CylindricalDistribution,
     FoilDistribution,
+    GaussianBunchDistribution,
     GaussianDistribution,
     UniformDistribution,
 )
@@ -29,6 +30,7 @@ from .interaction.ionization.fieldionization import (
     BSI,
     ADKVariant,
     BSIExtension,
+    FieldIonization,
     Keldysh,
 )
 from .lasers import (
@@ -79,12 +81,14 @@ __all__ = [
     "FoilDistribution",
     "UniformDistribution",
     "GaussianDistribution",
+    "GaussianBunchDistribution",
     "AnalyticDistribution",
     "ADK",
     "ADKVariant",
     "BSI",
     "BSIExtension",
     "Keldysh",
+    "FieldIonization",
     "ThomasFermi",
     "Synchrotron",
     "Interaction",

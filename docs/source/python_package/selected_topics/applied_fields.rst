@@ -1,0 +1,95 @@
+.. _applied_fields:
+
+Applied (Background) Fields
+===========================
+
+PIConGPU implements the PICMI-standard *applied fields* as **background
+fields**: a field that is added to the grid ``E`` and ``B`` fields around the
+particle push, so the particles feel it, while the field solver itself does not
+evolve it. Only the **whole simulation domain** is supported; ``lower_bound``
+and ``upper_bound`` must be left at their default (all ``None``), and region
+restriction raises an ``UnsupportedFeatureError``.
+
+Applied fields are attached declaratively via the ``applied_fields`` argument
+of :class:`~picongpu.picmi.simulation.Simulation` (or with
+:meth:`~picongpu.picmi.simulation.Simulation.add_applied_field`). Several fields
+may be given; their contributions are summed per component into the single
+background field that the C++ core evaluates:
+
+.. literalinclude:: ../snippets/selected_topics/applied_fields.py
+   :language: python
+   :start-at: BEGIN-APPLIED-FIELD-ADD
+   :end-before: END-APPLIED-FIELD-ADD
+
+The field classes
+-----------------
+
+:class:`~picongpu.picmi.applied_field.ConstantAppliedField`
+   A field that is constant in space and time. Its components use the
+   PICMI-standard names ``Ex``, ``Ey``, ``Ez`` (in V/m) and ``Bx``, ``By``,
+   ``Bz`` (in T).
+
+:class:`~picongpu.picmi.applied_field.AnalyticAppliedField`
+   A field given by Python expressions. Use the variables ``x``, ``y``, ``z``
+   (position in m) and ``t`` (time in s); additional keyword arguments become
+   named parameters inside the expressions. As in
+   :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`,
+   each of the six components accepts either a sympy-parseable
+   ``<component>_expression`` string or a ``<component>_function`` callable (see
+   :doc:`functors`). Expressions are in V/m for ``E`` and T for ``B``, evaluated
+   in SI units and converted to PIConGPU's internal units (see :ref:`units`).
+
+.. literalinclude:: ../snippets/selected_topics/applied_fields.py
+   :language: python
+   :start-at: BEGIN-APPLIED-FIELD-CONSTANT
+   :end-before: END-APPLIED-FIELD-CONSTANT
+
+.. literalinclude:: ../snippets/selected_topics/applied_fields.py
+   :language: python
+   :start-at: BEGIN-APPLIED-FIELD-ANALYTIC
+   :end-before: END-APPLIED-FIELD-ANALYTIC
+
+Expressions may only reference the free variables ``x``, ``y``, ``z`` and ``t``
+plus the named parameters passed as additional keyword arguments; any other
+symbol is rejected with a ``ValueError`` before code generation. Parameter names
+must not collide with those free variables or with generated identifiers such as
+``cellIdx`` or ``sim`` (also a ``ValueError``); C++ keywords are escaped by the
+PMAccPrinter rather than rejected.
+
+Influence (visibility) knobs
+----------------------------
+
+Both classes accept three PIConGPU-specific influence knobs (the ``picongpu_``
+prefix marks code-specific PICMI inputs); they correspond to options of the
+generated run configuration and default to ``True``:
+
+* ``picongpu_influence_particle_pusher`` — whether the particles feel the
+  background (the pusher flag).
+* ``picongpu_influences_plugins`` — whether plugins see the background.
+* ``picongpu_influences_dumps`` — whether dumps, including checkpoints, include
+  the background.
+
+The three knobs are **not independent**: with
+``picongpu_influence_particle_pusher=False`` the whole background is disabled, so
+the other two have no effect (explicitly setting them then triggers a
+``UserWarning``). The pusher knob covers the electric **and** magnetic
+background together; there is no per-component switch.
+
+Because the knobs configure the *single* C++ background functor pair, all
+applied fields of a simulation must agree on them. A mismatch is caught during
+translation and rejected with an ``UnsupportedFeatureError`` — the same applies
+to redefining a shared parameter with a different value:
+
+.. literalinclude:: ../snippets/selected_topics/applied_fields.py
+   :language: python
+   :start-at: BEGIN-APPLIED-FIELD-INFLUENCE
+   :end-before: END-APPLIED-FIELD-INFLUENCE
+
+When no background field is configured, the plugin/dump options are not written
+to the generated run configuration at all, so the core defaults apply unchanged.
+
+.. note::
+
+   The remaining PICMI applied-field surface is not implemented:
+   ``as_initial`` / ``as_injected`` and field-arithmetic options map onto
+   separate C++ mechanisms and are not available here.

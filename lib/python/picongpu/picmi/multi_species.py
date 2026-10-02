@@ -71,14 +71,24 @@ class MultiSpecies(picmistandard.PICMI_MultiSpecies):
         # *different* copy of the group, and the operation-merging layer would
         # no longer recognise them as coordinated. Register the copy up-front
         # and re-point every copied member at it.
+        #
+        # This relies on pydantic's private state attributes (verified with
+        # pydantic 2.13). If a future pydantic removes/renames them we raise a
+        # clear error instead of silently fragmenting the group.
         memo = {} if memo is None else memo
         cls = type(self)
         new = cls.__new__(cls)
         memo[id(self)] = new
-        object.__setattr__(new, "__dict__", deepcopy(self.__dict__, memo))
-        object.__setattr__(new, "__pydantic_extra__", deepcopy(self.__pydantic_extra__, memo))
-        object.__setattr__(new, "__pydantic_fields_set__", copy(self.__pydantic_fields_set__))
-        object.__setattr__(new, "__pydantic_private__", deepcopy(self.__pydantic_private__, memo))
+        try:
+            object.__setattr__(new, "__dict__", deepcopy(self.__dict__, memo))
+            object.__setattr__(new, "__pydantic_extra__", deepcopy(self.__pydantic_extra__, memo))
+            object.__setattr__(new, "__pydantic_fields_set__", copy(self.__pydantic_fields_set__))
+            object.__setattr__(new, "__pydantic_private__", deepcopy(self.__pydantic_private__, memo))
+        except AttributeError as err:
+            raise NotImplementedError(
+                "MultiSpecies.__deepcopy__ relies on pydantic's private state attributes; "
+                "pydantic internals appear to have changed. Update this override accordingly."
+            ) from err
         for member in new.species_instances_list:
             member._multi_species = new
         return new

@@ -94,9 +94,11 @@ MultiSpecies: collective initialisation
 
 A :class:`~picongpu.picmi.multi_species.MultiSpecies` is the explicit way to
 request **collective (coordinated) initialisation**: all its members share one
-``initial_distribution`` and are placed with a single density operation, so they
-occupy exactly the same in-cell positions -- and are therefore charge-neutral by
-construction, irrespective of per-member momentum or temperature.
+``initial_distribution``, and members whose layouts agree are placed with a
+single density operation, so they occupy exactly the same in-cell positions --
+and are therefore charge-neutral by construction, irrespective of per-member
+momentum or temperature. Members whose layouts do not agree are initialised
+independently instead (see the note below).
 
 .. literalinclude:: ../snippets/selected_topics/multi_species.py
    :language: python
@@ -121,11 +123,15 @@ The value at each position of ``proportions`` becomes the corresponding member's
 .. warning::
 
    Prior to the introduction of ``MultiSpecies``, species sharing the same
-   distribution *and* the same layout were merged implicitly. This heuristic has
-   been removed: such species are now initialised independently and PIConGPU
-   emits a ``UserWarning`` naming the affected species. Wrap them in a
+   distribution *and* the same layout (i.e. the same objects) were merged
+   implicitly. This heuristic has been removed: such species are now initialised
+   independently and PIConGPU emits a ``UserWarning`` naming the affected
+   species. Wrap them in a
    :class:`~picongpu.picmi.multi_species.MultiSpecies` to restore the previous
-   charge-neutral behaviour.
+   charge-neutral behaviour. The warning fires when the species literally share
+   the same ``initial_distribution`` and ``layout`` objects (the form the removed
+   heuristic matched); separately constructed but value-equal objects are not
+   flagged, exactly as they were not merged before.
 
 .. _distributions:
 

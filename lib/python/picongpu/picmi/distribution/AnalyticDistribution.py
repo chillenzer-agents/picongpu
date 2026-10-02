@@ -153,36 +153,56 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
         arbitrary_types_allowed=True, populate_by_name=True, extra="forbid", validate_assignment=True
     )
 
+    @classmethod
+    def _derive_density_function(cls, data):
+        # Normalise like the PICMI standard does (the field type does this on
+        # assignment too, but we need the normalised string here already), then
+        # sympify into the equivalent callable so the rendered density is identical.
+        sx, sy, sz = symbols("x,y,z")
+        parsed = sympify(f"{data['density_expression']}".replace("\n", ""))
+        data["density_function"] = lambda x, y, z: parsed.subs({sx: x, sy: y, sz: z})
+
+    @classmethod
+    def _derive_density_expression(cls, data):
+        # Compute the missing string field from the function so that both fields
+        # are always available. Extra parameters are bound and user_defined_kw
+        # substituted in, so the expression is self-contained (like the standard's).
+        x, y, z = symbols("x,y,z")
+        substituted = cls._bind_density_function(data["density_function"], data.get("user_defined_kw") or {})(x, y, z)
+        data["density_expression"] = sstr(substituted, order="none").replace("\n", "")
+
     @model_validator(mode="before")
     @classmethod
-    def _resolve_density(cls, data):
+    def _resolve_density(cls, data, info):
         if not isinstance(data, dict):
             return data
         data = dict(data)
+
+        # With ``validate_assignment=True`` (inherited from the standard base class)
+        # every assignment re-enters this validator with *both* density fields already
+        # populated, so the "exactly one input" rule below must not fire here. Keep the
+        # two density fields consistent when one of them is assigned, and let the field
+        # validators handle any other assignment unchanged.
+        if info.field_name is not None:
+            if info.field_name == "density_expression" and data.get("density_expression") is not None:
+                cls._derive_density_function(data)
+            elif info.field_name == "density_function" and data.get("density_function") is not None:
+                cls._collect_callable_user_defined_kw(data)
+                cls._derive_density_expression(data)
+            return data
+
         has_function = data.get("density_function") is not None
         has_expression = data.get("density_expression") is not None
         if has_function == has_expression:
             raise ValueError("exactly one of density_function or density_expression must be provided")
         if has_expression:
-            # Normalise like the PICMI standard does (the field type does this on
-            # assignment too, but we need the normalised string here already), then
-            # sympify into the equivalent callable so the rendered density is identical.
-            sx, sy, sz = symbols("x,y,z")
-            parsed = sympify(f"{data['density_expression']}".replace("\n", ""))
-            data["density_function"] = lambda x, y, z: parsed.subs({sx: x, sy: y, sz: z})
+            cls._derive_density_function(data)
         else:
             cls._collect_callable_user_defined_kw(data)
         cls._collect_spread_user_defined_kw(data)
         cls._reject_conflicting_drift(data)
         if not has_expression:
-            # Compute the missing string field from the function so that both fields
-            # are always available. Extra parameters are bound and user_defined_kw
-            # substituted in, so the expression is self-contained (like the standard's).
-            x, y, z = symbols("x,y,z")
-            substituted = cls._bind_density_function(data["density_function"], data.get("user_defined_kw") or {})(
-                x, y, z
-            )
-            data["density_expression"] = sstr(substituted, order="none").replace("\n", "")
+            cls._derive_density_expression(data)
         return data
 
     @staticmethod

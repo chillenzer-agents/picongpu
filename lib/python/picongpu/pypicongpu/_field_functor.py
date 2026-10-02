@@ -92,6 +92,70 @@ def sympify_expression(expression) -> sympy.Expr:
     return sympy.sympify(f"{expression}".replace("\n", ""))
 
 
+def expression_string(expression) -> str:
+    """
+    The canonical PICMI string spelling of a sympy expression.
+
+    This is the inverse of :func:`sympify_expression`, used when a model must
+    expose the ``*_expression`` string field for an expression that was actually
+    supplied as a callable: string-normalised (newlines removed) and stable
+    across a sympify round trip.
+    """
+    return sympy.sstr(sympy.sympify(expression), order="none").replace("\n", "")
+
+
+def function_from_expression(expression, variables: Iterable[str] = ("x", "y", "z")) -> Callable:
+    """
+    The callable spelling of a sympy expression.
+
+    The returned function takes the coordinate variables (in the order of
+    ``variables``) and substitutes them into the expression, so it is the
+    callable counterpart of a ``*_expression`` string.
+    """
+    variables = tuple(variables)
+    symbols = tuple(sympy.Symbol(name) for name in variables)
+    resolved = sympy.sympify(expression)
+    return lambda *args: resolved.subs(dict(zip(symbols, args)))
+
+
+def callable_extra_parameters(function: Callable, variables: Iterable[str] = ("x", "y", "z")) -> set[str]:
+    """
+    Names a callable accepts beyond the coordinate variables.
+
+    A plain ``f(x, y, z)`` yields the empty set and ``f(x, y, z, a, b)`` yields
+    ``{"a", "b"}``. Only explicitly named parameters (positional-or-keyword and
+    keyword-only) are reported; a catch-all ``**kwargs`` is ignored, so the
+    caller cannot silently bind an arbitrary keyword to it. Returns an empty set
+    when the signature cannot be inspected.
+    """
+    try:
+        signature = inspect.signature(function)
+    except (TypeError, ValueError):
+        return set()
+    named = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+    return {
+        name
+        for name, parameter in signature.parameters.items()
+        if name not in set(variables) and parameter.kind in named
+    }
+
+
+def expression_parameter_names(expression, variables: Iterable[str] = ("x", "y", "z")) -> set[str]:
+    """
+    The free-symbol names of an expression beyond the coordinate variables.
+
+    Used to collect additional keyword arguments referenced in an expression
+    string (PICMI ``user_defined_kw``). Returns an empty set for an expression
+    that cannot be parsed, so the caller leaves the parse error to
+    :class:`_FieldFunctor`.
+    """
+    try:
+        free = sympify_expression(expression).free_symbols
+    except Exception:
+        return set()
+    return {str(symbol) for symbol in free} - set(variables)
+
+
 def expression_from_callable(
     function: Callable,
     variables: Mapping[str, sympy.Symbol],

@@ -11,12 +11,12 @@ Copyright 2026 PIConGPU contributors
 Authors: Julian Lenz
 License: GPLv3+
 
-Defines an analytic density profile in two equivalent ways:
-as a sympy function handed over as a decorator, and as a
-sympy-parseable ``density_expression`` string, and adds a
-constant drift and thermal spread via the standard
-``momentum_expressions`` / ``momentum_spread_expressions`` (or their
-equivalent ``momentum_functions`` / ``momentum_spread_functions`` callables).
+Defines an analytic density profile together with a constant drift and thermal
+spread. The three field families -- the density, the per-axis ``momentum``
+(``gamma * velocity``) and the per-axis ``momentum_spread`` (Gaussian sigma) --
+are treated on the same footing: each is given either as a sympy-parseable
+string, as a sympy callable with the same keyword substitution, or read back as
+a parsed sympy expression.
 """
 
 from pathlib import Path
@@ -26,68 +26,54 @@ from sympy import exp
 from picongpu import picmi
 
 
-# BEGIN-DENSITY-FUNCTION
-@picmi.AnalyticDistribution
-def density(x, y, z):
-    return 1e25 * exp(-(((x - 1e-6) / 1e-7) ** 2))
-
-
-# END-DENSITY-FUNCTION
-
-# BEGIN-DENSITY-EXPRESSION
-# the same profile as a sympy-parseable string of x, y and z:
-density_string = picmi.AnalyticDistribution(density_expression="1e25 * exp(-((x - 1e-6) / 1e-7) ** 2)")
-# END-DENSITY-EXPRESSION
-
-# BEGIN-DENSITY-KWARGS
-# constants used in the density may be passed as keyword arguments, both to a
-# callable and to the decorator; they are collected into `user_defined_kw` and
-# substituted, exactly as for the `density_expression` string above:
-density_kwargs = picmi.AnalyticDistribution(
-    density_function=lambda x, y, z, n0, width: n0 * exp(-(((x - 1e-6) / width) ** 2)),
-    n0=1e25,
-    width=1e-7,
-)
-
-
-@picmi.AnalyticDistribution(n0=1e25, width=1e-7)
-def decorated_density(x, y, z, n0, width):
-    return n0 * exp(-(((x - 1e-6) / width) ** 2))
-
-
-assert decorated_density.density_sympy == density_kwargs.density_sympy
-# END-DENSITY-KWARGS
-
-# BEGIN-MOMENTUM-EXPRESSIONS
-# a constant drift (gamma * velocity [m/s]) along z and a Gaussian
-# thermal spread sigma [m/s] along the same axis; `n0`, `vz` and `vth`
-# are collected automatically into `user_defined_kw`:
-drifting = picmi.AnalyticDistribution(
-    density_expression="n0 * exp(-(((x - 1e-6) / 1e-7) ** 2))",
-    n0=1e25,
+# BEGIN-FIELD-EXPRESSIONS
+# density, per-axis momentum (gamma * velocity [m/s]) and per-axis momentum
+# spread (Gaussian sigma [m/s]) as sympy-parseable strings; `None` marks an axis
+# that is not supplied. `n0`, `k`, `vz` and `vth` are constants that are
+# collected automatically into `user_defined_kw`:
+from_expression = picmi.AnalyticDistribution(
+    density_expression="n0 * exp(-(x**2 + y**2) * k)",
     momentum_expressions=[None, None, "vz"],
     momentum_spread_expressions=[None, None, "vth"],
+    n0=1e25,
+    k=1e14,
     vz=1.0e6,
     vth=1.0e5,
 )
-# END-MOMENTUM-EXPRESSIONS
+# END-FIELD-EXPRESSIONS
 
-# BEGIN-MOMENTUM-FUNCTIONS
-# the momentum and spread surface mirrors the density exactly: each per-axis
-# expression can equally be given as a sympy callable (`None` marks an axis that
-# is not supplied), with the same keyword substitution, and the parsed
-# expressions are exposed as `momentum_sympy` / `momentum_spread_sympy`:
-drifting_function = picmi.AnalyticDistribution(
-    density_expression="n0 * exp(-(((x - 1e-6) / 1e-7) ** 2))",
-    n0=1e25,
+# BEGIN-FIELD-FUNCTIONS
+# each family may instead be given as a sympy callable, with the same extra
+# (beyond x, y and z, which stay positional) keyword arguments consumed the
+# same way:
+from_function = picmi.AnalyticDistribution(
+    density_function=lambda x, y, z, n0, k: n0 * exp(-(x**2 + y**2) * k),
     momentum_functions=[None, None, lambda x, y, z, vz: vz],
     momentum_spread_functions=[None, None, lambda x, y, z, vth: vth],
+    n0=1e25,
+    k=1e14,
     vz=1.0e6,
     vth=1.0e5,
 )
-assert drifting_function.momentum_sympy == drifting.momentum_sympy
-assert drifting_function.momentum_spread_sympy == drifting.momentum_spread_sympy
-# END-MOMENTUM-FUNCTIONS
+
+# the two spellings are interchangeable and describe the very same distribution:
+assert from_function == from_expression
+# END-FIELD-FUNCTIONS
+
+# BEGIN-FIELD-SYMPY
+# whichever spelling was given, both are available after construction and the
+# parsed sympy expressions are exposed as public properties:
+assert from_function.density_sympy == from_expression.density_sympy
+assert from_function.momentum_sympy == from_expression.momentum_sympy
+assert from_function.momentum_spread_sympy == from_expression.momentum_spread_sympy
+# END-FIELD-SYMPY
+
+# BEGIN-FIELD-KWARGS
+# constants referenced in any of the three families are collected uniformly from
+# the extra keyword arguments into `user_defined_kw` and substituted before the
+# C++ is rendered:
+assert from_expression.user_defined_kw == {"n0": 1e25, "k": 1e14, "vz": 1.0e6, "vth": 1.0e5}
+# END-FIELD-KWARGS
 
 grid = picmi.Cartesian3DGrid(
     number_of_cells=[32, 32, 32],
@@ -101,7 +87,7 @@ solver = picmi.ElectromagneticSolver(method="Yee", cfl=0.7, grid=grid)
 electrons = picmi.Species(
     name="electrons",
     particle_type="electron",
-    initial_distribution=drifting,
+    initial_distribution=from_expression,
 )
 layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=2)
 

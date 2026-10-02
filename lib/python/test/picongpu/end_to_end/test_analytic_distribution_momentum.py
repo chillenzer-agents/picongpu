@@ -51,7 +51,8 @@ DRIFT_DISTRIBUTION = AnalyticDistribution(
 )
 
 SPREAD_DISTRIBUTION = AnalyticDistribution(
-    density_expression="1",
+    density_expression="n0",
+    n0=1.0e25,
     momentum_spread_expressions=["vthx", "vthy", None],
     vthx=SPREAD_X,
     vthy=SPREAD_Y,
@@ -60,7 +61,8 @@ SPREAD_DISTRIBUTION = AnalyticDistribution(
 # the same surface, but with the per-axis callable forms and their keyword
 # substitution instead of the string expressions
 FUNCTION_DISTRIBUTION = AnalyticDistribution(
-    density_expression="1",
+    density_expression="n0",
+    n0=1.0e25,
     momentum_functions=[None, lambda x, y, z, vdrift: vdrift, None],
     momentum_spread_functions=[lambda x, y, z, vthx: vthx, lambda x, y, z, vthy: vthy, None],
     vdrift=GAMMA_VELOCITY_Y,

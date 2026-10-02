@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 from unittest import TestCase
 
+import picmistandard
 import pytest
 from pydantic import ValidationError
 from picongpu import picmi
@@ -1125,6 +1126,70 @@ class TestAddInteraction:
 
         for model_class in (ADK, BSI, Keldysh):
             assert issubclass(model_class, PICMI_Extension)
+
+    def test_standard_base_field_ionization_keldysh(self):
+        """a plain picmistandard.PICMI_FieldIonization is accepted and mapped to the concrete model"""
+        sim, ion, e = _interaction_sim()
+        standard = picmistandard.PICMI_FieldIonization(model="Keldysh", ionized_species=ion, product_species=e)
+        # the base class is not an instance of the PIConGPU adapter
+        assert not isinstance(standard, picmi.PICMI_FieldIonization)
+
+        sim.add_interaction(standard)
+
+        model = sim.picongpu_interaction[0]
+        assert isinstance(model, Keldysh)
+        assert model.ion_species is ion
+        assert model.ionization_electron_species is e
+        rendered = _render_species_definition(sim)
+        assert "Keldysh" in rendered
+
+    def test_standard_base_field_ionization_adk_needs_variant(self):
+        """a plain standard ADK request raises the actionable ADK_variant error (no knob on the standard object)"""
+        sim, ion, e = _interaction_sim()
+        standard = picmistandard.PICMI_FieldIonization(model="ADK", ionized_species=ion, product_species=e)
+        with pytest.raises(ValueError, match="ADK_variant"):
+            sim.add_interaction(standard)
+
+    def test_standard_base_field_ionization_unknown_model(self):
+        """a plain standard object with an unsupported model raises the clear model error"""
+        sim, ion, e = _interaction_sim()
+        standard = picmistandard.PICMI_FieldIonization(model="ThomasFermi", ionized_species=ion, product_species=e)
+        with pytest.raises(ValueError, match="Unsupported field ionization model"):
+            sim.add_interaction(standard)
+
+    def test_plain_bsi_with_empty_extensions_renders(self):
+        """BSI_extensions=() selects the plain BSI model without extensions"""
+        sim, ion, e = _interaction_sim()
+        sim.add_interaction(
+            picmi.PICMI_FieldIonization(model="BSI", ionized_species=ion, product_species=e, BSI_extensions=())
+        )
+        model = sim.picongpu_interaction[0]
+        assert isinstance(model, BSI)
+        assert model.BSI_extensions == ()
+        assert "BSI" in _render_species_definition(sim)
+
+    def test_irrelevant_knobs_are_rejected(self):
+        """a knob that does not belong to the selected model is rejected, not silently ignored"""
+        sim, ion, e = _interaction_sim()
+        with pytest.raises(ValueError, match="ADK_variant is only valid for the ADK model"):
+            sim.add_interaction(
+                picmi.PICMI_FieldIonization(
+                    model="Keldysh",
+                    ionized_species=ion,
+                    product_species=e,
+                    ADK_variant=ADKVariant.LinearPolarization,
+                )
+            )
+        sim, ion, e = _interaction_sim()
+        with pytest.raises(ValueError, match="BSI_extensions is only valid for the BSI model"):
+            sim.add_interaction(
+                picmi.PICMI_FieldIonization(
+                    model="Keldysh",
+                    ionized_species=ion,
+                    product_species=e,
+                    BSI_extensions=[BSIExtension.StarkShift],
+                )
+            )
 
     def test_unknown_model_raises(self):
         sim, ion, e = _interaction_sim()

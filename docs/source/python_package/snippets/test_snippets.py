@@ -321,7 +321,7 @@ EXPECTED_FILES = {
             ("adk_setup/include/picongpu/param/speciesDefinition.param", "ADKLinPol"),
             ("bsi_setup/include/picongpu/param/speciesDefinition.param", "BSIStarkShifted"),
             ("synchrotron_setup/include/picongpu/param/speciesDefinition.param", "synchrotron<species_photons>"),
-            ("standard_setup/include/picongpu/param/speciesDefinition.param", "ADKLinPol"),
+            ("standard_setup/include/picongpu/param/speciesDefinition.param", "Keldysh"),
         ],
     },
     "selected_topics/grids_and_solvers.py": {

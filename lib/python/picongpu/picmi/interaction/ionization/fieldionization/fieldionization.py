@@ -17,9 +17,12 @@ from .....pypicongpu.species.constant.ionizationcurrent import None_
 class FieldIonization(GroundStateIonizationModel, PICMI_Extension):
     """common interface of all field ionization models
 
-    inheriting from ``PICMI_Extension`` makes the concrete field ionization
-    models (ADK, BSI, Keldysh) usable as PIConGPU PICMI extensions, alongside
-    the standard-facing :class:`PICMI_FieldIonization`.
+    Inheriting from ``PICMI_Extension`` marks the concrete field ionization
+    models (ADK, BSI, Keldysh) as code-specific PIConGPU extensions. Note that
+    ``PICMI_Extension`` is *not* a subclass of ``PICMI_Interaction``, so the
+    standard ``PICMI_AnyInteraction`` union does not accept the concrete
+    models; the standard-facing :class:`PICMI_FieldIonization` is the entry
+    point for standard code.
     """
 
     ionization_current: IonizationCurrent | None

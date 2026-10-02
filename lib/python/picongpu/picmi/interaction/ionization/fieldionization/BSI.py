@@ -24,13 +24,13 @@ class BSI(FieldIonization):
 
     MODEL_NAME: str = "BSI"
 
-    BSI_extensions: tuple[BSIExtension]
-    """extension to the BSI model"""
+    BSI_extensions: tuple[BSIExtension, ...]
+    """extension to the BSI model; pass ``()`` for the plain model without extensions"""
 
     def get_as_pypicongpu(self) -> ionizationmodel.IonizationModel:
         self.check()
 
-        if self.BSI_extensions == []:
+        if not self.BSI_extensions:
             return ionizationmodel.BSI(
                 ionization_current=self._get_ionization_current(),
                 ionization_electron_species=self.ionization_electron_species.get_as_pypicongpu(),

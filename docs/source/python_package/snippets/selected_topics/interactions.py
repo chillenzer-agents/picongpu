@@ -20,6 +20,8 @@ and the standard ``add_interaction`` entry point with ``PICMI_FieldIonization``.
 
 from pathlib import Path
 
+import picmistandard
+
 from picongpu import picmi
 
 grid = picmi.Cartesian3DGrid(
@@ -137,12 +139,10 @@ sim_standard = picmi.Simulation(
     layouts=[layout, None],
 )
 sim_standard.add_interaction(
-    picmi.PICMI_FieldIonization(
-        model="ADK",
+    picmistandard.PICMI_FieldIonization(
+        model="Keldysh",
         ionized_species=standard_hydrogen,
         product_species=standard_electrons,
-        ADK_variant=picmi.ADKVariant.LinearPolarization,
-        ionization_current=None,
     )
 )
 sim_standard.run(setup_dir=Path("standard_setup"), run_dir=Path("standard_run"))

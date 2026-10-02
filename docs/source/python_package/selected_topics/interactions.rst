@@ -12,8 +12,11 @@ and the PICMI-standard
 :meth:`~picongpu.picmi.simulation.Simulation.add_interaction`,
 which accepts field ionization
 (the standard
-:class:`~picongpu.picmi.interaction.ionization.fieldionization.PICMI_FieldIonization`,
-converted to the matching concrete model)
+``picmistandard.PICMI_FieldIonization``,
+converted to the matching concrete model,
+as well as the PIConGPU
+:class:`~picongpu.picmi.interaction.ionization.fieldionization.PICMI_FieldIonization`
+adapter that adds the PIConGPU-specific knobs)
 as well as PIConGPU's own interaction objects.
 
 .. code-block:: python
@@ -99,24 +102,42 @@ The same snippet also shows the BSI variant:
 Standard interface
 ^^^^^^^^^^^^^^^^^^
 
-The PICMI-standard field ionization object
+The PICMI-standard field ionization can be passed to
+:meth:`~picongpu.picmi.simulation.Simulation.add_interaction`
+in two forms.
+
+A plain ``picmistandard.PICMI_FieldIonization``
+carries only the standard arguments
+``model``, ``ionized_species`` and ``product_species``;
+it is adapted and converted to the matching concrete model
+(``ADK``, ``BSI`` or ``Keldysh``) at add time.
+Because it has no PIConGPU knobs,
+selecting ``ADK`` or ``BSI`` this way raises the same required-knob error
+as an adapter without the knob.
 
 :class:`~picongpu.picmi.interaction.ionization.fieldionization.PICMI_FieldIonization`
-   A thin, standard-compatible adapter taking the standard arguments
-   ``model``, ``ionized_species`` and ``product_species``,
-   plus the PIConGPU-specific knobs
-   ``ionization_current``, ``ADK_variant`` and ``BSI_extensions``.
-   It is passed to :meth:`~picongpu.picmi.simulation.Simulation.add_interaction`
-   and converted to the matching concrete model
-   (``ADK``, ``BSI`` or ``Keldysh``) at add time,
+   PIConGPU's adapter subclass.
+   It adds the PIConGPU-specific knobs
+   ``ionization_current``, ``ADK_variant`` and ``BSI_extensions``
+   and is likewise converted to the matching concrete model at add time,
    so the rest of the workflow is identical to using ``picongpu_interaction``.
+
+.. note::
+
+   ``add_interaction()`` is the only entry point for interactions.
+   The inherited standard ``interactions=[...]`` constructor parameter
+   is accepted but ignored, so field ionization passed there is silently
+   dropped; use ``add_interaction()`` instead.
 
 The ``model`` string is matched case-insensitively against the concrete
 models' ``MODEL_NAME``
 (``"adk"``, ``"Adk"`` and ``"ADK"`` all select the ADK model).
 Model-specific knobs are required rather than defaulted:
 the ADK model requires ``ADK_variant``
-and the BSI model requires ``BSI_extensions``.
+and the BSI model requires ``BSI_extensions``
+(pass ``BSI_extensions=()`` for the plain BSI model without extensions).
+A knob that does not belong to the selected model is rejected rather than
+silently ignored.
 As with the concrete models, a bare standard field ionization uses
 ``ionization_current=None``
 (the C++ ``current::None`` default).

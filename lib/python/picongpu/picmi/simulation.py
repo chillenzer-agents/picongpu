@@ -458,13 +458,21 @@ class Simulation(picmistandard.PICMI_Simulation):
         """
         Add an interaction to the simulation.
 
-        Accepts both the standard `PICMI_FieldIonization` (which is converted to
-        the matching PIConGPU concrete ionization model at add time) and
-        PIConGPU's own `Interaction` types. The standard object is converted so
-        that the single `picongpu_interaction` pipeline is preserved.
+        Accepts the standard `picmistandard.PICMI_FieldIonization` (which is
+        converted to the matching PIConGPU concrete ionization model at add
+        time), PIConGPU's `PICMI_FieldIonization` adapter (with the
+        PIConGPU-specific knobs) and PIConGPU's own `Interaction` types. The
+        standard object is converted so that the single `picongpu_interaction`
+        pipeline is preserved.
+
+        This is the only entry point for interactions: the inherited standard
+        `interactions=[...]` constructor parameter is accepted but ignored
+        (pre-existing behaviour), so always use `add_interaction` here.
         """
         if isinstance(interaction, PICMI_FieldIonization):
             interaction = interaction.get_concrete()
+        elif isinstance(interaction, picmistandard.PICMI_FieldIonization):
+            interaction = PICMI_FieldIonization.from_standard(interaction).get_concrete()
         elif not isinstance(interaction, Interaction):
             pypicongpu.util.unsupported("This PICMI interaction type is not supported by PIConGPU", interaction)
         self.picongpu_interaction = (self.picongpu_interaction or []) + [interaction]

@@ -53,8 +53,11 @@ Its most important parameters are:
   override the (element-)derived mass and charge in SI units.
   This is how you define custom particles.
 * ``particle_shape``:
-  the particle shape used for current/charge deposition
-  (default ``"quadratic"``, i.e. TSC).
+  the particle shape used for current/charge deposition.
+  If left unset, it is inherited from
+  :attr:`~picongpu.picmi.simulation.Simulation.particle_shape`
+  and, if that too is unset, falls back to the PIConGPU default
+  ``"quadratic"`` (i.e. TSC).
 * ``method``:
   the particle pusher (default ``"Boris"``;
   ``"Vay"`` and ``"Higuera-Cary"`` are relativistic variants,
@@ -63,10 +66,72 @@ Its most important parameters are:
   rescales the species' density relative to a shared profile
   (see below).
 
-When several species share the same distribution and layout,
-they are placed at the same positions with their ``density_scale``
-respected --
-the standard way to build charge-neutral plasmas.
+The per-species shape and pusher method default to the Simulation:
+:attr:`~picongpu.picmi.simulation.Simulation.particle_shape`
+is inherited by every species that does not set its own
+(an explicit species ``particle_shape`` overrides it), while an unset
+``method`` falls back to ``"Boris"``.
+If neither the species nor the Simulation sets a shape,
+PIConGPU uses its native default ``"quadratic"`` (TSC):
+
+.. literalinclude:: ../snippets/selected_topics/species_shape_and_method.py
+   :language: python
+   :start-after: BEGIN-SPECIES_SHAPE
+   :end-before: END-SPECIES_SHAPE
+
+By default, every species is initialised **independently**: even when several
+species happen to share the same distribution and layout, each one draws its
+own in-cell positions.
+To place several species *collectively* -- i.e. on exactly the same in-cell
+positions, the standard way to build charge-neutral plasmas -- group them in a
+:class:`~picongpu.picmi.multi_species.MultiSpecies`
+(see :ref:`multi_species`).
+
+.. _multi_species:
+
+MultiSpecies: collective initialisation
+---------------------------------------
+
+A :class:`~picongpu.picmi.multi_species.MultiSpecies` is the explicit way to
+request **collective (coordinated) initialisation**: all its members share one
+``initial_distribution``, and members whose layouts agree are placed with a
+single density operation, so they occupy exactly the same in-cell positions --
+and are therefore charge-neutral by construction, irrespective of per-member
+momentum or temperature. Members whose layouts do not agree are initialised
+independently instead (see the note below).
+
+.. literalinclude:: ../snippets/selected_topics/multi_species.py
+   :language: python
+   :start-after: BEGIN-MULTI-SPECIES
+   :end-before: END-MULTI-SPECIES
+
+Each member is a plain :class:`~picongpu.picmi.species.Species` and is added to
+the simulation individually (typically with the same layout).
+The value at each position of ``proportions`` becomes the corresponding member's
+``density_scale`` (its ``DensityRatio`` on the C++ level), so a
+``proportions=[1.0, 1.0]`` ion/electron pair yields a neutral plasma.
+
+.. note::
+
+   Collective initialisation requires the members to agree on the layout.
+   In particular, two :class:`~picongpu.picmi.layout.PseudoRandomLayout`\ s
+   with different ``seed``\ s are treated as distinct and are therefore
+   initialised independently (deliberately non-neutral).
+   See the :class:`~picongpu.picmi.layout.PseudoRandomLayout` warning for what
+   the ``seed`` does and does not do.
+
+.. warning::
+
+   Prior to the introduction of ``MultiSpecies``, species sharing the same
+   distribution *and* the same layout (i.e. the same objects) were merged
+   implicitly. This heuristic has been removed: such species are now initialised
+   independently and PIConGPU emits a ``UserWarning`` naming the affected
+   species. Wrap them in a
+   :class:`~picongpu.picmi.multi_species.MultiSpecies` to restore the previous
+   charge-neutral behaviour. The warning fires when the species literally share
+   the same ``initial_distribution`` and ``layout`` objects (the form the removed
+   heuristic matched); separately constructed but value-equal objects are not
+   flagged, exactly as they were not merged before.
 
 .. _distributions:
 

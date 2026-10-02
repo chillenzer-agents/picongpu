@@ -5,6 +5,7 @@ Authors: Hannes Troepgen, Brian Edward Marre
 License: GPLv3+
 """
 
+from collections.abc import Sequence
 from functools import partial
 from operator import gt, le
 
@@ -17,14 +18,29 @@ from ..pypicongpu.species.operation.layout import Quiet, Random
 
 
 class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
+    """Random in-cell placement (pseudo-random).
+
+    .. warning::
+
+       The ``seed`` is a **grouping/across-species discriminator only**. It is
+       never forwarded to the C++ random number generator, so on the C++ level a
+       layout with ``seed=42`` renders byte-identically to one with ``seed=None``:
+       once a single ``PseudoRandomLayout`` is used, the ``seed`` neither makes
+       the in-cell positions reproducible from run to run nor separates the
+       random draws between independently-initialised species (both draw from the
+       same, externally-seeded device RNG stream). Its only effect is to make two
+       otherwise-equal random layouts *distinct* so that they are NOT merged into
+       one density operation (deliberately independent, non-neutral positions).
+    """
+
     n_macroparticles_per_cell: int = Field(gt=0)
     # PIConGPU can't handle the following separately:
     n_macroparticles: None = None
-    seed: None = None
+    seed: int | None = None
     grid: None = None
 
     def get_as_pypicongpu(self):
-        return Random(ppc=self.n_macroparticles_per_cell)
+        return Random(ppc=self.n_macroparticles_per_cell, seed=self.seed)
 
 
 class GriddedLayout(picmistandard.PICMI_GriddedLayout):
@@ -34,7 +50,7 @@ class GriddedLayout(picmistandard.PICMI_GriddedLayout):
         return Quiet(ppc=np.prod(self.n_macroparticles_per_cell), n_points=self.n_macroparticles_per_cell)
 
     @computed_field
-    def in_cell_offsets(self) -> np.ndarray:
+    def in_cell_offsets(self) -> Sequence[Sequence[float]]:
         return (np.mgrid[*map(slice, self.n_macroparticles_per_cell)] + 0.5).reshape(
             len(self.n_macroparticles_per_cell), -1
         ).T / self.n_macroparticles_per_cell

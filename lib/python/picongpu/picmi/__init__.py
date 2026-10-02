@@ -40,6 +40,7 @@ from .lasers import (
 )
 from .layout import GriddedLayout, OnePositionLayout, PseudoRandomLayout
 from .memory_config import MemoryConfig
+from .multi_species import MultiSpecies
 from .particle_functor import FilteredSpecies, ParticleFilter, ParticleFunctor
 from .precision_config import PrecisionConfig
 from .simulation import Simulation
@@ -63,6 +64,7 @@ __all__ = [
     "Species",
     "MemoryConfig",
     "PrecisionConfig",
+    "MultiSpecies",
     "FilteredSpecies",
     "ParticleFilter",
     "PseudoRandomLayout",

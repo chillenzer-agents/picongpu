@@ -17,7 +17,16 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import picmistandard
-from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import (
+    AfterValidator,
+    BeforeValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 from sympy import Symbol
 
 from picongpu import pypicongpu, templates
@@ -30,7 +39,7 @@ from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid, AnyGrid
 from picongpu.picmi.interaction import Interaction, Synchrotron
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
 from picongpu.picmi.layout import AnyLayout
-from picongpu.picmi.species import Species
+from picongpu.picmi.species import _STANDARD_SHAPES, Species
 from picongpu.picmi.species_requirements import (
     SimpleDensityOperation,
     SimpleMomentumOperation,
@@ -152,6 +161,30 @@ class Simulation(picmistandard.PICMI_Simulation):
     please refer to the PICMI documentation for the spec
     https://picmi-standard.github.io/standard/simulation.html
     """
+
+    # Override the standard's particle_shape (default "linear") to default to None:
+    # an unset Simulation-level shape lets each species fall back to the PIConGPU
+    # default ('quadratic'/TSC), while a set value is inherited by species that
+    # don't specify their own shape. The accepted values match Species.particle_shape
+    # (the PICMI-standard names plus PIConGPU 'other:' extensions).
+    particle_shape: str | None = Field(
+        default=None,
+        description="Default particle shape for species added to this simulation. "
+        "One of 'NGP', 'linear', 'quadratic', 'cubic' or a PIConGPU 'other:' extension "
+        "(unlike the PICMI standard, integer interpolation orders are not accepted). "
+        "Species without their own particle_shape inherit this value; if it is unset "
+        "they fall back to the PIConGPU default 'quadratic' (TSC).",
+    )
+
+    @field_validator("particle_shape")
+    @classmethod
+    def _validate_particle_shape(cls, value):
+        if value is not None and value not in _STANDARD_SHAPES and not value.startswith("other:"):
+            raise ValueError(
+                f"Unsupported particle shape {value!r}. Must be one of "
+                f"{', '.join(_STANDARD_SHAPES)} or be prefixed with 'other:'."
+            )
+        return value
 
     # Excluded from model dumps because it is passed through to the pypicongpu
     # Simulation as-is (single owner is the pypicongpu model) and because
@@ -375,14 +408,14 @@ class Simulation(picmistandard.PICMI_Simulation):
             )
         self.picongpu_run(**flags)
 
-    def _generate_openpmd_plugins(self, diagnostics, num_steps):
+    def _generate_openpmd_plugins(self, diagnostics, num_steps, default_particle_shape=None):
         diagnostics = list(diagnostics)
         return [
             OpenPMDPlugin(
                 sources=[
                     (
                         diagnostic.period.get_as_pypicongpu(time_step_size=self.time_step_size, num_steps=num_steps),
-                        diagnostic.species.get_as_pypicongpu()
+                        diagnostic.species.get_as_pypicongpu(default_particle_shape=default_particle_shape)
                         if isinstance(diagnostic, ParticleDump)
                         else PyPIConGPUFieldDump(
                             name=diagnostic.fieldname,
@@ -400,19 +433,21 @@ class Simulation(picmistandard.PICMI_Simulation):
             for options in unique(map(lambda x: x.options, diagnostics))
         ]
 
-    def _generate_plugins(self, num_steps):
+    def _generate_plugins(self, num_steps, default_particle_shape=None):
         return [
             entry.get_as_pypicongpu(
                 time_step_size=self.time_step_size,
                 num_steps=num_steps,
+                default_particle_shape=default_particle_shape,
             )
             for entry in self.diagnostics
             if not handled_via_openpmd(entry)
-        ] + self._generate_openpmd_plugins(filter(handled_via_openpmd, self.diagnostics), num_steps)
+        ] + self._generate_openpmd_plugins(
+            filter(handled_via_openpmd, self.diagnostics), num_steps, default_particle_shape
+        )
 
     def _check_compatibility(self):
         pypicongpu.util.unsupported("verbose", self.verbose)
-        pypicongpu.util.unsupported("particle shape", self.particle_shape, "linear")
         pypicongpu.util.unsupported("gamma boost", self.gamma_boost)
         if len(self.laser_injection_methods) != self.laser_injection_methods.count(None):
             pypicongpu.util.unsupported("laser injection method", self.laser_injection_methods, [])
@@ -468,10 +503,44 @@ class Simulation(picmistandard.PICMI_Simulation):
             )
         )
 
+    def _register_functor_requirements(self):
+        """Register the species attributes each diagnostic functor accesses.
+
+        Diagnostics own both the functor and the species it runs on, so this is
+        the point where ``Species.register_requirements`` can be handed the
+        functor. The functor translates its accessed attributes (e.g.
+        ``momentumPrev1``) into the corresponding ``Attribute`` requirements.
+        Particle filters are registered from ``FilteredSpecies`` instead.
+        """
+        for diagnostic in self.diagnostics:
+            functors = [
+                functor
+                for name in ("functor", "deposition_functor")
+                if (functor := getattr(diagnostic, name, None)) is not None
+            ] + [axis.functor for axis in getattr(diagnostic, "axes", None) or []]
+            if not functors:
+                continue
+            species = getattr(diagnostic, "species", None)
+            for one_species in species if isinstance(species, list) else [species]:
+                if one_species is None:
+                    continue
+                while hasattr(one_species, "species"):
+                    # A FilteredSpecies wraps the owner species; its filter
+                    # accesses attributes just like the diagnostic functor, so
+                    # register them on the (eventual) owner as well. This is
+                    # needed for diagnostics (e.g. DerivedFieldDump) that only
+                    # read the species by name and never convert the wrapper.
+                    if (filter_functor := getattr(one_species, "functor", None)) is not None:
+                        one_species.species.register_requirements(filter_functor.get_required_attributes())
+                    one_species = one_species.species
+                for functor in functors:
+                    one_species.register_requirements(functor.get_required_attributes())
+
     def get_as_pypicongpu(self) -> pypicongpu.simulation.Simulation:
         """translate to PyPIConGPU object"""
         self._check_compatibility()
         self._check_huygens_surface_positions()
+        self._register_functor_requirements()
 
         init_operations = organise_init_operations(
             chain(*(s.get_operation_requirements() for s in sorted(self.species)))
@@ -511,7 +580,9 @@ class Simulation(picmistandard.PICMI_Simulation):
         ]
 
         return pypicongpu.simulation.Simulation(
-            species=map(get_as_pypicongpu, sorted(self.species)),
+            species=map(
+                lambda s: s.get_as_pypicongpu(default_particle_shape=self.particle_shape), sorted(self.species)
+            ),
             init_operations=init_operations,
             typical_ppc=typical_ppc,
             delta_t_si=self.time_step_size,
@@ -523,11 +594,11 @@ class Simulation(picmistandard.PICMI_Simulation):
             walltime=walltime or Walltime(walltime=datetime.timedelta(hours=1)),
             time_steps=time_steps,
             laser=[ll.get_as_pypicongpu() for ll in self.lasers] or None,
-            output=self._generate_plugins(time_steps),
+            output=self._generate_plugins(time_steps, self.particle_shape),
             particle_filters=self._collect_particle_filters(),
             base_density=self._get_base_density(),
             synchrotron_params=synchrotron_params[0],
-            collisional_physics=collisions[0].get_as_pypicongpu(),
+            collisional_physics=collisions[0].get_as_pypicongpu(default_particle_shape=self.particle_shape),
             precision=self.picongpu_precision,
             precision_overrides=self.picongpu_precision_config.get_as_pypicongpu(),
             memory_config=self.picongpu_memory_config.get_as_pypicongpu(),

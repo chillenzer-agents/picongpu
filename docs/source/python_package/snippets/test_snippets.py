@@ -353,15 +353,39 @@ EXPECTED_FILES = {
             ("species_distributions_layouts_setup/include/picongpu/param/speciesDefinition.param", "species_electrons"),
         ],
     },
+    "selected_topics/analytic_distribution.py": {
+        "no_run": True,
+        "files": [
+            "analytic_distribution_setup/include/picongpu/param/speciesDefinition.param",
+        ],
+        "file_contains": [
+            ("analytic_distribution_setup/include/picongpu/param/speciesDefinition.param", "species_electrons"),
+        ],
+    },
+    "selected_topics/species_shape_and_method.py": {
+        "no_run": True,
+        "files": [
+            "species_shape_and_method_setup/include/picongpu/param/speciesDefinition.param",
+        ],
+        "file_contains": [
+            # ions inherit the Simulation-level "linear" shape (CIC)
+            ("species_shape_and_method_setup/include/picongpu/param/speciesDefinition.param", "shapes::CIC"),
+            # electrons override it with their own "cubic" shape (PQS)
+            ("species_shape_and_method_setup/include/picongpu/param/speciesDefinition.param", "shapes::PQS"),
+        ],
+    },
     "selected_topics/particle_functors.py": {
         "no_run": True,
         "files": [
             "particle_functors_setup/etc/picongpu/N.cfg",
             "particle_functors_setup/include/picongpu/param/particleFilters.param",
+            "particle_functors_setup/include/picongpu/param/fileOutput.param",
         ],
         "file_contains": [
             ("particle_functors_setup/etc/picongpu/N.cfg", "--electrons_energyHistogram.filter fast"),
             ("particle_functors_setup/include/picongpu/param/particleFilters.param", '"fast"'),
+            # the functor's unit is derived from its unit_dimension
+            ("particle_functors_setup/include/picongpu/param/fileOutput.param", "sim.unit.mass()"),
         ],
     },
     "selected_topics/units_and_constants.py": {

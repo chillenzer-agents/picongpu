@@ -287,15 +287,6 @@ class Simulation(picmistandard.PICMI_Simulation):
     models.
     """
 
-    @property
-    def picongpu_interaction(self) -> list[Interaction]:
-        """Back-compat alias for :attr:`interactions`."""
-        return self.interactions
-
-    @picongpu_interaction.setter
-    def picongpu_interaction(self, value) -> None:
-        self.interactions = value
-
     def _validate_typical_ppc(value: int | None) -> int | None:
         if value is not None and value <= 0:
             raise ValueError(f"Typical ppc should be > 0, not {value=}.")
@@ -623,8 +614,8 @@ class Simulation(picmistandard.PICMI_Simulation):
                 get_as_pypicongpu,
                 chain(
                     UnpackChain(self).diagnostics.species.functor,
-                    UnpackChain(self).picongpu_interaction.screening_species.functor,
-                    UnpackChain(self).picongpu_interaction.collisions.species_pairs[:].functor,
+                    UnpackChain(self).interactions.screening_species.functor,
+                    UnpackChain(self).interactions.collisions.species_pairs[:].functor,
                 ),
             )
         )
@@ -657,7 +648,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         time_steps = self.max_steps if self.max_steps is not None else math.ceil(self.max_time / self.time_step_size)
         # We provide the default as last element and we'll only read the first element:
         synchrotron_params = unique(
-            [x.synchrotron_parameters for x in self.picongpu_interaction if isinstance(x, Synchrotron)]
+            [x.synchrotron_parameters for x in self.interactions if isinstance(x, Synchrotron)]
         ) + [SynchrotronParams()]
         if len(synchrotron_params) > 2:
             raise ValueError(
@@ -665,9 +656,9 @@ class Simulation(picmistandard.PICMI_Simulation):
             )
         # We need to make sure that bare collisions are merged into a setup,
         # no matter if the interactions were assembled at construction time or later.
-        self.picongpu_interaction = _validate_collisional_physics_setup(self.picongpu_interaction)
+        self.interactions = _validate_collisional_physics_setup(self.interactions)
         # We provide the default as last element and we'll only read the first element:
-        collisions = [x for x in self.picongpu_interaction if isinstance(x, CollisionalPhysicsSetup)] + [
+        collisions = [x for x in self.interactions if isinstance(x, CollisionalPhysicsSetup)] + [
             CollisionalPhysicsSetup()
         ]
 

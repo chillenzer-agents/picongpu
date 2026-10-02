@@ -1185,19 +1185,6 @@ class TestAddInteraction:
         with pytest.raises(ValueError, match="not .* implemented by PIConGPU|not supported by PIConGPU"):
             sim.add_interaction(_UnsupportedInteraction())
 
-    def test_picongpu_interaction_back_compat_alias(self):
-        """the old picongpu_interaction name still reads and writes the same list"""
-        sim, ion, e = _interaction_sim()
-        model = ADK(
-            ADK_variant=ADKVariant.LinearPolarization,
-            ionization_current=None,
-            ion_species=ion,
-            ionization_electron_species=e,
-        )
-        sim.picongpu_interaction = [model]
-        assert sim.interactions[0] is model
-        assert sim.picongpu_interaction is sim.interactions
-
     def test_standard_base_field_ionization_keldysh(self):
         """a plain picmistandard.PICMI_FieldIonization is accepted and mapped to the concrete model"""
         sim, ion, e = _interaction_sim()

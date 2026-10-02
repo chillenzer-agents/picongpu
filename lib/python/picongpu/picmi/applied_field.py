@@ -14,10 +14,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from picongpu.pypicongpu import util
 from picongpu.pypicongpu._field_functor import (
+    _FieldFunctor,
     callable_parameter_names,
     check_allowed_symbols,
     check_parameter_names,
-    expression_from_callable,
     sympify_expression,
 )
 from picongpu.pypicongpu.backgroundfield import BackgroundField
@@ -271,7 +271,7 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
             data["user_defined_kw"] = user_defined_kw
         return data
 
-    def _component_expression(self, component: str) -> sympy.Expr | None:
+    def _component_functor(self, component: str) -> _FieldFunctor | None:
         expression = getattr(self, f"{component}_expression")
         function = getattr(self, f"{component}_function")
         if expression is not None and function is not None:
@@ -281,16 +281,20 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
             )
         if expression is None and function is None:
             return None
-        if function is not None:
-            return expression_from_callable(
-                function,
-                {name: sympy.Symbol(name) for name in _ANALYTIC_FREE_VARIABLES},
-                self.user_defined_kw,
-            )
-        return sympify_expression(expression)
+        return _FieldFunctor(
+            expression=expression,
+            function=function,
+            variables=_ANALYTIC_FREE_VARIABLES,
+            parameters=self.user_defined_kw,
+            context=f"AnalyticAppliedField {component}",
+        )
 
     def get_components(self) -> dict[str, sympy.Expr | None]:
-        return {component: self._component_expression(component) for component in COMPONENTS}
+        components = {}
+        for component in COMPONENTS:
+            functor = self._component_functor(component)
+            components[component] = None if functor is None else functor.expression
+        return components
 
     def get_parameters(self) -> list[dict]:
         return [{"name": name, "value": value} for name, value in sorted(self.user_defined_kw.items())]

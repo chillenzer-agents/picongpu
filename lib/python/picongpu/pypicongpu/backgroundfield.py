@@ -9,15 +9,19 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field, model_validator
 
-from ._field_functor import check_parameter_names
+from ._field_functor import check_parameter_names, render_identifier
 from ._field_functor import render as _render_field_expression
 
 
 class _Parameter(BaseModel):
     """A named parameter used inside a field expression."""
 
-    name: str
-    """name of the parameter as used inside the expressions"""
+    name: Annotated[str, BeforeValidator(render_identifier)]
+    """
+    name of the parameter as used inside the expressions, rendered through the
+    PMAccPrinter so that C++ keywords are escaped (``float`` -> ``float_``),
+    identical to how the printer spells the symbol inside the expressions.
+    """
     value: float
     """value assigned to the parameter (SI units)"""
 

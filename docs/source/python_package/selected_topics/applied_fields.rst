@@ -3,28 +3,41 @@
 Applied (Background) Fields
 ===========================
 
-PIConGPU supports the PICMI-standard *applied fields*, which it implements as
-**background fields**:
+PIConGPU implements the PICMI-standard *applied fields* as **background
+fields**: a field that is added to the grid ``E`` and ``B`` fields around the
+particle push, so the particles feel it, while the field solver itself does not
+evolve it. Only the **whole simulation domain** is supported; ``lower_bound``
+and ``upper_bound`` must be left at their default (all ``None``), and region
+restriction raises an ``UnsupportedFeatureError``.
+
+Applied fields are attached declaratively via the ``applied_fields`` argument
+of :class:`~picongpu.picmi.simulation.Simulation` (or with
+:meth:`~picongpu.picmi.simulation.Simulation.add_applied_field`). Several fields
+may be given; their contributions are summed per component into the single
+background field that the C++ core evaluates:
+
+.. literalinclude:: ../snippets/selected_topics/applied_fields.py
+   :language: python
+   :start-at: BEGIN-APPLIED-FIELD-ADD
+   :end-before: END-APPLIED-FIELD-ADD
+
+The field classes
+-----------------
 
 :class:`~picongpu.picmi.applied_field.ConstantAppliedField`
-   A field that is constant in space and time.
-   Its components use the PICMI-standard names ``Ex``, ``Ey``, ``Ez``
-   (in V/m) and ``Bx``, ``By``, ``Bz`` (in T).
+   A field that is constant in space and time. Its components use the
+   PICMI-standard names ``Ex``, ``Ey``, ``Ez`` (in V/m) and ``Bx``, ``By``,
+   ``Bz`` (in T).
 
 :class:`~picongpu.picmi.applied_field.AnalyticAppliedField`
-   A field given by Python expressions.
-   Use the variables ``x``, ``y``, ``z`` (position in m) and ``t`` (time in s);
-   additional keyword arguments become named parameters inside the expressions.
-   As in :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`,
-   each component accepts either a sympy-parseable ``<component>_expression``
-   string or a ``<component>_function`` callable (see
-   :doc:`functors`), for all six components.
-   The expressions are in V/m for ``E`` and T for ``B``.
-
-Construct the field, then attach it to the simulation with
-:meth:`~picongpu.picmi.simulation.Simulation.add_applied_field`.
-Several applied fields may be added; their contributions are summed per
-component into the single background field that the C++ core evaluates:
+   A field given by Python expressions. Use the variables ``x``, ``y``, ``z``
+   (position in m) and ``t`` (time in s); additional keyword arguments become
+   named parameters inside the expressions. As in
+   :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`,
+   each of the six components accepts either a sympy-parseable
+   ``<component>_expression`` string or a ``<component>_function`` callable (see
+   :doc:`functors`). Expressions are in V/m for ``E`` and T for ``B``, evaluated
+   in SI units and converted to PIConGPU's internal units (see :ref:`units`).
 
 .. literalinclude:: ../snippets/selected_topics/applied_fields.py
    :language: python
@@ -36,45 +49,36 @@ component into the single background field that the C++ core evaluates:
    :start-at: BEGIN-APPLIED-FIELD-ANALYTIC
    :end-before: END-APPLIED-FIELD-ANALYTIC
 
-.. literalinclude:: ../snippets/selected_topics/applied_fields.py
-   :language: python
-   :start-at: BEGIN-APPLIED-FIELD-ADD
-   :end-before: END-APPLIED-FIELD-ADD
+Expressions may only reference the free variables ``x``, ``y``, ``z`` and ``t``
+plus the named parameters passed as additional keyword arguments; any other
+symbol is rejected with a ``ValueError`` before code generation. Parameter names
+must not collide with those free variables or with generated identifiers such as
+``cellIdx`` or ``sim`` (also a ``ValueError``); C++ keywords are escaped by the
+PMAccPrinter rather than rejected.
 
-Influence (visibility)
-----------------------
+Influence (visibility) knobs
+----------------------------
 
-A background field is **added** to the grid ``E`` and ``B`` fields around the
-particle push, so the particles feel it, while the field solver itself does not
-evolve it.
-Both applied-field classes accept three PIConGPU-specific influence knobs.
-They carry the ``picongpu_`` prefix that marks code-specific PICMI inputs and
-correspond to options of the generated PIConGPU run configuration:
+Both classes accept three PIConGPU-specific influence knobs (the ``picongpu_``
+prefix marks code-specific PICMI inputs); they correspond to options of the
+generated run configuration and default to ``True``:
 
-``picongpu_influence_particle_pusher`` (default ``True``)
-   Whether the particles feel the background, i.e. whether it is added around
-   the particle push.
+* ``picongpu_influence_particle_pusher`` — whether the particles feel the
+  background (the pusher flag).
+* ``picongpu_influences_plugins`` — whether plugins see the background.
+* ``picongpu_influences_dumps`` — whether dumps, including checkpoints, include
+  the background.
 
-``picongpu_influences_plugins`` (default ``True``)
-   Whether plugins see the background.
+The three knobs are **not independent**: with
+``picongpu_influence_particle_pusher=False`` the whole background is disabled, so
+the other two have no effect (explicitly setting them then triggers a
+``UserWarning``). The pusher knob covers the electric **and** magnetic
+background together; there is no per-component switch.
 
-``picongpu_influences_dumps`` (default ``True``)
-   Whether dumps, including checkpoints, include the background.
-
-.. warning::
-
-   The three knobs are **not independent**.
-   Setting ``picongpu_influence_particle_pusher=False`` disables the *whole*
-   background, so ``picongpu_influences_plugins`` and
-   ``picongpu_influences_dumps`` then have no effect: nothing adds the
-   background to the fields, and no plugin or dump can see it.
-   The two visibility knobs only take effect while the pusher knob is ``True``.
-   (This mirrors the underlying PIConGPU behaviour, which the Python layer
-   reproduces faithfully; separating "who sees it" from "is it active" is
-   deliberately left for a later change.)
-
-The pusher knob covers the electric **and** magnetic background together;
-there is no per-component switch (e.g. pushing particles in ``B`` only).
+Because the knobs configure the *single* C++ background functor pair, all
+applied fields of a simulation must agree on them. A mismatch is caught during
+translation and rejected with an ``UnsupportedFeatureError`` — the same applies
+to redefining a shared parameter with a different value:
 
 .. literalinclude:: ../snippets/selected_topics/applied_fields.py
    :language: python
@@ -83,34 +87,6 @@ there is no per-component switch (e.g. pushing particles in ``B`` only).
 
 When no background field is configured, the plugin/dump options are not written
 to the generated run configuration at all, so the core defaults apply unchanged.
-
-Semantics
----------
-
-A configured background field is **added** to the grid ``E`` and ``B`` fields
-around the particle push, so the particles feel it, while the field solver
-itself does not evolve it.
-The expressions of an :class:`~picongpu.picmi.applied_field.AnalyticAppliedField`
-are evaluated in SI units and converted to PIConGPU's internal units
-(see :ref:`units`).
-
-Constraints
------------
-
-* Only the **whole simulation domain** is supported so far:
-  ``lower_bound`` and ``upper_bound`` must be left at their default
-  (all ``None``).
-  Region restriction is rejected with an ``UnsupportedFeatureError``.
-* Several applied fields may be added; they are summed per component.
-  All of them must agree on the influence knobs, since those configure the
-  single C++ background functor pair; a mismatch is rejected with an
-  ``UnsupportedFeatureError``.
-* The expressions of an :class:`~picongpu.picmi.applied_field.AnalyticAppliedField`
-  may only reference the free variables ``x``, ``y``, ``z`` and ``t``
-  plus the named parameters passed as additional keyword arguments.
-  Any other symbol is rejected with a ``ValueError`` before code generation.
-  Parameter names must not collide with ``x``/``y``/``z``/``t`` or with
-  generated C++ identifiers, and must not be C++ keywords.
 
 .. note::
 

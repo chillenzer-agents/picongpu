@@ -45,10 +45,12 @@ consistent. The parsed sympy expression is exposed as the public
 Constants used in the expressions may be passed as additional keyword
 arguments; they are collected automatically into ``user_defined_kw`` and
 substituted before rendering (both in the density and in the momentum
-expressions), mirroring the PICMI standard. The same mechanism works for the
-callable: any arguments of ``density_function`` beyond ``x``, ``y`` and ``z``
-name parameters, and the matching keyword arguments on the decorator or the
-constructor give their values:
+expressions), mirroring the PICMI standard. For a ``density_expression``
+string, any identifier that appears in the expression may be given this way.
+For a callable, the mechanism is narrower: only the extra parameters
+explicitly named in the signature of ``density_function`` beyond ``x``, ``y``
+and ``z`` are bound this way, and the matching keyword arguments on the
+decorator or the constructor give their values:
 
 .. literalinclude:: ../snippets/selected_topics/analytic_distribution.py
    :language: python

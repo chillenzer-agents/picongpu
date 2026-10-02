@@ -155,6 +155,29 @@ class TestAnalyticDistributionFromExpression(TestCase):
         string_dist = AnalyticDistribution(density_expression="x*y*z")
         np.testing.assert_allclose(np.asarray(string_dist(1, 2, 3)), np.asarray(6))
 
+    def test_field_assignment_is_validated_and_supported(self):
+        # validate_assignment=True (inherited from the standard base) must not make
+        # standard fields immutable: re-validating an already-constructed instance
+        # has both density fields set, so the "exactly one input" rule must not re-fire.
+        d = AnalyticDistribution(density_expression="x+y")
+        d.rms_velocity = [1.0, 2.0, 3.0]
+        self.assertEqual(d.rms_velocity, [1.0, 2.0, 3.0])
+        d.rms_velocity = d.rms_velocity
+        self.assertEqual(d.rms_velocity, [1.0, 2.0, 3.0])
+        # an invalid assignment is still rejected (values are not floats)
+        with pytest.raises(Exception):
+            d.rms_velocity = ["a", "b", "c"]
+
+    def test_assigning_a_density_field_keeps_the_other_in_sync(self):
+        x, y, z = symbols("x, y, z")
+        d = AnalyticDistribution(density_expression="x+y")
+        d.density_expression = "x*y"
+        self.assertEqual(d.density_sympy, sympify("x*y"))
+        self.assertEqual(d.density_function(x, y, z), x * y)
+        d.density_function = lambda x, y, z: x + y + z
+        self.assertEqual(d.density_sympy, sympify("x+y+z"))
+        self.assertEqual(sympify(d.density_expression), x + y + z)
+
 
 def _momentum_of(distribution):
     """translate the drift/temperature of an AnalyticDistribution through a real species"""

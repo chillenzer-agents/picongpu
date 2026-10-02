@@ -11,8 +11,8 @@ Copyright 2026 PIConGPU contributors
 Authors: Julian Lenz
 License: GPLv3+
 
-Defines a constant and an analytic applied (background) field
-and attaches one of them to a simulation.
+Defines a constant and an analytic applied (background) field and attaches them
+declaratively to a simulation.
 """
 
 from pathlib import Path
@@ -56,9 +56,9 @@ analytic_field = picmi.AnalyticAppliedField(
 # BEGIN-APPLIED-FIELD-INFLUENCE
 # PIConGPU-specific influence knobs (the picongpu_ prefix marks code-specific
 # PICMI inputs): whether particles feel the background, and whether plugins and
-# dumps see it. The pusher knob takes precedence: with it False the whole
-# background is disabled and the other two knobs have no effect.
-plugin_blind_field = picmi.AnalyticAppliedField(
+# dumps see it. They configure the single background functor pair, so all applied
+# fields of one simulation must agree on them.
+influence_field = picmi.AnalyticAppliedField(
     Ex_expression="1.0e5 * y",
     picongpu_influence_particle_pusher=True,
     picongpu_influences_plugins=False,
@@ -66,13 +66,14 @@ plugin_blind_field = picmi.AnalyticAppliedField(
 )
 # END-APPLIED-FIELD-INFLUENCE
 
-simulation = picmi.Simulation(max_steps=100, solver=solver)
-
 # BEGIN-APPLIED-FIELD-ADD
-# several applied fields may be added; their contributions are summed into the
-# single background field the C++ core evaluates
-simulation.add_applied_field(constant_field)
-simulation.add_applied_field(analytic_field)
+# applied fields are attached declaratively at construction; their contributions
+# are summed per component into the single background the C++ core evaluates
+simulation = picmi.Simulation(
+    max_steps=100,
+    solver=solver,
+    applied_fields=[constant_field, analytic_field],
+)
 # END-APPLIED-FIELD-ADD
 
 simulation.write_input_file(Path("applied_fields_setup"))

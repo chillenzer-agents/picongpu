@@ -143,10 +143,24 @@ class TestAnalyticAppliedField(TestCase):
         with pytest.raises(ValueError, match="collides"):
             applied_field.get_as_pypicongpu()
 
-    def test_cpp_keyword_parameter_name_rejected(self):
+    def test_cpp_keyword_parameter_name_is_escaped(self):
+        # the PMAccPrinter is the single source of truth for identifier spelling:
+        # a keyword parameter is escaped in both the declaration and the expression
         applied_field = picmi.AnalyticAppliedField(Ex_expression="float*x", float=2.0)
-        with pytest.raises(ValueError, match="C\\+\\+ keyword"):
-            applied_field.get_as_pypicongpu()
+        background = applied_field.get_as_pypicongpu()
+        assert "float_" in background.ex
+        assert "float*" not in background.ex
+        assert [p.name for p in background.user_defined_kw] == ["float_"]
+
+    def test_cxx20_keyword_parameter_name_is_escaped(self):
+        # C++20 keywords beyond sympy's built-in C++17 set (requires, concept, ...)
+        # must be escaped too, since PMacc compiles with C++20
+        for keyword in ("requires", "concept", "co_await", "char8_t", "consteval"):
+            with self.subTest(keyword=keyword):
+                applied_field = picmi.AnalyticAppliedField(**{"Ex_expression": f"{keyword}*x", keyword: 2.0})
+                background = applied_field.get_as_pypicongpu()
+                assert f"{keyword}_" in background.ex
+                assert f"{keyword}*" not in background.ex
 
     def test_lower_upper_bound_none_accepted(self):
         # the whole-domain case is the default (all-None bounds)
@@ -332,11 +346,12 @@ class TestSimulationBackgroundField(TestCase):
         with pytest.raises(ValueError, match="typo"):
             sim.get_as_pypicongpu()
 
-    def test_colliding_parameter_name_rejected_through_simulation(self):
+    def test_keyword_parameter_name_escaped_through_simulation(self):
         sim = _get_sim()
         sim.add_applied_field(picmi.AnalyticAppliedField(Ex_expression="x/float", float=2.0))
-        with pytest.raises(ValueError, match="C\\+\\+ keyword"):
-            sim.get_as_pypicongpu()
+        background = sim.get_as_pypicongpu().background_field
+        assert "float_" in background.ex
+        assert "x/float*" not in background.ex
 
     def test_conflicting_influence_knobs_rejected(self):
         sim = _get_sim()

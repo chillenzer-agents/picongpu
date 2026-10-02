@@ -13,11 +13,14 @@ named parameters supplied as additional keyword arguments. The generated C++
 functors evaluate those expressions on device, so the same rules apply to both:
 
 * the free variables must be exactly the supported coordinates/time,
-* parameters must not collide with generated C++ identifiers or keywords,
-* the expressions are rendered to PMAcc C++ with the :class:`PMAccPrinter`.
+* parameters must not shadow a live identifier of the generated functor,
+* the expressions (and the parameter names) are rendered to PMAcc C++ with the
+  :class:`PMAccPrinter`; that printer is the single source of truth for how an
+  identifier is spelled (including escaping C++ keywords).
 
-This module holds those shared rules so that the two features stay aligned; the
-individual classes only describe *which* quantities they expose.
+:class:`_FieldFunctor` packages one such expression together with its named
+parameters so that the individual PICMI classes only describe *which* quantities
+they expose and which coordinates those use.
 """
 
 import inspect
@@ -33,7 +36,9 @@ _RENDERER = PMAccPrinter()
 _RENDERED_CODE_MARKER = re.compile(r"pmacc::|::")
 
 #: Identifiers that are always live inside the generated C++ functors. A
-#: user-defined parameter must not shadow one of these.
+#: user-defined parameter must not shadow one of these: unlike a C++ keyword
+#: (which the ``PMAccPrinter`` escapes), this would silently bind a different
+#: quantity inside the generated expression.
 GENERATED_IDENTIFIERS = frozenset(
     {
         # mathtools free variables + locals inside the generated functors
@@ -45,103 +50,6 @@ GENERATED_IDENTIFIERS = frozenset(
         "currentStep",
         "m_unitField",
         "sim",
-    }
-)
-
-_CPP_KEYWORDS = frozenset(
-    {
-        "alignas",
-        "alignof",
-        "and",
-        "and_eq",
-        "asm",
-        "auto",
-        "bitand",
-        "bitor",
-        "bool",
-        "break",
-        "case",
-        "catch",
-        "char",
-        "char8_t",
-        "char16_t",
-        "char32_t",
-        "class",
-        "compl",
-        "concept",
-        "const",
-        "consteval",
-        "constexpr",
-        "constinit",
-        "const_cast",
-        "continue",
-        "co_await",
-        "co_return",
-        "co_yield",
-        "decltype",
-        "default",
-        "delete",
-        "do",
-        "double",
-        "dynamic_cast",
-        "else",
-        "enum",
-        "explicit",
-        "export",
-        "extern",
-        "false",
-        "float",
-        "for",
-        "friend",
-        "goto",
-        "if",
-        "inline",
-        "int",
-        "long",
-        "mutable",
-        "namespace",
-        "new",
-        "noexcept",
-        "not",
-        "not_eq",
-        "nullptr",
-        "operator",
-        "or",
-        "or_eq",
-        "private",
-        "protected",
-        "public",
-        "register",
-        "reinterpret_cast",
-        "requires",
-        "return",
-        "short",
-        "signed",
-        "sizeof",
-        "static",
-        "static_assert",
-        "static_cast",
-        "struct",
-        "switch",
-        "template",
-        "this",
-        "thread_local",
-        "throw",
-        "true",
-        "try",
-        "typedef",
-        "typeid",
-        "typename",
-        "union",
-        "unsigned",
-        "using",
-        "virtual",
-        "void",
-        "volatile",
-        "wchar_t",
-        "while",
-        "xor",
-        "xor_eq",
     }
 )
 
@@ -159,6 +67,18 @@ def render(value) -> str:
     if isinstance(value, str) and _RENDERED_CODE_MARKER.search(value):
         return value
     return _RENDERER.doprint(value)
+
+
+def render_identifier(name: str) -> str:
+    """
+    Render a single identifier through the PMAccPrinter.
+
+    The printer escapes language keywords (e.g. ``float`` -> ``float_``) using
+    its own reserved-word data, so user-provided parameter names cannot silently
+    emit invalid C++. The same function is used for the parameter declaration in
+    the generated functor, keeping the declaration and the expression in sync.
+    """
+    return _RENDERER.doprint(sympy.Symbol(name))
 
 
 def sympify_expression(expression) -> sympy.Expr:
@@ -261,18 +181,19 @@ def _accepted_parameters(function: Callable) -> set[str] | None:
 
 
 def check_parameter_names(names: Iterable[str]) -> None:
-    """Reject parameter names that shadow generated C++ identifiers or keywords."""
+    """
+    Reject parameter names that would shadow a live generated identifier.
+
+    C++ keywords are *not* checked here: the :class:`PMAccPrinter` escapes them
+    when rendering, so a parameter named ``float`` simply becomes ``float_`` in
+    the generated code (both in the declaration and in the expression).
+    """
     for name in names:
         if name in GENERATED_IDENTIFIERS:
             raise ValueError(
                 f"Parameter name {name!r} collides with a coordinate/time variable or a generated "
                 "identifier in the C++ field functors (x, y, z, t, cellIdx, currentStep, "
                 "m_unitField, sim); choose a different name."
-            )
-        if name in _CPP_KEYWORDS:
-            raise ValueError(
-                f"Parameter name {name!r} is a C++ keyword and cannot be used in the generated "
-                "field functors; choose a different name."
             )
 
 
@@ -293,3 +214,93 @@ def check_allowed_symbols(expressions: Mapping[str, sympy.Expr], allowed: set[st
             "generated C++ functors only know the position (x/y/z), the time (t) and the "
             "parameters passed as additional keyword arguments."
         )
+
+
+class _FieldFunctor:
+    """
+    One sympy-backed field expression plus its named parameters.
+
+    This is the reusable core shared by every field that is rendered into a
+    generated C++ functor (the six applied-field components here, the density
+    and the per-axis momentum/spread fields of
+    :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`
+    in a follow-up). It encapsulates the full pipeline once, so no caller has to
+    reproduce it:
+
+    1. resolve exactly one of an expression (a PICMI string, a plain number or a
+       sympy expression) or a callable of the coordinate variables,
+    2. normalise it to a sympy expression,
+    3. collect/validate the named parameters supplied as additional keyword
+       arguments and reject undefined free symbols,
+    4. render the expression through the :class:`PMAccPrinter`.
+
+    Parameters
+    ----------
+    expression:
+        A PICMI expression string, a plain number or an already-parsed sympy
+        expression. Mutually exclusive with ``function``.
+    function:
+        A callable of the coordinate variables (in the order of ``variables``)
+        returning something sympy can understand. Extra named parameters are
+        taken from ``parameters``. Mutually exclusive with ``expression``.
+    variables:
+        The names of the supported free variables, in argument order. The
+        applied fields use ``("x", "y", "z", "t")``; the density and per-axis
+        momentum/spread fields use ``("x", "y", "z")``.
+    parameters:
+        Mapping of parameter name to value (the PICMI ``user_defined_kw``).
+        Values stay symbolic; they are rendered as compile-time constants.
+    context:
+        Prefix used in error messages (e.g. ``"AnalyticAppliedField Ex"``).
+
+    The resolved sympy expression is available as :attr:`expression`; call
+    :meth:`render` for the PMAcc C++ string and :meth:`parameter_list` for the
+    validated parameters in the ``{"name": ..., "value": ...}`` form used by the
+    pypicongpu models.
+    """
+
+    def __init__(
+        self,
+        *,
+        expression=None,
+        function: Callable | None = None,
+        variables: Iterable[str] = ("x", "y", "z", "t"),
+        parameters: Mapping[str, float] | None = None,
+        context: str = "field functor",
+    ):
+        if (expression is None) == (function is None):
+            raise ValueError(f"{context} must provide exactly one of an expression or a function.")
+
+        self.context = context
+        self.variables = tuple(variables)
+        self.parameters = dict(parameters or {})
+        self._symbols = {name: sympy.Symbol(name) for name in self.variables}
+
+        if function is not None:
+            self.expression = expression_from_callable(function, self._symbols, self.parameters)
+        elif isinstance(expression, sympy.Expr):
+            self.expression = expression
+        else:
+            self.expression = sympify_expression(expression)
+
+        check_parameter_names(self.parameters)
+        self._check_symbols()
+
+    def _check_symbols(self) -> None:
+        allowed = set(self.variables) | set(self.parameters)
+        check_allowed_symbols({"expression": self.expression}, allowed, self.context)
+
+    def render(self) -> str:
+        """The PMAcc C++ rendering of the resolved expression."""
+        return render(self.expression)
+
+    def parameter_list(self) -> list[dict]:
+        """
+        The named parameters as ``{"name": ..., "value": ...}`` dicts, sorted by name.
+
+        The name is rendered through the :class:`PMAccPrinter`, so it is the
+        spelling that actually appears in the generated functor (escaped
+        keywords included). Re-rendering it is idempotent, so passing it through
+        the pypicongpu model validators a second time is safe.
+        """
+        return [{"name": render_identifier(name), "value": value} for name, value in sorted(self.parameters.items())]

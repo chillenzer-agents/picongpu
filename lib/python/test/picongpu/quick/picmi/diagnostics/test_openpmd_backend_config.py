@@ -6,6 +6,7 @@ License: GPLv3+
 
 import json
 
+import openpmd_api as io
 import pytest
 import tomli_w
 
@@ -16,6 +17,7 @@ from picongpu.pypicongpu.output.openpmd_backend import (
     Adios2Config,
     Adios2Engine,
     Adios2Operator,
+    DatasetOverride,
     Hdf5Config,
     Hdf5Dataset,
     JsonTomlConfig,
@@ -39,6 +41,21 @@ def _adios2_with_per_dataset_overrides() -> OpenPMDBackendConfig:
         ),
         hdf5=Hdf5Config(dataset=Hdf5Dataset(chunks="auto")),
     )
+
+
+def _rendered_backend_config(tmp_path, backend_config) -> dict:
+    (tmp_path / "etc").mkdir()
+    plugin = OpenPMDPlugin(
+        sources=[
+            (
+                PyTimeStepSpec(specs=[Spec(start=0, stop=-1, step=1)]),
+                FieldDump(name="E", functor=None, filtername=None, species_name=None),
+            )
+        ],
+        config=OpenPMDConfig(file="simData", backend_config=backend_config),
+    )
+    plugin.setup_dir = tmp_path
+    return plugin._generate_config_file()["backend_config"]
 
 
 def test_backend_config_renders_nested_toml_table(tmp_path):
@@ -139,20 +156,110 @@ def test_binning_accepts_plain_dict():
     assert json.loads(serialized) == {"hdf5": {"dataset": {"chunks": "auto"}}}
 
 
-def test_resizable_is_a_top_level_dataset_option():
-    """``resizable`` is a backend-independent option that openPMD reads as a top-level key of
-    the (per-)dataset config (a sibling of ``hdf5``), *not* nested under any backend table.
-    It must therefore live on the root model, not on ``Hdf5Dataset``."""
-    # It is accepted at the root and renders as a top-level key ...
-    model = OpenPMDBackendConfig(backend="hdf5", resizable=True, hdf5=Hdf5Config(dataset=Hdf5Dataset(chunks="auto")))
-    dumped = model.model_dump(mode="json")
-    assert dumped["resizable"] is True
-    # ... and is NOT emitted under the hdf5 dataset table (where the C++ does not read it).
-    assert "resizable" not in dumped["hdf5"]["dataset"]
-    # And the (former) placement on Hdf5Dataset is gone.
+# --------------------------------------------------------------------------- #
+# B1: rank_table is a string method description, not a bool
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("method", ["hostname", "mpi_processor_name", "posix_hostname"])
+def test_rank_table_accepts_documented_method_strings(method):
+    """openPMD's ``rank_table`` is a string method description; the documented values must be
+    expressible and render as a string (a bool is coerced to ``"1"`` and rejected by openPMD)."""
+    model = OpenPMDBackendConfig(backend="hdf5", rank_table=method)
+    assert model.model_dump(mode="json")["rank_table"] == method
+
+
+def test_rank_table_rejects_bool():
+    """The former ``Optional[bool]`` type accepted ``True``, which openPMD aborts on with
+    ``Wrong value for JSON option 'rank_table': '1'``; it must no longer validate."""
+    with pytest.raises(Exception):
+        OpenPMDBackendConfig(backend="hdf5", rank_table=True)
+
+
+@pytest.mark.parametrize("method", ["hostname", "posix_hostname"])
+def test_rank_table_rendered_value_is_accepted_by_openpmd(tmp_path, method):
+    """EFFECT: the rendered value is accepted by the installed openPMD backend."""
+    rendered = OpenPMDBackendConfig(backend="hdf5", rank_table=method).model_dump(mode="json")
+    series = io.Series(str(tmp_path / "rank_table.h5"), io.Access.create, rendered)
+    series.iterations[0].close()
+    series.close()
+
+
+# --------------------------------------------------------------------------- #
+# B2: openPMD requires cfg; a valid empty cfg must survive rendering
+# --------------------------------------------------------------------------- #
+def test_dataset_override_requires_cfg():
+    """``cfg`` is mandatory in openPMD's ``JSONMatcher::readPattern`` -- including for the
+    default entry -- so the model must not allow its omission."""
+    with pytest.raises(Exception):
+        DatasetOverride(select=".*")
+    with pytest.raises(Exception):
+        Hdf5Config(dataset=[{"select": ".*"}])
+
+
+def test_empty_default_cfg_is_preserved():
+    """An explicitly-provided empty ``cfg`` (the docs' default form) must not be stripped,
+    otherwise openPMD raises ``Mandatory key missing: 'cfg'!``."""
+    model = OpenPMDBackendConfig(hdf5=Hdf5Config(dataset=[{"cfg": {}}]))
+    assert model.model_dump(mode="json") == {"hdf5": {"dataset": [{"cfg": {}}]}}
+
+
+def test_empty_select_cfg_is_preserved_through_rendering(tmp_path):
+    """EFFECT: the rendered config keeps the empty ``cfg`` openPMD mandates."""
+    rendered = _rendered_backend_config(
+        tmp_path, OpenPMDBackendConfig(hdf5=Hdf5Config(dataset=[{"select": ".*E.*", "cfg": {}}]))
+    )
+    assert rendered == {"hdf5": {"dataset": [{"select": ".*E.*", "cfg": {}}]}}
+
+
+def test_default_and_select_dataset_entries_are_accepted_by_openpmd(tmp_path):
+    """EFFECT: a schema-legal default entry (``cfg = {}``) plus a pattern entry feeds openPMD
+    successfully; without the preserved ``cfg`` it would raise ``ErrorBackendConfigSchema``."""
+    rendered = OpenPMDBackendConfig(
+        backend="hdf5",
+        hdf5=Hdf5Config(dataset=[{"cfg": {}}, {"select": ".*E.*", "cfg": {"chunks": "auto"}}]),
+    ).model_dump(mode="json")
+    series = io.Series(str(tmp_path / "dataset_cfg.h5"), io.Access.create, rendered)
+    series.iterations[0].close()
+    series.close()
+
+
+# --------------------------------------------------------------------------- #
+# B3: resizable cannot be configured through the Series backend config
+# --------------------------------------------------------------------------- #
+def test_root_resizable_is_rejected():
+    """A top-level ``resizable`` is silently ignored by openPMD (it only reads the key from
+    per-``Dataset`` constructor options), so the model rejects it with a clear error rather
+    than shipping a no-op knob."""
+    with pytest.raises(Exception):
+        OpenPMDBackendConfig(backend="hdf5", resizable=True)
+    assert "resizable" not in OpenPMDBackendConfig.model_fields
     assert "resizable" not in Hdf5Dataset.model_fields
 
 
+def test_root_resizable_rejection_message_is_actionable():
+    with pytest.raises(Exception, match="per-Dataset"):
+        OpenPMDBackendConfig(backend="hdf5", resizable=False)
+
+
+# --------------------------------------------------------------------------- #
+# N1: unknown/typo keys are rejected, not silently swallowed
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: Hdf5Config(dataset={"chunkz": "auto"}),
+        lambda: Adios2Engine(type="bp5", bogus=1),
+        lambda: Adios2Config(dataset=[{"opertors": []}]),
+        lambda: OpenPMDBackendConfig(backends="hdf5"),
+    ],
+)
+def test_unknown_keys_are_rejected(build):
+    with pytest.raises(Exception):
+        build()
+
+
+# --------------------------------------------------------------------------- #
+# Previously-fixed QA items (regression)
+# --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "target", ["disk", "buffer", "new_step", "disk_override", "buffer_override", "new_step_override"]
 )

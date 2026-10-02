@@ -261,6 +261,7 @@ EXPECTED_FILES = {
             "[backend_config]",
             'backend = "adios2"',
             'iteration_encoding = "group_based"',
+            'rank_table = "hostname"',
             "[backend_config.adios2.engine]",
             'BufferGrowthFactor = "1.2"',
             "[[backend_config.adios2.dataset]]",

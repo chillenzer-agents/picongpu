@@ -34,6 +34,7 @@ from picongpu.picmi.diagnostics import (
 backend_config = OpenPMDBackendConfig(
     backend="adios2",
     iteration_encoding="group_based",
+    rank_table="hostname",
     adios2={
         "engine": {"type": "bp5", "parameters": {"BufferGrowthFactor": "1.2"}},
         "dataset": [

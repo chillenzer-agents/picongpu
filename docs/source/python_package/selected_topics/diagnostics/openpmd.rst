@@ -107,12 +107,27 @@ a typed model of the full openPMD backend schema
 (`openPMD backend configuration <https://openpmd-api.readthedocs.io/en/latest/details/backendconfig.html>`__,
 openPMD-api 0.17+).
 It covers the backend-independent root (``backend``,
-``iteration_encoding``, lazy-parsing hints, ``resizable``, ``rank_table``),
+``iteration_encoding``, lazy-parsing hints, ``rank_table``),
 the per-backend tables ``adios2``, ``hdf5``, ``json`` and ``toml``,
 and the nested ADIOS2 engine/operators, HDF5 VFD/permanent filters
 and JSON/TOML dataset/attribute sub-models.
 Every option is optional and unset options are omitted,
 so openPMD's own defaults apply.
+Unknown keys are rejected with a validation error rather than
+silently dropped, so typos surface immediately.
+
+``rank_table`` takes the name of a host-name method as a string
+(``"hostname"``, ``"mpi_processor_name"`` or ``"posix_hostname"``),
+matching openPMD's own schema.
+
+The per-dataset ``dataset`` list follows openPMD's pattern-matched form:
+each entry is a ``{select, cfg}`` object, where ``cfg`` is **mandatory**
+(use ``cfg = {}`` to accept the backend defaults) and ``select`` is optional.
+The entry without ``select`` is the default configuration.
+
+``resizable`` is deliberately **not** exposed: openPMD honours it only as a
+per-``Dataset`` constructor option, so a backend-config key would be silently
+ignored (the model rejects it with an explanatory error instead).
 
 The example below selects the ADIOS2 backend, applies blosc compression
 to every dataset through the default ``dataset`` entry,

@@ -7,7 +7,8 @@ License: GPLv3+
 
 from unittest import TestCase
 
-from picongpu.picmi import ParticleFunctor
+from picongpu import picmi
+from picongpu.picmi import ParticleFilter, ParticleFunctor
 from picongpu.picmi.particle_functor.particle_functor import MacroParticle, PhysicalParticle
 from picongpu.picmi.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
@@ -178,6 +179,51 @@ class TestPhysicalParticleScaling(TestCase):
             return particle.get("charge")
 
         self.assertEqual(self._expression(charge), "charge/weighting")
+
+
+class TestFilteredDerivedFieldRequirementRegistration(TestCase):
+    """A filter inside a ``DerivedFieldDump`` must register its attributes.
+
+    ``DerivedFieldDump`` is handled via the openPMD path, which reads the species
+    by name and never converts the ``FilteredSpecies`` wrapper; the filter's
+    accessed attributes still have to reach the owning species (regression for
+    the ``momentumPrev1`` gap).
+    """
+
+    def _converted_species(self, diagnostic):
+        grid = picmi.Cartesian3DGrid(
+            number_of_cells=[8, 8, 8],
+            lower_bound=[0, 0, 0],
+            upper_bound=[8, 8, 8],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+        )
+        sim = picmi.Simulation(
+            time_step_size=1.0,
+            max_steps=4,
+            solver=picmi.ElectromagneticSolver(method="Yee", grid=grid),
+        )
+        species = picmi.Species(particle_type="electron")
+        sim.add_species(species, None)
+        sim.add_diagnostic(diagnostic(species))
+        return sim.get_as_pypicongpu().species[0]
+
+    def test_filter_attributes_are_registered(self):
+        from picongpu.picmi.diagnostics import DerivedFieldDump
+        from picongpu.picmi.particle_functor import FilteredSpecies
+
+        @ParticleFilter
+        def fprev(particle: MacroParticle) -> bool:
+            return particle.get("momentumPrev1")[0] > 0
+
+        @ParticleFunctor
+        def plain(particle: MacroParticle):
+            return particle.get("gamma")
+
+        converted = self._converted_species(
+            lambda s: DerivedFieldDump(species=FilteredSpecies(species=s, functor=fprev), functor=plain)
+        )
+        self.assertIn(MomentumPrev1(), converted.attributes)
 
 
 class TestParticleClassResolution(TestCase):

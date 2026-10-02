@@ -60,11 +60,13 @@ that describes a particle property symbolically.
 It is used as a decorator, and its first argument must be annotated with the
 particle flavour it operates on --
 :class:`~picongpu.picmi.particle_functor.MacroParticle` (the default) or
-:class:`~picongpu.picmi.particle_functor.PhysicalParticle`::
+:class:`~picongpu.picmi.particle_functor.PhysicalParticle`.
+A minimal (tested) example is shown at the end of this section:
 
-   @ParticleFunctor
-   def gamma(particle: MacroParticle):
-       ...
+.. literalinclude:: ../snippets/selected_topics/particle_functors.py
+   :language: python
+   :start-after: BEGIN-PARTICLE-FUNCTOR
+   :end-before: END-PARTICLE-FUNCTOR
 
 The ``particle`` argument provides access to the particle's attributes
 through ``particle.get("...")``:
@@ -99,11 +101,6 @@ Use ``return_type`` (e.g. ``int``) when the annotation of your function
 is not enough, and ``unit_dimension``
 (a :class:`~picongpu.picmi.particle_functor.UnitDimension`)
 to declare the physical unit of the result.
-
-.. literalinclude:: ../snippets/selected_topics/particle_functors.py
-   :language: python
-   :start-after: BEGIN-PARTICLE-FUNCTOR
-   :end-before: END-PARTICLE-FUNCTOR
 
 Single-particle semantics
 -------------------------

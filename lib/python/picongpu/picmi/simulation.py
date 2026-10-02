@@ -525,6 +525,13 @@ class Simulation(picmistandard.PICMI_Simulation):
                 if one_species is None:
                     continue
                 while hasattr(one_species, "species"):
+                    # A FilteredSpecies wraps the owner species; its filter
+                    # accesses attributes just like the diagnostic functor, so
+                    # register them on the (eventual) owner as well. This is
+                    # needed for diagnostics (e.g. DerivedFieldDump) that only
+                    # read the species by name and never convert the wrapper.
+                    if (filter_functor := getattr(one_species, "functor", None)) is not None:
+                        one_species.species.register_requirements(filter_functor.get_required_attributes())
                     one_species = one_species.species
                 for functor in functors:
                     one_species.register_requirements(functor.get_required_attributes())

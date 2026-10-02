@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from picongpu.pypicongpu import util
 from picongpu.pypicongpu._field_functor import (
+    callable_parameter_names,
     check_allowed_symbols,
     check_parameter_names,
     expression_from_callable,
@@ -115,6 +116,22 @@ def _check_expression_symbols(expressions: dict[str, sympy.Expr], parameters: li
     check_allowed_symbols(expressions, allowed, "AnalyticAppliedField")
 
 
+def _validate_components(expressions: dict[str, sympy.Expr], parameters: list[dict]) -> None:
+    """
+    Run the expression checks shared by the direct and the combined translation paths.
+
+    Both :meth:`AnalyticAppliedField.get_as_pypicongpu` and
+    :func:`combine_applied_fields` (the ``Simulation`` path) must reject undefined
+    symbols and non-renderable parameter names, otherwise invalid C++ is emitted
+    and only fails at device-compile time.
+    """
+    check_parameter_names(parameter["name"] for parameter in parameters)
+    _check_expression_symbols(
+        {component: expression for component, expression in expressions.items() if expression is not None},
+        parameters,
+    )
+
+
 def combine_applied_fields(applied_fields) -> BackgroundField:
     """
     Combine several applied fields into the single pypicongpu background field.
@@ -137,9 +154,11 @@ def combine_applied_fields(applied_fields) -> BackgroundField:
             if name in parameters and parameters[name] != value:
                 util.unsupported(f"redefining parameter {name!r} with a different value", value)
             parameters[name] = value
+    parameter_list = [{"name": name, "value": value} for name, value in sorted(parameters.items())]
+    _validate_components(combined, parameter_list)
     return BackgroundField(
         **{component.lower(): expression for component, expression in combined.items()},
-        user_defined_kw=[{"name": name, "value": value} for name, value in sorted(parameters.items())],
+        user_defined_kw=parameter_list,
         **influence,
     )
 
@@ -215,23 +234,39 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
 
         The PICMI-standard collector only inspects ``*_expression`` strings, so
         a parameter used solely inside a ``*_function`` would be rejected as an
-        unknown input. When at least one function is given, every extra kwarg is
-        registered as a parameter (the same catch-all the standard uses for
-        expressions). For expression-only inputs the standard collector is left
-        in charge, so unreferenced kwargs are still rejected.
+        unknown input. To mirror
+        :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`
+        (see #97), only kwargs whose names are *actually* declared as extra
+        parameters of one of the given callables are registered; any other
+        unknown kwarg is still rejected by ``extra="forbid"`` (so a typo does
+        not silently become an unused constant).
         """
         if not isinstance(data, dict):
             return data
-        function_fields = [f"{component}_function" for component in COMPONENTS]
-        if not any(data.get(field) is not None for field in function_fields):
+        functions = [
+            data.get(f"{component}_function")
+            for component in COMPONENTS
+            if data.get(f"{component}_function") is not None
+        ]
+        if not functions:
             return data
+        accepted: set[str] = set()
+        accepts_any = False
+        for function in functions:
+            names = callable_parameter_names(function)
+            if names is None:
+                accepts_any = True
+            else:
+                accepted |= names
+        accepted -= set(_ANALYTIC_FREE_VARIABLES)
         data = dict(data)
         known = set(cls.model_fields)
         user_defined_kw = dict(data.get("user_defined_kw") or {})
         for key in list(data):
             if key in known:
                 continue
-            user_defined_kw[key] = data.pop(key)
+            if accepts_any or key in accepted:
+                user_defined_kw[key] = data.pop(key)
         if user_defined_kw or "user_defined_kw" in data:
             data["user_defined_kw"] = user_defined_kw
         return data
@@ -264,11 +299,7 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
         _check_only_full_domain(self)
         parameters = self.get_parameters()
         components = self.get_components()
-        check_parameter_names(parameter["name"] for parameter in parameters)
-        _check_expression_symbols(
-            {component: expression for component, expression in components.items() if expression is not None},
-            parameters,
-        )
+        _validate_components(components, parameters)
         return BackgroundField(
             **{component.lower(): expression for component, expression in components.items()},
             user_defined_kw=parameters,

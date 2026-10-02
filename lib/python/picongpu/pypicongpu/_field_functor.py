@@ -182,8 +182,9 @@ def expression_from_callable(
 
     The callable is called with the free variables (in the order given by
     ``variables``) and must return something sympy can understand. Additional
-    named parameters are passed as keyword arguments when the callable accepts
-    them (the same additional-kwargs mechanism as for expression strings).
+    named parameters are passed as keyword arguments to the parameters the
+    callable actually asks for (the same additional-kwargs mechanism as for
+    expression strings).
     """
     # Named parameters are passed as sympy symbols (not their numeric values) so
     # that the resulting expression stays symbolic and the values are rendered
@@ -197,13 +198,44 @@ def expression_from_callable(
     for name in names:
         if accepted is None or name in accepted:
             arguments[name] = sympy.Symbol(name)
+
+    # Prefer calling by keyword, but only for signatures that actually accept it.
+    # Falling back to positional arguments is reserved for a genuine
+    # signature/arity mismatch: a ``TypeError`` raised *inside* the user callable
+    # must propagate, not be masked by a second (positional) call.
+    try:
+        signature = inspect.signature(function)
+    except (TypeError, ValueError):
+        signature = None
+    if signature is not None:
+        try:
+            signature.bind(**arguments)
+        except TypeError:
+            positional = list(variables.values()) + [sympy.Symbol(name) for name in names]
+            signature.bind(*positional)
+            return sympy.sympify(function(*positional))
+        return sympy.sympify(function(**arguments))
+
+    # No inspectable signature (e.g. some C callables): keep the previous
+    # best-effort fallback.
     try:
         return sympy.sympify(function(**arguments))
     except TypeError:
-        # Fall back to the AnalyticDistribution idiom: all quantities passed
-        # positionally, coordinates first, then the named parameters.
         positional = list(variables.values()) + [sympy.Symbol(name) for name in names]
         return sympy.sympify(function(*positional))
+
+
+def callable_parameter_names(function: Callable) -> set[str] | None:
+    """
+    Names the callable accepts beyond the coordinate/time variables.
+
+    Returns ``None`` for a callable with ``**kwargs`` (any keyword may be a
+    parameter), an empty set when the signature cannot be inspected.
+    """
+    accepted = _accepted_parameters(function)
+    if accepted is None:
+        return None
+    return accepted
 
 
 def _accepted_parameters(function: Callable) -> set[str] | None:

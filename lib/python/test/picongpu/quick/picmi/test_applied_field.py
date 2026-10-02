@@ -212,6 +212,21 @@ class TestAnalyticAppliedFieldFunctionInterface(TestCase):
         with pytest.raises(Exception, match="bogus"):
             picmi.AnalyticAppliedField(Ex_expression="x", bogus=3.0)
 
+    def test_function_only_unreferenced_kwarg_still_rejected(self):
+        # a function input must use the #97 mechanism: only kwargs named like the
+        # callable's extra parameters are collected, unknown ones are rejected
+        with pytest.raises(Exception, match="bogus"):
+            picmi.AnalyticAppliedField(Ex_function=lambda x, y, z, t: sympy.Integer(5), bogus=3.0)
+
+    def test_type_error_inside_callable_is_not_masked(self):
+        # a genuine error raised *inside* the user callable must propagate, not
+        # be swallowed and retried positionally by the fallback
+        def broken(x, y, z, t):
+            raise TypeError("inside user callable")
+
+        with pytest.raises(TypeError, match="inside user callable"):
+            picmi.AnalyticAppliedField(Ex_function=broken).get_as_pypicongpu()
+
     def test_mixed_expression_and_function_parameters(self):
         applied_field = picmi.AnalyticAppliedField(
             Ex_expression="q*x",
@@ -301,6 +316,26 @@ class TestSimulationBackgroundField(TestCase):
         sim.add_applied_field(picmi.AnalyticAppliedField(Ex_expression="a*x", a=2.0))
         sim.add_applied_field(picmi.AnalyticAppliedField(Ey_expression="a*y", a=3.0))
         with pytest.raises(UnsupportedFeatureError):
+            sim.get_as_pypicongpu()
+
+    def test_undefined_symbol_rejected_through_simulation(self):
+        # the combine path must run the same expression validation as the direct
+        # get_as_pypicongpu() path, not emit invalid C++ for an undefined symbol
+        sim = _get_sim()
+        sim.add_applied_field(picmi.AnalyticAppliedField(Ex_expression="wl*sin(x)"))
+        with pytest.raises(ValueError, match="wl"):
+            sim.get_as_pypicongpu()
+
+    def test_function_undefined_symbol_rejected_through_simulation(self):
+        sim = _get_sim()
+        sim.add_applied_field(picmi.AnalyticAppliedField(Ex_function=lambda x, y, z, t: sympy.Symbol("typo") * x))
+        with pytest.raises(ValueError, match="typo"):
+            sim.get_as_pypicongpu()
+
+    def test_colliding_parameter_name_rejected_through_simulation(self):
+        sim = _get_sim()
+        sim.add_applied_field(picmi.AnalyticAppliedField(Ex_expression="x/float", float=2.0))
+        with pytest.raises(ValueError, match="C\\+\\+ keyword"):
             sim.get_as_pypicongpu()
 
     def test_conflicting_influence_knobs_rejected(self):

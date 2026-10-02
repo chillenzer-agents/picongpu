@@ -29,10 +29,9 @@ All models reject unknown keys (``extra="forbid"``) so a typo becomes a clear va
 error instead of being silently dropped before openPMD ever sees it.
 """
 
-import warnings
-from typing import Any, Generic, List, Literal, Optional, TypeVar, Union
+from typing import Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, model_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
 T = TypeVar("T")
 
@@ -67,37 +66,37 @@ def _strip_unset(value: Any) -> Any:
 # ADIOS2
 # --------------------------------------------------------------------------- #
 class Adios2Engine(_OpenPMDModel):
-    type: Optional[str] = None
-    pretend_engine: Optional[str] = None
-    access_mode: Optional[Literal["Write", "Read", "Append", "ReadRandomAccess"]] = None
+    type: str | None = None
+    pretend_engine: str | None = None
+    access_mode: Literal["Write", "Read", "Append", "ReadRandomAccess"] | None = None
     # Opaque engine parameters forwarded verbatim to ``adios2::IO::SetParameters``;
     # openPMD coerces string/number/boolean values via ``asStringDynamic``.
-    parameters: Optional[dict[str, Any]] = None
+    parameters: dict[str, Any] | None = None
     # openPMD also accepts the ``<value>_override`` variants (``disk_override``,
     # ``buffer_override``, ``new_step_override``) which take precedence over the
     # non-suffixed values on a per-``flush()`` basis.
-    preferred_flush_target: Optional[
-        Literal["disk", "buffer", "new_step", "disk_override", "buffer_override", "new_step_override"]
-    ] = None
+    preferred_flush_target: (
+        Literal["disk", "buffer", "new_step", "disk_override", "buffer_override", "new_step_override"] | None
+    ) = None
 
 
 class Adios2Operator(_OpenPMDModel):
-    type: Optional[str] = None
-    parameters: Optional[dict[str, Any]] = None
+    type: str | None = None
+    parameters: dict[str, Any] | None = None
 
 
 class Adios2Dataset(_OpenPMDModel):
-    operators: Optional[Union[Adios2Operator, List[Adios2Operator]]] = None
+    operators: Adios2Operator | list[Adios2Operator] | None = None
 
 
 class Adios2Config(_OpenPMDModel):
-    engine: Optional[Adios2Engine] = None
-    dataset: Optional[Union[Adios2Dataset, List["DatasetOverride[Adios2Dataset]"]]] = None
-    use_span_based_put: Optional[bool] = None
-    attribute_writing_ranks: Optional[Union[int, List[int]]] = None
+    engine: Adios2Engine | None = None
+    dataset: Adios2Dataset | list["DatasetOverride[Adios2Dataset]"] | None = None
+    use_span_based_put: bool | None = None
+    attribute_writing_ranks: int | list[int] | None = None
     # openPMD honours ``dont_warn_unused_keys`` at any (backend) node, and the
     # documented examples place it inside a backend table.
-    dont_warn_unused_keys: Optional[List[str]] = None
+    dont_warn_unused_keys: list[str] | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -105,53 +104,53 @@ class Adios2Config(_OpenPMDModel):
 # --------------------------------------------------------------------------- #
 class Hdf5FilterZlib(_OpenPMDModel):
     type: Literal["zlib"] = "zlib"
-    aggression: Optional[int] = None
+    aggression: int | None = None
 
 
 class Hdf5FilterById(_OpenPMDModel):
-    id: Union[int, Literal["deflate", "shuffle", "fletcher32", "szip", "nbit", "scaleoffset"]]
-    type: Optional[Literal["by_id"]] = None
-    flags: Optional[Literal["mandatory", "optional"]] = None
-    cd_values: Optional[List[int]] = None
+    id: int | Literal["deflate", "shuffle", "fletcher32", "szip", "nbit", "scaleoffset"]
+    type: Literal["by_id"] | None = None
+    flags: Literal["mandatory", "optional"] | None = None
+    cd_values: list[int] | None = None
 
 
-Hdf5Filter = Union[Hdf5FilterZlib, Hdf5FilterById]
+Hdf5Filter = Hdf5FilterZlib | Hdf5FilterById
 
 
 class Hdf5Dataset(_OpenPMDModel):
-    chunks: Optional[Union[Literal["auto", "none"], List[int]]] = None
-    permanent_filters: Optional[Union[Hdf5Filter, List[Hdf5Filter]]] = None
+    chunks: Literal["auto", "none"] | list[int] | None = None
+    permanent_filters: Hdf5Filter | list[Hdf5Filter] | None = None
 
 
 class Hdf5Vfd(_OpenPMDModel):
-    type: Optional[Literal["default", "subfiling"]] = None
-    ioc_selection: Optional[Literal["one_per_node", "every_nth_rank", "with_config", "total"]] = None
-    stripe_size: Optional[int] = None
-    stripe_count: Optional[int] = None
+    type: Literal["default", "subfiling"] | None = None
+    ioc_selection: Literal["one_per_node", "every_nth_rank", "with_config", "total"] | None = None
+    stripe_size: int | None = None
+    stripe_count: int | None = None
 
 
 class Hdf5Config(_OpenPMDModel):
-    dataset: Optional[Union[Hdf5Dataset, List["DatasetOverride[Hdf5Dataset]"]]] = None
-    vfd: Optional[Hdf5Vfd] = None
-    independent_stores: Optional[bool] = None
-    dont_warn_unused_keys: Optional[List[str]] = None
+    dataset: Hdf5Dataset | list["DatasetOverride[Hdf5Dataset]"] | None = None
+    vfd: Hdf5Vfd | None = None
+    independent_stores: bool | None = None
+    dont_warn_unused_keys: list[str] | None = None
 
 
 # --------------------------------------------------------------------------- #
 # JSON / TOML
 # --------------------------------------------------------------------------- #
 class JsonTomlDataset(_OpenPMDModel):
-    mode: Optional[Literal["dataset", "template"]] = None
+    mode: Literal["dataset", "template"] | None = None
 
 
 class JsonTomlAttribute(_OpenPMDModel):
-    mode: Optional[Literal["long", "short"]] = None
+    mode: Literal["long", "short"] | None = None
 
 
 class JsonTomlConfig(_OpenPMDModel):
-    dataset: Optional[JsonTomlDataset] = None
-    attribute: Optional[JsonTomlAttribute] = None
-    dont_warn_unused_keys: Optional[List[str]] = None
+    dataset: JsonTomlDataset | None = None
+    attribute: JsonTomlAttribute | None = None
+    dont_warn_unused_keys: list[str] | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -168,60 +167,60 @@ class DatasetOverride(_OpenPMDModel, Generic[T]):
     table (``cfg = {}``) to accept the backend defaults.
     """
 
-    select: Optional[Union[str, List[str]]] = None
+    select: str | list[str] | None = None
     cfg: T
 
 
 # --------------------------------------------------------------------------- #
 # Root / backend-independent configuration
 # --------------------------------------------------------------------------- #
-# The canonical openPMD key ``json`` (the JSON backend table) shadows pydantic's
-# deprecated ``BaseModel.json`` compat method, which emits a ``UserWarning`` at class
-# definition time. The field name is required by the openPMD schema, so we suppress the
-# one-off import-time warning rather than rename the key.
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", category=UserWarning)
+class OpenPMDBackendConfig(_OpenPMDModel):
+    # The openPMD key for the JSON backend table is literally ``json``, which would
+    # shadow pydantic's deprecated ``BaseModel.json`` compat method (and still triggers a
+    # ``UserWarning`` at class-definition time). The attribute is therefore named
+    # ``json_config`` and mapped to the openPMD key via an alias; ``populate_by_name``
+    # keeps the Python name usable and ``serialize_by_alias`` emits the ``json`` key.
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
-    class OpenPMDBackendConfig(_OpenPMDModel):
-        backend: Optional[Literal["hdf5", "adios2", "json", "toml"]] = None
-        iteration_encoding: Optional[Literal["file_based", "group_based", "variable_based"]] = None
-        defer_iteration_parsing: Optional[bool] = None
-        hint_lazy_parsing_timeout: Optional[int] = None
-        verify_homogeneous_extents: Optional[bool] = None
-        # A string method description, not a bool: openPMD reads it via
-        # ``getJsonOptionLowerCase`` and maps it in
-        # ``host_info::methodFromStringDescription`` (see ``ChunkInfo.cpp``).
-        # A bool is coerced to ``"1"`` and then rejected with
-        # ``Wrong value for JSON option 'rank_table': '1'``.
-        rank_table: Optional[Literal["hostname", "mpi_processor_name", "posix_hostname"]] = None
-        dont_warn_unused_keys: Optional[List[str]] = None
-        adios2: Optional[Adios2Config] = None
-        hdf5: Optional[Hdf5Config] = None
-        json: Optional[JsonTomlConfig] = None
-        toml: Optional[JsonTomlConfig] = None
+    backend: Literal["hdf5", "adios2", "json", "toml"] | None = None
+    iteration_encoding: Literal["file_based", "group_based", "variable_based"] | None = None
+    defer_iteration_parsing: bool | None = None
+    hint_lazy_parsing_timeout: int | None = None
+    verify_homogeneous_extents: bool | None = None
+    # A string method description, not a bool: openPMD reads it via
+    # ``getJsonOptionLowerCase`` and maps it in
+    # ``host_info::methodFromStringDescription`` (see ``ChunkInfo.cpp``).
+    # A bool is coerced to ``"1"`` and then rejected with
+    # ``Wrong value for JSON option 'rank_table': '1'``.
+    rank_table: Literal["hostname", "mpi_processor_name", "posix_hostname"] | None = None
+    dont_warn_unused_keys: list[str] | None = None
+    adios2: Adios2Config | None = None
+    hdf5: Hdf5Config | None = None
+    json_config: JsonTomlConfig | None = Field(default=None, alias="json")
+    toml: JsonTomlConfig | None = None
 
-        @model_validator(mode="before")
-        @classmethod
-        def _reject_resizable(cls, data: Any) -> Any:
-            """``resizable`` is intentionally not modelled here.
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_resizable(cls, data: Any) -> Any:
+        """``resizable`` is intentionally not modelled here.
 
-            openPMD reads it only from the per-``Dataset`` constructor options
-            (``HDF5IOHandler::parse_dataset_config`` reads ``config["resizable"]`` where
-            ``config`` is the per-dataset config); in a Series-constructor JSON/TOML
-            config the key reaches the backend only through ``hdf5.dataset`` pattern
-            matching, which never forwards it to that path, so a top-level ``resizable``
-            is silently ignored. Reject it with a clear message instead of shipping a
-            no-op knob.
-            """
-            if isinstance(data, dict) and "resizable" in data:
-                raise ValueError(
-                    "'resizable' cannot be configured through the openPMD Series backend "
-                    "config: openPMD only honours it as a per-Dataset constructor option, "
-                    "so a config-level key is silently ignored. Pass it via openPMD's "
-                    "Dataset options instead."
-                )
-            return data
+        openPMD reads it only from the per-``Dataset`` constructor options
+        (``HDF5IOHandler::parse_dataset_config`` reads ``config["resizable"]`` where
+        ``config`` is the per-dataset config); in a Series-constructor JSON/TOML
+        config the key reaches the backend only through ``hdf5.dataset`` pattern
+        matching, which never forwards it to that path, so a top-level ``resizable``
+        is silently ignored. Reject it with a clear message instead of shipping a
+        no-op knob.
+        """
+        if isinstance(data, dict) and "resizable" in data:
+            raise ValueError(
+                "'resizable' cannot be configured through the openPMD Series backend "
+                "config: openPMD only honours it as a per-Dataset constructor option, "
+                "so a config-level key is silently ignored. Pass it via openPMD's "
+                "Dataset options instead."
+            )
+        return data
 
-        @model_serializer(mode="wrap")
-        def _serialize_stripped(self, handler):
-            return _strip_unset(handler(self))
+    @model_serializer(mode="wrap")
+    def _serialize_stripped(self, handler):
+        return _strip_unset(handler(self))

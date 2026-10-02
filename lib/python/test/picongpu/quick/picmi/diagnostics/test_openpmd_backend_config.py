@@ -114,6 +114,37 @@ def test_empty_nested_models_are_stripped():
     assert dumped["adios2"]["dataset"] == [{"cfg": {"operators": []}}]
 
 
+# --------------------------------------------------------------------------- #
+# The ``json`` backend key: aliased attribute avoids shadowing BaseModel.json
+# --------------------------------------------------------------------------- #
+def test_json_backend_key_round_trips():
+    """The openPMD key ``json`` is modelled as ``json_config`` so it no longer shadows
+    pydantic's deprecated ``BaseModel.json`` (which emitted a ``UserWarning`` and forced the
+    former ``warnings.catch_warnings`` hack). It must accept the ``json`` key and serialise
+    it back under the openPMD key, not the Python attribute name."""
+    model = OpenPMDBackendConfig(backend="json", json=JsonTomlConfig(dataset={"mode": "template"}))
+    assert "json" not in OpenPMDBackendConfig.model_fields
+    assert model.json_config.dataset.mode == "template"
+    assert model.model_dump(mode="json") == {
+        "backend": "json",
+        "json": {"dataset": {"mode": "template"}},
+    }
+
+
+def test_json_backend_key_accepts_python_name():
+    """``populate_by_name`` keeps the Python attribute name usable too."""
+    model = OpenPMDBackendConfig(json_config=JsonTomlConfig(attribute={"mode": "short"}))
+    assert model.model_dump(mode="json") == {"json": {"attribute": {"mode": "short"}}}
+
+
+def test_json_backend_key_renders_through_plugin(tmp_path):
+    """EFFECT: the rendered config carries the openPMD ``json`` key, not ``json_config``."""
+    rendered = _rendered_backend_config(
+        tmp_path, OpenPMDBackendConfig(backend="json", json=JsonTomlConfig(dataset={"mode": "template"}))
+    )
+    assert rendered["json"] == {"dataset": {"mode": "template"}}
+
+
 def _binning(backend_config):
     electron = Species(particle_type="electron")
     return Binning(

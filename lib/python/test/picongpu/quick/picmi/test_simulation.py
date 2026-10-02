@@ -752,6 +752,29 @@ class TestPicmiSimulation(TestCase):
         # ... while momentum is still applied individually per species
         assert len(momentum_operations) == 2
 
+    def test_multispecies_value_equal_distinct_layouts_still_group(self):
+        """value-equal but distinct layout objects must still group (picmi equality is identity)"""
+        profile = picmi.UniformDistribution(density=42)
+        multispecies = picmi.MultiSpecies(
+            particle_types=["electron", "H"],
+            names=["electron", "proton"],
+            proportions=[1.0, 1.0],
+            initial_distribution=profile,
+        )
+        # A fresh, value-identical layout per member: picmistandard compares by
+        # identity, so the grouping must compare the *rendered* pypicongpu layout.
+        for member in multispecies:
+            self.sim.add_species(member, picmi.PseudoRandomLayout(n_macroparticles_per_cell=4))
+
+        density_operations = list(
+            filter(
+                lambda op: isinstance(op, species.operation.SimpleDensity),
+                self.sim.get_as_pypicongpu().init_operations,
+            )
+        )
+        assert len(density_operations) == 1
+        assert len(density_operations[0].species) == 2
+
     def test_multispecies_different_seed_independent(self):
         """same density + different random-layout seed -> independent (non-neutral on purpose)"""
         profile = picmi.UniformDistribution(density=42)

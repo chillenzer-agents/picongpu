@@ -257,10 +257,17 @@ class SimpleDensityOperation(DelayedConstruction):
             # collective, charge-neutral initialisation.
             if _density_profile(self) != _density_profile(other):
                 return False
-            # In-cell placement must agree. The (pseudo-random) layout seed is a
+            # In-cell placement must agree. Compare the *rendered* pypicongpu
+            # layout, not the picmi object: picmistandard models override
+            # equality to object identity, so two freshly constructed but
+            # value-equal layouts would silently fail to group. The rendered
+            # layout carries the (pseudo-random) ``seed``, which is a
             # force-independent discriminator: equal-ppc random layouts with
             # different seeds are deliberately initialised independently.
-            if self.metadata.kwargs["layout"] != other.metadata.kwargs["layout"]:
+            if (
+                self.metadata.kwargs["layout"].get_as_pypicongpu()
+                != other.metadata.kwargs["layout"].get_as_pypicongpu()
+            ):
                 return False
             self.metadata.kwargs["species"].extend(other.metadata.kwargs["species"])
             return True
@@ -285,11 +292,16 @@ def warn_would_have_merged_species(operations):
     Since the switch to picmi-standard semantics (Option B) each species is
     initialised independently unless it is an explicit member of a
     ``MultiSpecies``. Species that are *not* wrapped in a ``MultiSpecies`` but
-    share the same full ``initial_distribution`` AND the same ``layout`` are
-    exactly the ones the removed implicit-derive heuristic used to merge
+    share the *same* ``initial_distribution`` and ``layout`` objects are exactly
+    the ones the removed implicit-derive heuristic used to merge
     (collective/charge-neutral in-cell positions). This detection only makes the
     semantic change loud for the affected setups; it does not (re-)introduce the
     heuristic. One warning is emitted per affected group.
+
+    The comparison here is deliberately by picmi object identity, matching the
+    removed heuristic: picmistandard overrides equality to identity, so
+    separately constructed but value-equal distributions/layouts were *not*
+    merged by the old heuristic either and are therefore not warned about.
     """
     density_ops = [
         op

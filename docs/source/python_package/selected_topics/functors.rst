@@ -146,17 +146,29 @@ reports it through ``getUnit()`` / ``getUnitDimension()``.
 For pure monomial quantities these are derived automatically from the
 7-component unit vector, matching the built-in derived attributes.
 ``unit_factor`` is an optional escape hatch for the cases the automatic
-derivation cannot handle: it is a string of C++ code giving the numeric scale
-factor returned by ``getUnit()`` (the openPMD ``unitSI`` factor, i.e. the value
-of one internal unit in SI units). It defaults to ``None``, meaning "derive the
+derivation cannot handle: it gives the numeric scale factor returned by
+``getUnit()`` (the openPMD ``unitSI`` factor, i.e. the value of one internal
+unit in SI units). It defaults to ``None``, meaning "derive the
 ``sim.unit.*`` monomial from ``unit_dimension``"; setting it overrides that
-derivation verbatim. Use it when the dimension is not a pure monomial -- it has
+derivation. It accepts a number (implicitly converted), a sympy expression,
+or a :class:`~collections.abc.Callable` returning one, and is rendered
+through the same ``PMAccPrinter`` as the rest of the functor interface -- like
+the ``AnalyticDistribution`` expressions, there are **no C++ code strings** in
+the interface. Use it when the dimension is not a pure monomial -- it has
 a temperature, amount-of-substance or luminous-intensity component, or a
 non-integer exponent -- because such a dimension cannot be turned into a
 numeric scale, and input-file generation raises instead.
 A typical case is a count/density quantity whose unit carries the
-macro-particle weighting ``N_ppm``, which is not representable in the
-7-component unit vector.
+macro-particle weighting ``N_ppm``. As a number you would write e.g.
+``unit_factor=1e6`` when one internal unit corresponds to :math:`10^6` SI
+units; if the factor itself must reference an internal unit expression, pass a
+sympy expression built from ``sympy.Symbol("sim.unit.mass()")`` and friends
+(rendered verbatim by the printer).
+
+.. literalinclude:: ../snippets/selected_topics/particle_functors.py
+   :language: python
+   :start-after: BEGIN-UNIT-FACTOR
+   :end-before: END-UNIT-FACTOR
 
 Because a functor or filter accesses concrete particle attributes, using one
 with a species registers those attributes on that species (via

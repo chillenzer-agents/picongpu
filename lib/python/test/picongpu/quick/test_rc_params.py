@@ -144,6 +144,21 @@ def test_preset_default_prefill_ignores_other_parameters_and_presets():
     assert preset_default_prefill(None, "pic_libs") is None
 
 
+def test_preset_default_prefill_is_gated_on_registration_not_literalness():
+    # capella declares a literal (placeholder-*looking*, but non-shell) default
+    # for project_name; it must NOT pre-fill because the (preset, key) pair is
+    # not registered. This pins the allowlist gate itself: dropping the
+    # membership test would make this pass through as "p_name_of_your_project".
+    assert get_preset_declared_value("zih-tud/capella", "project_name") == "p_name_of_your_project"
+    assert preset_default_prefill("zih-tud/capella", "project_name") is None
+
+
+def test_get_preset_declared_value_returns_none_for_unknown_preset():
+    # An unknown preset makes _read_preset raise ValueError, which the helper
+    # turns into None rather than propagating.
+    assert get_preset_declared_value("does-not-exist/nope", "pic_libs") is None
+
+
 def test_get_preset_declared_value_only_returns_concrete_literals():
     assert (
         get_preset_declared_value("rosi-hzdr/gpu-v100", "pic_libs") == "/bigdata/hplsim/development/rosi-picongpu-libs/"

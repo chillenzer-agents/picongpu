@@ -283,8 +283,8 @@ def get_preset_declared_value(preset, rc_key: str) -> str | None:
 
     Returns ``None`` when the preset does not declare the variable or declares it
     as a shell construct (``$VAR`` expansion, ``$(...)``/backtick command
-    substitution) or an angle-bracketed placeholder -- i.e. when there is no
-    literal value a user could just accept.
+    substitution) or as a value that is entirely an angle-bracket placeholder --
+    i.e. when there is no literal value a user could just accept.
     """
     if preset is None:
         return None

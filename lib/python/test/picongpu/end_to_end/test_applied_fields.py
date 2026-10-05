@@ -39,7 +39,7 @@ from picongpu.picmi import (
 from picongpu.picmi.diagnostics import Checkpoint, TS
 
 from .applied_fields import APPLIED_FIELDS, combined_field_values
-from .arbitrary_parameters import NUMBER_OF_CELLS, UPPER_BOUNDARY, directory_in_home, gather_results
+from .arbitrary_parameters import CELL_SIZE, NUMBER_OF_CELLS, UPPER_BOUNDARY, directory_in_home, gather_results
 
 logging.basicConfig(level=logging.INFO)
 
@@ -113,15 +113,19 @@ def _read_field_components(path: Path, field_name: str):
     return components, grid_spacing, grid_global_offset
 
 
-def _cell_centers(shape, grid_spacing, grid_global_offset):
+def _cell_centers(shape, grid_global_offset):
     """
     Return the SI coordinates of every cell center, in field layout ``[z][y][x]``.
 
-    Both ``shape`` and openPMD's ``grid_spacing``/``grid_global_offset`` are in
-    field order ``(z, y, x)`` (the writer stores them that way), so we build the
-    three axis coordinates without reordering.
+    The cell size is taken from the input geometry (``CELL_SIZE``) rather than
+    from openPMD's ``grid_spacing``: that attribute is stored as float32, which
+    perturbs the coordinate by ~1e-7 relative and makes a reference evaluation at
+    a sine node (e.g. ``sin(k * x)`` at ``x = 32``) pick up a non-zero value
+    instead of the exact zero the C++ core computes in float64. The field layout
+    is ``(z, y, x)``, so ``CELL_SIZE`` is reordered accordingly.
     """
-    z, y, x = (grid_global_offset[axis] + np.arange(shape[axis]) * grid_spacing[axis] for axis in range(3))
+    cell_size = (CELL_SIZE[2], CELL_SIZE[1], CELL_SIZE[0])
+    z, y, x = (grid_global_offset[axis] + np.arange(shape[axis]) * cell_size[axis] for axis in range(3))
     z, y, x = np.meshgrid(z, y, x, indexing="ij")
     return x, y, z
 
@@ -150,15 +154,23 @@ class TestAppliedFields(TestCase):
     def test_dumped_fields_match_the_combined_applied_fields(self):
         time = 0.0  # the step-0 checkpoint is dumped before the first push
         for field_name, prefix, components in (("E", "e", "xyz"), ("B", "b", "xyz")):
-            values, grid_spacing, grid_global_offset = _read_field_components(self.checkpoint, field_name)
+            values, _, grid_global_offset = _read_field_components(self.checkpoint, field_name)
             shape = values["x"].shape
             self.assertEqual(tuple(shape), tuple(NUMBER_OF_CELLS[::-1]))
-            x, y, z = _cell_centers(shape, grid_spacing, grid_global_offset)
+            x, y, z = _cell_centers(shape, grid_global_offset)
             expected = combined_field_values(x, y, z, time)
             for component in components:
                 with self.subTest(field=field_name, component=component):
                     reference = expected[f"{prefix.upper()}{component}"]
-                    np.testing.assert_allclose(values[component], reference, rtol=1.0e-4)
+                    # The dumped field is float32, so its resolution at the field
+                    # peak is eps32 * |F|_max. Near a node (e.g. sin(k*x) at
+                    # x = pi/k) the reference passes through zero and a pure
+                    # relative tolerance is ill-posed: the call operator evaluates
+                    # through a lambdified expression whose rounded constants
+                    # leave an O(1e-9) residue. Use the dump's own quantization as
+                    # the absolute floor; it is far below any non-nodal value.
+                    atol = np.finfo(np.float32).eps * np.max(np.abs(reference))
+                    np.testing.assert_allclose(values[component], reference, rtol=1.0e-4, atol=atol)
 
     def test_single_applied_field_component_is_summed(self):
         # Ex is only contributed by the constant field; guard against a silent

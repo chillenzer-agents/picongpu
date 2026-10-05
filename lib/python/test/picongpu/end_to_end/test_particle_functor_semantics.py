@@ -88,9 +88,12 @@ def macroparticle_counter(_: MacroParticle):
     return 1
 
 
-# Result type is inferred from the type annotation:
+# Result type is inferred from the type annotation. The value is the number of
+# physical particles represented by one macroparticle (i.e. the weighting,
+# ~1e23 here), so it is a real quantity, not an int: a C++ `int` return would
+# overflow. `scales_with_weighting=-1` turns `1` into `weighting`.
 @ParticleFunctor(scales_with_weighting=-1)
-def physical_counter(_: PhysicalParticle) -> int:
+def physical_counter(_: PhysicalParticle) -> float:
     return 1
 
 

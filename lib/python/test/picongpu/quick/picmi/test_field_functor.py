@@ -152,7 +152,6 @@ class TestFieldFunctorFloatFidelity(TestCase):
 
     def test_genuinely_different_spellings_are_still_rejected(self):
         # the more tolerant comparison must not accept a real disagreement
-        functor = _FieldFunctor(expression="sin(y)", variables=("x", "y", "z", "t"))
         with pytest.raises(ValueError, match="disagree"):
             _FieldFunctor(
                 expression="sin(y)",

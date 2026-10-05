@@ -76,13 +76,12 @@ assert np.shape(analytic_field(x=positions, y=positions, z=positions, t=0.0)["Ex
 # END-APPLIED-FIELD-CALL
 
 # BEGIN-APPLIED-FIELD-INFLUENCE
-# PIConGPU-specific influence knobs (the picongpu_ prefix marks code-specific
-# PICMI inputs): whether particles feel the background, and whether plugins and
-# dumps see it. They configure the single background functor pair, so all applied
-# fields of one simulation must agree on them.
+# PIConGPU-specific visibility knobs (the picongpu_ prefix marks code-specific
+# PICMI inputs): whether plugins and dumps see the background. The background is
+# always applied around the particle push; these knobs configure the single
+# background functor pair, so all applied fields of one simulation must agree.
 influence_field = picmi.AnalyticAppliedField(
     Ex_expression="1.0e5 * y",
-    picongpu_influence_particle_pusher=True,
     picongpu_influences_plugins=False,
     picongpu_influences_dumps=True,
 )

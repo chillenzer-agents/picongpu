@@ -89,24 +89,20 @@ must not collide with those free variables or with generated identifiers such as
 ``cellIdx`` or ``sim`` (also a ``ValueError``); C++ keywords are escaped by the
 PMAccPrinter rather than rejected.
 
-Influence (visibility) knobs
-----------------------------
+Visibility knobs
+----------------
 
-Both classes accept three PIConGPU-specific influence knobs (the ``picongpu_``
+Both classes accept two PIConGPU-specific visibility knobs (the ``picongpu_``
 prefix marks code-specific PICMI inputs); they correspond to options of the
 generated run configuration and default to ``True``:
 
-* ``picongpu_influence_particle_pusher`` — whether the particles feel the
-  background (the pusher flag).
 * ``picongpu_influences_plugins`` — whether plugins see the background.
 * ``picongpu_influences_dumps`` — whether dumps, including checkpoints, include
   the background.
 
-The three knobs are **not independent**: with
-``picongpu_influence_particle_pusher=False`` the whole background is disabled, so
-the other two have no effect (explicitly setting them then triggers a
-``UserWarning``). The pusher knob covers the electric **and** magnetic
-background together; there is no per-component switch.
+The background is always applied to the grid around the particle push, so the
+particles always feel it; there is no pusher-visibility switch. The two knobs
+cover the electric **and** magnetic background together.
 
 Because the knobs configure the *single* C++ background functor pair, all
 applied fields of a simulation must agree on them. A mismatch is caught during

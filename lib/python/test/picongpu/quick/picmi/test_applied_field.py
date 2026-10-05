@@ -5,7 +5,6 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-import warnings
 from pathlib import Path
 from unittest import TestCase
 
@@ -14,6 +13,7 @@ import sympy
 from picongpu import picmi
 from picongpu.pypicongpu.backgroundfield import BackgroundField
 from picongpu.pypicongpu.util import UnsupportedFeatureError
+from pydantic import ValidationError
 
 REPO_ROOT = Path(__file__).resolve().parents[6]
 STATIC_FIELDBACKGROUND_PARAM = REPO_ROOT / "include" / "picongpu" / "param" / "fieldBackground.param"
@@ -55,44 +55,24 @@ class TestConstantAppliedField(TestCase):
 
     def test_influence_defaults(self):
         background = picmi.ConstantAppliedField(Ex=1e6).get_as_pypicongpu()
-        assert background.influence_particle_pusher is True
         assert background.influences_plugins is True
         assert background.influences_dumps is True
 
     def test_influence_knobs_forwarded(self):
-        with pytest.warns(UserWarning, match="has no effect"):
-            applied_field = picmi.ConstantAppliedField(
-                Ex=1e6,
-                picongpu_influence_particle_pusher=False,
-                picongpu_influences_plugins=False,
-                picongpu_influences_dumps=True,
-            )
+        applied_field = picmi.ConstantAppliedField(
+            Ex=1e6,
+            picongpu_influences_plugins=False,
+            picongpu_influences_dumps=True,
+        )
         background = applied_field.get_as_pypicongpu()
-        assert background.influence_particle_pusher is False
         assert background.influences_plugins is False
         assert background.influences_dumps is True
 
-    def test_moot_visibility_knobs_warn_when_pusher_disabled(self):
-        # pusher=False disables the whole background, so explicitly setting the
-        # visibility knobs is moot and must be surfaced instead of silently ignored
-        with pytest.warns(UserWarning, match="has no effect"):
-            picmi.ConstantAppliedField(
-                Ex=1e6,
-                picongpu_influence_particle_pusher=False,
-                picongpu_influences_plugins=False,
-            )
-        with pytest.warns(UserWarning, match="has no effect"):
-            picmi.ConstantAppliedField(
-                Ex=1e6,
-                picongpu_influence_particle_pusher=False,
-                picongpu_influences_dumps=True,
-            )
-
-    def test_no_warning_for_default_visibility_knobs(self):
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
+    def test_no_particle_pusher_influence_knob(self):
+        # The pusher scope is not a meaningful knob: the background is always
+        # applied around the push. The extension keyword is rejected.
+        with pytest.raises(ValidationError):
             picmi.ConstantAppliedField(Ex=1e6, picongpu_influence_particle_pusher=False)
-            picmi.ConstantAppliedField(Ex=1e6, picongpu_influences_plugins=False)
 
 
 class TestAnalyticAppliedField(TestCase):
@@ -119,17 +99,14 @@ class TestAnalyticAppliedField(TestCase):
     def test_influence_knobs_are_not_expression_parameters(self):
         # the picongpu_* extension kwargs must be intercepted before the standard
         # base class funnels unknown kwargs into user_defined_kw
-        with pytest.warns(UserWarning, match="has no effect"):
-            applied_field = picmi.AnalyticAppliedField(
-                Ex_expression="b0*x",
-                b0=2.0,
-                picongpu_influence_particle_pusher=False,
-                picongpu_influences_plugins=False,
-                picongpu_influences_dumps=False,
-            )
+        applied_field = picmi.AnalyticAppliedField(
+            Ex_expression="b0*x",
+            b0=2.0,
+            picongpu_influences_plugins=False,
+            picongpu_influences_dumps=False,
+        )
         background = applied_field.get_as_pypicongpu()
         assert [p.name for p in background.user_defined_kw] == ["b0"]
-        assert background.influence_particle_pusher is False
         assert background.influences_plugins is False
         assert background.influences_dumps is False
 
@@ -456,14 +433,13 @@ class TestSimulationBackgroundField(TestCase):
             "bx",
             "by",
             "bz",
-            "influence_particle_pusher",
             "influences_plugins",
             "influences_dumps",
         ):
             assert key in context["background_field"]
         # the renderer only accepts the standard leaf types
         assert isinstance(context["background_field"]["ey"], str)
-        assert isinstance(context["background_field"]["influence_particle_pusher"], bool)
+        assert isinstance(context["background_field"]["influences_plugins"], bool)
 
     def test_applied_field_from_constructor(self):
         grid = picmi.Cartesian3DGrid(
@@ -537,26 +513,23 @@ class TestRenderedParamFunctionallyEqual(TestCase):
         assert "FieldBackgroundJ" in rendered
         assert "activated = false" in rendered
 
-    def test_configured_rendering_defaults_keep_pusher_plugins_dumps_on(self):
+    def test_configured_rendering_defaults_keep_plugins_and_dumps_on(self):
         rendered = self._render_setup(picmi.ConstantAppliedField(Ey=1e6))
-        # both functors default to influence the pusher
+        # the generated background is always applied around the particle push
         assert rendered.count("InfluenceParticlePusher = true") == 2
         cfg = self._render_n_cfg(picmi.ConstantAppliedField(Ey=1e6))
         assert "--fieldBackground.influencesPlugins true" in cfg
         assert "--fieldBackground.influencesDumps true" in cfg
 
-    def test_configured_rendering_honours_influence_knobs(self):
-        with pytest.warns(UserWarning, match="has no effect"):
-            applied_field = picmi.ConstantAppliedField(
-                Ey=1e6,
-                picongpu_influence_particle_pusher=False,
-                picongpu_influences_plugins=False,
-                picongpu_influences_dumps=False,
-            )
+    def test_configured_rendering_honours_visibility_knobs(self):
+        applied_field = picmi.ConstantAppliedField(
+            Ey=1e6,
+            picongpu_influences_plugins=False,
+            picongpu_influences_dumps=False,
+        )
         rendered = self._render_setup(applied_field)
-        # both functors render the configured value
-        assert rendered.count("InfluenceParticlePusher = true") == 0
-        assert rendered.count("InfluenceParticlePusher = false") == 2
+        # the generated background is always applied around the push
+        assert rendered.count("InfluenceParticlePusher = true") == 2
         cfg = self._render_n_cfg(applied_field)
         assert "--fieldBackground.influencesPlugins false" in cfg
         assert "--fieldBackground.influencesDumps false" in cfg

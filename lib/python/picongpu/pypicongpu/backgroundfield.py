@@ -68,19 +68,6 @@ class BackgroundField(BaseModel):
     bz: Annotated[str, BeforeValidator(_render_field_expression)] = "0"
     """B_z component of the background field in T"""
 
-    influence_particle_pusher: bool = True
-    """
-    Whether the background is added to the grid fields around the particle
-    push (the C++ ``FieldBackgroundE``/``FieldBackgroundB``
-    ``InfluenceParticlePusher`` flag).
-
-    With ``True`` (default) particles feel the background while the field
-    solver does not evolve it. With ``False`` the whole background is
-    disabled in the C++ core, exactly like setting
-    ``InfluenceParticlePusher = false`` in the legacy
-    ``fieldBackground.param``.
-    """
-
     influences_plugins: bool = True
     """
     Whether plugins see the background (the C++

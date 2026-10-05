@@ -94,9 +94,16 @@ def _read_field_components(path: Path, field_name: str):
     """
     series = opmd.Series(str(path), opmd.Access.read_only)
     mesh = series.iterations[0].meshes[field_name]
-    components = {component: mesh[component].load_chunk() * mesh[component].unit_SI for component in ("x", "y", "z")}
-    grid_spacing = np.asarray(mesh.grid_spacing) * mesh.grid_unit_SI
-    grid_global_offset = np.asarray(mesh.grid_global_offset) * mesh.grid_unit_SI
+    # Read in double precision: ``load_chunk`` yields float32 and scaling it by
+    # the (large) field ``unit_SI`` overflows float32, which the test session's
+    # ``filterwarnings = error`` turns into a failure. The promoted product is
+    # the same value with more headroom.
+    components = {
+        component: mesh[component].load_chunk().astype(np.float64) * mesh[component].unit_SI
+        for component in ("x", "y", "z")
+    }
+    grid_spacing = np.asarray(mesh.grid_spacing, dtype=np.float64) * mesh.grid_unit_SI
+    grid_global_offset = np.asarray(mesh.grid_global_offset, dtype=np.float64) * mesh.grid_unit_SI
     series.flush()
     series.close()
     return components, grid_spacing, grid_global_offset

@@ -5,7 +5,6 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-import warnings
 from collections.abc import Callable
 
 import numpy as np
@@ -35,23 +34,19 @@ _ANALYTIC_FREE_VARIABLES = ("x", "y", "z", "t")
 
 class _InfluenceOptions(BaseModel):
     """
-    PIConGPU-specific influence knobs shared by the applied-field classes.
+    PIConGPU-specific visibility knobs shared by the applied-field classes.
 
     The PICMI standard has no notion of field-background visibility, so these
     are PIConGPU extensions. They are declared as real fields (rather than left
     to the standard ``user_defined_kw`` catch-all) so that they are not silently
     treated as expression parameters. The names carry the ``picongpu_`` prefix
     as required for code-specific PICMI inputs.
+
+    The background is always applied to the grid around the particle push, so
+    the particles always feel it; these knobs only control whether plugins and
+    dumps see it.
     """
 
-    picongpu_influence_particle_pusher: bool = Field(
-        default=True,
-        description=(
-            "Whether particles feel the background (C++ ``InfluenceParticlePusher``). "
-            "With ``False`` the whole background is disabled in the core, exactly like "
-            "the legacy ``fieldBackground.param``."
-        ),
-    )
     picongpu_influences_plugins: bool = Field(
         default=True,
         description="Whether plugins see the background (C++ ``fieldBackground.influencesPlugins``).",
@@ -60,21 +55,6 @@ class _InfluenceOptions(BaseModel):
         default=True,
         description="Whether dumps (incl. checkpoints) include the background (C++ ``fieldBackground.influencesDumps``).",
     )
-
-    @model_validator(mode="after")
-    def _warn_on_moot_visibility_knobs(self):
-        if self.picongpu_influence_particle_pusher:
-            return self
-        explicitly_set = {"picongpu_influences_plugins", "picongpu_influences_dumps"} & self.model_fields_set
-        if explicitly_set:
-            warnings.warn(
-                "picongpu_influence_particle_pusher=False disables the whole background, so "
-                f"{' and '.join(sorted(explicitly_set))} has no effect: nothing adds the "
-                "background to the fields. The pusher knob takes precedence.",
-                UserWarning,
-                stacklevel=2,
-            )
-        return self
 
 
 def _check_only_full_domain(applied_field) -> None:
@@ -93,7 +73,6 @@ def _check_only_full_domain(applied_field) -> None:
 
 def _influence_kwargs(applied_field) -> dict:
     return dict(
-        influence_particle_pusher=applied_field.picongpu_influence_particle_pusher,
         influences_plugins=applied_field.picongpu_influences_plugins,
         influences_dumps=applied_field.picongpu_influences_dumps,
     )
@@ -101,7 +80,7 @@ def _influence_kwargs(applied_field) -> dict:
 
 def merge_influence(applied_fields) -> dict:
     """
-    Combine the influence knobs of several applied fields.
+    Combine the visibility knobs of several applied fields.
 
     The knobs configure the *single* C++ ``FieldBackgroundE``/``FieldBackgroundB``
     pair, so all applied fields must agree on them.

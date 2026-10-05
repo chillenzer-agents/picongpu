@@ -43,7 +43,6 @@ multispecies = picmi.MultiSpecies(
     proportions=[1.0, 1.0],
     initial_distribution=plasma,
 )
-# END-MULTI-SPECIES
 
 # the MultiSpecies is added as a whole with one layout for the entire group
 layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4)
@@ -53,5 +52,6 @@ simulation = picmi.Simulation(
     solver=solver,
 )
 simulation.add_species(species=multispecies, layout=layout)
+# END-MULTI-SPECIES
 
 simulation.write_input_file(Path("multi_species_setup"))

@@ -31,6 +31,7 @@ import inspect
 import re
 from collections.abc import Callable, Iterable, Mapping
 
+import numpy as np
 import sympy
 
 from picongpu.pypicongpu._field_functor import (
@@ -191,17 +192,22 @@ def resolve(
     *,
     function: Callable | None = None,
     expression=None,
+    sympy_expression: sympy.Expr | None = None,
     variables: Iterable[str] = ("x", "y", "z"),
     parameters: Mapping[str, float] | None = None,
     context: str = "field functor",
 ) -> tuple[sympy.Expr, str, Callable]:
     """
-    Translate any of the expression/function spellings into all three.
+    Translate any of the expression/function/sympy spellings into all three.
 
     Parameters are kept symbolic in the returned expression; the canonical
-    string and callable are the exact translations of it. If both an expression
-    and a function are supplied they must resolve to the same expression (a
-    mismatch that still depends only on the coordinates is rejected).
+    string and callable are the exact translations of it. If several spellings
+    are supplied they must resolve to the same expression (a mismatch that still
+    depends only on the coordinates is rejected).
+
+    ``sympy_expression`` is the already-resolved spelling and is treated exactly
+    like an ``expression`` (the two must agree if both are given), so a caller
+    that only has the sympy form still gets the string and callable translations.
 
     Returns ``(symbolic_expression, canonical_string, callable)``. The returned
     callable has the named parameters already substituted (it depends on the
@@ -217,30 +223,38 @@ def resolve(
     # still parsed as that symbol rather than as the sympy object.
     parameter_locals = {**symbols, **{name: sympy.Symbol(name) for name in parameters}}
 
-    from_expression = None
+    spellings: dict[str, sympy.Expr] = {}
     if expression is not None:
-        from_expression = (
+        spellings["expression"] = (
             expression if isinstance(expression, sympy.Expr) else sympify_expression(expression, parameter_locals)
         )
-    from_function = None
+    if sympy_expression is not None:
+        spellings["sympy"] = (
+            sympy_expression
+            if isinstance(sympy_expression, sympy.Expr)
+            else sympify_expression(sympy_expression, parameter_locals)
+        )
     if function is not None:
         # The callable receives the parameters as (symbolic) keywords, exactly
         # like an expression string references them by name.
-        from_function = expression_from_callable(function, symbols, parameters)
+        spellings["function"] = expression_from_callable(function, symbols, parameters)
 
-    if from_expression is not None and from_function is not None:
-        # Compare the two spellings with the parameters substituted, so a
-        # symbolic expression and its (numeric) callable counterpart agree.
-        difference = sympy.simplify(from_expression.subs(parameters) - from_function.subs(parameters))
+    if not spellings:
+        raise ValueError(f"{context} must provide an expression, a sympy expression or a function.")
+
+    # Every supplied spelling is compared with the parameters substituted, so a
+    # symbolic expression and its (numeric) callable counterpart agree. This also
+    # catches a string and a sympy spelling that disagree.
+    resolved = [value.subs(parameters) for value in spellings.values()]
+    reference = resolved[0]
+    for name, value in zip(list(spellings)[1:], resolved[1:], strict=False):
+        difference = sympy.simplify(reference - value)
         if difference != 0:
             raise ValueError(
-                f"{context} expression and function disagree by {difference!r}; "
-                "provide one spelling, or two that agree."
+                f"{context} {name} spelling disagrees by {difference!r}; provide one spelling, or several that agree."
             )
-    if from_expression is not None:
-        symbolic = from_expression
-    else:
-        symbolic = from_function
+
+    symbolic = next(iter(spellings.values()))
     return symbolic, expression_string(symbolic), function_from_expression(symbolic.subs(parameters), variables)
 
 
@@ -269,8 +283,12 @@ class _FieldFunctor:
     function:
         A callable of the coordinate variables (in the order of ``variables``)
         returning something sympy can understand. Extra named parameters are
-        taken from ``parameters``. May be combined with ``expression`` if the
-        two agree; at least one of the two must be given.
+        taken from ``parameters``. May be combined with the other spellings if
+        they agree; at least one spelling must be given.
+    sympy_expression:
+        An already-resolved :class:`sympy.Expr`; the exact ``*_sympy`` spelling.
+        It is validated against any ``expression``/``function`` given and may be
+        the only spelling supplied.
     variables:
         The names of the supported free variables, in argument order. The
         applied fields use ``("x", "y", "z", "t")``; the density and per-axis
@@ -301,19 +319,18 @@ class _FieldFunctor:
         *,
         expression=None,
         function: Callable | None = None,
+        sympy_expression: sympy.Expr | None = None,
         variables: Iterable[str] = ("x", "y", "z", "t"),
         parameters: Mapping[str, float] | None = None,
         context: str = "field functor",
     ):
-        if expression is None and function is None:
-            raise ValueError(f"{context} must provide an expression or a function.")
-
         self.context = context
         self.variables = tuple(variables)
         self.parameters = dict(parameters or {})
         self.symbolic, self.expression, self.function = resolve(
             expression=expression,
             function=function,
+            sympy_expression=sympy_expression,
             variables=self.variables,
             parameters=self.parameters,
             context=context,
@@ -335,6 +352,24 @@ class _FieldFunctor:
         declares the parameters separately (see :meth:`parameter_list`).
         """
         return render(self.symbolic)
+
+    def evaluate(self, *args):
+        """
+        Evaluate the field at the given coordinates (SI), with all parameters substituted.
+
+        The arguments are the coordinate variables in the order of
+        :attr:`variables` and may be scalars or numpy arrays (broadcasting is
+        supported). Named parameters are already substituted, so no keyword
+        arguments are accepted. Returns the numerical value(s), not a sympy
+        expression; this is the same evaluation the pypicongpu layer renders
+        into C++.
+        """
+        function = sympy.lambdify(tuple(sympy.Symbol(name) for name in self.variables), self.sympy, "numpy")
+        values = function(*args)
+        # lambdify returns a plain Python number for scalar, constant input;
+        # wrap it into an array so the result type is consistent (and so a
+        # caller can broadcast/compose it uniformly).
+        return np.asarray(values)
 
     def parameter_list(self) -> list[dict]:
         """

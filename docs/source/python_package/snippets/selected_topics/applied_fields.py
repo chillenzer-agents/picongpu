@@ -17,6 +17,7 @@ declaratively to a simulation.
 
 from pathlib import Path
 
+import numpy as np
 from sympy import pi, sin
 
 from picongpu import picmi
@@ -62,6 +63,17 @@ assert analytic_field.Ey_sympy is not None
 assert analytic_field.Ex_expression is not None
 assert analytic_field.Ey_function is not None
 # END-APPLIED-FIELD-SYMPY
+
+# BEGIN-APPLIED-FIELD-CALL
+# every applied field is callable: it returns the six components (in SI units)
+# at the given coordinates, exactly as the C++ functor evaluates them
+values = analytic_field(x=0.3e-6, y=0.4e-6, z=0.0, t=10.0e-15)
+assert set(values) == {"Ex", "Ey", "Ez", "Bx", "By", "Bz"}
+assert values["Ez"] is None  # no field was set for that component
+# the coordinates may be numpy arrays; the components are then arrays too
+positions = np.array([0.1e-6, 0.2e-6, 0.3e-6])
+assert np.shape(analytic_field(x=positions, y=positions, z=positions, t=0.0)["Ex"]) == positions.shape
+# END-APPLIED-FIELD-CALL
 
 # BEGIN-APPLIED-FIELD-INFLUENCE
 # PIConGPU-specific influence knobs (the picongpu_ prefix marks code-specific

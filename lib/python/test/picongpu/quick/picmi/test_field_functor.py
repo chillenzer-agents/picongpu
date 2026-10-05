@@ -19,7 +19,7 @@ class TestFieldFunctor(TestCase):
         assert "pmacc::math::cos(t)" in functor.render()
 
     def test_neither_expression_nor_function_rejected(self):
-        with pytest.raises(ValueError, match="expression or a function"):
+        with pytest.raises(ValueError, match="must provide"):
             _FieldFunctor()
 
     def test_backs_all_three_spellings(self):
@@ -39,6 +39,29 @@ class TestFieldFunctor(TestCase):
             expression="x", function=lambda x, y, z, t: sympy.Symbol("x"), variables=("x", "y", "z", "t")
         )
         assert functor.symbolic == sympy.Symbol("x")
+
+    def test_sympy_spelling_alone_is_translated(self):
+        # an already-resolved sympy expression is a first-class input spelling
+        x, y, z, t = sympy.symbols("x y z t")
+        functor = _FieldFunctor(sympy_expression=sympy.sin(x) + t, variables=("x", "y", "z", "t"))
+        assert functor.symbolic == sympy.sin(x) + t
+        assert functor.sympy == sympy.sin(x) + t
+        assert sympy.sympify(functor.expression) == sympy.sin(x) + t
+
+    def test_sympy_spelling_must_agree_with_expression(self):
+        x, y, z, t = sympy.symbols("x y z t")
+        functor = _FieldFunctor(expression="x", sympy_expression=sympy.Symbol("x"), variables=("x", "y", "z", "t"))
+        assert functor.symbolic == sympy.Symbol("x")
+        with pytest.raises(ValueError, match="disagree"):
+            _FieldFunctor(expression="x", sympy_expression=2 * x, variables=("x", "y", "z", "t"))
+
+    def test_evaluate_returns_numeric_values(self):
+        import numpy as np
+
+        functor = _FieldFunctor(expression="2*x + t", variables=("x", "y", "z", "t"))
+        assert functor.evaluate(3.0, 0.0, 0.0, 1.0) == 7.0
+        values = functor.evaluate(np.array([0.0, 1.0, 2.0]), 0.0, 0.0, 0.0)
+        np.testing.assert_allclose(values, [0.0, 2.0, 4.0])
 
     def test_callable_with_extra_parameters(self):
         functor = _FieldFunctor(

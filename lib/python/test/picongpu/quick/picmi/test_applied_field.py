@@ -227,6 +227,55 @@ class TestAnalyticAppliedFieldFunctionInterface(TestCase):
         assert applied_field.Ey_sympy is None
         assert applied_field.Ey_expression is None
 
+    def test_all_three_spellings_are_owned_by_the_subclass(self):
+        # the standard base class already declares ``*_expression``; the PIConGPU
+        # subclass must declare the full triple itself so that every spelling is
+        # exposed on this class and backed by the shared _FieldFunctor
+        annotations = picmi.AnalyticAppliedField.__annotations__
+        for component in ("Ex", "Ey", "Ez", "Bx", "By", "Bz"):
+            for spelling in ("expression", "function", "sympy"):
+                assert f"{component}_{spelling}" in annotations, f"{component}_{spelling} not declared"
+                assert f"{component}_{spelling}" in picmi.AnalyticAppliedField.model_fields
+
+    def test_expression_spelling_supplied_as_sympy_expression(self):
+        x, y, z, t = sympy.symbols("x y z t")
+        applied_field = picmi.AnalyticAppliedField(Ex_sympy=sympy.sin(x) + t)
+        assert applied_field.Ex_sympy == sympy.sin(x) + t
+        assert sympy.sympify(applied_field.Ex_expression) == sympy.sin(x) + t
+        assert applied_field.Ex_function(x, y, z, t) == sympy.sin(x) + t
+
+    def test_expression_spelling_supplied_as_number(self):
+        applied_field = picmi.AnalyticAppliedField(Ex_expression=3.5)
+        assert applied_field.Ex_sympy == sympy.Float(3.5)
+        assert applied_field.Ex_expression == "3.50000000000000"
+
+    def test_call_operator_evaluates_all_components(self):
+        applied_field = picmi.AnalyticAppliedField(
+            Ex_expression="E0*x", Ey_function=lambda x, y, z, t: sympy.sin(t), E0=2.0
+        )
+        values = applied_field(3.0, 0.0, 0.0, 0.0)
+        assert set(values) == {"Ex", "Ey", "Ez", "Bx", "By", "Bz"}
+        assert values["Ex"] == 6.0
+        assert values["Ey"] == 0.0
+        assert values["Ez"] is None
+
+    def test_call_operator_broadcasts_over_arrays(self):
+        import numpy as np
+
+        applied_field = picmi.AnalyticAppliedField(Ex_expression="2*x")
+        values = applied_field(np.array([0.0, 1.0, 2.0]), 0.0, 0.0, 0.0)
+        np.testing.assert_allclose(values["Ex"], [0.0, 2.0, 4.0])
+
+    def test_constant_call_operator_is_broadcastable(self):
+        import numpy as np
+
+        applied_field = picmi.ConstantAppliedField(Ex=1.0e6, Bz=0.5)
+        x = np.zeros((2, 3))
+        values = applied_field(x, x, x, 0.0)
+        assert values["Ex"] == 1.0e6
+        np.testing.assert_allclose(values["Bz"], 0.5)
+        assert values["Ey"] is None
+
     def test_function_undefined_symbol_rejected(self):
         unknown = sympy.Symbol("unknown")
         with pytest.raises(ValueError, match="unknown"):

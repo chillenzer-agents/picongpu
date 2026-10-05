@@ -45,14 +45,13 @@ multispecies = picmi.MultiSpecies(
 )
 # END-MULTI-SPECIES
 
-# all members use the same layout -> one shared in-cell position set
+# the MultiSpecies is added as a whole with one layout for the entire group
 layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4)
 
 simulation = picmi.Simulation(
     max_steps=100,
     solver=solver,
 )
-for member in multispecies:
-    simulation.add_species(member, layout)
+simulation.add_species(species=multispecies, layout=layout)
 
 simulation.write_input_file(Path("multi_species_setup"))

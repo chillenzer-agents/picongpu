@@ -54,8 +54,8 @@ simulation = picmi.Simulation(
     max_steps=100,
     solver=solver,
 )
-for member in multispecies:
-    simulation.add_species(member, layout)
+# add the whole group at once, with one layout for all members
+simulation.add_species(species=multispecies, layout=layout)
 
 simulation.run(setup_dir=Path("warm_plasma_setup"), run_dir=Path("warm_plasma_run"))
 # END-WARM-PLASMA

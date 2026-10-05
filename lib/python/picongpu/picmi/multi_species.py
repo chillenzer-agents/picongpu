@@ -34,11 +34,14 @@ class MultiSpecies(picmistandard.PICMI_MultiSpecies):
     the species' ``DensityRatio`` and is respected when deriving the members'
     weightings.
 
-    The members are plain :class:`picmi.Species`. Add every member to your
-    :class:`picmi.Simulation` via :meth:`picmi.Simulation.add_species`, typically
-    with the same layout. Members whose layouts differ (in particular
-    ``PseudoRandomLayout`` with different ``seed``) are deliberately initialised
-    independently (force-independent discriminator, non-neutral on purpose).
+    The members are plain :class:`picmi.Species`. Following the PICMI standard,
+    add the ``MultiSpecies`` as a whole to your :class:`picmi.Simulation` via
+    :meth:`picmi.Simulation.add_species` with a single layout for the entire
+    group (e.g. ``sim.add_species(species=multi, layout=layout)``); its members
+    can be addressed by index or name for further use (e.g. in interactions).
+    Members whose layouts differ (in particular ``PseudoRandomLayout`` with
+    different ``seed``) are deliberately initialised independently
+    (force-independent discriminator, non-neutral on purpose).
 
     .. note::
 

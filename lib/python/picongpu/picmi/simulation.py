@@ -745,15 +745,24 @@ class Simulation(picmistandard.PICMI_Simulation):
             )
         return self._runner
 
-    def _picongpu_add_species(self, species, layout):
+    def _picongpu_add_species(self, species, layout, initialize_self_field=None):
+        # PICMI-standard interface: a ``MultiSpecies`` is added as one object
+        # together with one layout for the whole group (this is the form the
+        # standard example uses). Expand it into its member species, each added
+        # with that shared layout, so the existing per-species machinery (and
+        # hence collective initialisation) applies unchanged.
+        if isinstance(species, picmistandard.PICMI_MultiSpecies):
+            for member in species.species_instances_list:
+                self._picongpu_add_species(member, layout, initialize_self_field)
+            return
         self.species.append(species)
         self.layouts.append(layout)
         _validate_species_layout(species, layout)
         if species.initial_distribution is not None:
             self.picongpu_distributions.append(_DensityImpl(species=species, layout=layout, grid=self.solver.grid))
 
-    def add_species(self, *args, **kwargs):
-        return self._picongpu_add_species(*args, **kwargs)
+    def add_species(self, species, layout, initialize_self_field=None):
+        return self._picongpu_add_species(species, layout, initialize_self_field)
 
 
 def organise_init_operations(operations):

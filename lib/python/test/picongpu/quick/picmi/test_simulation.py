@@ -496,15 +496,14 @@ class TestPicmiSimulation(TestCase):
         layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=3)
         other_layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4)
 
-        # explicitly coordinated group
+        # explicitly coordinated group, added as a whole (standard PICMI form)
         multispecies = picmi.MultiSpecies(
             particle_types=["electron", "H"],
             names=["colocated1", "colocated2"],
             proportions=[4, 2],
             initial_distribution=profile,
         )
-        self.sim.add_species(multispecies[0], layout)
-        self.sim.add_species(multispecies[1], layout)
+        self.sim.add_species(species=multispecies, layout=layout)
         # independent species that merely look the same w.r.t. profile/layout
         self.sim.add_species(
             picmi.Species(name="separate1", mass=3, initial_distribution=other_profile),
@@ -600,8 +599,7 @@ class TestPicmiSimulation(TestCase):
             proportions=[1.0, 1.0],
             initial_distribution=profile,
         )
-        sim.add_species(multispecies[0], layout)
-        sim.add_species(multispecies[1], layout)
+        sim.add_species(species=multispecies, layout=layout)
         with warnings.catch_warnings():
             warnings.simplefilter("error", UserWarning)
             sim.get_as_pypicongpu()
@@ -638,7 +636,8 @@ class TestPicmiSimulation(TestCase):
         )
         for member, distribution in zip(multispecies, momenta, strict=True):
             member.initial_distribution = distribution
-            self.sim.add_species(member, layout)
+        # add the whole group at once with one shared layout
+        self.sim.add_species(species=multispecies, layout=layout)
 
         density_operations = list(
             filter(
@@ -697,9 +696,8 @@ class TestPicmiSimulation(TestCase):
                 if hasattr(ratio, "ratio")
             )
 
-        # the whole MultiSpecies is placed on a single shared grid
-        for layout_member in multispecies.species_instances_list:
-            self.sim.add_species(layout_member, layout)
+        # the whole MultiSpecies is added as one object with a single shared layout
+        self.sim.add_species(species=multispecies, layout=layout)
 
         density_operations = list(
             filter(
@@ -712,6 +710,51 @@ class TestPicmiSimulation(TestCase):
         # exactly one species is created ("placed"), the other one is derived
         assert len(op.placed_species_copied) == 1
         assert set(s.name for s in op.species) == {"electron", "proton"}
+
+    def test_multispecies_added_as_whole_object(self):
+        """the standard interface adds the MultiSpecies in one add_species call
+
+        Mirrors the PICMI-standard example (``sim.add_species(species=multi,
+        layout=layout)``): the object is expanded into its member species, each
+        carrying the shared layout, and they are collectively initialised.
+        """
+        profile = picmi.UniformDistribution(density=42)
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4)
+        multispecies = picmi.MultiSpecies(
+            particle_types=["H", "electron"],
+            names=["ions", "electrons"],
+            proportions=[1.0, 1.0],
+            initial_distribution=profile,
+        )
+
+        self.sim.add_species(species=multispecies, layout=layout)
+
+        # the members are registered individually, sharing the one layout
+        assert [s.name for s in self.sim.species] == ["ions", "electrons"]
+        assert self.sim.layouts == [layout, layout]
+
+        density_operations = list(
+            filter(
+                lambda op: isinstance(op, species.operation.SimpleDensity),
+                self.sim.get_as_pypicongpu().init_operations,
+            )
+        )
+        # collective initialisation: a single density operation for both members
+        assert len(density_operations) == 1
+        assert set(s.name for s in density_operations[0].species) == {"ions", "electrons"}
+
+    def test_multispecies_members_addressed_by_name_and_index(self):
+        """members are addressable by name or index, as in the standard example"""
+        profile = picmi.UniformDistribution(density=42)
+        multispecies = picmi.MultiSpecies(
+            particle_types=["He", "Ar", "electron"],
+            names=["He+", "Argon", "e-"],
+            charge_states=[1, 5, None],
+            proportions=[0.2, 0.8, 0.2 + 5 * 0.8],
+            initial_distribution=profile,
+        )
+        assert multispecies["Argon"] is multispecies[1]
+        assert multispecies["e-"] is multispecies[-1]
 
     def test_multispecies_same_density_different_momentum_charge_neutral(self):
         """#5762: same density, differing momentum -> grouped (charge-neutral)"""
@@ -729,8 +772,7 @@ class TestPicmiSimulation(TestCase):
         # customize the momentum (rms_velocity) per member while keeping the density
         multispecies[0].initial_distribution = profile_cold
         multispecies[1].initial_distribution = profile_hot
-        for member in multispecies:
-            self.sim.add_species(member, layout)
+        self.sim.add_species(species=multispecies, layout=layout)
 
         pypic = self.sim.get_as_pypicongpu()
         density_operations = list(
@@ -876,8 +918,7 @@ class TestPicmiSimulation(TestCase):
             proportions=[1.0, 1.0],
             initial_distribution=profile,
         )
-        for member in multispecies:
-            self.sim.add_species(member, layout)
+        self.sim.add_species(species=multispecies, layout=layout)
 
         sim_copy = copy.deepcopy(self.sim)
         density_operations = list(

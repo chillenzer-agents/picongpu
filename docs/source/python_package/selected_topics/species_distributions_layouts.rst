@@ -105,8 +105,11 @@ independently instead (see the note below).
    :start-after: BEGIN-MULTI-SPECIES
    :end-before: END-MULTI-SPECIES
 
-Each member is a plain :class:`~picongpu.picmi.species.Species` and is added to
-the simulation individually (typically with the same layout).
+The whole :class:`~picongpu.picmi.multi_species.MultiSpecies` is added to the
+simulation as one object with a single layout
+(:meth:`~picongpu.picmi.simulation.Simulation.add_species`); its individual
+members can be addressed by index or, if named, by name (e.g.
+``multispecies["electrons"]``) and added to other places as needed.
 The value at each position of ``proportions`` becomes the corresponding member's
 ``density_scale`` (its ``DensityRatio`` on the C++ level), so a
 ``proportions=[1.0, 1.0]`` ion/electron pair yields a neutral plasma.

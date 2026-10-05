@@ -5,8 +5,6 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from copy import copy, deepcopy
-
 import picmistandard
 
 from picongpu.picmi.species import Species
@@ -35,66 +33,19 @@ class MultiSpecies(picmistandard.PICMI_MultiSpecies):
     weightings.
 
     The members are plain :class:`picmi.Species`. Following the PICMI standard,
-    add the ``MultiSpecies`` as a whole to your :class:`picmi.Simulation` via
-    :meth:`picmi.Simulation.add_species` with a single layout for the entire
-    group (e.g. ``sim.add_species(species=multi, layout=layout)``); its members
-    can be addressed by index or name for further use (e.g. in interactions).
-    Members whose layouts differ (in particular ``PseudoRandomLayout`` with
-    different ``seed``) are deliberately initialised independently
-    (force-independent discriminator, non-neutral on purpose).
+    pass the ``MultiSpecies`` as a whole to your :class:`picmi.Simulation`,
+    either via the declarative constructor
+    (``Simulation(..., species=[multi], layouts=[layout])``) or via
+    :meth:`picmi.Simulation.add_species`
+    (``sim.add_species(species=multi, layout=layout)``); both take a single
+    layout for the entire group. Its members can be addressed by index or name
+    for further use (e.g. in interactions).
 
-    .. note::
-
-       The grouping is tracked by a private per-member marker
-       (``Species._multi_species``). It survives deep-copies of a
-       :class:`picmi.Simulation` (all members reference the same
-       ``MultiSpecies`` instance) but is **not** part of any serialized
-       representation of a species: a pydantic ``model_dump``/``model_validate``
-       round-trip does not preserve it. The picmi layer has no such
-       serialization surface today; the pypicongpu layer is the serialization
-       surface and stores the *result* of the grouping (the ``created`` species
-       plus the ``derived`` members) explicitly, so a round-trip through
-       pypicongpu keeps the merged/charge-neutral setup intact.
+    Grouping is structural: the :class:`picmi.Simulation` stores the
+    ``MultiSpecies`` object as one entry, and translation maps that whole entry
+    onto a single density operation. There is no per-member marker, so grouping
+    is preserved by construction and does not depend on any private state.
     """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for member in self.species_instances_list:
-            # Marker used by the operation-merging layer to identify coordinated
-            # groups. Session-level only (survives deep-copies of a Simulation, as
-            # all members reference the same instance); the merged result is what
-            # survives serialization on the pypicongpu level.
-            member._multi_species = self
-
-    def __deepcopy__(self, memo=None):
-        # pydantic's ``BaseModel.__deepcopy__`` does not register the new
-        # instance in ``memo`` before copying its private attributes, so the
-        # ``_multi_species`` marker (which points back at this object) would be
-        # deep-copied once per member. Each member would then reference a
-        # *different* copy of the group, and the operation-merging layer would
-        # no longer recognise them as coordinated. Register the copy up-front
-        # and re-point every copied member at it.
-        #
-        # This relies on pydantic's private state attributes (verified with
-        # pydantic 2.13). If a future pydantic removes/renames them we raise a
-        # clear error instead of silently fragmenting the group.
-        memo = {} if memo is None else memo
-        cls = type(self)
-        new = cls.__new__(cls)
-        memo[id(self)] = new
-        try:
-            object.__setattr__(new, "__dict__", deepcopy(self.__dict__, memo))
-            object.__setattr__(new, "__pydantic_extra__", deepcopy(self.__pydantic_extra__, memo))
-            object.__setattr__(new, "__pydantic_fields_set__", copy(self.__pydantic_fields_set__))
-            object.__setattr__(new, "__pydantic_private__", deepcopy(self.__pydantic_private__, memo))
-        except AttributeError as err:
-            raise NotImplementedError(
-                "MultiSpecies.__deepcopy__ relies on pydantic's private state attributes; "
-                "pydantic internals appear to have changed. Update this override accordingly."
-            ) from err
-        for member in new.species_instances_list:
-            member._multi_species = new
-        return new
 
     def __iter__(self):
         return iter(self.species_instances_list)

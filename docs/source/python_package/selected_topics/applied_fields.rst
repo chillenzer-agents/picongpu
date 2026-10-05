@@ -120,9 +120,3 @@ to redefining a shared parameter with a different value:
 
 When no background field is configured, the plugin/dump options are not written
 to the generated run configuration at all, so the core defaults apply unchanged.
-
-.. note::
-
-   The remaining PICMI applied-field surface is not implemented:
-   ``as_initial`` / ``as_injected`` and field-arithmetic options map onto
-   separate C++ mechanisms and are not available here.

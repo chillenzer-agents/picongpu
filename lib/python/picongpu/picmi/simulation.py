@@ -85,6 +85,34 @@ class _DensityImpl(BaseModel):
         )
 
 
+def _expand_multi_species(species, layouts):
+    """Expand every ``MultiSpecies`` entry into its member species.
+
+    The PICMI standard allows a ``MultiSpecies`` to be passed as one entry of the
+    declarative ``species=[...]`` list together with one ``layouts`` entry for the
+    whole group (the same form ``add_species`` accepts). The rest of the
+    translation pipeline works per plain species, so expand each group here,
+    replicating its layout across the members. The members keep their shared
+    ``_multi_species`` marker, so the operation-merging layer still recognises
+    them as one coordinated (charge-neutral) group.
+    """
+    expanded_species = []
+    expanded_layouts = []
+    if len(layouts) != len(species):
+        raise ValueError(
+            f"species and layouts must have the same length, but you gave {len(species)=} and {len(layouts)=}."
+        )
+    for one_species, layout in zip(species, layouts):
+        if isinstance(one_species, picmistandard.PICMI_MultiSpecies):
+            for member in one_species.species_instances_list:
+                expanded_species.append(member)
+                expanded_layouts.append(layout)
+        else:
+            expanded_species.append(one_species)
+            expanded_layouts.append(layout)
+    return expanded_species, expanded_layouts
+
+
 def _validate_species_layout(species, layout):
     """Validate one (species, layout) pair.
 
@@ -393,6 +421,10 @@ class Simulation(picmistandard.PICMI_Simulation):
         # so the inherited ``add_species_through_plane`` (whose base ``_append``
         # sets ``species`` and ``layouts`` in two separate steps) is unaffected.
         if self.species or self.layouts:
+            # A ``MultiSpecies`` is accepted as one entry with a shared layout;
+            # expand it into its members so every downstream consumer sees plain
+            # species (the members keep their shared group marker).
+            self.species, self.layouts = _expand_multi_species(self.species, self.layouts)
             self.picongpu_distributions = _derive_density_distributions(self.species, self.layouts, self.solver.grid)
 
     def _compute_cfl_or_delta_t(self) -> None:

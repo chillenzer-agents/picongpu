@@ -50,12 +50,13 @@ multispecies = picmi.MultiSpecies(
 # place 8 macroparticles per cell on a 2x2x2 sub-grid
 layout = picmi.GriddedLayout(n_macroparticles_per_cell=[2, 2, 2])
 
+# pass the whole group as one species together with one layout for all members
 simulation = picmi.Simulation(
     max_steps=100,
     solver=solver,
+    species=[multispecies],
+    layouts=[layout],
 )
-# add the whole group at once, with one layout for all members
-simulation.add_species(species=multispecies, layout=layout)
 
 simulation.run(setup_dir=Path("warm_plasma_setup"), run_dir=Path("warm_plasma_run"))
 # END-WARM-PLASMA

@@ -743,6 +743,39 @@ class TestPicmiSimulation(TestCase):
         assert len(density_operations) == 1
         assert set(s.name for s in density_operations[0].species) == {"ions", "electrons"}
 
+    def test_multispecies_added_as_whole_object_declaratively(self):
+        """the declarative constructor accepts a MultiSpecies as one species
+
+        ``Simulation(species=[multi], layouts=[layout])``: the group is expanded
+        into its members, each carrying the shared layout, and they are
+        collectively initialised -- the declarative equivalent of the
+        ``add_species`` form.
+        """
+        profile = picmi.UniformDistribution(density=42)
+        layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=4)
+        multispecies = picmi.MultiSpecies(
+            particle_types=["H", "electron"],
+            names=["ions", "electrons"],
+            proportions=[1.0, 1.0],
+            initial_distribution=profile,
+        )
+
+        sim = picmi.Simulation(
+            time_step_size=17, max_steps=4, solver=self.sim.solver, species=[multispecies], layouts=[layout]
+        )
+
+        assert [s.name for s in sim.species] == ["ions", "electrons"]
+        assert sim.layouts == [layout, layout]
+
+        density_operations = list(
+            filter(
+                lambda op: isinstance(op, species.operation.SimpleDensity),
+                sim.get_as_pypicongpu().init_operations,
+            )
+        )
+        assert len(density_operations) == 1
+        assert set(s.name for s in density_operations[0].species) == {"ions", "electrons"}
+
     def test_multispecies_members_addressed_by_name_and_index(self):
         """members are addressable by name or index, as in the standard example"""
         profile = picmi.UniformDistribution(density=42)

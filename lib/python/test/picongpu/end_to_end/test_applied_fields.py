@@ -13,11 +13,12 @@ therefore the field dump: the Python layer translates the PICMI applied fields
 into the C++ ``fieldBackground.param`` functors, the (compiled) simulation
 evaluates them and writes E and B to the checkpoint. This test builds and runs
 such a simulation and compares the dumped, unit-converted E/B values against the
-analytic expression the PICMI input describes.
+call operator of the very same PICMI applied fields.
 
-The setup adds several applied fields (constant, string-expression and callable)
-so that the summation into the single C++ background functor pair is covered end
-to end.
+The simulation is built declaratively in a single ``Simulation(...)`` call; the
+setup adds several applied fields (constant, string-expression and callable) so
+that the summation into the single C++ background functor pair is covered end to
+end.
 """
 
 import logging
@@ -37,7 +38,7 @@ from picongpu.picmi import (
 )
 from picongpu.picmi.diagnostics import Checkpoint, TS
 
-from .applied_fields import APPLIED_FIELDS, EXPECTED
+from .applied_fields import APPLIED_FIELDS, combined_field_values
 from .arbitrary_parameters import NUMBER_OF_CELLS, UPPER_BOUNDARY, directory_in_home, gather_results
 
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +47,7 @@ LAYOUT = PseudoRandomLayout(n_macroparticles_per_cell=1)
 
 
 def basic_simulation():
+    """The applied-field simulation, built entirely through the constructor."""
     grid = Cartesian3DGrid(
         number_of_cells=NUMBER_OF_CELLS,
         lower_bound=[0, 0, 0],
@@ -54,15 +56,14 @@ def basic_simulation():
         lower_boundary_conditions=["open", "open", "open"],
         upper_boundary_conditions=["open", "open", "open"],
     )
-    sim = Simulation(max_steps=0, solver=ElectromagneticSolver(method="Yee", cfl=1.0, grid=grid))
-    sim.add_species(
-        Species(particle_type="electron", initial_distribution=UniformDistribution(density=1.0e24)),
-        LAYOUT,
+    return Simulation(
+        max_steps=0,
+        solver=ElectromagneticSolver(method="Yee", cfl=1.0, grid=grid),
+        species=[Species(particle_type="electron", initial_distribution=UniformDistribution(density=1.0e24))],
+        layouts=[LAYOUT],
+        applied_fields=APPLIED_FIELDS,
+        diagnostics=[Checkpoint(period=TS[:])],
     )
-    for applied_field in APPLIED_FIELDS.values():
-        sim.add_applied_field(applied_field())
-    sim.diagnostics = [Checkpoint(period=TS[:])]
-    return sim
 
 
 RUN_DIR = ""
@@ -142,13 +143,15 @@ class TestAppliedFields(TestCase):
             shape = values["x"].shape
             self.assertEqual(tuple(shape), tuple(NUMBER_OF_CELLS[::-1]))
             x, y, z = _cell_centers(shape, grid_spacing, grid_global_offset)
+            expected = combined_field_values(x, y, z, time)
             for component in components:
                 with self.subTest(field=field_name, component=component):
-                    expected = EXPECTED[f"{prefix}{component}"](x, y, z, time)
-                    np.testing.assert_allclose(values[component], expected, rtol=1.0e-4)
+                    reference = expected[f"{prefix.upper()}{component}"]
+                    np.testing.assert_allclose(values[component], reference, rtol=1.0e-4)
 
     def test_single_applied_field_component_is_summed(self):
         # Ex is only contributed by the constant field; guard against a silent
-        # loss of that (trivial) contribution.
+        # loss of that (trivial) contribution by comparing against the call
+        # operator of that single field.
         values, _, _ = _read_field_components(self.checkpoint, "E")
-        np.testing.assert_allclose(values["x"], 1.0e6, rtol=1.0e-4)
+        np.testing.assert_allclose(values["x"], combined_field_values(0.0, 0.0, 0.0, 0.0)["Ex"], rtol=1.0e-4)

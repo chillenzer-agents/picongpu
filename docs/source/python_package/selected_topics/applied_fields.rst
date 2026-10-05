@@ -58,12 +58,29 @@ The field classes
 All three spellings of a component are backed by the same
 :class:`~picongpu.picmi._FieldFunctor._FieldFunctor`: supplying any one computes
 the others, so they are available and consistent after construction, and
-supplying several for one component is accepted as long as they agree:
+supplying several for one component is accepted as long as they agree. The
+``<component>_expression``, ``<component>_function`` and ``<component>_sympy``
+fields are all declared on the PIConGPU class itself:
 
 .. literalinclude:: ../snippets/selected_topics/applied_fields.py
    :language: python
    :start-at: BEGIN-APPLIED-FIELD-SYMPY
    :end-before: END-APPLIED-FIELD-SYMPY
+
+Evaluating the field
+--------------------
+
+Like :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`,
+every applied field is callable. Calling it with the coordinates ``x``, ``y``,
+``z`` and ``t`` (SI units) returns the six components ``Ex`` … ``Bz`` as
+evaluated by the same expression the C++ functor renders; a component that was
+not set is ``None``. The arguments may be scalars or numpy arrays, so a whole
+cell grid can be queried at once:
+
+.. literalinclude:: ../snippets/selected_topics/applied_fields.py
+   :language: python
+   :start-at: BEGIN-APPLIED-FIELD-CALL
+   :end-before: END-APPLIED-FIELD-CALL
 
 Expressions may only reference the free variables ``x``, ``y``, ``z`` and ``t``
 plus the named parameters passed as additional keyword arguments; any other

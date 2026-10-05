@@ -8,8 +8,10 @@ License: GPLv3+
 import warnings
 from collections.abc import Callable
 
+import numpy as np
 import sympy
 from picmistandard import PICMI_AnalyticAppliedField, PICMI_ConstantAppliedField
+from picmistandard.base import Expression
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from picongpu.picmi._FieldFunctor import (
@@ -188,6 +190,19 @@ class ConstantAppliedField(_InfluenceOptions, PICMI_ConstantAppliedField):
             for component in COMPONENTS
         }
 
+    def __call__(self, x=0.0, y=0.0, z=0.0, t=0.0) -> dict[str, object]:
+        """
+        The six field components (in SI units) at the given coordinates.
+
+        A constant field does not depend on position or time; the arguments are
+        accepted and ignored so that constant and analytic applied fields share
+        one call-operator interface. Unset components are ``None``.
+        """
+        return {
+            component: None if expression is None else float(expression)
+            for component, expression in self.get_components().items()
+        }
+
     def get_parameters(self) -> list[dict]:
         return []
 
@@ -232,12 +247,28 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    # The full triple is declared explicitly on the PIConGPU subclass (the
+    # ``*_expression`` fields would otherwise only be inherited from the PICMI
+    # standard base), so that all three spellings are owned here and backed by
+    # the same shared :class:`_FieldFunctor`.
+    Ex_expression: Expression | None = None
+    Ey_expression: Expression | None = None
+    Ez_expression: Expression | None = None
+    Bx_expression: Expression | None = None
+    By_expression: Expression | None = None
+    Bz_expression: Expression | None = None
     Ex_function: Callable | None = None
     Ey_function: Callable | None = None
     Ez_function: Callable | None = None
     Bx_function: Callable | None = None
     By_function: Callable | None = None
     Bz_function: Callable | None = None
+    Ex_sympy: sympy.Expr | None = None
+    Ey_sympy: sympy.Expr | None = None
+    Ez_sympy: sympy.Expr | None = None
+    Bx_sympy: sympy.Expr | None = None
+    By_sympy: sympy.Expr | None = None
+    Bz_sympy: sympy.Expr | None = None
 
     # ------------------------------------------------------------------
     # Input resolution: every component is one _FieldFunctor
@@ -275,30 +306,41 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
         if user_defined_kw:
             data["user_defined_kw"] = user_defined_kw
 
+    @staticmethod
+    def _component_spellings(component: str) -> tuple[str, str, str]:
+        return (f"{component}_expression", f"{component}_function", f"{component}_sympy")
+
     @classmethod
     def _resolve_component(cls, data, component: str, consumed: set[str]) -> None:
         """Bring the three spellings of one component in sync via one ``_FieldFunctor``.
 
-        Either the string or the callable spelling is accepted, the missing one
-        is computed from the given one, and the named parameters each spelling
-        needs are collected. The shared :class:`_FieldFunctor` validates that a
-        string and a callable given together agree.
+        Any of the string, callable or sympy spelling is accepted, the missing
+        ones are computed from it, and the named parameters each spelling needs
+        are collected. The shared :class:`_FieldFunctor` validates that
+        spellings given together agree.
         """
         expression = data.get(f"{component}_expression")
         function = data.get(f"{component}_function")
-        if expression is None and function is None:
+        sympy_expression = data.get(f"{component}_sympy")
+        if expression is None and function is None and sympy_expression is None:
             return
+        # The sympy spelling is scanned like the string spelling (both are
+        # rendered to a Python string form), so parameters referenced only in
+        # ``<component>_sympy`` are collected as well.
         cls._collect_expression_user_defined_kw(data, expression, consumed)
+        cls._collect_expression_user_defined_kw(data, sympy_expression, consumed)
         cls._collect_callable_user_defined_kw(data, function, consumed)
         functor = _FieldFunctor(
             expression=expression,
             function=function,
+            sympy_expression=sympy_expression,
             variables=_ANALYTIC_FREE_VARIABLES,
             parameters=data.get("user_defined_kw") or {},
             context=f"AnalyticAppliedField {component}",
         )
         data[f"{component}_expression"] = functor.expression
         data[f"{component}_function"] = functor.function
+        data[f"{component}_sympy"] = functor.sympy
 
     @model_validator(mode="before")
     @classmethod
@@ -306,17 +348,18 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
         # With ``validate_assignment=True`` (inherited from the standard base
         # class) every assignment re-enters this validator with all fields
         # already populated. The assigned field is the new source of truth, so
-        # drop its counterpart before re-resolving; all other components are
-        # re-validated unchanged.
+        # drop its two counterparts before re-resolving; all other components
+        # are re-validated unchanged.
         if not isinstance(data, dict):
             return data
         data = dict(data)
         if info.field_name is not None:
             for component in COMPONENTS:
-                if info.field_name == f"{component}_expression":
-                    data.pop(f"{component}_function", None)
-                elif info.field_name == f"{component}_function":
-                    data.pop(f"{component}_expression", None)
+                spellings = cls._component_spellings(component)
+                if info.field_name in spellings:
+                    for spelling in spellings:
+                        if spelling != info.field_name:
+                            data.pop(spelling, None)
         consumed: set[str] = set()
         for component in COMPONENTS:
             cls._resolve_component(data, component, consumed)
@@ -339,39 +382,24 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
             context=f"AnalyticAppliedField {component}",
         )
 
-    def _component_sympy(self, component: str) -> sympy.Expr | None:
-        functor = self._component_functor(component)
-        return None if functor is None else functor.sympy
+    def __call__(self, x=0.0, y=0.0, z=0.0, t=0.0) -> dict[str, object]:
+        """
+        Evaluate all six field components (in SI units) at the given coordinates.
 
-    @property
-    def Ex_sympy(self) -> sympy.Expr | None:
-        """The ``Ex`` component as a sympy expression (parameters substituted)."""
-        return self._component_sympy("Ex")
-
-    @property
-    def Ey_sympy(self) -> sympy.Expr | None:
-        """The ``Ey`` component as a sympy expression (parameters substituted)."""
-        return self._component_sympy("Ey")
-
-    @property
-    def Ez_sympy(self) -> sympy.Expr | None:
-        """The ``Ez`` component as a sympy expression (parameters substituted)."""
-        return self._component_sympy("Ez")
-
-    @property
-    def Bx_sympy(self) -> sympy.Expr | None:
-        """The ``Bx`` component as a sympy expression (parameters substituted)."""
-        return self._component_sympy("Bx")
-
-    @property
-    def By_sympy(self) -> sympy.Expr | None:
-        """The ``By`` component as a sympy expression (parameters substituted)."""
-        return self._component_sympy("By")
-
-    @property
-    def Bz_sympy(self) -> sympy.Expr | None:
-        """The ``Bz`` component as a sympy expression (parameters substituted)."""
-        return self._component_sympy("Bz")
+        Mirrors :meth:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution.__call__`:
+        the coordinates may be scalars or numpy arrays and are broadcast against
+        each other. Returns a mapping from the PIConGPU component keys
+        (``"Ex"`` ... ``"Bz"``) to the evaluated values; an unset component is
+        ``None``. Named parameters are already substituted, exactly as in the
+        rendered C++ functor.
+        """
+        coordinates = np.broadcast_arrays(*(np.asarray(argument) for argument in (x, y, z, t)))
+        return {
+            component: (
+                None if (functor := self._component_functor(component)) is None else functor.evaluate(*coordinates)
+            )
+            for component in COMPONENTS
+        }
 
     def get_components(self) -> dict[str, sympy.Expr | None]:
         """The E/B components as sympy expressions with parameters kept symbolic."""

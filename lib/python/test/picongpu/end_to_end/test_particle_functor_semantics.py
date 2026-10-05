@@ -152,14 +152,29 @@ def read_fields_si(series_name, names=("E", "B")):
     ``unitSI`` scale must be applied.
     """
     series = opmd.Series(str(series_name), opmd.Access.read_only)
-    tmp = {}
+    # ``load_chunk`` only schedules a read; the buffers are undefined until
+    # ``series.flush()``. Collect the raw chunks first, flush, then scale, so the
+    # arithmetic never touches uninitialised memory.
+    raw = {}
+    scales = {}
+    scalar = {}
     for name in names:
         mesh = series.iterations[0].meshes[name]
         try:
-            tmp[name] = [mesh[c].load_chunk() * mesh[c].unit_SI for c in "xyz"]
+            raw[name] = [mesh[c].load_chunk() for c in "xyz"]
+            scales[name] = [mesh[c].unit_SI for c in "xyz"]
         except ErrorWrongAPIUsage:
-            tmp[name] = mesh.load_chunk() * mesh.unit_SI
+            scalar[name] = True
+            raw[name] = mesh.load_chunk()
+            scales[name] = mesh.unit_SI
     series.flush()
+    tmp = {}
+    for name in names:
+        if scalar.get(name):
+            tmp[name] = np.asarray(raw[name], dtype=np.float64) * scales[name]
+        else:
+            tmp[name] = [np.asarray(chunk, dtype=np.float64) * scale for chunk, scale in zip(raw[name], scales[name])]
+    series.close()
     return {key: np.array(value) for key, value in tmp.items()}
 
 

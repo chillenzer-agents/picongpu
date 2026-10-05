@@ -169,9 +169,10 @@ class TestAnalyticDistributionMomentum(TestCase):
         drift = self.particles.loc(axis=0)["function"]
         momenta = drift[["momentum_x", "momentum_y", "momentum_z"]].to_numpy()
         assert len(momenta) > 0
-        np.testing.assert_allclose(momenta[:, 0], 0.0, atol=0.0)
+        # z carries neither a momentum nor a spread expression, so it stays exactly
+        # zero; x carries the thermal spread and y the drift plus the (three times
+        # broader) spread.
         np.testing.assert_allclose(momenta[:, 2], 0.0, atol=0.0)
-        # anisotropic spread: y is three times as broad as x
         std_x = momenta[:, 0].std()
         std_y = momenta[:, 1].std()
         assert std_x > 0.0

@@ -24,7 +24,7 @@ from picongpu.picmi.diagnostics import DerivedFieldDump
 from picongpu.picmi.particle_functor.particle_functor import MacroParticle, PhysicalParticle
 from picongpu.picmi.particle_functor.unit_dimension import M
 
-from .arbitrary_parameters import NUMBER_OF_CELLS, UPPER_BOUNDARY
+from .arbitrary_parameters import NUMBER_OF_CELLS, UPPER_BOUNDARY, gather_results
 from .distributions import Gaussian
 
 logging.basicConfig(level=logging.INFO)
@@ -170,6 +170,8 @@ class TestParticleFunctorSemantics(TestCase):
         global SIM
         if SIM is None:
             SIM = setup_sim()
+            self.sim = SIM
+            gather_results(self.result_path)
         self.sim = SIM
         fieldnames_to_names = {diag.fieldname: name for name, diag in DIAGNOSTICS.items()}
         self.fields = {

@@ -9,8 +9,8 @@ from collections.abc import Callable, Iterable
 from inspect import signature
 from typing import Any, get_type_hints
 
-from pydantic import BaseModel, computed_field, model_validator
-from sympy import Expr, Symbol, symbols
+from pydantic import BaseModel, computed_field, field_validator, model_validator
+from sympy import Expr, Symbol, symbols, sympify
 
 from picongpu.picmi.particle_functor.rng_arg import RNGArg
 from picongpu.picmi.particle_functor.unit_dimension import UnitDimension
@@ -19,6 +19,7 @@ from picongpu.pypicongpu.particle_functor import (
     UnitDimension as PyPIConGPUUnitDimension,
     generate_preamble,
 )
+from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.species.attribute.attribute import Attribute
 from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
 from picongpu.pypicongpu.species.attribute.momentum import Momentum
@@ -200,8 +201,32 @@ class ParticleFunctor(BaseModel):
     name: str | None = None
     return_type: type | str | None = None
     unit_dimension: UnitDimension | None = None
-    unit_factor: str | None = None
+    unit_factor: Callable[[], Expr] | Expr | int | float | None = None
     scales_with_weighting: int | None = None
+
+    @field_validator("unit_factor", mode="after")
+    @classmethod
+    def _render_unit_factor(cls, value):
+        """Render the Python ``unit_factor`` to the C++ text of ``getUnit()``.
+
+        Accepts ``None`` (auto-derive), a number (implicitly converted), a
+        sympy expression, or a no-argument :class:`~collections.abc.Callable`
+        returning one, rendered through the :class:`PMAccPrinter`. Raw strings
+        of C++ code are rejected: the interface is Python expressions, not C++
+        strings, consistent with the ``AnalyticDistribution`` expression surface.
+        """
+        if value is None or isinstance(value, str):
+            if isinstance(value, str):
+                raise ValueError(
+                    "unit_factor must be a number, a sympy expression, or a callable "
+                    "returning one -- not a string of C++ code. The expression is "
+                    "rendered through the PMAccPrinter, so use sympy (and e.g. "
+                    "sympy.Symbol('sim.unit.mass()') if you need an internal-unit scale)."
+                )
+            return value
+        if callable(value):
+            value = value()
+        return PMAccPrinter().doprint(sympify(value))
 
     def _rng_classes(self) -> list[type]:
         return [
@@ -227,8 +252,12 @@ class ParticleFunctor(BaseModel):
                 annotation = get_type_hints(self.functor).get(first.name, annotation)
             except (NameError, TypeError):
                 pass
-        if isinstance(annotation, type) and issubclass(annotation, Particle):
-            return annotation
+        # Only the concrete trackers (:class:`MacroParticle` and
+        # :class:`PhysicalParticle`) can be instantiated to record attribute
+        # access. The abstract bases ``Particle``/``AbstractParticle`` mean
+        # "an ordinary particle" and default to the macro-particle flavour.
+        if isinstance(annotation, type) and issubclass(annotation, PhysicalParticle):
+            return PhysicalParticle
         return MacroParticle
 
     @model_validator(mode="after")

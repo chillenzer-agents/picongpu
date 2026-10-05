@@ -182,6 +182,9 @@ class ParticleFunctor(RenderedObject, BaseModel):
     functor_preamble: list[_PreambleStatement]
     return_type: Annotated[str, BeforeValidator(translate_to_cpp_type)]
     unit_dimension: UnitDimension | None = UnitDimension()
+    # Already-rendered C++ text of ``getUnit()``; the public (picmi) interface
+    # accepts Python expressions/callables and renders them before constructing
+    # this pypicongpu model.
     unit_factor: str | None = None
     needs_total_position: bool = False
     rng_info: RNGInfo | None = None

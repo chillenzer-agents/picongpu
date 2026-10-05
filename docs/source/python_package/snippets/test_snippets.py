@@ -386,6 +386,8 @@ EXPECTED_FILES = {
             ("particle_functors_setup/include/picongpu/param/particleFilters.param", '"fast"'),
             # the functor's unit is derived from its unit_dimension
             ("particle_functors_setup/include/picongpu/param/fileOutput.param", "sim.unit.mass()"),
+            # unit_factor pins the numeric getUnit() scale (no C++ code string)
+            ("particle_functors_setup/include/picongpu/param/fileOutput.param", "return 1000000.0;"),
         ],
     },
     "selected_topics/units_and_constants.py": {

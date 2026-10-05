@@ -7,6 +7,8 @@ License: GPLv3+
 
 from unittest import TestCase
 
+from sympy import Symbol, sqrt
+
 from picongpu import picmi
 from picongpu.picmi import ParticleFilter, ParticleFunctor
 from picongpu.picmi.particle_functor.particle_functor import MacroParticle, PhysicalParticle
@@ -105,8 +107,21 @@ class TestUnitDerivation(TestCase):
     def test_dimensionless(self):
         self.assertEqual(self._get_unit(UnitDimension()), "1.")
 
-    def test_unit_factor_overrides_auto_derivation(self):
-        self.assertEqual(self._get_unit(UnitDimension(M=1), unit_factor="my_factor()"), "my_factor()")
+    def test_unit_factor_number_overrides_auto_derivation(self):
+        # A number is implicitly converted (rendered through the PMAccPrinter).
+        self.assertEqual(self._get_unit(UnitDimension(M=1), unit_factor=1.0e6), "1000000.0")
+
+    def test_unit_factor_callable_overrides_auto_derivation(self):
+        # A no-argument callable returning a sympy expression is rendered through PMAccPrinter.
+        self.assertEqual(self._get_unit(UnitDimension(M=1), unit_factor=lambda: sqrt(2)), "pmacc::math::sqrt(2)")
+
+    def test_unit_factor_sympy_symbol_renders_verbatim(self):
+        self.assertEqual(self._get_unit(UnitDimension(N=1), unit_factor=Symbol("sim.unit.mass()")), "sim.unit.mass()")
+
+    def test_unit_factor_rejects_cpp_string(self):
+        # No C++ strings in the interface: a raw code string must be rejected.
+        with self.assertRaises(ValueError):
+            self._get_unit(UnitDimension(M=1), unit_factor="my_factor()")
 
     def test_unit_dimension_rendered_as_seven_vector(self):
         self.assertEqual(

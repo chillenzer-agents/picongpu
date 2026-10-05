@@ -11,7 +11,13 @@ from tempfile import TemporaryDirectory
 
 from moosetash import MissingVariable
 from picongpu import DirtyResetError, core, rc_params
-from picongpu._rc_params import PROFILE_PARAMETERS, get_profile_parameter, search_for_in_parents
+from picongpu._rc_params import (
+    PROFILE_PARAMETERS,
+    get_preset_declared_value,
+    get_profile_parameter,
+    preset_default_prefill,
+    search_for_in_parents,
+)
 from pytest import fixture, raises, warns
 
 
@@ -120,6 +126,32 @@ def test_get_profile_parameter_roundtrips():
     for parameter in PROFILE_PARAMETERS:
         assert get_profile_parameter(parameter.rc_key) is parameter
     assert get_profile_parameter("no_such_parameter") is None
+
+
+def test_preset_default_prefill_for_rosi_pic_libs():
+    # rosi-hzdr pins pic_libs to a concrete, site-provided directory that the
+    # user can just accept (https://github.com/chillenzer-agents/picongpu/issues/204).
+    assert preset_default_prefill("rosi-hzdr/gpu-v100", "pic_libs") == "/bigdata/hplsim/development/rosi-picongpu-libs/"
+
+
+def test_preset_default_prefill_ignores_other_parameters_and_presets():
+    # Only the explicitly registered (preset, key) pairs pre-fill.
+    assert preset_default_prefill("rosi-hzdr/gpu-v100", "author") is None
+    # jupiter/perlmutter declare a *shell* default ("$PROJECT/...") that the
+    # user must expand themselves; it must not be offered as a literal prefill.
+    assert preset_default_prefill("jupiter-jsc/gh200", "pic_libs") is None
+    assert preset_default_prefill("perlmutter-nersc/gpu", "pic_libs") is None
+    assert preset_default_prefill(None, "pic_libs") is None
+
+
+def test_get_preset_declared_value_only_returns_concrete_literals():
+    assert (
+        get_preset_declared_value("rosi-hzdr/gpu-v100", "pic_libs") == "/bigdata/hplsim/development/rosi-picongpu-libs/"
+    )
+    # shell expansion / command substitution / placeholders are not literal:
+    assert get_preset_declared_value("jupiter-jsc/gh200", "pic_libs") is None
+    assert get_preset_declared_value("frontier-ornl/batch", "project_id") is None
+    assert get_preset_declared_value("rosi-hzdr/gpu-v100", "no_such_key") is None
 
 
 def test_required_information_is_exactly_the_required_preset_parameters(my_rc_params):

@@ -134,9 +134,8 @@ class TestAnalyticAppliedField(TestCase):
         assert background.influences_dumps is False
 
     def test_undefined_symbol_rejected(self):
-        applied_field = picmi.AnalyticAppliedField(Ex_expression="wl*sin(x)")
         with pytest.raises(ValueError, match="wl"):
-            applied_field.get_as_pypicongpu()
+            picmi.AnalyticAppliedField(Ex_expression="wl*sin(x)")
 
     def test_colliding_parameter_name_rejected(self):
         applied_field = picmi.AnalyticAppliedField(Ex_expression="x/L", x=2.0, L=3.0)
@@ -210,16 +209,28 @@ class TestAnalyticAppliedFieldFunctionInterface(TestCase):
         assert "E0" in background.ex
         assert "wl" in background.ex
 
-    def test_expression_and_function_for_same_component_rejected(self):
-        applied_field = picmi.AnalyticAppliedField(Ex_expression="1.0", Ex_function=lambda x, y, z, t: sympy.Integer(1))
-        with pytest.raises(ValueError, match="both Ex_expression and Ex_function"):
-            applied_field.get_as_pypicongpu()
+    def test_expression_and_function_for_same_component_must_agree(self):
+        # both spellings for one component are accepted as long as they agree
+        agreed = picmi.AnalyticAppliedField(Ex_expression="1.0", Ex_function=lambda x, y, z, t: sympy.Integer(1))
+        assert agreed.Ex_sympy == sympy.Float(1)
+        # a genuine disagreement is rejected
+        with pytest.raises(ValueError, match="disagree"):
+            picmi.AnalyticAppliedField(Ex_expression="1.0", Ex_function=lambda x, y, z, t: sympy.Integer(2))
+
+    def test_component_triple_is_consistent(self):
+        # every spelling is backed by the same _FieldFunctor and translates
+        x, y, z, t = sympy.symbols("x y z t")
+        applied_field = picmi.AnalyticAppliedField(Ex_function=lambda x, y, z, t: sympy.sin(x) + t)
+        assert applied_field.Ex_sympy == sympy.sin(x) + t
+        assert sympy.sympify(applied_field.Ex_expression) == sympy.sin(x) + t
+        assert applied_field.Ex_function(x, y, z, t) == sympy.sin(x) + t
+        assert applied_field.Ey_sympy is None
+        assert applied_field.Ey_expression is None
 
     def test_function_undefined_symbol_rejected(self):
         unknown = sympy.Symbol("unknown")
-        applied_field = picmi.AnalyticAppliedField(Ex_function=lambda x, y, z, t: unknown * x)
         with pytest.raises(ValueError, match="unknown"):
-            applied_field.get_as_pypicongpu()
+            picmi.AnalyticAppliedField(Ex_function=lambda x, y, z, t: unknown * x)
 
     def test_expression_only_unreferenced_kwarg_still_rejected(self):
         # the standard collector stays in charge for pure-expression inputs
@@ -333,18 +344,16 @@ class TestSimulationBackgroundField(TestCase):
             sim.get_as_pypicongpu()
 
     def test_undefined_symbol_rejected_through_simulation(self):
-        # the combine path must run the same expression validation as the direct
-        # get_as_pypicongpu() path, not emit invalid C++ for an undefined symbol
+        # the same expression validation runs at construction, so an undefined
+        # symbol can never reach the combine path and emit invalid C++
         sim = _get_sim()
-        sim.add_applied_field(picmi.AnalyticAppliedField(Ex_expression="wl*sin(x)"))
         with pytest.raises(ValueError, match="wl"):
-            sim.get_as_pypicongpu()
+            sim.add_applied_field(picmi.AnalyticAppliedField(Ex_expression="wl*sin(x)"))
 
     def test_function_undefined_symbol_rejected_through_simulation(self):
         sim = _get_sim()
-        sim.add_applied_field(picmi.AnalyticAppliedField(Ex_function=lambda x, y, z, t: sympy.Symbol("typo") * x))
         with pytest.raises(ValueError, match="typo"):
-            sim.get_as_pypicongpu()
+            sim.add_applied_field(picmi.AnalyticAppliedField(Ex_function=lambda x, y, z, t: sympy.Symbol("typo") * x))
 
     def test_keyword_parameter_name_escaped_through_simulation(self):
         sim = _get_sim()

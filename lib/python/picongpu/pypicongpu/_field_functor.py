@@ -4,13 +4,13 @@ Copyright 2026 PIConGPU contributors
 Authors: Julian Lenz
 License: GPLv3+
 
-Shared machinery for sympy-backed field functors.
+Rendering primitives for the sympy-backed field functors.
 
-Both :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`
-and :class:`~picongpu.picmi.applied_field.AnalyticAppliedField` describe a
-physical quantity as a sympy expression of a few free variables, optionally with
-named parameters supplied as additional keyword arguments. The generated C++
-functors evaluate those expressions on device, so the same rules apply to both:
+Every field that is rendered into a generated C++ functor (the applied-field
+components of :class:`~picongpu.picmi.applied_field.AnalyticAppliedField`, the
+density / momentum / spread fields of
+:class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`,
+...) follows the same rules:
 
 * the free variables must be exactly the supported coordinates/time,
 * parameters must not shadow a live identifier of the generated functor,
@@ -18,14 +18,13 @@ functors evaluate those expressions on device, so the same rules apply to both:
   :class:`PMAccPrinter`; that printer is the single source of truth for how an
   identifier is spelled (including escaping C++ keywords).
 
-:class:`_FieldFunctor` packages one such expression together with its named
-parameters so that the individual PICMI classes only describe *which* quantities
-they expose and which coordinates those use.
+The PICMI-level expression/function/sympy triple that uses these primitives
+lives in :mod:`picongpu.picmi._FieldFunctor`; the pypicongpu models consume the
+rendered strings and the ``{"name": ..., "value": ...}`` parameter lists.
 """
 
-import inspect
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Mapping
 
 import sympy
 
@@ -81,106 +80,20 @@ def render_identifier(name: str) -> str:
     return _RENDERER.doprint(sympy.Symbol(name))
 
 
-def sympify_expression(expression) -> sympy.Expr:
+def sympify_expression(expression, locals: Mapping[str, sympy.Symbol] | None = None) -> sympy.Expr:
     """
     Parse a PICMI expression string.
 
     Mirrors the PICMI-standard normalisation (newlines are removed) and coerces
     non-string inputs to their string form, so a bare number becomes a constant
-    expression.
+    expression. ``locals`` names the user-defined parameters as symbols, so a
+    parameter whose name also exists in sympy's namespace (e.g. ``E1``) is still
+    parsed as that symbol rather than as the sympy object.
     """
-    return sympy.sympify(f"{expression}".replace("\n", ""))
+    return sympy.sympify(f"{expression}".replace("\n", ""), locals=locals or {})
 
 
-def expression_from_callable(
-    function: Callable,
-    variables: Mapping[str, sympy.Symbol],
-    parameters: Mapping[str, float] | None = None,
-) -> sympy.Expr:
-    """
-    Evaluate a user-supplied callable on the coordinate symbols.
-
-    The callable is called with the free variables (in the order given by
-    ``variables``) and must return something sympy can understand. Additional
-    named parameters are passed as keyword arguments to the parameters the
-    callable actually asks for (the same additional-kwargs mechanism as for
-    expression strings).
-    """
-    # Named parameters are passed as sympy symbols (not their numeric values) so
-    # that the resulting expression stays symbolic and the values are rendered
-    # as compile-time constants by pypicongpu, exactly like ``*_expression``
-    # strings with additional keyword arguments. We only pass the parameters
-    # the callable actually asks for, so a function that only uses some
-    # coordinates keeps working when unrelated parameters are present.
-    accepted = _accepted_parameters(function)
-    names = list(parameters or {})
-    arguments = dict(variables)
-    for name in names:
-        if accepted is None or name in accepted:
-            arguments[name] = sympy.Symbol(name)
-
-    # Prefer calling by keyword, but only for signatures that actually accept it.
-    # Falling back to positional arguments is reserved for a genuine
-    # signature/arity mismatch: a ``TypeError`` raised *inside* the user callable
-    # must propagate, not be masked by a second (positional) call.
-    try:
-        signature = inspect.signature(function)
-    except (TypeError, ValueError):
-        signature = None
-    if signature is not None:
-        try:
-            signature.bind(**arguments)
-        except TypeError:
-            positional = list(variables.values()) + [sympy.Symbol(name) for name in names]
-            signature.bind(*positional)
-            return sympy.sympify(function(*positional))
-        return sympy.sympify(function(**arguments))
-
-    # No inspectable signature (e.g. some C callables): keep the previous
-    # best-effort fallback.
-    try:
-        return sympy.sympify(function(**arguments))
-    except TypeError:
-        positional = list(variables.values()) + [sympy.Symbol(name) for name in names]
-        return sympy.sympify(function(*positional))
-
-
-def callable_parameter_names(function: Callable) -> set[str] | None:
-    """
-    Names the callable accepts beyond the coordinate/time variables.
-
-    Returns ``None`` for a callable with ``**kwargs`` (any keyword may be a
-    parameter), an empty set when the signature cannot be inspected.
-    """
-    accepted = _accepted_parameters(function)
-    if accepted is None:
-        return None
-    return accepted
-
-
-def _accepted_parameters(function: Callable) -> set[str] | None:
-    """
-    Names the callable accepts as keyword arguments, or ``None`` for ``**kwargs``.
-
-    Returns ``None`` when the callable accepts arbitrary keyword arguments, in
-    which case every parameter may be passed. Returns an empty set when the
-    signature cannot be inspected (e.g. some C callables).
-    """
-    try:
-        signature = inspect.signature(function)
-    except (TypeError, ValueError):
-        return set()
-    parameters = signature.parameters.values()
-    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters):
-        return None
-    return {
-        name
-        for name, parameter in signature.parameters.items()
-        if parameter.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-    }
-
-
-def check_parameter_names(names: Iterable[str]) -> None:
+def check_parameter_names(names) -> None:
     """
     Reject parameter names that would shadow a live generated identifier.
 
@@ -197,7 +110,7 @@ def check_parameter_names(names: Iterable[str]) -> None:
             )
 
 
-def check_allowed_symbols(expressions: Mapping[str, sympy.Expr], allowed: set[str], context: str) -> None:
+def check_allowed_symbols(expressions, allowed: set[str], context: str) -> None:
     """
     Reject expressions that reference symbols we cannot resolve.
 
@@ -214,93 +127,3 @@ def check_allowed_symbols(expressions: Mapping[str, sympy.Expr], allowed: set[st
             "generated C++ functors only know the position (x/y/z), the time (t) and the "
             "parameters passed as additional keyword arguments."
         )
-
-
-class _FieldFunctor:
-    """
-    One sympy-backed field expression plus its named parameters.
-
-    This is the reusable core shared by every field that is rendered into a
-    generated C++ functor (the six applied-field components here, the density
-    and the per-axis momentum/spread fields of
-    :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`
-    in a follow-up). It encapsulates the full pipeline once, so no caller has to
-    reproduce it:
-
-    1. resolve exactly one of an expression (a PICMI string, a plain number or a
-       sympy expression) or a callable of the coordinate variables,
-    2. normalise it to a sympy expression,
-    3. collect/validate the named parameters supplied as additional keyword
-       arguments and reject undefined free symbols,
-    4. render the expression through the :class:`PMAccPrinter`.
-
-    Parameters
-    ----------
-    expression:
-        A PICMI expression string, a plain number or an already-parsed sympy
-        expression. Mutually exclusive with ``function``.
-    function:
-        A callable of the coordinate variables (in the order of ``variables``)
-        returning something sympy can understand. Extra named parameters are
-        taken from ``parameters``. Mutually exclusive with ``expression``.
-    variables:
-        The names of the supported free variables, in argument order. The
-        applied fields use ``("x", "y", "z", "t")``; the density and per-axis
-        momentum/spread fields use ``("x", "y", "z")``.
-    parameters:
-        Mapping of parameter name to value (the PICMI ``user_defined_kw``).
-        Values stay symbolic; they are rendered as compile-time constants.
-    context:
-        Prefix used in error messages (e.g. ``"AnalyticAppliedField Ex"``).
-
-    The resolved sympy expression is available as :attr:`expression`; call
-    :meth:`render` for the PMAcc C++ string and :meth:`parameter_list` for the
-    validated parameters in the ``{"name": ..., "value": ...}`` form used by the
-    pypicongpu models.
-    """
-
-    def __init__(
-        self,
-        *,
-        expression=None,
-        function: Callable | None = None,
-        variables: Iterable[str] = ("x", "y", "z", "t"),
-        parameters: Mapping[str, float] | None = None,
-        context: str = "field functor",
-    ):
-        if (expression is None) == (function is None):
-            raise ValueError(f"{context} must provide exactly one of an expression or a function.")
-
-        self.context = context
-        self.variables = tuple(variables)
-        self.parameters = dict(parameters or {})
-        self._symbols = {name: sympy.Symbol(name) for name in self.variables}
-
-        if function is not None:
-            self.expression = expression_from_callable(function, self._symbols, self.parameters)
-        elif isinstance(expression, sympy.Expr):
-            self.expression = expression
-        else:
-            self.expression = sympify_expression(expression)
-
-        check_parameter_names(self.parameters)
-        self._check_symbols()
-
-    def _check_symbols(self) -> None:
-        allowed = set(self.variables) | set(self.parameters)
-        check_allowed_symbols({"expression": self.expression}, allowed, self.context)
-
-    def render(self) -> str:
-        """The PMAcc C++ rendering of the resolved expression."""
-        return render(self.expression)
-
-    def parameter_list(self) -> list[dict]:
-        """
-        The named parameters as ``{"name": ..., "value": ...}`` dicts, sorted by name.
-
-        The name is rendered through the :class:`PMAccPrinter`, so it is the
-        spelling that actually appears in the generated functor (escaped
-        keywords included). Re-rendering it is idempotent, so passing it through
-        the pypicongpu model validators a second time is safe.
-        """
-        return [{"name": render_identifier(name), "value": value} for name, value in sorted(self.parameters.items())]

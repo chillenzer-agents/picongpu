@@ -40,9 +40,10 @@ constant_field = picmi.ConstantAppliedField(
 
 # BEGIN-APPLIED-FIELD-ANALYTIC
 # x, y, z (position in m) and t (time in s) are the free variables.
-# Each component accepts a sympy-parseable ``*_expression`` string or a
-# ``*_function`` callable, exactly like AnalyticDistribution. Named parameters
-# are passed as additional keyword arguments.
+# Each component is backed by the same _FieldFunctor and accepts any of the
+# interchangeable spellings: a sympy-parseable ``*_expression`` string, a
+# ``*_function`` callable, or the read-back ``*_sympy`` expression. Named
+# parameters are passed as additional keyword arguments.
 analytic_field = picmi.AnalyticAppliedField(
     Ex_expression="E0 * sin(2 * pi * y / wavelength) * cos(2 * pi * t / period)",
     Ey_function=lambda x, y, z, t, E1, period: E1 * sin(2 * pi * t / period),
@@ -52,6 +53,15 @@ analytic_field = picmi.AnalyticAppliedField(
     period=50.0e-15,
 )
 # END-APPLIED-FIELD-ANALYTIC
+
+# BEGIN-APPLIED-FIELD-SYMPY
+# whichever spelling was given, all three are available and consistent after
+# construction; ``*_sympy`` is the resolved sympy expression of the component:
+assert analytic_field.Ex_sympy is not None
+assert analytic_field.Ey_sympy is not None
+assert analytic_field.Ex_expression is not None
+assert analytic_field.Ey_function is not None
+# END-APPLIED-FIELD-SYMPY
 
 # BEGIN-APPLIED-FIELD-INFLUENCE
 # PIConGPU-specific influence knobs (the picongpu_ prefix marks code-specific

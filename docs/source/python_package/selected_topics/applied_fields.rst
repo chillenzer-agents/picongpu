@@ -34,10 +34,16 @@ The field classes
    (position in m) and ``t`` (time in s); additional keyword arguments become
    named parameters inside the expressions. As in
    :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`,
-   each of the six components accepts either a sympy-parseable
-   ``<component>_expression`` string or a ``<component>_function`` callable (see
-   :doc:`functors`). Expressions are in V/m for ``E`` and T for ``B``, evaluated
-   in SI units and converted to PIConGPU's internal units (see :ref:`units`).
+   each of the six components is backed by the shared
+   :class:`~picongpu.picmi._FieldFunctor._FieldFunctor` and is exposed in all
+   three interchangeable spellings: a sympy-parseable ``<component>_expression``
+   string, a ``<component>_function`` callable, and the resolved
+   ``<component>_sympy`` expression (see :doc:`functors`). Any one of them may be
+   supplied; the others are computed from it, so all three are available and
+   consistent after construction, and several spellings may be given for one
+   component as long as they agree. Expressions are in V/m for ``E`` and T for
+   ``B``, evaluated in SI units and converted to PIConGPU's internal units (see
+   :ref:`units`).
 
 .. literalinclude:: ../snippets/selected_topics/applied_fields.py
    :language: python
@@ -48,6 +54,16 @@ The field classes
    :language: python
    :start-at: BEGIN-APPLIED-FIELD-ANALYTIC
    :end-before: END-APPLIED-FIELD-ANALYTIC
+
+All three spellings of a component are backed by the same
+:class:`~picongpu.picmi._FieldFunctor._FieldFunctor`: supplying any one computes
+the others, so they are available and consistent after construction, and
+supplying several for one component is accepted as long as they agree:
+
+.. literalinclude:: ../snippets/selected_topics/applied_fields.py
+   :language: python
+   :start-at: BEGIN-APPLIED-FIELD-SYMPY
+   :end-before: END-APPLIED-FIELD-SYMPY
 
 Expressions may only reference the free variables ``x``, ``y``, ``z`` and ``t``
 plus the named parameters passed as additional keyword arguments; any other

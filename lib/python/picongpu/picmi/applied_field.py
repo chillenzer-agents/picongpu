@@ -12,10 +12,13 @@ import sympy
 from picmistandard import PICMI_AnalyticAppliedField, PICMI_ConstantAppliedField
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from picongpu.picmi._FieldFunctor import (
+    _FieldFunctor,
+    callable_extra_parameters,
+    expression_parameter_names,
+)
 from picongpu.pypicongpu import util
 from picongpu.pypicongpu._field_functor import (
-    _FieldFunctor,
-    callable_parameter_names,
     check_allowed_symbols,
     check_parameter_names,
     sympify_expression,
@@ -207,10 +210,20 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
     The field mirrors the interface of
     :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`
     (see :doc:`/python_package/selected_topics/functors`): each of the six
-    components may be given either as a sympy-parseable ``<component>_expression``
-    string or as a ``<component>_function`` callable of ``x``, ``y``, ``z`` and
-    ``t``. Named parameters used by either form are supplied as additional
-    keyword arguments and rendered as compile-time constants.
+    components is one shared
+    :class:`~picongpu.picmi._FieldFunctor._FieldFunctor` and is exposed in all
+    three interchangeable spellings:
+
+    * ``<component>_expression`` -- a sympy-parseable string of ``x``, ``y``,
+      ``z`` and ``t``,
+    * ``<component>_function`` -- a callable of ``x``, ``y``, ``z`` and ``t``,
+    * ``<component>_sympy`` -- the resolved :class:`sympy.Expr`.
+
+    Any one of them may be supplied; the others are computed from it, so all
+    three are available and consistent after construction. Supplying several
+    spellings for one component is allowed as long as they agree, otherwise it
+    is rejected. Named parameters used by the spellings are supplied as
+    additional keyword arguments and rendered as compile-time constants.
 
     ``Ex`` etc. are in V/m and ``Bx`` etc. in T. Only whole-domain fields are
     supported so far, so ``lower_bound`` and ``upper_bound`` must be left as
@@ -226,59 +239,96 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
     By_function: Callable | None = None
     Bz_function: Callable | None = None
 
+    # ------------------------------------------------------------------
+    # Input resolution: every component is one _FieldFunctor
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def _collect_expression_user_defined_kw(cls, data, expression, consumed: set[str]) -> None:
+        """Register the free symbols an expression string references."""
+        if expression is None:
+            return
+        user_defined_kw = dict(data.get("user_defined_kw") or {})
+        for name in sorted(expression_parameter_names(expression, _ANALYTIC_FREE_VARIABLES)):
+            if name in data and name not in consumed:
+                user_defined_kw[name] = data.pop(name)
+                consumed.add(name)
+        if user_defined_kw:
+            data["user_defined_kw"] = user_defined_kw
+
+    @classmethod
+    def _collect_callable_user_defined_kw(cls, data, function, consumed: set[str]) -> None:
+        """Register the extra keyword arguments a callable field asks for.
+
+        Only kwargs whose names are actually declared as extra parameters of the
+        callable are registered; unknown ones are still rejected by the
+        ``extra="forbid"`` config (so a typo does not silently become an unused
+        constant).
+        """
+        if function is None:
+            return
+        user_defined_kw = dict(data.get("user_defined_kw") or {})
+        for name in sorted(callable_extra_parameters(function, _ANALYTIC_FREE_VARIABLES)):
+            if name in data and name not in consumed:
+                user_defined_kw[name] = data.pop(name)
+                consumed.add(name)
+        if user_defined_kw:
+            data["user_defined_kw"] = user_defined_kw
+
+    @classmethod
+    def _resolve_component(cls, data, component: str, consumed: set[str]) -> None:
+        """Bring the three spellings of one component in sync via one ``_FieldFunctor``.
+
+        Either the string or the callable spelling is accepted, the missing one
+        is computed from the given one, and the named parameters each spelling
+        needs are collected. The shared :class:`_FieldFunctor` validates that a
+        string and a callable given together agree.
+        """
+        expression = data.get(f"{component}_expression")
+        function = data.get(f"{component}_function")
+        if expression is None and function is None:
+            return
+        cls._collect_expression_user_defined_kw(data, expression, consumed)
+        cls._collect_callable_user_defined_kw(data, function, consumed)
+        functor = _FieldFunctor(
+            expression=expression,
+            function=function,
+            variables=_ANALYTIC_FREE_VARIABLES,
+            parameters=data.get("user_defined_kw") or {},
+            context=f"AnalyticAppliedField {component}",
+        )
+        data[f"{component}_expression"] = functor.expression
+        data[f"{component}_function"] = functor.function
+
     @model_validator(mode="before")
     @classmethod
-    def _collect_function_parameters(cls, data):
-        """
-        Fold the extra kwargs of ``*_function`` into ``user_defined_kw``.
-
-        The PICMI-standard collector only inspects ``*_expression`` strings, so
-        a parameter used solely inside a ``*_function`` would be rejected as an
-        unknown input. To mirror
-        :class:`~picongpu.picmi.distribution.AnalyticDistribution.AnalyticDistribution`
-        (see #97), only kwargs whose names are *actually* declared as extra
-        parameters of one of the given callables are registered; any other
-        unknown kwarg is still rejected by ``extra="forbid"`` (so a typo does
-        not silently become an unused constant).
-        """
+    def _resolve_components(cls, data, info):
+        # With ``validate_assignment=True`` (inherited from the standard base
+        # class) every assignment re-enters this validator with all fields
+        # already populated. The assigned field is the new source of truth, so
+        # drop its counterpart before re-resolving; all other components are
+        # re-validated unchanged.
         if not isinstance(data, dict):
             return data
-        functions = [
-            data.get(f"{component}_function")
-            for component in COMPONENTS
-            if data.get(f"{component}_function") is not None
-        ]
-        if not functions:
-            return data
-        accepted: set[str] = set()
-        accepts_any = False
-        for function in functions:
-            names = callable_parameter_names(function)
-            if names is None:
-                accepts_any = True
-            else:
-                accepted |= names
-        accepted -= set(_ANALYTIC_FREE_VARIABLES)
         data = dict(data)
-        known = set(cls.model_fields)
-        user_defined_kw = dict(data.get("user_defined_kw") or {})
-        for key in list(data):
-            if key in known:
-                continue
-            if accepts_any or key in accepted:
-                user_defined_kw[key] = data.pop(key)
-        if user_defined_kw or "user_defined_kw" in data:
-            data["user_defined_kw"] = user_defined_kw
+        if info.field_name is not None:
+            for component in COMPONENTS:
+                if info.field_name == f"{component}_expression":
+                    data.pop(f"{component}_function", None)
+                elif info.field_name == f"{component}_function":
+                    data.pop(f"{component}_expression", None)
+        consumed: set[str] = set()
+        for component in COMPONENTS:
+            cls._resolve_component(data, component, consumed)
         return data
+
+    # ------------------------------------------------------------------
+    # Delegation to the shared functor
+    # ------------------------------------------------------------------
 
     def _component_functor(self, component: str) -> _FieldFunctor | None:
         expression = getattr(self, f"{component}_expression")
         function = getattr(self, f"{component}_function")
-        if expression is not None and function is not None:
-            raise ValueError(
-                f"AnalyticAppliedField got both {component}_expression and {component}_function; "
-                "provide exactly one of them."
-            )
         if expression is None and function is None:
             return None
         return _FieldFunctor(
@@ -289,12 +339,46 @@ class AnalyticAppliedField(_InfluenceOptions, PICMI_AnalyticAppliedField):
             context=f"AnalyticAppliedField {component}",
         )
 
+    def _component_sympy(self, component: str) -> sympy.Expr | None:
+        functor = self._component_functor(component)
+        return None if functor is None else functor.sympy
+
+    @property
+    def Ex_sympy(self) -> sympy.Expr | None:
+        """The ``Ex`` component as a sympy expression (parameters substituted)."""
+        return self._component_sympy("Ex")
+
+    @property
+    def Ey_sympy(self) -> sympy.Expr | None:
+        """The ``Ey`` component as a sympy expression (parameters substituted)."""
+        return self._component_sympy("Ey")
+
+    @property
+    def Ez_sympy(self) -> sympy.Expr | None:
+        """The ``Ez`` component as a sympy expression (parameters substituted)."""
+        return self._component_sympy("Ez")
+
+    @property
+    def Bx_sympy(self) -> sympy.Expr | None:
+        """The ``Bx`` component as a sympy expression (parameters substituted)."""
+        return self._component_sympy("Bx")
+
+    @property
+    def By_sympy(self) -> sympy.Expr | None:
+        """The ``By`` component as a sympy expression (parameters substituted)."""
+        return self._component_sympy("By")
+
+    @property
+    def Bz_sympy(self) -> sympy.Expr | None:
+        """The ``Bz`` component as a sympy expression (parameters substituted)."""
+        return self._component_sympy("Bz")
+
     def get_components(self) -> dict[str, sympy.Expr | None]:
-        components = {}
-        for component in COMPONENTS:
-            functor = self._component_functor(component)
-            components[component] = None if functor is None else functor.expression
-        return components
+        """The E/B components as sympy expressions with parameters kept symbolic."""
+        return {
+            component: None if (functor := self._component_functor(component)) is None else functor.symbolic
+            for component in COMPONENTS
+        }
 
     def get_parameters(self) -> list[dict]:
         return [{"name": name, "value": value} for name, value in sorted(self.user_defined_kw.items())]

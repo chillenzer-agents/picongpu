@@ -9,7 +9,7 @@ from unittest import TestCase
 
 import pytest
 import sympy
-from picongpu.pypicongpu._field_functor import _FieldFunctor
+from picongpu.picmi._FieldFunctor import _FieldFunctor
 
 
 class TestFieldFunctor(TestCase):
@@ -18,13 +18,27 @@ class TestFieldFunctor(TestCase):
         assert "pmacc::math::sin(x)" in functor.render()
         assert "pmacc::math::cos(t)" in functor.render()
 
-    def test_exactly_one_of_expression_and_function(self):
-        # neither form
-        with pytest.raises(ValueError, match="exactly one"):
+    def test_neither_expression_nor_function_rejected(self):
+        with pytest.raises(ValueError, match="expression or a function"):
             _FieldFunctor()
-        # both forms
-        with pytest.raises(ValueError, match="exactly one"):
-            _FieldFunctor(expression="x", function=lambda x, y, z, t: x)
+
+    def test_backs_all_three_spellings(self):
+        # the class translates between expression, function and sympy
+        x, y, z, t = sympy.symbols("x y z t")
+        functor = _FieldFunctor(function=lambda x, y, z, t: sympy.sin(x) + t, variables=("x", "y", "z", "t"))
+        assert functor.symbolic == sympy.sin(x) + t
+        assert functor.sympy == sympy.sin(x) + t
+        assert functor.function(x, y, z, t) == sympy.sin(x) + t
+        assert sympy.sympify(functor.expression) == sympy.sin(x) + t
+
+    def test_expression_and_function_must_agree(self):
+        with pytest.raises(ValueError, match="disagree"):
+            _FieldFunctor(expression="x", function=lambda x, y, z, t: 2 * x, variables=("x", "y", "z", "t"))
+        # equal spellings are accepted
+        functor = _FieldFunctor(
+            expression="x", function=lambda x, y, z, t: sympy.Symbol("x"), variables=("x", "y", "z", "t")
+        )
+        assert functor.symbolic == sympy.Symbol("x")
 
     def test_callable_with_extra_parameters(self):
         functor = _FieldFunctor(
@@ -48,17 +62,21 @@ class TestFieldFunctor(TestCase):
             _FieldFunctor(expression="cellIdx*x", variables=("x", "y", "z", "t"), parameters={"cellIdx": 2.0})
 
     def test_keyword_parameter_escaped(self):
-        functor = _FieldFunctor(
-            expression="float*x", variables=("x", "y", "z", "t"), parameters={"float": 2.0}
-        )
+        functor = _FieldFunctor(expression="float*x", variables=("x", "y", "z", "t"), parameters={"float": 2.0})
         assert functor.render() == "float_*x"
         assert functor.parameter_list() == [{"name": "float_", "value": 2.0}]
 
     def test_variables_can_be_position_only(self):
-        # the density / per-axis momentum functors in #97 use only x, y, z
+        # the density / per-axis momentum functors of #97 use only x, y, z
         functor = _FieldFunctor(expression="x*y*z", variables=("x", "y", "z"))
         assert functor.render() == "x*y*z"
 
     def test_time_not_a_free_symbol_when_not_a_variable(self):
         with pytest.raises(ValueError, match="t"):
             _FieldFunctor(expression="x*t", variables=("x", "y", "z"))
+
+    def test_parameters_are_substituted_in_the_public_sympy_view(self):
+        functor = _FieldFunctor(expression="E0*x", variables=("x", "y", "z", "t"), parameters={"E0": 3.0})
+        assert functor.symbolic == sympy.Symbol("E0") * sympy.Symbol("x")
+        assert functor.sympy == 3.0 * sympy.Symbol("x")
+        assert functor.function(sympy.Symbol("x"), 0, 0, 0) == 3.0 * sympy.Symbol("x")

@@ -41,6 +41,12 @@ repos:
       - id: remove-crlf
   - repo: local
     hooks:
+      - id: check_field_descriptions
+        name: check_field_descriptions
+        entry: share/ci/check_field_descriptions.py
+        language: script
+        files: ^lib/python/picongpu/picmi/.*\.py$
+        pass_filenames: false
       - id: check_cpp_code_style
         name: check_cpp_code_style
         entry: share/ci/check_cpp_code_style.sh

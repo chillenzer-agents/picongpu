@@ -35,11 +35,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PICMI_DIR = REPO_ROOT / "lib" / "python" / "picongpu" / "picmi"
 
-# Fields declared by the pinned picmistandard base classes
+# Real model fields declared by the pinned picmistandard base classes
 # (chillenzer/picmi@c1d66223, installed as `picmistandard`). Embedded verbatim
 # so this script stays stdlib-only and offline: a redeclaration of any of these
 # names in a PIConGPU subclass shadows the standard description and must carry
-# its own.
+# its own. Only names present in the standard's ``model_fields`` belong here --
+# ``ClassVar`` attributes (e.g. ``number_of_dimensions``) and properties (e.g.
+# ``PICMI_MagnetostaticSolver.methods_list``) can never take a ``Field``
+# description and are deliberately excluded; (ii) additionally skips
+# ``ClassVar``-annotated targets as a safety net.
 STANDARD_FIELDS: dict[str, frozenset[str]] = {
     "PICMI_AnalyticDistribution": frozenset(
         {
@@ -68,7 +72,6 @@ STANDARD_FIELDS: dict[str, frozenset[str]] = {
             "lower_boundary_conditions_particles",
             "moving_window_velocity",
             "number_of_cells",
-            "number_of_dimensions",
             "nx",
             "pml_cells",
             "refined_regions",
@@ -99,7 +102,6 @@ STANDARD_FIELDS: dict[str, frozenset[str]] = {
             "lower_boundary_conditions_particles",
             "moving_window_velocity",
             "number_of_cells",
-            "number_of_dimensions",
             "nx",
             "ny",
             "pml_cells",
@@ -139,7 +141,6 @@ STANDARD_FIELDS: dict[str, frozenset[str]] = {
             "lower_boundary_conditions_particles",
             "moving_window_velocity",
             "number_of_cells",
-            "number_of_dimensions",
             "nx",
             "ny",
             "nz",
@@ -182,7 +183,6 @@ STANDARD_FIELDS: dict[str, frozenset[str]] = {
             "n_azimuthal_modes",
             "nr",
             "number_of_cells",
-            "number_of_dimensions",
             "nz",
             "pml_cells",
             "refined_regions",
@@ -209,7 +209,6 @@ STANDARD_FIELDS: dict[str, frozenset[str]] = {
             "galilean_velocity",
             "grid",
             "method",
-            "methods_list",
             "pml_divB_cleaning",
             "pml_divE_cleaning",
             "source_smoother",
@@ -412,6 +411,20 @@ def _annotated_field_name(node: ast.AnnAssign) -> str | None:
     return None
 
 
+def _is_classvar(node: ast.AnnAssign) -> bool:
+    """True if the annotation's outer subscript is ``ClassVar``/``typing.ClassVar``.
+
+    ``ClassVar`` attributes are not pydantic model fields and can never take a
+    ``Field(description=...)``; flagging them as undescribed shadowed fields
+    would be a false positive (e.g. the standard grid's
+    ``number_of_dimensions: ClassVar[int]``).
+    """
+    annotation = node.annotation
+    if isinstance(annotation, ast.Subscript):
+        annotation = annotation.value
+    return _call_name(annotation) == "ClassVar"
+
+
 def _base_names(node: ast.ClassDef) -> list[str]:
     names = []
     for base in node.bases:
@@ -427,7 +440,7 @@ class _ClassInfo:
         self.name = node.name
         self.fields: dict[str, ast.AnnAssign] = {}
         for stmt in node.body:
-            if isinstance(stmt, ast.AnnAssign):
+            if isinstance(stmt, ast.AnnAssign) and not _is_classvar(stmt):
                 field_name = _annotated_field_name(stmt)
                 if field_name is not None:
                     self.fields[field_name] = stmt

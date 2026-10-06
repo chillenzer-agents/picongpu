@@ -14,6 +14,7 @@ from picmistandard import PICMI_Species
 from pydantic import (
     BaseModel,
     ConfigDict,
+    Field,
     PrivateAttr,
     computed_field,
     field_validator,
@@ -96,8 +97,17 @@ class Species(PICMI_Species):
     """
 
     picongpu_fixed_charge: bool = False
-    particle_shape: str | None = "quadratic"
-    method: str | None = "Boris"
+    particle_shape: str | None = Field(
+        "quadratic",
+        description="Particle shape used for deposition and gather. If not specified, the value from the "
+        "Simulation object will be used. Other values maybe specified that are code dependent.",
+    )
+    method: str | None = Field(
+        "Boris",
+        description="The particle advance method to use. Code-specific method can be specified using "
+        "'other:<method>'. The default is code dependent. Must be one of 'Boris', 'Vay', "
+        "'Higuera-Cary', 'Li', 'free-streaming', 'LLRK4', or start with 'other:'",
+    )
 
     # Theoretically, Position(), Momentum() and Weighting() are also requirements imposed from the outside,
     # e.g., by the current deposition, pusher, ..., but these concepts are not separately modelled in PICMI

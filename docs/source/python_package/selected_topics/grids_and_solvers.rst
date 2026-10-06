@@ -66,6 +66,44 @@ Guard cells
 It must be a non-negative multiple of the super-cell size;
 if unset, PIConGPU's default is used.
 
+.. _grids_particle_boundaries:
+
+Particle boundary conditions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The field boundary conditions above also define how the *fields* behave.
+How *particles* behave at the box edges is set separately with the
+PICMI-standard, per-axis particle boundary conditions:
+
+* ``lower_boundary_conditions_particles`` /
+  ``upper_boundary_conditions_particles``: a list of ``"periodic"``,
+  ``"absorbing"``, ``"reflect"`` or ``"thermal"`` per axis
+  (or the per-direction forms ``bc_xmin_particles``/…);
+* unset axes **inherit the field boundary conditions**
+  (``"open"`` becomes ``"absorbing"``, ``"periodic"`` stays ``"periodic"``);
+* as for the field boundary conditions, PIConGPU chooses **per axis**,
+  so the lower and the upper value of a dimension must be equal.
+
+These grid-level conditions are the **default for every species**;
+the resolved value is exposed as
+``Cartesian3DGrid.picongpu_particle_boundary_conditions``
+(a ``tuple`` in PICMI names, per axis).
+A species can override it individually --
+see :ref:`Particle boundaries <species_particle_boundaries>` on the
+species page.
+
+.. literalinclude:: ../snippets/selected_topics/particle_boundaries.py
+   :language: python
+   :start-after: # BEGIN-GRID
+   :end-before: # END-GRID
+
+.. note::
+
+   ``reflect`` and ``thermal`` are only compatible with an **absorbing**
+   (``"open"``) field boundary on the same axis, and ``periodic`` requires a
+   **periodic** field boundary and a zero offset. The frontend enforces these
+   rules when the input file is generated.
+
 Solvers
 -------
 

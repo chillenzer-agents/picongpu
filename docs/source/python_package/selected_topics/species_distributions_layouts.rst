@@ -68,6 +68,43 @@ they are placed at the same positions with their ``density_scale``
 respected --
 the standard way to build charge-neutral plasmas.
 
+.. _species_particle_boundaries:
+
+Particle boundary conditions
+----------------------------
+
+Particle boundary conditions are PIConGPU extensions and are configured in
+two layers (see :ref:`Particle boundary conditions
+<python_package/selected_topics/grids_and_solvers:Particle boundary conditions>`
+on the grid page for the grid-wide default):
+
+* the **grid** sets the default per axis
+  (``lower_boundary_conditions_particles`` / ``upper_boundary_conditions_particles``),
+* a species may **override** it per axis via
+  ``picongpu_particle_boundary``, a
+  :class:`~picongpu.picmi.particle_boundary.ParticleBoundary`:
+
+  * ``boundary``: the per-axis kind, ``"periodic"``, ``"absorbing"``,
+    ``"reflect"`` or ``"thermal"`` (give a single name for all axes or a
+    3-tuple ``(x, y, z)``);
+  * ``boundary_offset`` (optional, int ≥ 0): the inward offset in cells
+    (scalar or 3-tuple);
+  * ``boundary_temperature`` (optional, float ≥ 0, in keV): the temperature
+    for ``"thermal"`` boundaries (scalar or 3-tuple; ignored otherwise).
+
+A species that does not set ``picongpu_particle_boundary`` simply inherits
+the grid's per-axis setting. In 2D3V the third (``z``) axis is dropped, so a
+3-axis override is truncated to the grid's axes.
+
+.. literalinclude:: ../snippets/selected_topics/particle_boundaries.py
+   :language: python
+   :start-after: # BEGIN-SPECIES
+   :end-before: # END-SPECIES
+
+The frontend rejects a per-axis combination the C++ core cannot honour:
+``reflect``/``thermal`` require an absorbing (``"open"``) field boundary on
+that axis, ``periodic`` requires a periodic field boundary and a zero offset.
+
 .. _distributions:
 
 Particle Distributions

@@ -9,7 +9,19 @@ from unittest import TestCase
 from picongpu import picmi
 from picongpu.picmi import constants
 from picongpu.picmi.diagnostics import PhaseSpace, TS
+from picongpu.picmi.grid import Cartesian3DGrid
 from picongpu.picmi.particle_functor import ParticleFilter
+from picongpu.picmi.species import particle_boundary_translation_context
+
+# Converting a species (e.g. nested in a PhaseSpace) now requires a grid context.
+_GRID = Cartesian3DGrid(
+    number_of_cells=[1, 1, 1],
+    lower_bound=[0, 0, 0],
+    upper_bound=[1, 1, 1],
+    lower_boundary_conditions=["periodic", "periodic", "periodic"],
+    upper_boundary_conditions=["periodic", "periodic", "periodic"],
+    picongpu_super_cell_size=(1, 1, 1),
+)
 
 
 class TestPhaseSpace(TestCase):
@@ -35,7 +47,8 @@ class TestPhaseSpace(TestCase):
 
         phase_space = self.__get_phase_space(species, -3.0 * momentum_unit_si, 5.0 * momentum_unit_si)
 
-        converted = phase_space.get_as_pypicongpu(time_step_size=1, num_steps=17)
+        with particle_boundary_translation_context(_GRID):
+            converted = phase_space.get_as_pypicongpu(time_step_size=1, num_steps=17)
 
         assert converted.type_phasespace is True
         assert abs(converted.min_momentum - (-3.0)) < 1e-12
@@ -49,7 +62,8 @@ class TestPhaseSpace(TestCase):
 
         phase_space = self.__get_phase_space(species, 0.0, momentum_si)
 
-        converted = phase_space.get_as_pypicongpu(time_step_size=1, num_steps=17)
+        with particle_boundary_translation_context(_GRID):
+            converted = phase_space.get_as_pypicongpu(time_step_size=1, num_steps=17)
 
         assert abs(converted.max_momentum - momentum_si / (mass_si * constants.c)) < 1e-12
 
@@ -72,7 +86,8 @@ class TestPhaseSpace(TestCase):
             max_momentum=2.0 * momentum_unit_si,
         )
 
-        converted = phase_space.get_as_pypicongpu(time_step_size=1, num_steps=17)
+        with particle_boundary_translation_context(_GRID):
+            converted = phase_space.get_as_pypicongpu(time_step_size=1, num_steps=17)
 
         assert abs(converted.min_momentum - (-2.0)) < 1e-12
         assert abs(converted.max_momentum - 2.0) < 1e-12
@@ -82,5 +97,6 @@ class TestPhaseSpace(TestCase):
 
         phase_space = self.__get_phase_space(species, 0.0, 1.0)
 
-        with self.assertRaises(ValueError):
-            phase_space.get_as_pypicongpu(time_step_size=1, num_steps=17)
+        with particle_boundary_translation_context(_GRID):
+            with self.assertRaises(ValueError):
+                phase_space.get_as_pypicongpu(time_step_size=1, num_steps=17)

@@ -17,18 +17,39 @@ from ..pypicongpu.species.operation.layout import Quiet, Random
 
 
 class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
-    n_macroparticles_per_cell: int = Field(gt=0)
+    n_macroparticles_per_cell: int = Field(
+        gt=0,
+        description="Number of macroparticles to load per cell. Either this argument or n_macroparticles "
+        "should be supplied (not both).",
+    )
     # PIConGPU can't handle the following separately:
-    n_macroparticles: None = None
-    seed: None = None
-    grid: None = None
+    n_macroparticles: None = Field(
+        None,
+        description="Not supported by PIConGPU: the particle count is set per cell via "
+        "n_macroparticles_per_cell, so n_macroparticles must be None.",
+    )
+    seed: None = Field(
+        None,
+        description="Not supported by PIConGPU: the pseudo-random number generator seed cannot be chosen, "
+        "so seed must be None.",
+    )
+    grid: None = Field(
+        None,
+        description="Not supported by PIConGPU: the underlying grid is always used, so grid must be None.",
+    )
 
     def get_as_pypicongpu(self):
         return Random(ppc=self.n_macroparticles_per_cell)
 
 
 class GriddedLayout(picmistandard.PICMI_GriddedLayout):
-    n_macroparticles_per_cell: list[int] = Field([0], init_var=False)
+    n_macroparticles_per_cell: list[int] = Field(
+        [0],
+        init_var=False,
+        description="Number of particles per cell along each axis (one entry per grid dimension). "
+        "In PIConGPU this field is typed as a plain list of ints (the standard's broadcast "
+        "validation is not re-applied).",
+    )
 
     def get_as_pypicongpu(self):
         return Quiet(ppc=np.prod(self.n_macroparticles_per_cell), n_points=self.n_macroparticles_per_cell)

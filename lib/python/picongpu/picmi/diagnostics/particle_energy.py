@@ -5,7 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from picongpu.picmi.copy_attributes import default_converts_to
 from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
@@ -22,18 +22,13 @@ class ParticleEnergy(BaseModel):
     This plugin computes the kinetic and total energy of the particles of a given
     species at the given time steps and writes it to
     ``<species>_energy_<filter>.dat``.
-
-    Parameters
-    ----------
-    species: string
-        Name of the particle species to track (e.g., "electron", "proton").
-
-    period: int
-        Number of simulation steps between consecutive outputs.
-        Unit: steps (simulation time steps).
     """
 
-    species: Species | FilteredSpecies
-    period: TimeStepSpec
+    species: Species | FilteredSpecies = Field(
+        description="Name of the particle species to track (e.g., 'electron', 'proton')."
+    )
+    period: TimeStepSpec = Field(
+        description="Number of simulation steps between consecutive outputs. Unit: steps (simulation time steps)."
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

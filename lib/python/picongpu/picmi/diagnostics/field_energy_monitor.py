@@ -5,7 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from picongpu.picmi.copy_attributes import default_converts_to
 
@@ -23,13 +23,8 @@ class FieldEnergyMonitor(BaseModel):
     This free (species-independent) plugin tracks the total field energy
     (energy stored in the electric and magnetic fields) over the course of the
     simulation, useful for verifying energy conservation.
-
-    Parameters
-    ----------
-    period: TimeStepSpec
-        Specify on which time steps to record the total field energy.
     """
 
-    period: TimeStepSpec
+    period: TimeStepSpec = Field(description="Specify on which time steps to record the total field energy.")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

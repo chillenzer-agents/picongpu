@@ -5,7 +5,7 @@ Authors: Masoud Afshari, Julian Lenz
 License: GPLv3+
 """
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from picongpu.picmi import constants
 from picongpu.picmi.copy_attributes import default_converts_to
@@ -29,31 +29,6 @@ class EnergyHistogram(BaseModel):
 
     This plugin extracts energy histogram data from the simulation, allowing
     for detailed analysis of energy distributions of particles.
-
-    Parameters
-    ----------
-    species: string
-        Name of the particle species to track (e.g., "electron", "proton").
-
-    period: int
-        Number of simulation steps between consecutive outputs.
-        If set to a non-zero value, the energy histogram of all electrons is computed.
-        By default, the value is 0 and no histogram for the electrons is computed.
-        Unit: steps (simulation time steps).
-
-    bin_count: int
-        Number of bins for the energy histogram.
-
-    min_energy: float
-        Minimum value for the energy histogram range.
-        Unit: J (energy in SI units).
-
-    max_energy: float
-        Maximum value for the energy histogram range.
-        Unit: J (energy in SI units).
-
-    name: string, optional
-        Optional name for the energy histogram plugin.
     """
 
     def check(self, *args, **kwargs):
@@ -62,10 +37,16 @@ class EnergyHistogram(BaseModel):
         if self.bin_count <= 0:
             raise ValueError("bin_count must be > 0")
 
-    species: Species | FilteredSpecies
-    period: TimeStepSpec
-    bin_count: int
-    min_energy: float
-    max_energy: float
+    species: Species | FilteredSpecies = Field(
+        description="Name of the particle species to track (e.g., 'electron', 'proton')."
+    )
+    period: TimeStepSpec = Field(
+        description="Number of simulation steps between consecutive outputs. If set to a non-zero value, "
+        "the energy histogram of all electrons is computed. By default, the value is 0 and no "
+        "histogram for the electrons is computed. Unit: steps (simulation time steps).",
+    )
+    bin_count: int = Field(description="Number of bins for the energy histogram.")
+    min_energy: float = Field(description="Minimum value for the energy histogram range. Unit: J (energy in SI units).")
+    max_energy: float = Field(description="Maximum value for the energy histogram range. Unit: J (energy in SI units).")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

@@ -44,6 +44,12 @@ Other parameters:
 Restarting a run
 ----------------
 
+The Python interface can drive this automatically: running a simulation in
+chunks with :meth:`~picongpu.picmi.simulation.Simulation.step` resumes each
+chunk from the checkpoint written by the previous one, without you configuring
+the restart options by hand (see :ref:`Running Your Simulation
+<python_package/foundations/running_simulation:Stepwise Running>`).
+
 A new run resumes from a checkpoint by adding the restart options
 (in addition to the mandatory ``period`` or ``timePeriod``):
 

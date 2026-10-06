@@ -13,6 +13,9 @@ With ``--no-run``, the workflow run step (``picongpu.pypicongpu.runner.Runner.ru
 is replaced by a no-op that emulates a finished simulation: it writes a synthetic
 EnergyHistogram output into the run directory so that snippets reading
 diagnostic results work without compiling or submitting anything.
+The stepwise path used by ``Simulation.step()`` (``Runner.build_once`` and
+``Runner.run_chunk``) is stubbed the same way; the real additive chunk config is
+still written, but no compile/submit happens.
 This harness is test infrastructure only, not part of the documented interface.
 """
 
@@ -71,6 +74,22 @@ def _fake_runner_run(self):
     write_synthetic_energy_histogram(self.run_dir, emulated_electron_count(self.run_dir))
 
 
+def _fake_build_once(self, **flags):
+    """Emulate the once-per-simulation build (no compilation in the harness)."""
+    self._built = True
+
+
+def _fake_runner_run_chunk(self, start, end, *, need_checkpoint=True):
+    """Emulate one stepwise chunk: still write the real additive chunk config.
+
+    The compiled chunk execution (cwltool/GPU) is out of scope for the snippet
+    harness, but the additive config (``N-step-<start>-<end>.cfg``) is written
+    for real so that the documented ``step()`` behavior is exercised.
+    """
+    self.build_once()
+    self.write_chunk_config(start, end, need_checkpoint=need_checkpoint)
+
+
 def main(argv):
     no_run = False
     if argv and argv[0] == "--no-run":
@@ -86,6 +105,10 @@ def main(argv):
         from picongpu.pypicongpu import runner as runner_module
 
         runner_module.Runner.run = _fake_runner_run
+        # step() drives the chunk path (build-once + per-chunk config/run), so
+        # those two Runner methods are stubbed as well.
+        runner_module.Runner.build_once = _fake_build_once
+        runner_module.Runner.run_chunk = _fake_runner_run_chunk
 
     sys.argv = [str(snippet), *snippet_argv]
     runpy.run_path(str(snippet), run_name="__main__")

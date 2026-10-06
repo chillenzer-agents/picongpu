@@ -179,7 +179,11 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
     # sympy based density_function. Both fields are always available after construction:
     # a before validator computes whichever one was not given from the other, and still
     # enforces the standard's "exactly one input" rule for the user-facing construction.
-    density_expression: Expression
+    density_expression: Expression = Field(
+        description="Analytic expression describing physical number density [m^-3]. Expression should be in terms of "
+        "the position, written as 'x', 'y', and 'z'. Parameters can be used in the expression with the values given "
+        "as keyword arguments."
+    )
     density_function: Callable[[Symbol, Symbol, Symbol], Expr]
 
     # PIConGPU extensions mirroring the density callable for the momentum/spread

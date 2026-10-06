@@ -281,9 +281,7 @@ STANDARD_FIELDS: dict[str, frozenset[str]] = {
             "write_dir",
         }
     ),
-    "PICMI_PseudoRandomLayout": frozenset(
-        {"grid", "n_macroparticles", "n_macroparticles_per_cell", "seed"}
-    ),
+    "PICMI_PseudoRandomLayout": frozenset({"grid", "n_macroparticles", "n_macroparticles_per_cell", "seed"}),
     "PICMI_Simulation": frozenset(
         {
             "applied_fields",
@@ -499,8 +497,7 @@ def check(directory: Path) -> list[str]:
                 for call in calls:
                     if not _has_description(call) and (rel, cls.name, field_name) not in BARE_FIELD_BASELINE:
                         findings.append(
-                            f"{rel}:{call.lineno}: {cls.name}.{field_name}: "
-                            f"Field(...) is missing description="
+                            f"{rel}:{call.lineno}: {cls.name}.{field_name}: Field(...) is missing description="
                         )
                 # (ii) redeclaration of a standard or local-base field without description
                 inherited = field_name in STANDARD_FIELDS.get(

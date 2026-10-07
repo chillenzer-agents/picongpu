@@ -23,8 +23,11 @@ adds a Gaussian pulse to a full setup.
 Analytic fields
 ---------------
 
-Several lasers can evaluate the analytic electric field they describe, which is
-what PIConGPU injects for them.
+:class:`~picongpu.picmi.lasers.GaussianLaser`,
+:class:`~picongpu.picmi.lasers.PlaneWaveLaser`,
+:class:`~picongpu.picmi.lasers.DispersivePulseLaser` and
+:class:`~picongpu.picmi.lasers.TWTSLaser` can evaluate the analytic electric
+field they describe, which is what PIConGPU injects for them.
 :meth:`~picongpu.picmi.lasers.GaussianLaser.complex_amplitude` returns the
 complex field amplitude, :meth:`~picongpu.picmi.lasers.GaussianLaser.envelope`
 its absolute value, and
@@ -75,10 +78,26 @@ one contract:
   description applies.  They are not a solution of the full Maxwell system:
   the model is a scalar field times a polarization vector.
 
-The analytic interface currently exposes the electric field only: there is no
-``B`` method.  The C++ incident-field solver derives its magnetic counterpart
-from ``E`` through the slowly-varying-envelope approximation, so no separate
-Python formula exists.
+:class:`~picongpu.picmi.lasers.DispersivePulseLaser` inherits and overrides
+the Gaussian interface: its
+:meth:`~picongpu.picmi.lasers.DispersivePulseLaser.complex_amplitude`
+and :meth:`~picongpu.picmi.lasers.DispersivePulseLaser.E` additionally require
+the simulation time step ``dt`` (the field is a finite discrete inverse Fourier
+transform) and accept the translated initialization duration ``pulse_init``.
+:class:`~picongpu.picmi.lasers.TWTSLaser` provides
+:meth:`~picongpu.picmi.lasers.TWTSLaser.E` (per component ``Ex``/``Ey``/``Ez``)
+and the corresponding :meth:`~picongpu.picmi.lasers.TWTSLaser.B`; both take the
+domain center as the ``domain_center`` context argument, matching the core's
+domain-center origin.
+
+For the other lasers the analytic interface exposes the electric field only:
+there is no ``B`` method.  The C++ incident-field solver derives their magnetic
+counterpart from ``E`` through the slowly-varying-envelope approximation, so no
+separate Python formula exists.  The convention matches the injected field: the
+on-axis, in-focus amplitude of a
+:class:`~picongpu.picmi.lasers.GaussianLaser` is its ``E0``, the field envelope
+decays as ``exp(-t^2 / duration^2)``, and the ``GaussianLaser`` ``duration`` is
+the 1/e half-width of that field envelope.
 
 Documented limitations
 ~~~~~~~~~~~~~~~~~~~~~~

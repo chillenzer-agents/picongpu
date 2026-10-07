@@ -83,6 +83,7 @@ from picongpu.picmi import (
     GaussianLaser,
     PlaneWaveLaser,
     Simulation,
+    TWTSLaser,
     constants,
 )
 from picongpu.picmi import Species as Species
@@ -197,7 +198,32 @@ DISPERSIVE_LASER = DispersivePulseLaser(
     E0=E0,
     phi0=0.0,
 )
-LASERS = [GAUSSIAN_LASER, PLANE_WAVE_LASER, DISPERSIVE_LASER]
+# TWTS (issue #117). It is not a BaseFunctorE: its core time reference is
+# `currentStep * dt - TDELAY` with TDELAY = time_offset_si (focal_y - centroid_y) /
+# (beta0 c), and it enters through its default faces (YMin/ZMax here). Its focus
+# sits at the domain center laterally, hence the analytic field needs the domain
+# center as extra context. The parameters are chosen so the pulse is well inside
+# the box (strong field) at the later checkpoints.
+TWTS_DURATION_SIGMA = 2.0e-15
+TWTS_DURATION = 2 * TWTS_DURATION_SIGMA
+TWTS_FOCAL_POSITION = DOMAIN_CENTER.copy()
+TWTS_FOCAL_POSITION[1] = 2.8e-6
+TWTS_CENTROID_POSITION = DOMAIN_CENTER.copy()
+TWTS_CENTROID_POSITION[1] = -8.0e-6
+# TWTS (issue #117): category A; uses its default injection faces (YMin + ZMax
+# for laserIncidenceAngle < 0); the tilted pulse front is visible in the field.
+TWTS_LASER = TWTSLaser(
+    wavelength=0.8e-6,
+    waist=2.0e-6,
+    duration=TWTS_DURATION,
+    laserIncidenceAngle=-np.deg2rad(10.0),
+    polarizationAngle=0.0,
+    focal_position=TWTS_FOCAL_POSITION.tolist(),
+    centroid_position=TWTS_CENTROID_POSITION.tolist(),
+    picongpu_polarization_type=PolarizationType.LINEAR,
+    a0=8.0,
+)
+LASERS = [GAUSSIAN_LASER, PLANE_WAVE_LASER, DISPERSIVE_LASER, TWTS_LASER]
 
 
 def basic_simulation():
@@ -334,6 +360,13 @@ def _expected_E_field(coordinates, lasers, time, dt):
         if isinstance(laser, DispersivePulseLaser):
             extra["dt"] = dt
             extra["pulse_init"] = laser.get_as_pypicongpu(CELL_SIZE, NUMBER_OF_CELLS).pulse_init
+        if isinstance(laser, TWTSLaser):
+            # TWTS is not a BaseFunctorE: its time reference is already
+            # `time_offset_si` (TDELAY) and its origin is the domain center
+            # laterally, so the analytic field needs the domain-center context.
+            # Its Blackman-Nuttall window also needs the global `dt`.
+            extra["domain_center"] = DOMAIN_CENTER
+            extra["dt"] = dt
         contribution = laser.E(*coordinates, t=time, **extra)
         total = contribution if total is None else total + contribution
     return total
@@ -792,10 +825,17 @@ class TestPlaneWaveFeedIn(_LaserTestBase):
         scale, it, expected, mask = best
         self.assertGreater(scale, 0.1 * E0, "The injected plane wave is too weak to test.")
         fields = self.fields_at(it)
-        # Only E_x is meaningful for the x-polarized plane wave; the other
-        # components are the Gaussian's (E_z) or the sub-permille residuals.
+        # Isolate the plane wave: E_x also carries the other lasers present in
+        # the shared run (e.g. the TWTS pulse), so subtract their analytic
+        # contributions before comparing.
+        others = _expected_E_field(
+            self.coordinates,
+            [laser for laser in LASERS if laser is not PLANE_WAVE_LASER],
+            it * self.sim.time_step_size,
+            self.sim.time_step_size,
+        )
         np.testing.assert_allclose(
-            fields["E"][component][mask],
+            fields["E"][component][mask] - others[component][mask],
             expected[mask],
             rtol=_HUYGENS_RTOL,
             atol=_HUYGENS_ATOL_FRACTION * scale,

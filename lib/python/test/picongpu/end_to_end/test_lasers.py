@@ -78,6 +78,7 @@ from unittest import TestCase
 import numpy as np
 from picongpu.picmi import (
     Cartesian3DGrid,
+    DispersivePulseLaser,
     ElectromagneticSolver,
     GaussianLaser,
     PlaneWaveLaser,
@@ -146,10 +147,10 @@ FOCAL_POSITION[1] += 0.5 * CELL_SIZE[1]
 CENTROID_POSITION = DOMAIN_CENTER.copy()
 CENTROID_POSITION[1] *= -1
 
-# Two lasers in one simulation, separated by polarization component so that a
+# Lasers in one simulation, separated by polarization component so that a
 # given component of E can be attributed to a single category:
-#   * GaussianLaser (category A) is z-polarized -> carries E_z;
-#   * PlaneWaveLaser (category B) is x-polarized -> carries E_x.
+#   * category A (GaussianLaser, DispersivePulseLaser) is z-polarized -> E_z;
+#   * category B (PlaneWaveLaser) is x-polarized -> carries E_x.
 # Compilation dominates the cost, hence one simulation; the component split is
 # the diagnosability strategy.  (At this stack layer the frontend only enables
 # the YMin surface -- cf. the incidentField.param.mustache TODO and issue #115;
@@ -180,7 +181,23 @@ PLANE_WAVE_LASER = PlaneWaveLaser(
     E0=E0,
     phi0=0.0,
 )
-LASERS = [GAUSSIAN_LASER, PLANE_WAVE_LASER]
+# DispersivePulse (issue #117): category A, Gaussian-family, so it shares the
+# Gaussian's focus/centroid and the z (category-A) channel.  The dispersion
+# terms stay at their zero default, but the finite inverse-DFT path is
+# exercised regardless.  TWTS is intentionally absent here (separate issue).
+DISPERSIVE_LASER = DispersivePulseLaser(
+    wavelength=WAVELENGTH,
+    waist=WAIST,
+    duration=LASER_DURATION,
+    propagation_direction=[0.0, 1.0, 0.0],
+    polarization_direction=[0.0, 0.0, 1.0],
+    focal_position=FOCAL_POSITION.tolist(),
+    centroid_position=CENTROID_POSITION.tolist(),
+    picongpu_polarization_type=PolarizationType.LINEAR,
+    E0=E0,
+    phi0=0.0,
+)
+LASERS = [GAUSSIAN_LASER, PLANE_WAVE_LASER, DISPERSIVE_LASER]
 
 
 def basic_simulation():
@@ -296,7 +313,7 @@ def _transverse_confinement_mask(shape, confinement):
     return result
 
 
-def _expected_E_field(coordinates, lasers, time):
+def _expected_E_field(coordinates, lasers, time, dt):
     """
     Sum of the analytic laser fields, evaluated at ``time`` (SI).
 
@@ -305,10 +322,19 @@ def _expected_E_field(coordinates, lasers, time):
     so the analytic ``laser.E(..., t)`` and the simulation share one uniquely
     defined reference frame and no ad-hoc timing shift is needed.  The field
     exists only inside the Huygens box (masked separately).
+
+    The ``DispersivePulseLaser`` field is a finite discrete inverse Fourier
+    transform, so it additionally needs the global time step ``dt`` and the
+    translated ``pulse_init``; both are supplied here (the translated value is
+    exactly the one rendered into ``incidentField.param``).
     """
     total = None
     for laser in lasers:
-        contribution = laser.E(*coordinates, t=time)
+        extra = {}
+        if isinstance(laser, DispersivePulseLaser):
+            extra["dt"] = dt
+            extra["pulse_init"] = laser.get_as_pypicongpu(CELL_SIZE, NUMBER_OF_CELLS).pulse_init
+        contribution = laser.E(*coordinates, t=time, **extra)
         total = contribution if total is None else total + contribution
     return total
 
@@ -484,7 +510,7 @@ class _LaserTestBase(TestCase):
         return read_fields(self.checkpoint_pattern, iteration=iteration)
 
     def expected_at(self, iteration):
-        return _expected_E_field(self.coordinates, LASERS, iteration * self.sim.time_step_size)
+        return _expected_E_field(self.coordinates, LASERS, iteration * self.sim.time_step_size, self.sim.time_step_size)
 
 
 class TestLaserInterface(_LaserTestBase):
@@ -664,7 +690,7 @@ class TestGaussianBulkEnvelope(_LaserTestBase):
 
     def _analytic_field(self, time):
         """Analytic category-A ``E_z`` on the checkpoint grid (SI)."""
-        return _expected_E_field(self.coordinates, [GAUSSIAN_LASER], time)[self._component]
+        return _expected_E_field(self.coordinates, [GAUSSIAN_LASER], time, self.sim.time_step_size)[self._component]
 
     def test_gaussian_envelope_amplitude_and_widths(self):
         """
@@ -688,8 +714,18 @@ class TestGaussianBulkEnvelope(_LaserTestBase):
 
         # Analytic and measured observables go through the identical extraction.
         analytic = _observables(best_field, CELL_SIZE, _BULK_WINDOW_CELLS)
+        component = self._component
+        dt = self.sim.time_step_size
+        # Isolate the Gaussian: the written E_z also carries the other
+        # category-A lasers present in the shared run (e.g. DispersivePulseLaser).
+        others = _expected_E_field(
+            self.coordinates,
+            [laser for laser in LASERS if laser is not GAUSSIAN_LASER],
+            best_it * dt,
+            dt,
+        )
         simulated = _observables(
-            self.fields_at(best_it)["E"][self._component],
+            self.fields_at(best_it)["E"][component] - others[component],
             CELL_SIZE,
             _BULK_WINDOW_CELLS,
         )

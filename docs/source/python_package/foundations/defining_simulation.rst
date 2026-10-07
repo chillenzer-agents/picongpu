@@ -184,3 +184,48 @@ This function can be used in an optimization routine, for example:
    :language: python
    :start-after: BEGIN-OPTIMIZE-FOCAL-POSITION
    :end-before: END-OPTIMIZE-FOCAL-POSITION
+
+Grouping simulations into a single workflow
+-------------------------------------------
+
+The examples above drive their sub-simulations from plain Python loops.
+For the common case of a fixed set of sub-simulations that should all be
+built and submitted together,
+:class:`~picongpu.picmi.simulation_group.SimulationGroup` packages them
+into one overarching `CWL <https://www.commonwl.org/>`__ workflow
+with a single root `RO-Crate <https://www.researchobject.org/ro-crate/>`__:
+
+.. literalinclude:: ../snippets/defining_simulation/simulation_group.py
+   :language: python
+   :start-after: BEGIN-SIMULATION-GROUP
+   :end-before: END-SIMULATION-GROUP
+
+A :class:`~picongpu.picmi.simulation_group.SimulationGroup` mirrors the
+:class:`~picongpu.picmi.simulation.Simulation` interface:
+:meth:`~picongpu.picmi.simulation_group.SimulationGroup.write_input_file`
+generates a self-contained PIConGPU setup
+(with its own CWL workflow and RO-Crate)
+per sub-simulation,
+then writes an overarching ``workflow/group_workflow.cwl``
+and the group RO-Crate,
+and
+:meth:`~picongpu.picmi.simulation_group.SimulationGroup.run`
+additionally executes that workflow,
+building and submitting every sub-simulation.
+Runtime flags (e.g. ``jobs`` or ``cmake``) passed to either method
+are forwarded to every sub-simulation and recorded in its
+``workflow/input.yaml``.
+
+The ``simulations`` argument maps each sub-entry name
+to a :class:`~picongpu.picmi.simulation.Simulation`,
+a nested :class:`~picongpu.picmi.simulation_group.SimulationGroup`
+(or an equivalent plain ``dict``),
+so groups can be nested arbitrarily.
+Names must be non-empty, must not contain ``/``
+and must not start with ``.``.
+Passing a list of simulations instead of a mapping
+is a shortcut that generates a unique name for each entry.
+The flattened ``(name, simulation)`` pairs are available as
+:attr:`~picongpu.picmi.simulation_group.SimulationGroup.simulations_by_path`.
+Each sub-simulation is written to ``<group_dir>/<name>/``
+and appears as a content section of the group RO-Crate.

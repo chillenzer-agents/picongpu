@@ -47,6 +47,7 @@ from .multi_species import MultiSpecies
 from .particle_functor import FilteredSpecies, ParticleFilter, ParticleFunctor
 from .precision_config import PrecisionConfig
 from .simulation import Simulation
+from .simulation_group import SimulationGroup
 from .solver import BinomialSmoother, ElectromagneticSolver
 from .species import Species
 
@@ -54,6 +55,7 @@ assert sys.version_info.major > 3 or sys.version_info.minor >= 11, "Python 3.11 
 
 __all__ = [
     "Simulation",
+    "SimulationGroup",
     "ParticleFunctor",
     "Cartesian3DGrid",
     "Cartesian2DGrid",

@@ -907,11 +907,21 @@ class TestPlaneWaveFeedIn(_LaserTestBase):
 # the single analytic contribution of that one pulse -- not a sum of two
 # independent pulses. This is the acceptance criterion agreed in the issue.
 
-MULTIFACE_PROPAGATION = np.array([0.5, 0.0, np.sqrt(3.0) / 2.0])
-MULTIFACE_FOCAL_POSITION = FOCAL_POSITION + np.array([0.0, -1.0e-5, 0.0])
-# enough distance from the focus that the centroid is outside the box on both
-# the x- and the z-entry side, along the (negative) propagation direction:
-MULTIFACE_CENTROID_POSITION = MULTIFACE_FOCAL_POSITION - 9.0e-5 * MULTIFACE_PROPAGATION
+# 45 degrees in the x-z plane: with symmetric x/z components both the XMin and
+# the ZMin face are crossed equally, so the two Huygens surfaces receive the same
+# profile at the same retarded time (the "single pulse, not two" case).
+MULTIFACE_PROPAGATION = np.array([1.0 / np.sqrt(2.0), 0.0, 1.0 / np.sqrt(2.0)])
+# The pulse propagates purely in the x-z plane (no y-component), so its beam
+# axis is fixed in y. The box is only 128 cells (5.67 um) thick in y, unlike the
+# +y setup above whose FOCAL_POSITION[1] is far out of plane. For the pulse to
+# actually pass through the box volume, the axis must lie inside the box in y, so
+# the focus is placed at the box center (DOMAIN_CENTER) on all axes.
+MULTIFACE_FOCAL_POSITION = DOMAIN_CENTER.copy()
+# The centroid sits 25 um up along -prop, just outside the box on both the x- and
+# the z-entry sides (centroid_d*direction_d < 0 for both crossed entry faces).
+# The peak then crosses both faces a few tens of steps in and the strong field is
+# well inside the box by the it=100 checkpoint.
+MULTIFACE_CENTROID_POSITION = MULTIFACE_FOCAL_POSITION - 25.0e-6 * MULTIFACE_PROPAGATION
 
 MULTIFACE_LASER = GaussianLaser(
     wavelength=0.8e-6,

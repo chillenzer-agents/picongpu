@@ -287,13 +287,12 @@ def _huygens_interior_mask(lasers, cell_size, domain_cells):
         )
         # The generation surface sits at (index + 0.75) cells and the Huygens
         # box is applied on every face, so the total-field/scattered-field
-        # correction lives in the few cells adjacent to the surface (and is
-        # applied twice where two faces meet).  There the simulated field still
-        # carries the discrete injection error, not the analytic incident field,
-        # so keep cells well clear of the surface on every side.  The pulse is
-        # effectively plane in x/z, which is why the source-adjacent layers are
-        # only excluded here rather than compared.
-        margin = 4
+        # correction lives in the cells adjacent to the surface (and is applied
+        # twice where two faces meet, e.g. the XMin/ZMin corner of the oblique
+        # multi-face pulse).  There the simulated field still carries the
+        # discrete injection error, not the analytic incident field, so keep a
+        # several-cell band clear of the surface on every side.
+        margin = 8
         inner_min = int(np.max(mins) + margin)
         inner_max = int(np.min(maxs) - margin)
         # selector varies along mask-axis `axis` (mask layout: x, y, z)
@@ -587,8 +586,20 @@ class _LaserTestBase(TestCase):
         return selection
 
     def expected_at(self, iteration, selection=None):
-        return _expected_E_field(
-            self.coordinates, LASERS, iteration * self.sim.time_step_size, self.sim.time_step_size, selection=selection
+        # ``_expected_E_field`` returns the analytic field in the meshgrid
+        # (component, x, y, z) layout; ``read_fields``/``_huygens_interior_mask``
+        # use the openPMD (component, z, y, x) layout, so transpose it here to
+        # keep the mask and ``[:, region]`` indexing consistent.  The expensive
+        # DispersivePulseLaser reference is evaluated only on ``selection``.
+        return np.transpose(
+            _expected_E_field(
+                self.coordinates,
+                LASERS,
+                iteration * self.sim.time_step_size,
+                self.sim.time_step_size,
+                selection=selection,
+            ),
+            (0, 3, 2, 1),
         )
 
 
@@ -882,7 +893,11 @@ class TestPlaneWaveFeedIn(_LaserTestBase):
         component = _component_index(PLANE_WAVE_LASER)
         best = None
         for it in self.checkpoint_steps:
-            expected = PLANE_WAVE_LASER.E(*self.coordinates, t=it * self.sim.time_step_size)[component]
+            # transpose into the openPMD (component, z, y, x) layout (see
+            # ``expected_at``) so the mask and ``read_fields`` indexing agree.
+            expected = np.transpose(
+                PLANE_WAVE_LASER.E(*self.coordinates, t=it * self.sim.time_step_size), (0, 3, 2, 1)
+            )[component]
             mask = np.zeros(expected.shape, dtype=bool)
             surface_index = PLANE_WAVE_LASER.picongpu_huygens_surface_positions[1][0]
             start = surface_index + _HUYGENS_PROBE_MARGIN_CELLS
@@ -904,12 +919,15 @@ class TestPlaneWaveFeedIn(_LaserTestBase):
         # analytic contributions before comparing.  Restrict the evaluation to
         # the probe slab to keep the expensive DispersivePulseLaser reference
         # tractable.
-        others = _expected_E_field(
-            self.coordinates,
-            [laser for laser in LASERS if laser is not PLANE_WAVE_LASER],
-            it * self.sim.time_step_size,
-            self.sim.time_step_size,
-            selection=self._probe_selection(),
+        others = np.transpose(
+            _expected_E_field(
+                self.coordinates,
+                [laser for laser in LASERS if laser is not PLANE_WAVE_LASER],
+                it * self.sim.time_step_size,
+                self.sim.time_step_size,
+                selection=self._probe_selection(),
+            ),
+            (0, 3, 2, 1),
         )
         np.testing.assert_allclose(
             fields["E"][component][mask] - others[component][mask],
@@ -1021,8 +1039,11 @@ class TestMultiFaceLaser(TestCase):
         compared_any = False
         for it in self.checkpoint_steps:
             time = it * self.sim.time_step_size
-            # one analytic contribution for the one physical pulse:
-            expected = _expected_E_field(self.coordinates, MULTIFACE_LASERS, time, self.sim.time_step_size)
+            # one analytic contribution for the one physical pulse, transposed
+            # into the openPMD (component, z, y, x) field layout (see TestLasers):
+            expected = np.transpose(
+                _expected_E_field(self.coordinates, MULTIFACE_LASERS, time, self.sim.time_step_size), (0, 3, 2, 1)
+            )
             fields = read_fields(self.checkpoint_pattern, iteration=it)
             if it == self.checkpoint_steps[0]:
                 self.assertLess(

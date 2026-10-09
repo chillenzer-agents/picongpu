@@ -23,14 +23,26 @@ adds a Gaussian pulse to a full setup.
 Analytic fields
 ---------------
 
-:class:`~picongpu.picmi.lasers.GaussianLaser` and
-:class:`~picongpu.picmi.lasers.PlaneWaveLaser` can evaluate the analytic
-electric field they describe, which is what PIConGPU injects for them.
+:class:`~picongpu.picmi.lasers.GaussianLaser`,
+:class:`~picongpu.picmi.lasers.PlaneWaveLaser`,
+:class:`~picongpu.picmi.lasers.DispersivePulseLaser` and
+:class:`~picongpu.picmi.lasers.TWTSLaser` can evaluate the analytic electric
+field they describe, which is what PIConGPU injects for them.
 :meth:`~picongpu.picmi.lasers.GaussianLaser.complex_amplitude` returns the
 complex field amplitude, :meth:`~picongpu.picmi.lasers.GaussianLaser.envelope`
 its absolute value, and
 :meth:`~picongpu.picmi.lasers.GaussianLaser.E` the real vector field
 (also available per component as ``Ex``/``Ey``/``Ez``).
+:class:`~picongpu.picmi.lasers.DispersivePulseLaser` inherits and overrides
+these: its :meth:`~picongpu.picmi.lasers.DispersivePulseLaser.complex_amplitude`
+and :meth:`~picongpu.picmi.lasers.DispersivePulseLaser.E` additionally require
+the simulation time step ``dt`` (the field is a finite discrete inverse Fourier
+transform) and accept the translated initialization duration ``pulse_init``.
+:class:`~picongpu.picmi.lasers.TWTSLaser` provides
+:meth:`~picongpu.picmi.lasers.TWTSLaser.E` (per component ``Ex``/``Ey``/``Ez``)
+and the corresponding :meth:`~picongpu.picmi.lasers.TWTSLaser.B`; both take the
+domain center as the ``domain_center`` context argument, matching the core's
+domain-center origin.
 The coordinates ``x``, ``y`` and ``z`` may be numpy arrays of equal shape
 (e.g. from ``numpy.meshgrid``); the vector field is returned
 *component first*, i.e. with shape ``(3,) + x.shape``.
@@ -59,11 +71,11 @@ All lasers share a few properties:
 
 * ``wavelength`` in metres,
 * ``duration`` in seconds:
-  for the standard Gaussian lasers (``GaussianLaser`` and the dispersive
-  pulse) this is the 1/e half-width of the electric-field envelope
+  for the standard Gaussian lasers (``GaussianLaser``, the dispersive pulse
+  and ``TWTSLaser``) this is the 1/e half-width of the electric-field envelope
   (``E ~ exp(-t^2 / duration^2)``), i.e. the intensity (``E^2``) has the
   1-sigma width ``duration / 2``;
-  ``PlaneWaveLaser`` and ``TWTSLaser`` instead take ``duration`` directly
+  ``PlaneWaveLaser`` instead takes ``duration`` directly
   as the 1-sigma width of the intensity profile,
 * ``propagation_direction`` and ``polarization_direction``:
   normalized 3D vectors.
@@ -139,6 +151,11 @@ Laser types
    Its placement is fixed to the ``YMin``/``ZMin``/``ZMax`` faces
    (it always enters through ``YMin``); ``propagation_direction``
    must still point into the box (positive ``y`` component).
+   Its focus is set by ``focal_position`` (the ``x`` coordinate is
+   fixed to the domain center), and the analytic
+   :meth:`~picongpu.picmi.lasers.TWTSLaser.E` /
+   :meth:`~picongpu.picmi.lasers.TWTSLaser.B` additionally take the
+   domain center as context (the C++ origin is the domain center).
 
 :class:`~picongpu.picmi.lasers.PlaneWaveLaser`
    A plane wave with a temporal shape:

@@ -59,6 +59,7 @@ from picongpu.pypicongpu.output.openpmd_plugin import FieldDump as PyPIConGPUFie
 from picongpu.pypicongpu.output.openpmd_plugin import OpenPMDPlugin
 from picongpu.pypicongpu.runner import Runner
 from picongpu.pypicongpu.species.attribute.momentum import Momentum
+from picongpu.pypicongpu.particle_functor.particle_functor import _SpeciesName
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
 from picongpu.pypicongpu.util import UnpackChain, unique
@@ -638,21 +639,39 @@ class Simulation(picmistandard.PICMI_Simulation):
                 )
 
     def _collect_particle_filters(self):
-        # This does not necessarily work on Binning plugin
-        # because that might have a list of species.
-        # But that's fine because the Binning plugin uses it's own mechanism
-        # and we don't need their filters to register
-        # unless they are used somewhere else as well.
-        return unique(
-            map(
-                get_as_pypicongpu,
+        # Collect every reusable filter with the compile-time name(s) of the species
+        # it is registered on (merged across its occurrences). particleFilters.param
+        # then emits a name-keyed SpeciesEligibleForSolver specialisation narrowing
+        # the filter to exactly those species instead of all of VectorAllSpecies.
+        # Functors are deduplicated by value, like before: they are not hashable
+        # because of their volatile per-call ``typename``.
+        registered = list(
+            zip(
+                map(
+                    get_as_pypicongpu,
+                    chain(
+                        UnpackChain(self).diagnostics.species.functor,
+                        UnpackChain(self).interactions.screening_species.functor,
+                        UnpackChain(self).interactions.collisions.species_pairs[:].functor,
+                    ),
+                ),
                 chain(
-                    UnpackChain(self).diagnostics.species.functor,
-                    UnpackChain(self).interactions.screening_species.functor,
-                    UnpackChain(self).interactions.collisions.species_pairs[:].functor,
+                    UnpackChain(self).diagnostics.species.species_name,
+                    UnpackChain(self).interactions.screening_species.species_name,
+                    UnpackChain(self).interactions.collisions.species_pairs[:].species_name,
                 ),
             )
         )
+        return [
+            functor.model_copy(
+                update={
+                    "species_names": [
+                        _SpeciesName(name=name) for name in sorted({n for f, n in registered if f == functor})
+                    ]
+                }
+            )
+            for functor in unique(f for f, _ in registered)
+        ]
 
     def _register_functor_requirements(self):
         """Register the species attributes each diagnostic functor accesses.

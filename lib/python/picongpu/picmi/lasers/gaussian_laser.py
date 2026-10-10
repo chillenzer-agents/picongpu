@@ -81,6 +81,11 @@ class GaussianLaser(PICMI_GaussianLaser, BaseLaser):
         Positions of the Huygens surface inside the PML. Each entry is a
         pair [min, max] indices along x, y, z.
 
+    - picongpu_entry_faces : list[str], optional
+        Explicit per-laser list of Huygens faces to inject through (e.g.
+        ``["XMin", "ZMin"]``). If not given, all faces crossed by
+        ``propagation_direction`` are used. Z faces are rejected in 2D.
+
     - phi0 : float, optional
     Initial phase offset [rad].
 

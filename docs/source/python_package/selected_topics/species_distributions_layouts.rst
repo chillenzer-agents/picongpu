@@ -229,6 +229,33 @@ The available distributions are:
       :start-at: bunch = picmi.GaussianBunchDistribution
       :end-before: electrons = picmi.Species
 
+:class:`~picongpu.picmi.distribution.FromFileDistribution`
+   Loads the particles of a species from an external openPMD file
+   (the PICMI-standard ``FromFileDistribution``).
+   ``file_path`` points at the file and the optional ``iteration``
+   selects the openPMD iteration to read (default ``0``).
+   The file must provide ``position`` and ``positionOffset`` (the latter
+   either a constant record component or the per-particle beginning-of-cell
+   form; its ``unitSI`` is respected), ``momentum`` and ``weighting``.
+   If the file additionally carries ``particlePatches`` in PIConGPU's
+   cell-index layout it is read through the fast checkpoint reader;
+   otherwise every rank reads the whole record and keeps only the particles
+   inside its own domain, which is correct for any such file but slower and
+   less memory-efficient.
+   The file's native datatype is read and converted explicitly, so a
+   double-precision file can be loaded into a single-precision simulation.
+   Because the particle positions and weightings come from the file, a
+   from-file distribution must **not** be paired with a layout and the
+   species must **not** set ``density_scale``: either raises a ``ValueError``.
+   It also cannot be used as a member of a ``MultiSpecies`` (a single file
+   cannot supply several differently-named species) and is currently rejected
+   on a 2D grid, as is a dimensionality that does not match the simulation.
+
+   .. literalinclude:: ../snippets/selected_topics/from_file.py
+      :language: python
+      :start-after: BEGIN-FROM-FILE
+      :end-before: END-FROM-FILE
+
 The reference density used to normalize the code units is
 ``simulation.picongpu_base_density`` (default ``1.0e25`` m⁻³).
 

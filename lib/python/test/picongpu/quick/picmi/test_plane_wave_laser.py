@@ -5,10 +5,12 @@ Authors: Hannes Troepgen, Brian Edward Marre, Alexander Debus, Richard Pausch
 License: GPLv3+
 """
 
+import math
 from unittest import TestCase
 
 import numpy as np
 from scipy.spatial.transform import Rotation
+from picongpu.picmi import constants
 from picongpu.picmi.lasers import PlaneWaveLaser
 from scipy.constants import c
 
@@ -105,3 +107,48 @@ class TestPlaneWaveLaserFieldComputation(TestCase):
         laser = self.make_laser()
         e = laser.E(*self.grid)
         self.assertEqual(e.shape, (3,) + self.grid.shape[1:])
+
+
+class TestPlaneWaveAmplitudeConversion(TestCase):
+    """
+    Pin the ``E0 <-> a0 <-> AMPLITUDE_SI`` conversion of the plane wave against
+    the C++ ``UNITCONV_A0_to_Amplitude_SI`` (see
+    ``include/picongpu/fields/incidentField/profiles/BaseParam.def``).
+
+    The rendered parameter is the SI peak field ``E0`` directly
+    (``incidentField.param.mustache`` renders ``AMPLITUDE_SI = E0_si``): there
+    is no hidden factor between the Python ``E0`` and the amplitude the C++
+    ``PlaneWaveFunctorIncidentE`` uses -- its plateau peak is exactly
+    ``AMPLITUDE``.  These tests pin that conversion so a regression introduced
+    while editing the frontend is caught in the quick suite rather than only on
+    GPU.
+    """
+
+    @staticmethod
+    def _factor(wavelength):
+        # UNITCONV_A0_to_Amplitude_SI = 2*pi/wavelength * m_e * c^2 / q_e
+        return constants.m_e * constants.c**2 * (2.0 * math.pi / wavelength) / constants.q_e
+
+    def _laser(self, **kwargs):
+        base = dict(
+            wavelength=1.0e-6,
+            duration=20.0 / c,
+            propagation_direction=[0.0, 1.0, 0.0],
+            polarization_direction=[1.0, 0.0, 0.0],
+            centroid_position=[0.0, 0.0, 0.0],
+        )
+        return PlaneWaveLaser(**(base | kwargs))
+
+    def test_e0_is_rendered_verbatim_as_amplitude_si(self):
+        laser = self._laser(E0=2.5)
+        self.assertAlmostEqual(laser.get_as_pypicongpu().E0_si, 2.5)
+
+    def test_e0_and_a0_relation_matches_cpp_conversion(self):
+        laser = self._laser(E0=2.5)
+        np.testing.assert_allclose(laser.a0, 2.5 / self._factor(laser.wavelength), rtol=1e-12)
+
+    def test_a0_is_converted_to_si_amplitude(self):
+        laser = self._laser(a0=1.0)
+        np.testing.assert_allclose(
+            laser.get_as_pypicongpu().E0_si, self._factor(laser.wavelength), rtol=1e-12
+        )

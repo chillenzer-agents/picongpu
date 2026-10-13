@@ -26,6 +26,29 @@ class PolarizationType(Enum):
     CIRCULAR = "Circular"
 
 
+ORTHO_TOLERANCE = 1.0e-4
+"""Tolerance for the orthogonality of the laser's propagation and polarization
+directions. Mirrors the C++ compile-time check in
+``include/picongpu/fields/incidentField/profiles/BaseParam.hpp`` (and
+``FromOpenPMDPulse.hpp``), which asserts the (final, unit) direction vectors' dot
+product lies within [-1e-4, 1e-4]."""
+
+
+def _validate_orthogonal_directions(propagation_direction, polarization_direction):
+    """Raise ValueError if the two serialized (x, y, z) direction vectors are not
+    (approximately) orthogonal, mirroring the C++ compile-time check that this
+    layer fails early instead."""
+    dot = sum(p * q for (p, q) in zip(propagation_direction, polarization_direction))
+    if not (-ORTHO_TOLERANCE < dot < ORTHO_TOLERANCE):
+        raise ValueError(
+            "The polarization direction vector must be orthogonal to the "
+            "propagation direction vector (their dot product must lie within "
+            f"[-{ORTHO_TOLERANCE:g}, {ORTHO_TOLERANCE:g}]). You gave "
+            f"{propagation_direction=} and {polarization_direction=} "
+            f"with dot product {dot}."
+        )
+
+
 def _get_huygens_surface_serialized(huygens_surface_positions) -> dict:
     """Serialize huygens surface positions for all laser types"""
     return {
@@ -98,6 +121,14 @@ class _BaseLaser(BaseModel):
         """Axis index (0/1/2) of the largest-magnitude propagation component."""
         magnitudes = [abs(component.component) for component in self.propagation_direction]
         return magnitudes.index(max(magnitudes))
+
+    @model_validator(mode="after")
+    def _validate_orthogonality(self):
+        _validate_orthogonal_directions(
+            tuple(c.component for c in self.propagation_direction),
+            tuple(c.component for c in self.polarization_direction),
+        )
+        return self
 
     @computed_field
     def entry_face(self) -> str:
@@ -246,6 +277,14 @@ class FromOpenPMDPulseLaser(BaseModel):
     huygens_surface_positions: Annotated[list[list[int]], PlainSerializer(_get_huygens_surface_serialized)]
     """Position in cells of the Huygens surface relative to start/
        edge(negative numbers) of the total domain"""
+
+    @model_validator(mode="after")
+    def _validate_orthogonality(self):
+        _validate_orthogonal_directions(
+            tuple(c.component for c in self.propagation_direction),
+            tuple(c.component for c in self.polarization_direction),
+        )
+        return self
 
 
 class TWTSLaser(_BaseLaser):

@@ -131,24 +131,27 @@ class TestPicmiGaussianLaser(TestCase):
         one whose normal is the dominant propagation-direction component, and the
         centroid must be outside the box on that entry side."""
 
-        # (propagation_direction, centroid_position, focal_position, expected entry face)
+        # (propagation_direction, polarization_direction, centroid_position, focal_position, expected entry face);
+        # the polarization is always chosen orthogonal to the propagation direction.
         valid_cases = [
-            ([0, 1, 0], [0.5, -1, 0.5], [0.5, 2, 0.5], "YMin"),
-            ([0, -1, 0], [0.5, 1, 0.5], [0.5, 2, 0.5], "YMax"),
-            ([1, 0, 0], [-1, 0.5, 0.5], [2, 0.5, 0.5], "XMin"),
-            ([-1, 0, 0], [1, 0.5, 0.5], [2, 0.5, 0.5], "XMax"),
-            ([0, 0, 1], [0.5, 0.5, -1], [0.5, 0.5, 2], "ZMin"),
-            ([0, 0, -1], [0.5, 0.5, 1], [0.5, 0.5, 2], "ZMax"),
-            # non-axis direction with a clear dominant (+y) component
+            ([0, 1, 0], [1, 0, 0], [0.5, -1, 0.5], [0.5, 2, 0.5], "YMin"),
+            ([0, -1, 0], [1, 0, 0], [0.5, 1, 0.5], [0.5, 2, 0.5], "YMax"),
+            ([1, 0, 0], [0, 0, 1], [-1, 0.5, 0.5], [2, 0.5, 0.5], "XMin"),
+            ([-1, 0, 0], [0, 0, 1], [1, 0.5, 0.5], [2, 0.5, 0.5], "XMax"),
+            ([0, 0, 1], [1, 0, 0], [0.5, 0.5, -1], [0.5, 0.5, 2], "ZMin"),
+            ([0, 0, -1], [1, 0, 0], [0.5, 0.5, 1], [0.5, 0.5, 2], "ZMax"),
+            # non-axis direction with a clear dominant (+y) component; the polarization
+            # is the unit vector [0, 1, 0] orthogonalized against it (dot product ~1e-16).
             (
                 (np.array([1, 3, 1]) / sqrt(11)).tolist(),
+                tuple(v / sqrt(22.0) for v in (-3.0, 2.0, -3.0)),
                 (np.array([-2, -6, -2]) / sqrt(11)).tolist(),
                 [0, 0, 0],
                 "YMin",
             ),
         ]
 
-        for propagation_direction, centroid, focal, expected_face in valid_cases:
+        for propagation_direction, polarization, centroid, focal, expected_face in valid_cases:
             laser = GaussianLaser(
                 wavelength=1,
                 waist=2,
@@ -156,7 +159,7 @@ class TestPicmiGaussianLaser(TestCase):
                 focal_position=focal,
                 centroid_position=centroid,
                 propagation_direction=propagation_direction,
-                polarization_direction=[1, 0, 0],
+                polarization_direction=polarization,
                 E0=1,
             )
             self.assertEqual(laser.get_as_pypicongpu().entry_face, expected_face)
@@ -196,6 +199,59 @@ class TestPicmiGaussianLaser(TestCase):
                 E0=1,
             )
 
+    def test_directions_must_be_orthogonal(self):
+        """propagation_direction and polarization_direction must be orthogonal
+        (mirroring the C++ compile-time check in BaseParam.hpp / FromOpenPMDPulse.hpp)"""
+
+        # non-orthogonal input must be rejected at the PICMI layer
+        with pytest.raises(ValidationError, match=".*orthogonal.*"):
+            GaussianLaser(
+                wavelength=1,
+                waist=2,
+                duration=3,
+                focal_position=[0, 0, 0],
+                centroid_position=[0, -1, 0],
+                propagation_direction=[0, 1, 0],
+                # normalized, 45 deg off-plane: not orthogonal to +y
+                polarization_direction=(1.0 / sqrt(2.0), 1.0 / sqrt(2.0), 0.0),
+                E0=1,
+            )
+
+        # a near-orthogonal within the 1e-4 tolerance passes
+        eps = 1.0e-6  # |dot| = 1e-6 << 1e-4
+        py, px = sqrt(1.0 - eps**2), eps
+        photogon = GaussianLaser(
+            wavelength=1,
+            waist=2,
+            duration=3,
+            focal_position=[0, 0, 0],
+            centroid_position=[0, -1, 0],
+            propagation_direction=[0, 1, 0],
+            polarization_direction=[px, 0.0, py],
+            E0=1,
+        )
+        assert photogon.get_as_pypicongpu().model_dump() != {}
+
+        # and the pypicongpu layer rejects a non-orthogonal pair directly
+        from picongpu.pypicongpu import laser as pypic_laser
+
+        with pytest.raises(Exception, match=".*orthogonal.*"):
+            pypic_laser.GaussianLaser(
+                wavelength=1,
+                duration=1,
+                propagation_direction=[0, 1, 0],
+                polarization_direction=[1, 1, 0],
+                polarization_type="Linear",
+                focal_position=[0, 0, 0],
+                phi0=0,
+                E0=1,
+                pulse_init=5.0,
+                huygens_surface_positions=[[16, -16], [16, -16], [16, -16]],
+                waist=1,
+                laguerre_modes=[1.0],
+                laguerre_phases=[0.0],
+            )
+
     def test_values_polarization_direction(self):
         """polarization_vector must be normalized"""
         invalid_polarizations = [
@@ -218,8 +274,8 @@ class TestPicmiGaussianLaser(TestCase):
                     E0=1,
                 )
 
-        # valid examples:
-        valid_polarization_vectors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+        # valid examples (orthogonal to the +y propagation direction):
+        valid_polarization_vectors = [(1, 0, 0), (0, 0, 1)]
 
         for valid_polarization_vector in valid_polarization_vectors:
             picmi_laser = GaussianLaser(

@@ -154,6 +154,10 @@ class TWTSLaser(PICMI_Laser, BaseLaser):
                 f"You gave {self.propagation_direction=} with norm {n}."
             )
 
+        # The directions are *derived* from laserIncidenceAngle/polarizationAngle
+        # (computed fields above); validate the derived pair, not user input.
+        self._validate_orthogonal_directions()
+
         if self.propagation_direction[1] <= 0.0:
             raise ValueError(
                 "Laser propagation parallel to the y-plane or pointing outside "

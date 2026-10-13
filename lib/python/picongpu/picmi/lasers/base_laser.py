@@ -20,6 +20,14 @@ PositiveFloat = Annotated[
 ]
 """float that must be strictly > 0"""
 
+ORTHO_TOLERANCE = 1.0e-4
+"""Tolerance for the orthogonality of the laser's propagation and polarization
+directions. Mirrors the C++ compile-time check in
+``include/picongpu/fields/incidentField/profiles/BaseParam.hpp`` (and
+``FromOpenPMDPulse.hpp``), which asserts the (final, unit) direction vectors' dot
+product lies within [-1e-4, 1e-4]. Checking with the same tolerance fails non-
+orthogonal input fast in Python instead of at C++ compile time."""
+
 
 def scalarProduct(a: list[float], b: list[float]) -> float:
     return np.dot(a, b).tolist()
@@ -88,6 +96,27 @@ class BaseLaser:
         if a0 is None:
             a0 = E0 / factor
         return a0, E0
+
+    def _validate_orthogonal_directions(self):
+        """Fail fast on a non-orthogonal (propagation, polarization) pair.
+
+        Mirrors the C++ compile-time ``PMACC_CASSERT`` in
+        ``BaseParam.hpp``/``FromOpenPMDPulse.hpp``: the dot product of the two
+        *unit* direction vectors must lie within [-``ORTHO_TOLERANCE``,
+        ``ORTHO_TOLERANCE``]. Both vectors are required to be normalized (checked
+        before this method runs).
+        """
+        propagation = np.asarray(self.propagation_direction, dtype=float)
+        polarization = np.asarray(self.polarization_direction, dtype=float)
+        dot = float(scalarProduct(propagation, polarization))
+        if not (-ORTHO_TOLERANCE < dot < ORTHO_TOLERANCE):
+            raise ValueError(
+                "The polarization direction vector must be orthogonal to the "
+                "propagation direction vector (their dot product must lie within "
+                f"[-{ORTHO_TOLERANCE:g}, {ORTHO_TOLERANCE:g}]). You gave "
+                f"{self.propagation_direction=} and {self.polarization_direction=} "
+                f"with dot product {dot}."
+            )
 
     def _pulse_duration_sigma_si(self):
         """Pulse duration in s, as the 1 sigma of a standard gaussian for the intensity (E^2).
@@ -165,6 +194,8 @@ class BaseLaser:
                 "The propagation direction vector must be normalized. "
                 f"You gave {self.propagation_direction=} with norm {n}."
             )
+
+        self._validate_orthogonal_directions()
 
         axis = self._entry_axis()
         entry_axis_name = "xyz"[axis]

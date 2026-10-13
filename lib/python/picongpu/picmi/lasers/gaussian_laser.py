@@ -206,22 +206,17 @@ class GaussianLaser(PICMI_GaussianLaser, BaseLaser):
 
     def _polarization_vector_standard_conditions_at(self, x, y, z, t):
         """
-        This is
-        - focus is in the origin at t=0
-        - propagation in z direction
-        - polarization in x direction
+        Constant polarization vector (mirrors C++ GaussianPulseFunctorIncidentE::
+        getLinearPolarizationVector()).
+
+        Unlike the scalar envelope, the polarization direction does NOT vary with
+        the transverse coordinates across the curved wavefront.  The coordinate-
+        dependent rotation that was previously applied here produced a spurious
+        ``E_x ∝ x`` component of up to ~5 % of ``E_z`` at a 1.5 µm waist; this is
+        absent from the C++ functor and from DispersivePulseLaser.
         """
-        if self.picongpu_polarization_type == PolarizationType.LINEAR:
-            w0x = self.waist
-            w0y = self.waist
-            angle_x = np.arcsin(x * self._inverse_curvature_radius(z, w0x))
-            angle_y = np.arcsin(y * self._inverse_curvature_radius(z, w0y))
-            r = Rotation.from_euler("xy", np.moveaxis(np.asarray([angle_x, angle_y]), 0, -1))
-            return np.moveaxis(r.apply(self.polarization_direction), -1, 0)
-        elif self.picongpu_polarization_type == PolarizationType.CIRCULAR:
-            raise NotImplementedError("Circular polarization is not yet implemented.")
-        else:
-            raise ValueError("Unknown {self.picongpu_polarization_type=}.")
+        shape = np.broadcast_shapes(np.shape(x), np.shape(y), np.shape(z))
+        return np.reshape(self.polarization_direction, (-1,) + (1,) * len(shape)) * np.ones((3,) + tuple(shape))
 
     def polarization_vector_at(self, x, y, z, t=0.0):
         return self._polarization_vector_standard_conditions_at(*self._to_standard_coordinates(x, y, z, t))

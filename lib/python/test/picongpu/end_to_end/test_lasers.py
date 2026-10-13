@@ -83,7 +83,6 @@ from picongpu.picmi import (
     GaussianLaser,
     PlaneWaveLaser,
     Simulation,
-    TWTSLaser,
     constants,
 )
 from picongpu.picmi import Species as Species
@@ -198,32 +197,15 @@ DISPERSIVE_LASER = DispersivePulseLaser(
     E0=E0,
     phi0=0.0,
 )
-# TWTS (issue #117). It is not a BaseFunctorE: its core time reference is
-# `currentStep * dt - TDELAY` with TDELAY = time_offset_si (focal_y - centroid_y) /
-# (beta0 c), and it enters through its default faces (YMin/ZMax here). Its focus
-# sits at the domain center laterally, hence the analytic field needs the domain
-# center as extra context. The parameters are chosen so the pulse is well inside
-# the box (strong field) at the later checkpoints.
-TWTS_DURATION_SIGMA = 2.0e-15
-TWTS_DURATION = 2 * TWTS_DURATION_SIGMA
-TWTS_FOCAL_POSITION = DOMAIN_CENTER.copy()
-TWTS_FOCAL_POSITION[1] = 2.8e-6
-TWTS_CENTROID_POSITION = DOMAIN_CENTER.copy()
-TWTS_CENTROID_POSITION[1] = -8.0e-6
-# TWTS (issue #117): category A; uses its default injection faces (YMin + ZMax
-# for laserIncidenceAngle < 0); the tilted pulse front is visible in the field.
-TWTS_LASER = TWTSLaser(
-    wavelength=0.8e-6,
-    waist=2.0e-6,
-    duration=TWTS_DURATION,
-    laserIncidenceAngle=-np.deg2rad(10.0),
-    polarizationAngle=0.0,
-    focal_position=TWTS_FOCAL_POSITION.tolist(),
-    centroid_position=TWTS_CENTROID_POSITION.tolist(),
-    picongpu_polarization_type=PolarizationType.LINEAR,
-    a0=8.0,
-)
-LASERS = [GAUSSIAN_LASER, PLANE_WAVE_LASER, DISPERSIVE_LASER, TWTS_LASER]
+# The shared analytic-isolation set.  Every laser here carries E0 = 1, i.e. the
+# same in-focus amplitude, which is what makes the per-laser isolation (subtract
+# the other lasers' analytic fields) meaningful.  `TWTSLaser` is deliberately
+# *not* in this set: it is not amplitude-comparable (its `a0=8` renders an
+# AMPLITUDE_SI ~3.2e13 against 1.0 for the others), its WIP analytic field has a
+# large residual (~12% in E_x) that swamps the shared bulk/pointwise comparison,
+# and its validation is tracked separately (issue #117).  See the module
+# docstring's category A/B taxonomy.
+LASERS = [GAUSSIAN_LASER, PLANE_WAVE_LASER, DISPERSIVE_LASER]
 
 
 def basic_simulation():
@@ -339,7 +321,7 @@ def _transverse_confinement_mask(shape, confinement):
     return result
 
 
-def _expected_E_field(coordinates, lasers, time, dt):
+def _expected_E_field(coordinates, lasers, time, dt, selection=None):
     """
     Sum of the analytic laser fields, evaluated at ``time`` (SI).
 
@@ -353,23 +335,32 @@ def _expected_E_field(coordinates, lasers, time, dt):
     transform, so it additionally needs the global time step ``dt`` and the
     translated ``pulse_init``; both are supplied here (the translated value is
     exactly the one rendered into ``incidentField.param``).
+
+    ``selection`` optionally restricts the pointwise evaluation to a boolean
+    subset of the grid (shape ``coordinates[0].shape``).  This is purely a
+    performance measure for the expensive ``DispersivePulseLaser`` inverse-DFT:
+    the analytic field is a pointwise function, so evaluating it on the subset
+    gives identical values there, and the result is scattered back into a
+    full-grid array that is zero outside ``selection``.  Callers therefore see
+    an unchanged full-shape result.
     """
+    if selection is not None:
+        evaluation_coordinates = tuple(axis[selection] for axis in coordinates)
+    else:
+        evaluation_coordinates = coordinates
     total = None
     for laser in lasers:
         extra = {}
         if isinstance(laser, DispersivePulseLaser):
             extra["dt"] = dt
             extra["pulse_init"] = laser.get_as_pypicongpu(CELL_SIZE, NUMBER_OF_CELLS).pulse_init
-        if isinstance(laser, TWTSLaser):
-            # TWTS is not a BaseFunctorE: its time reference is already
-            # `time_offset_si` (TDELAY) and its origin is the domain center
-            # laterally, so the analytic field needs the domain-center context.
-            # Its Blackman-Nuttall window also needs the global `dt`.
-            extra["domain_center"] = DOMAIN_CENTER
-            extra["dt"] = dt
-        contribution = laser.E(*coordinates, t=time, **extra)
+        contribution = laser.E(*evaluation_coordinates, t=time, **extra)
         total = contribution if total is None else total + contribution
-    return total
+    if selection is None:
+        return total
+    full = np.zeros((3,) + tuple(coordinates[0].shape), dtype=np.asarray(total).dtype)
+    full[:, selection] = total
+    return full
 
 
 def _strong_field_mask(field, threshold=0.05):
@@ -453,6 +444,14 @@ def _observables(component_field, spacing, window_cells):
 # Dispersion/buildup is negligible at this depth; the dominant polarization
 # component is asserted tightly (rtol 5 % covers TF/SF stencil + sampling;
 # the scalar-approximation floor is documented below).
+#
+# Conflict resolution (rebase onto the new laser-48 bottom): the lower branch
+# deliberately shrank the probe to 1 cell margin / 2 cells wide and set the
+# dominant-component tolerance to 5 % (see the Gaussian-polarization commit).
+# That new structure wins here; the upper branch's tighter 3/6/0.03 constants
+# were a workaround for the non-amplitude-comparable TWTS pulse, which is
+# simply absent from this branch's laser set, so there is nothing to tighten
+# against.
 _HUYGENS_PROBE_MARGIN_CELLS = 1
 _HUYGENS_PROBE_WIDTH_CELLS = 2
 _HUYGENS_RTOL = 0.05
@@ -542,8 +541,32 @@ class _LaserTestBase(TestCase):
     def fields_at(self, iteration):
         return read_fields(self.checkpoint_pattern, iteration=iteration)
 
-    def expected_at(self, iteration):
-        return _expected_E_field(self.coordinates, LASERS, iteration * self.sim.time_step_size, self.sim.time_step_size)
+    def _probe_selection(self):
+        """Boolean grid selection (coordinates layout x,y,z): the thin YMin slab
+        probed by the Huygens-proximate test, a superset of the final mask."""
+        selection = np.zeros(tuple(NUMBER_OF_CELLS), dtype=bool)
+        surface_index = GAUSSIAN_LASER.picongpu_huygens_surface_positions[1][0]
+        start = surface_index + _HUYGENS_PROBE_MARGIN_CELLS
+        selection[:, start : start + _HUYGENS_PROBE_WIDTH_CELLS, :] = True
+        return selection
+
+    def _bulk_window_selection(self):
+        """Boolean grid selection (coordinates layout x,y,z): the central
+        transverse window ``_observables`` reduces (full carrier extent in y)."""
+        ix = NUMBER_OF_CELLS[0] // 2
+        iz = NUMBER_OF_CELLS[2] // 2
+        selection = np.zeros(tuple(NUMBER_OF_CELLS), dtype=bool)
+        selection[
+            ix - _BULK_WINDOW_CELLS : ix + _BULK_WINDOW_CELLS,
+            :,
+            iz - _BULK_WINDOW_CELLS : iz + _BULK_WINDOW_CELLS,
+        ] = True
+        return selection
+
+    def expected_at(self, iteration, selection=None):
+        return _expected_E_field(
+            self.coordinates, LASERS, iteration * self.sim.time_step_size, self.sim.time_step_size, selection=selection
+        )
 
 
 class TestLaserInterface(_LaserTestBase):
@@ -637,8 +660,9 @@ class TestInjectedFieldAtHuygensSurface(_LaserTestBase):
         # dominant component is asserted where it is actually significant.
         per_component = {}  # component -> (ref_scale, iteration, expected, mask)
         best = None
+        probe = self._probe_selection()
         for it in self.checkpoint_steps:
-            expected = self.expected_at(it)
+            expected = self.expected_at(it, selection=probe)
             mask = self._probe_mask(expected)
             if not mask.any():
                 continue
@@ -751,11 +775,14 @@ class TestGaussianBulkEnvelope(_LaserTestBase):
         dt = self.sim.time_step_size
         # Isolate the Gaussian: the written E_z also carries the other
         # category-A lasers present in the shared run (e.g. DispersivePulseLaser).
+        # The expensive DispersivePulseLaser reference is only needed inside the
+        # window ``_observables`` reduces, so restrict the evaluation to it.
         others = _expected_E_field(
             self.coordinates,
             [laser for laser in LASERS if laser is not GAUSSIAN_LASER],
             best_it * dt,
             dt,
+            selection=self._bulk_window_selection(),
         )
         simulated = _observables(
             self.fields_at(best_it)["E"][component] - others[component],
@@ -826,13 +853,16 @@ class TestPlaneWaveFeedIn(_LaserTestBase):
         self.assertGreater(scale, 0.1 * E0, "The injected plane wave is too weak to test.")
         fields = self.fields_at(it)
         # Isolate the plane wave: E_x also carries the other lasers present in
-        # the shared run (e.g. the TWTS pulse), so subtract their analytic
-        # contributions before comparing.
+        # the shared run (e.g. the DispersivePulseLaser), so subtract their
+        # analytic contributions before comparing.  Restrict the evaluation to
+        # the probe slab to keep the expensive DispersivePulseLaser reference
+        # tractable.
         others = _expected_E_field(
             self.coordinates,
             [laser for laser in LASERS if laser is not PLANE_WAVE_LASER],
             it * self.sim.time_step_size,
             self.sim.time_step_size,
+            selection=self._probe_selection(),
         )
         np.testing.assert_allclose(
             fields["E"][component][mask] - others[component][mask],

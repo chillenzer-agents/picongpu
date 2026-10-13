@@ -187,9 +187,10 @@ Use the PIConGPU extension keyword ``picongpu_entry_faces`` to give an
 explicit per-laser face list, which overrides the derived all-crossed
 default. It is available on the standard lasers
 (:class:`~picongpu.picmi.lasers.GaussianLaser`,
-:class:`~picongpu.picmi.lasers.DispersivePulseLaser` and
-:class:`~picongpu.picmi.lasers.PlaneWaveLaser`); ``TWTSLaser`` and
-``FromOpenPMDPulseLaser`` have a fixed placement and reject it.
+:class:`~picongpu.picmi.lasers.DispersivePulseLaser`,
+:class:`~picongpu.picmi.lasers.PlaneWaveLaser` and
+:class:`~picongpu.picmi.lasers.FromOpenPMDPulseLaser`); ``TWTSLaser``
+keeps a dedicated two-plane placement and rejects it.
 
 .. literalinclude:: ../snippets/selected_topics/laser_multi_face.py
    :language: python
@@ -259,6 +260,19 @@ Laser types
    A pulse imported from an `openPMD <https://www.openpmd.org/>`__ file
    (``file_path``, ``iteration``, ``dataset_name``, ...),
    for initial conditions that are too complex to describe analytically.
+   Like the standard lasers it is placed on the faces its
+   ``propagation_direction`` crosses, and ``picongpu_entry_faces`` may
+   override the derived list (it is not rejected for this laser type). The
+   profile requires an axis-parallel direction (core constraint, checked in
+   the frontend), so the derived list is exactly one face;
+   ``propagationAxisOpenPMD`` names the record axis the stored pulse runs
+   along and need not coincide with the direction's axis — the core rotates
+   the record into the simulation frame. Two caveats are the user's
+   responsibility: the stored dataset is loaded once per parameter type at
+   t=0 (``OpenPMDdata<T_Params>::get()``), so listing the same pulse under
+   several faces shares one on-device dataset (memory, not correctness), and
+   an explicit face list the direction does not head for is physically
+   meaningless even though the core accepts it.
 
 .. note::
 

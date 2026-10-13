@@ -282,7 +282,13 @@ class FromOpenPMDPulseLaser(BaseModel):
     """
     PIConGPU FromOpenPMDPulseLaser
 
-    Holds Parameters to specify a laser pulse from an OpenPMD file
+    Holds Parameters to specify a laser pulse from an OpenPMD file.
+
+    The record profile is a face-agnostic ``FromOpenPMDPulse<T_Params>`` at the
+    C++ layer, and the solver allows it to be listed under any face list
+    (duplicates included), so it uses the same entry-face machinery as the
+    other laser types: the derived (or explicitly given) face list is exposed
+    as the ``on_*`` membership flags the template renders against.
     """
 
     type_fromOpenPMDPulse: Literal[True] = True
@@ -320,6 +326,54 @@ class FromOpenPMDPulseLaser(BaseModel):
             tuple(c.component for c in self.polarization_direction),
         )
         return self
+
+    entry_faces: list[str] = Field(exclude=True)
+    """coordinate faces this laser is injected through (see :data:`ENTRY_FACES`).
+
+    The same pulse profile is listed under each of these faces so that one
+    physical pulse enters the box across all of them. All entries must be from
+    :data:`ENTRY_FACES` and free of duplicates. The ``exclude`` keeps the list out
+    of ``model_dump``; the template uses the ``on_*`` membership flags.
+    """
+
+    @field_validator("entry_faces")
+    @classmethod
+    def _validate_entry_faces(cls, entry_faces):
+        illegal = [face for face in entry_faces if face not in ENTRY_FACES]
+        if illegal:
+            raise ValueError(
+                f"Unknown Huygens entry face(s) {illegal}. Valid faces are {list(ENTRY_FACES)}. "
+                f"You gave {entry_faces=}."
+            )
+        if len(set(entry_faces)) != len(entry_faces):
+            raise ValueError(f"Duplicate Huygens entry faces are not allowed. You gave {entry_faces=}.")
+        if not entry_faces:
+            raise ValueError("At least one Huygens entry face must be selected.")
+        return entry_faces
+
+    @computed_field
+    def on_XMin(self) -> bool:
+        return "XMin" in self.entry_faces
+
+    @computed_field
+    def on_XMax(self) -> bool:
+        return "XMax" in self.entry_faces
+
+    @computed_field
+    def on_YMin(self) -> bool:
+        return "YMin" in self.entry_faces
+
+    @computed_field
+    def on_YMax(self) -> bool:
+        return "YMax" in self.entry_faces
+
+    @computed_field
+    def on_ZMin(self) -> bool:
+        return "ZMin" in self.entry_faces
+
+    @computed_field
+    def on_ZMax(self) -> bool:
+        return "ZMax" in self.entry_faces
 
 
 class TWTSLaser(_BaseLaser):

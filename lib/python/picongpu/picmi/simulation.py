@@ -591,9 +591,11 @@ class Simulation(picmistandard.PICMI_Simulation):
         if isinstance(self.solver.grid, Cartesian2DGrid):
             # 2D3V: there is no spatial z coordinate (momentum still has all three components).
             # A Huygens surface cannot be placed on a Z face either (answer 5 of
-            # https://github.com/chillenzer-agents/picongpu/issues/180). Only
-            # standard lasers carry an entry-face selection (TWTS and
-            # fromOpenPMDPulse keep their dedicated placement).
+            # https://github.com/chillenzer-agents/picongpu/issues/180). The standard
+            # lasers and the FromOpenPMD pulse both carry an entry-face selection
+            # (the latter since it renders via the on_* face guards like them), so
+            # any Z selection is rejected for them; TWTS keeps its dedicated
+            # two-plane placement, and the core prunes its Z profiles in 2D.
             for laser in self.lasers:
                 if (validate := getattr(laser, "validate_entry_faces", None)) is not None:
                     validate(2)

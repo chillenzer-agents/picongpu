@@ -92,6 +92,13 @@ from picongpu.picmi.lasers import PolarizationType
 from .arbitrary_parameters import gather_results
 from .compare_particles import read_fields, read_grids
 
+# The two laser e2e classes run a full 340-step 256^3 launch (the team's
+# accepted geometry, see below), which can exceed the shared default wait
+# budget of arbitrary_parameters.TIMEOUT_COUNT x sleep_interval (100 x 5 s =
+# 500 s), so pass a per-test budget instead of bumping the module constant for
+# every other e2e user.
+GATHER_TIMEOUT_COUNT = 200
+
 logging.basicConfig(level=logging.INFO)
 
 # ---------------------------------------------------------------------------
@@ -535,7 +542,7 @@ class _LaserTestBase(TestCase):
         global SIM
         if SIM is None:
             SIM = setup_sim()
-            gather_results(SIM.picongpu_get_runner().run_dir)
+            gather_results(SIM.picongpu_get_runner().run_dir, timeout_count=GATHER_TIMEOUT_COUNT)
         self.sim = SIM
         self.coordinates = np.transpose(
             np.meshgrid(
@@ -937,6 +944,7 @@ class TestPlaneWaveFeedIn(_LaserTestBase):
             err_msg=f"Injected plane wave (E_x) disagrees with the analytic waveform at iteration {it}.",
         )
 
+
 # ---------------------------------------------------------------------------
 # One physical pulse injected from multiple Huygens faces
 # (https://github.com/chillenzer-agents/picongpu/issues/180)
@@ -1010,7 +1018,7 @@ class TestMultiFaceLaser(TestCase):
         if MULTIFACE_SIM is None:
             MULTIFACE_SIM = setup_multiface_sim()
         self.sim = MULTIFACE_SIM
-        gather_results(self.result_path)
+        gather_results(self.result_path, timeout_count=GATHER_TIMEOUT_COUNT)
         self.coordinates = np.transpose(
             np.meshgrid(
                 *(

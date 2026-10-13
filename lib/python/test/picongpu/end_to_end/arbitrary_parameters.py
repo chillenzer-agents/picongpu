@@ -27,13 +27,14 @@ ALL_UNITS = ["cell", "si", "pic"]
 NUMBER_OF_GUARD_CELLS = [8, 8, 4]
 EPSILON = 1.0e-5
 
-# Wait budget = TIMEOUT_COUNT x sleep_interval (5 s) per gathered result; the
-# two 300-step laser e2e runs (~700 s each on the reduced CI node) need
-# headroom above 100 (500 s).
-TIMEOUT_COUNT = 200
+# Default wait budget = TIMEOUT_COUNT x sleep_interval (5 s) per gathered
+# result. 100 (500 s) covers the short (64x64x32-box) e2e runs; the slow
+# 300-step 192x128x192 laser e2e runs (~700 s each on the reduced CI node)
+# pass a larger budget to gather_results (see test_lasers.py).
+TIMEOUT_COUNT = 100
 
 
-def _wait_until(function, sleep_interval=5, timeout_count=TIMEOUT_COUNT):
+def _wait_until(function, sleep_interval=5, timeout_count=TIMEOUT_COUNT) -> None:
     for _ in range(timeout_count):
         if not function():
             sleep(sleep_interval)
@@ -86,17 +87,18 @@ def _make_wait_function_from(submission_information, submission_cmd="bash"):
             raise NotImplementedError("Only bash submission information can be parsed at this point.")
 
 
-def gather_results(result_path: str | Path):
+def gather_results(result_path: str | Path, timeout_count: int = TIMEOUT_COUNT):
     # `result_path` may arrive as a plain string: the runner stores `run_dir`
     # verbatim when a caller assigns to it (e.g. the laser e2e test's
     # PICONGPU_LASER_TEST_RUN_DIR reuse path), and `str / str` is a TypeError.
     result_path = Path(result_path)
     # job has to finish
     _wait_until(
-        _make_wait_function_from(result_path / "submission_information.txt", rc_params.get("tbg_submit", "bash"))
+        _make_wait_function_from(result_path / "submission_information.txt", rc_params.get("tbg_submit", "bash")),
+        timeout_count=timeout_count,
     )
     # CWLtool has to copy over the files
-    _wait_until(lambda: (result_path / "link_results.sh").exists())
+    _wait_until(lambda: (result_path / "link_results.sh").exists(), timeout_count=timeout_count)
 
     run([result_path / "link_results.sh", result_path])
 

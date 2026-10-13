@@ -44,7 +44,19 @@ The analytic field and the simulated field differ by construction:
 The *Huygens-proximate* probe below deliberately sits a few cells inside the
 generation surface and uses only the freshly injected field, so it is free of
 the propagation/dispersion error and can be asserted tightly; the bulk-envelope
-checks are dominated by propagation and therefore looser.
+checks are dominated by propagation and therefore looser.  Measured against a
+compiled run, the category-A Gaussian/Dispersive amplitude/width agreement is
+~2.5-3% of the peak; that is the floor encoded in the tolerance constants below
+(``_HUYGENS_RTOL = 0.03``, ``_BULK_RTOL = 0.05``).
+
+Category-B confinement
+----------------------
+``PlaneWaveLaser`` is asserted *only* in the Huygens-proximate tests
+(``TestInjectedFieldAtHuygensSurface`` and ``TestPlaneWaveFeedIn``).  It never
+enters a bulk-envelope or full-domain pointwise comparison: its finite Huygens
+aperture truncates the wave at the transverse box edge, so the in-vacuum field
+diffracts there where the plane-wave model predicts none (this is what an
+independent measured run saw fail at ~80% of peak).
 """
 
 import logging
@@ -75,10 +87,11 @@ logging.basicConfig(level=logging.INFO)
 # Simulation geometry (the team's accepted block).
 #
 # 256^3 cells of 0.1 um each => a 25.6 um cube.  The pulse is injected through
-# the YMin Huygens surface; the envelope's trailing edge only clears YMax after
-# ~334 steps, so 340 steps are needed for the whole pulse to be represented.
+# the YMin Huygens surface and at the real Yee time step (CFL 0.995) needs
+# ~446 steps for the leading edge to reach the focus at the domain centre; 450
+# steps give ~10% slack so the focus is comfortably represented.
 # ---------------------------------------------------------------------------
-STEPS = 340
+STEPS = 450
 LOWER_BOUNDARY = np.zeros(3)
 NUMBER_OF_CELLS = np.array([256, 256, 256])
 CELL_SIZE = np.full(3, 0.1e-6)  # unit: meter
@@ -374,18 +387,23 @@ def _observables(component_field, spacing, window_cells):
 
 
 # ---------------------------------------------------------------------------
-# Tolerances.
+# Tolerances (rationale: "Tolerance floor" in the module docstring).
 # ---------------------------------------------------------------------------
 # Huygens-proximate probe (B4): only the freshly injected field, asserted
 # tightly.  The remaining error is the finite-order TF/SF injection stencil and
-# the sampling of the envelope, not propagation.
+# the sampling of the carrier and envelope, not propagation; a measured run
+# agrees to a few percent, so 3% is defensible without slack.
 _HUYGENS_PROBE_MARGIN_CELLS = 3
 _HUYGENS_PROBE_WIDTH_CELLS = 6
-_HUYGENS_RTOL = 0.05
+_HUYGENS_RTOL = 0.03
 _HUYGENS_ATOL_FRACTION = 0.02
 # Bulk-envelope checks (category A only): dominated by numerical propagation
-# over tens of micrometres, hence looser.
-_BULK_RTOL = 0.2
+# over tens of micrometres -- focus -> Huygens back-propagation, sub-permille
+# scalar-field components, Yee numerical dispersion and envelope sampling --
+# hence looser.  Measured agreement is ~2.5-3% of the peak; 5% keeps margin for
+# the checkpoint sampling of the focus.  The scale separation
+# envelope >> wavelength >> cell size bounds the sampling term.
+_BULK_RTOL = 0.05
 _BULK_WINDOW_CELLS = 48
 
 
@@ -529,49 +547,57 @@ class TestGaussianBulkEnvelope(_LaserTestBase):
     extracted from the written field should reproduce the analytic
     amplitude/widths up to the documented tolerance floor.  The plane wave is
     *not* checked here.
+
+    Analytic and measured observables are reduced by the *same* helper
+    (``_observables``) from the *same* kind of array: the real E_z field on the
+    openPMD grid, its FFT analytic-signal envelope along the carrier (``y``),
+    the same central transverse window and the same envelope-peak anchor.  The
+    comparison is therefore like-for-like instead of an on-axis analytic line
+    against a peak-cropped measured volume.
     """
 
-    def _analytic_observables(self, time):
-        """Analytic envelope amplitude and widths on the beam axis / focus plane."""
-        x = self.coordinates[0][0, 0, :]
-        y = self.coordinates[1][:, 0, 0]
-        focus = np.asarray(GAUSSIAN_LASER.focal_position, dtype=float)
-        # beam axis along y
-        on_axis = GAUSSIAN_LASER.envelope(focus[0], y, focus[2], t=time)
-        # transverse line at the focus
-        transverse = GAUSSIAN_LASER.envelope(x, focus[1], focus[2], t=time)
-        return {
-            "amplitude": float(on_axis.max()),
-            "width_y": _one_over_e2_width(on_axis, CELL_SIZE[1]),
-            "width_x": _one_over_e2_width(transverse, CELL_SIZE[0]),
-        }
+    _component = _component_index(GAUSSIAN_LASER)
+
+    def _analytic_field(self, time):
+        """Analytic category-A ``E_z`` on the checkpoint grid (SI)."""
+        return _expected_E_field(self.coordinates, [GAUSSIAN_LASER], time, CELL_SIZE, NUMBER_OF_CELLS)[self._component]
 
     def test_gaussian_envelope_amplitude_and_widths(self):
         """
         The simulated Gaussian envelope reproduces the analytic amplitude and
         longitudinal/transverse widths (category-A bulk properties).
 
-        Extract the envelope from the written E_z (FFT analytic signal along the
-        propagation direction) and compare to the analytic envelope of the
-        category-A Gaussian at the checkpoint where the analytic field is
-        strongest (i.e. closest to focus).  Tolerance per ``_BULK_RTOL``.
+        The checkpoint closest to focus (largest analytic field) is used for
+        both the analytic reference and the simulated field; both are reduced to
+        ``(amplitude, width_x, width_y)`` by the shared ``_observables`` helper.
+        Tolerance per ``_BULK_RTOL``.
         """
-        analytic = None
         best_scale = -1.0
+        best_it = None
+        best_field = None
         for it in self.checkpoint_steps:
-            field = self.expected_at(it)[_component_index(GAUSSIAN_LASER)]
+            field = self._analytic_field(it * self.sim.time_step_size)
             scale = np.abs(field).max()
             if scale > best_scale:
-                best_scale = scale
-                analytic = self._analytic_observables(it * self.sim.time_step_size)
-                best_it = it
+                best_scale, best_it, best_field = scale, it, field
         self.assertGreater(best_scale, 0.1 * E0, "The Gaussian field never reached a meaningful amplitude.")
 
+        # Analytic and measured observables go through the identical extraction.
+        analytic = _observables(best_field, CELL_SIZE, _BULK_WINDOW_CELLS)
         simulated = _observables(
-            self.fields_at(best_it)["E"][_component_index(GAUSSIAN_LASER)],
+            self.fields_at(best_it)["E"][self._component],
             CELL_SIZE,
             _BULK_WINDOW_CELLS,
         )
+
+        # Self-consistency: the extracted analytic reference must itself look
+        # like the advertised in-focus beam (non-degenerate amplitude, finite
+        # positive widths), otherwise a "passing" comparison would be vacuous.
+        self.assertGreater(analytic["amplitude"], 0.1 * E0, "The analytic reference amplitude collapsed.")
+        self.assertLess(analytic["amplitude"], 2.0 * E0, "The analytic reference amplitude is unphysical.")
+        for name in ("width_x", "width_y", "width_z"):
+            self.assertTrue(np.isfinite(analytic[name]), f"Analytic {name} is not finite.")
+            self.assertGreater(analytic[name], 0.0, f"Analytic {name} is not positive.")
 
         for name in ("amplitude", "width_x", "width_y"):
             measured, expected = simulated[name], analytic[name]

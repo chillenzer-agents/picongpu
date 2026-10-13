@@ -215,7 +215,7 @@ def setup_sim():
     # centre.
     sim.diagnostics = [Checkpoint(period=TimeStepSpec[::50])]
     if RUN_DIR:
-        sim.picongpu_get_runner().run_dir = str(RUN_DIR)
+        sim.picongpu_get_runner().run_dir = RUN_DIR
     else:
         sim.step(STEPS)
     return sim

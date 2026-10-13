@@ -77,6 +77,24 @@ class GaussianLaser(PICMI_GaussianLaser, BaseLaser):
     Notes:
     - Exactly one of ``a0`` or ``E0`` must be provided, the other is
       calculated automatically.
+
+    Analytic field (category A)
+    ---------------------------
+    This is a **category-A** laser: it is derived from its focus properties
+    (``waist``, ``focal_position``), so its analytic ``E`` is *what the laser
+    would look like in perfect vacuum* at ``(x, y, z, t)`` --
+    a diffraction-aware description of the focused beam.
+    Category-A lasers are the only ones exposed to *bulk* envelope-property
+    checks; category-B lasers (``PlaneWaveLaser``, ``FromOpenPMDPulseLaser``)
+    are only checked at the feed-in surface.
+
+    The methods follow the shared analytic-field contract (see
+    :class:`~picongpu.picmi.lasers.base_laser.BaseLaser`): SI coordinates in
+    metres, SI time in seconds, SI fields in V/m, vector fields returned
+    component-first with shape ``(3,) + x.shape``.  The formula is a scalar
+    field times a polarization vector and drops the sub-permille longitudinal /
+    transverse vector components; see ``lasers.rst`` for the documented
+    limitations and the tolerance floor.
     """
 
     picongpu_polarization_type: PolarizationType = PolarizationType.LINEAR
@@ -223,9 +241,22 @@ class GaussianLaser(PICMI_GaussianLaser, BaseLaser):
         return x, y, z, t
 
     def complex_amplitude(self, x, y, z, t=0.0):
+        """
+        Complex scalar field amplitude [V/m] at SI ``(x, y, z)`` and time ``t``.
+
+        Category-A semantics: this is the amplitude of the field the laser would
+        have in perfect vacuum; for a Gaussian laser the on-axis, in-focus value
+        is ``E0``.  Shape ``x.shape``; see the class docstring for the contract.
+        """
         return self._complex_amplitude_standard_conditions(*self._to_standard_coordinates(x, y, z, t))
 
     def E(self, x, y, z, t=0.0):
+        """
+        Real vector electric field [V/m] at SI ``(x, y, z)`` and time ``t``.
+
+        Component-first, shape ``(3,) + x.shape``; the carrier is the real part
+        of :meth:`complex_amplitude` times the (curved) polarization vector.
+        """
         return (
             self.polarization_vector_at(x, y, z, t)
             * np.real(self.complex_amplitude(x, y, z, t)).astype(float)[np.newaxis, ...]
@@ -241,6 +272,11 @@ class GaussianLaser(PICMI_GaussianLaser, BaseLaser):
         return self.E(x, y, z, t)[2]
 
     def envelope(self, x, y, z, t=0.0):
+        """
+        Absolute value of :meth:`complex_amplitude` [V/m] at SI ``(x, y, z)``.
+
+        This is the carrier-free envelope of the field; shape ``x.shape``.
+        """
         return np.abs(self.complex_amplitude(x, y, z, t))
 
 

@@ -37,6 +37,13 @@ class DispersivePulseLaser(GaussianLaser):
         Group delay dispersion (GDD) [s^2].
     - picongpu_tod_si : float, default=0.0
         Third-order dispersion (TOD) [s^3].
+
+    Analytic field (category A)
+    ---------------------------
+    Like :class:`~picongpu.picmi.lasers.GaussianLaser`, this is a
+    **category-A** laser (derived from its focus properties); its analytic
+    ``E`` is the perfect-vacuum field.  See ``lasers.rst`` for the taxonomy and
+    the shared contract.
     """
 
     picongpu_spectral_support: float = 6.0

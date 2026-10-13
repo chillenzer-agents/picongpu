@@ -35,7 +35,28 @@ def difference(a: list[float], b: list[float]) -> list[float]:
 
 class BaseLaser:
     """
-    Base class for all PICMI laser implementations to reduce code duplication
+    Base class for all PICMI laser implementations to reduce code duplication.
+
+    Analytic-field contract
+    -----------------------
+    Lasers that expose ``E``/``complex_amplitude``/``envelope`` (and the
+    per-component ``Ex``/``Ey``/``Ez``) share one contract.
+    The analytic interface currently exposes the electric field only; no
+    magnetic field ``B`` is provided (the C++ incident-field solver derives it
+    from ``E`` via the slowly-varying-envelope approximation).
+
+    * SI coordinates in metres and SI time in seconds; the returned fields are
+      in V/m;
+    * the vector field is returned *component first*, shape
+      ``(3,) + x.shape``, while ``complex_amplitude``/``envelope`` are scalar
+      with shape ``x.shape``; the inputs may be scalars or equal-shaped arrays
+      (e.g. from ``numpy.meshgrid``);
+    * the formula describes the outgoing/incident beam around the focus and is
+      a scalar field times a polarization vector -- it is not a solution of the
+      full Maxwell system.
+
+    See ``docs/source/python_package/selected_topics/lasers.rst`` for the
+    category-A/B taxonomy and the documented limitations / tolerance floor.
     """
 
     def _propagation_connects_centroid_and_focus(self):

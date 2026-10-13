@@ -3,6 +3,48 @@ This file is part of PIConGPU.
 Copyright 2026 PIConGPU contributors
 Authors: Julian Lenz
 License: GPLv3+
+
+End-to-end tests for the analytic PICMI lasers and their injection through the
+Huygens surface.
+
+Test intents (see ``docs/source/python_package/selected_topics/lasers.rst``,
+"Analytic fields"):
+
+* **interface / usability** -- the setup renders, the grid layout matches, the
+  checkpoint diagnostics are readable (``TestLaserInterface``);
+* **semantics / correctness** -- the field the simulation injects equals the
+  analytic field the laser object advertises
+  (``TestInjectedFieldAtHuygensSurface``) and, for category-A lasers, its bulk
+  envelope properties match the analytic model (``TestGaussianBulkEnvelope``).
+
+Category A/B taxonomy (enforced here):
+
+* **A** (derived from the focus properties) ``GaussianLaser``,
+  ``DispersivePulseLaser``, ``TWTSLaser``: may be checked against *bulk*
+  envelope properties (amplitude, transverse/longitudinal width) of
+  ``E = "the field in perfect vacuum"``;
+* **B** (defined by the input shape) ``PlaneWaveLaser``,
+  ``FromOpenPMDPulseLaser``: only checked at the feed-in (Huygens) surface --
+  their model is the injected waveform, not the diffracted-in-vacuum field.
+
+Tolerance floor
+---------------
+The analytic field and the simulated field differ by construction:
+
+* physical approximations: the scalar ``E`` model ignores sub-permille
+  transverse/longitudinal vector components (the polarization rotation across
+  the curved wavefront) and the model does not back-propagate the focus to the
+  Huygens surface;
+* numerical: the finite-order Yee stencil (TF/SF injection error), numerical
+  dispersion / phase-velocity error, and the sampling of the carrier and
+  envelope.  The setup is chosen with clear scale separation
+  ``envelope >> wavelength >> cell size`` (envelope ~ 10 um, wavelength 1 um,
+  cell 0.1 um, i.e. 10 cells per wavelength and >100 samples per envelope).
+
+The *Huygens-proximate* probe below deliberately sits a few cells inside the
+generation surface and uses only the freshly injected field, so it is free of
+the propagation/dispersion error and can be asserted tightly; the bulk-envelope
+checks are dominated by propagation and therefore looser.
 """
 
 import logging
@@ -29,10 +71,17 @@ from .compare_particles import read_fields, read_grids
 
 logging.basicConfig(level=logging.INFO)
 
-STEPS = 300
+# ---------------------------------------------------------------------------
+# Simulation geometry (the team's accepted block).
+#
+# 256^3 cells of 0.1 um each => a 25.6 um cube.  The pulse is injected through
+# the YMin Huygens surface; the envelope's trailing edge only clears YMax after
+# ~334 steps, so 340 steps are needed for the whole pulse to be represented.
+# ---------------------------------------------------------------------------
+STEPS = 340
 LOWER_BOUNDARY = np.zeros(3)
-NUMBER_OF_CELLS = np.array([192, 128, 192])
-CELL_SIZE = np.array([0.1772e-6, 0.4430e-7, 0.1772e-6])  # unit: meter
+NUMBER_OF_CELLS = np.array([256, 256, 256])
+CELL_SIZE = np.full(3, 0.1e-6)  # unit: meter
 UPPER_BOUNDARY = NUMBER_OF_CELLS * CELL_SIZE + LOWER_BOUNDARY
 
 GRID = Cartesian3DGrid(
@@ -42,47 +91,71 @@ GRID = Cartesian3DGrid(
     lower_boundary_conditions=["open", "open", "open"],
     upper_boundary_conditions=["open", "open", "open"],
 )
-SOLVER = ElectromagneticSolver(grid=GRID, method="Yee", cfl=0.9)
+SOLVER = ElectromagneticSolver(grid=GRID, method="Yee", cfl=0.995)
 
-
-PULSE_INIT = 15.0
-# PIConGPU's PULSE_DURATION (1 sigma of the intensity) that the (already existing)
-# simulation run used:
-LASER_DURATION_SIGMA = 5.0e-15
-# The PICMI-standard `duration` is the 1/e field width tau, i.e. twice the sigma
-# (PULSE_DURATION = duration / 2); see GaussianLaser._pulse_duration_sigma_si (#5739).
+WAVELENGTH = 1.0e-6
+# On-axis, in-focus amplitude of the category-A laser; E0 = 1 V/m keeps the
+# checks dimensionless.
+E0 = 1.0
+# Test-local constant: the pulse is initialized pulse_init=5 intensity-sigmas
+# ahead of the surface.  One intensity sigma (PIConGPU PULSE_DURATION) is then
+# exactly the time it takes light to cross the box divided by 5.
+PULSE_INIT = 5.0
+LASER_DURATION_SIGMA = CELL_SIZE[0] * NUMBER_OF_CELLS[0] / constants.c / PULSE_INIT
+# The PICMI-standard `duration` is the 1/e field width tau = 2 * sigma
+# (PULSE_DURATION = duration / 2); see GaussianLaser._pulse_duration_sigma_si.
 LASER_DURATION = 2 * LASER_DURATION_SIGMA
-FOCAL_POSITION = NUMBER_OF_CELLS / 2 * CELL_SIZE
-FOCAL_POSITION[1] = 4.62e-5
-CENTROID_POSITION = NUMBER_OF_CELLS / 2 * CELL_SIZE
-# pulse_init (a multiple of PULSE_DURATION) is derived from the centroid via the
-# sigma, keep the same pulse_init=15 as in the existing run:
-CENTROID_POSITION[1] = -0.5 * PULSE_INIT * LASER_DURATION_SIGMA * constants.c
+# waist = 1.5 um => Rayleigh length ~7.07 um, so the beam has w ~3.1 um at YMin,
+# i.e. ~8 sigma across the 25.6 um face -- comfortably inside the domain.
+WAIST = 1.5e-6
 
-LASERS = [
-    GaussianLaser(
-        wavelength=0.8e-6,
-        waist=5.0e-6 / 1.17741,
-        duration=LASER_DURATION,
-        propagation_direction=[0.0, 1.0, 0.0],
-        polarization_direction=[1.0, 0.0, 0.0],
-        focal_position=FOCAL_POSITION.tolist(),
-        centroid_position=CENTROID_POSITION.tolist(),
-        picongpu_polarization_type=PolarizationType.LINEAR,
-        a0=8.0,
-        phi0=0.0,
-    ),
-    PlaneWaveLaser(
-        wavelength=0.8e-6,
-        duration=LASER_DURATION,
-        propagation_direction=[0.0, 1.0, 0.0],
-        polarization_direction=[1.0, 0.0, 0.0],
-        centroid_position=CENTROID_POSITION.tolist(),
-        picongpu_polarization_type=PolarizationType.LINEAR,
-        a0=8.0,
-        phi0=0.0,
-    ),
-]
+DOMAIN_CENTER = NUMBER_OF_CELLS / 2 * CELL_SIZE
+# Focus on a half-cell integer (a cell centre), not exactly L/2 (a cell
+# boundary), to avoid a focus-on-cell-boundary phase slip.  The transverse
+# coordinates keep the domain centre so that propagation still connects the
+# centroid and the focus.
+FOCAL_POSITION = DOMAIN_CENTER.copy()
+FOCAL_POSITION[1] += 0.5 * CELL_SIZE[1]
+# The pulse is upstream of YMin (centroid_y < 0) and focuses at the domain
+# centre: self-consistent with propagation along +y.
+CENTROID_POSITION = DOMAIN_CENTER.copy()
+CENTROID_POSITION[1] *= -1
+
+# Two lasers in one simulation, separated by polarization component so that a
+# given component of E can be attributed to a single category:
+#   * GaussianLaser (category A) is z-polarized -> carries E_z;
+#   * PlaneWaveLaser (category B) is x-polarized -> carries E_x.
+# Compilation dominates the cost, hence one simulation; the component split is
+# the diagnosability strategy.  (At this stack layer the frontend only enables
+# the YMin surface -- cf. the incidentField.param.mustache TODO and issue #115;
+# per-laser/different Huygens surfaces become available with #105/#219.)
+GAUSSIAN_LASER = GaussianLaser(
+    wavelength=WAVELENGTH,
+    waist=WAIST,
+    duration=LASER_DURATION,
+    propagation_direction=[0.0, 1.0, 0.0],
+    polarization_direction=[0.0, 0.0, 1.0],
+    focal_position=FOCAL_POSITION.tolist(),
+    centroid_position=CENTROID_POSITION.tolist(),
+    picongpu_polarization_type=PolarizationType.LINEAR,
+    E0=E0,
+    phi0=0.0,
+)
+# A plane wave is broad by construction (its model ignores diffraction); keep
+# its temporal duration long (LASER_DURATION is the category-A 1/e field width
+# but, per the documented PlaneWaveLaser semantics, its duration is the
+# 1-sigma width, i.e. this plane wave is even broader).
+PLANE_WAVE_LASER = PlaneWaveLaser(
+    wavelength=WAVELENGTH,
+    duration=LASER_DURATION,
+    propagation_direction=[0.0, 1.0, 0.0],
+    polarization_direction=[1.0, 0.0, 0.0],
+    centroid_position=CENTROID_POSITION.tolist(),
+    picongpu_polarization_type=PolarizationType.LINEAR,
+    E0=E0,
+    phi0=0.0,
+)
+LASERS = [GAUSSIAN_LASER, PLANE_WAVE_LASER]
 
 
 def basic_simulation():
@@ -124,7 +197,10 @@ def setup_sim():
     sim = basic_simulation()
     for laser in LASERS:
         sim.add_laser(laser, None)
-    sim.diagnostics = [Checkpoint(period=TimeStepSpec[::100])]
+    # Checkpoints every 50 steps: step 150 lands on the pulse crossing the
+    # Huygens surface, step 250/300 on the pulse focusing near the domain
+    # centre.
+    sim.diagnostics = [Checkpoint(period=TimeStepSpec[::50])]
     if RUN_DIR:
         sim.picongpu_get_runner().run_dir = str(RUN_DIR)
     else:
@@ -230,15 +306,104 @@ def _strong_field_mask(field, threshold=0.05):
     return magnitude > threshold * np.max(magnitude)
 
 
-class TestLasers(TestCase):
+# ---------------------------------------------------------------------------
+# Envelope / observable helper (test-local; see issue #221 for a possible
+# promotion to a public user interface -- deliberately NOT done here).
+# ---------------------------------------------------------------------------
+def _analytic_signal(field, axis):
+    """
+    Complex analytic signal along ``axis`` via an FFT.
+
+    FFT -> discard the negative frequencies (and double the positive ones) ->
+    inverse FFT.  For a propagating pulse the field oscillates along the
+    propagation direction, so ``abs`` of the result is the (carrier-free)
+    envelope sampled on the grid.
+    """
+    field = np.asarray(field)
+    spectrum = np.fft.fft(field, axis=axis)
+    positive = np.fft.fftfreq(field.shape[axis]) > 0
+    selector = [slice(None)] * field.ndim
+    selector[axis] = positive
+    spectrum[tuple(selector)] *= 2
+    selector[axis] = ~positive
+    spectrum[tuple(selector)] = 0
+    return np.fft.ifft(spectrum, axis=axis)
+
+
+def _envelope(field, axis):
+    return np.abs(_analytic_signal(field, axis))
+
+
+def _one_over_e2_width(profile, spacing):
+    """
+    1/e^2 radius of the intensity (envelope^2) of a 1D ``profile``.
+
+    For an envelope ``exp(-r^2 / w^2)`` the intensity is ``exp(-2 r^2 / w^2)``
+    with second moment ``w^2 / 4``, hence ``w = 2 * sqrt(Var)``.
+    """
+    intensity = np.asarray(profile, dtype=float) ** 2
+    total = intensity.sum()
+    if total <= 0:
+        return np.nan
+    r = np.arange(intensity.size) * spacing
+    center = (r * intensity).sum() / total
+    variance = ((r - center) ** 2 * intensity).sum() / total
+    return 2.0 * np.sqrt(variance)
+
+
+def _observables(component_field, spacing, window_cells):
+    """
+    Extract ``(amplitude, width_x, width_y, width_z)`` from one component of E.
+
+    ``component_field`` has the openPMD layout ``(z, y, x)``; the carrier runs
+    along ``y`` (axis 1).  Widths are 1/e^2 radii of the intensity.  The
+    transverse moment integrals are restricted to a central window to keep the
+    (well contained) beam from picking up boundary noise.
+    """
+    envelope = _envelope(component_field, axis=1)
+    nz, ny, nx = envelope.shape
+    cz, cx = nz // 2, nx // 2
+    crop = envelope[cz - window_cells : cz + window_cells, :, cx - window_cells : cx + window_cells]
+    peak = np.unravel_index(np.argmax(crop), crop.shape)
+    return {
+        "amplitude": float(crop.max()),
+        "width_x": _one_over_e2_width(crop[peak[0], peak[1], :], spacing[0]),
+        "width_y": _one_over_e2_width(crop[peak[0], :, peak[2]], spacing[1]),
+        "width_z": _one_over_e2_width(crop[:, peak[1], peak[2]], spacing[2]),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tolerances.
+# ---------------------------------------------------------------------------
+# Huygens-proximate probe (B4): only the freshly injected field, asserted
+# tightly.  The remaining error is the finite-order TF/SF injection stencil and
+# the sampling of the envelope, not propagation.
+_HUYGENS_PROBE_MARGIN_CELLS = 3
+_HUYGENS_PROBE_WIDTH_CELLS = 6
+_HUYGENS_RTOL = 0.05
+_HUYGENS_ATOL_FRACTION = 0.02
+# Bulk-envelope checks (category A only): dominated by numerical propagation
+# over tens of micrometres, hence looser.
+_BULK_RTOL = 0.2
+_BULK_WINDOW_CELLS = 48
+
+
+def _component_index(laser):
+    """Index of the (dominant) polarization component of ``laser``."""
+    return int(np.argmax(np.abs(np.asarray(laser.polarization_direction, dtype=float))))
+
+
+class _LaserTestBase(TestCase):
+    """Shared simulation, coordinates and checkpoint bookkeeping."""
+
     _result_path = None
 
     def setUp(self):
         global SIM
         if SIM is None:
             SIM = setup_sim()
-            self.sim = SIM
-            gather_results(self.result_path)
+            gather_results(SIM.picongpu_get_runner().run_dir)
         self.sim = SIM
         self.coordinates = np.transpose(
             np.meshgrid(
@@ -263,58 +428,206 @@ class TestLasers(TestCase):
     def checkpoint_pattern(self):
         return self.result_path / "simOutput" / "checkpoints" / "checkpoint_%T.bp5"
 
+    def fields_at(self, iteration):
+        return read_fields(self.checkpoint_pattern, iteration=iteration)
+
+    def expected_at(self, iteration):
+        return _expected_E_field(
+            self.coordinates, LASERS, iteration * self.sim.time_step_size, CELL_SIZE, NUMBER_OF_CELLS
+        )
+
+
+class TestLaserInterface(_LaserTestBase):
+    """Interface / usability: the setup renders and the diagnostics are readable."""
+
     def test_grid(self):
         np.testing.assert_allclose(read_grids(self.checkpoint_pattern)["E"], self.coordinates)
 
-    def test_total_E_field(self):
+    def test_no_field_before_the_pulse_arrives(self):
+        """Before the laser enters the volume there must not be any field yet."""
+        first = self.checkpoint_steps[0]
+        expected = self.expected_at(first)
+        self.assertLess(
+            np.abs(self.fields_at(first)["E"]).max(),
+            1.0e-3 * np.abs(expected).max(),
+            f"Laser field present before the pulse has arrived (iteration {first}).",
+        )
+
+
+class TestInjectedFieldAtHuygensSurface(_LaserTestBase):
+    """
+    B4 -- Huygens-proximate hard invariant (the primary correctness gate).
+
+    A few cells inside the YMin generation surface the injected field has not
+    propagated yet, so it is directly comparable to the analytic
+    ``laser.E(x, y, z, t)`` with no field-solver interference (no dispersion,
+    no diffraction).  This pins down the *analytic formula* against the very
+    profile the C++ incident-field functor injects, for both the category-A
+    Gaussian and the category-B plane wave.
+    """
+
+    def _probe_mask(self, expected):
+        """Thin slab a few cells inside YMin, on the part the pulse has reached."""
+        mask = np.zeros(expected.shape[1:], dtype=bool)
+        surface_index = GAUSSIAN_LASER.picongpu_huygens_surface_positions[1][0]
+        start = surface_index + _HUYGENS_PROBE_MARGIN_CELLS
+        mask[:, start : start + _HUYGENS_PROBE_WIDTH_CELLS, :] = True
+        mask &= _huygens_interior_mask(LASERS, CELL_SIZE, NUMBER_OF_CELLS)
+        return mask & _strong_field_mask(expected, threshold=0.2)
+
+    def test_injected_field_equals_analytic_field(self):
         """
-        The simulated E field equals the sum of the (analytic) laser fields,
-        up to the distortions introduced by the numerical propagation layer.
+        The freshly injected field equals the analytic field.
 
-        What is tested:
-
-        * the FACET/laser implementation: the analytic formulas evaluate the very
-          same incident-field profile that the simulation injects via the Huygens
-          surface (the C++ ``GaussianPulse``/``PlaneWave`` functors);
-        * the analytical formulas: amplitude (E0), temporal width (2*duration),
-          Rayleigh length, Gouy phase, wavefront curvature;
-        * the solver precision: numerical (Yee) dispersion/sampling distort the
-          propagated pulse by a small amount, which bounds how tight the
-          tolerances may be.
-
-        Layers of distortion that are explicitly accounted for:
-
-        * only the inside of the Huygens box is compared (the absorbing/PML
-          layers near the boundaries are controlled by the boundary conditions,
-          not by the laser model);
-        * only cells the laser has actually reached (strong field) are compared;
-        * the Huygens-surface timing shift (see ``_expected_E_field``).
+        The probe is placed 3..9 cells inside the YMin surface (Yee spatial
+        order 2 => TF/SF correction stencil width 1, so the probe is clear of
+        the injection layer) and restricted to the pulse body.  The achieved
+        agreement is asserted to ``rtol=0.05``; tightening it requires the
+        measured residual from a compiled run (see the module docstring and the
+        report on PR #48).
         """
-        interior = _huygens_interior_mask(LASERS, CELL_SIZE, NUMBER_OF_CELLS)
+        best = None
         for it in self.checkpoint_steps:
-            time = it * self.sim.time_step_size
-            expected = _expected_E_field(self.coordinates, LASERS, time, CELL_SIZE, NUMBER_OF_CELLS)
-            fields = read_fields(self.checkpoint_pattern, iteration=it)
-
-            if it == self.checkpoint_steps[0]:
-                # Before the laser has entered the simulation volume there must
-                # not be any field yet.
-                self.assertLess(
-                    np.abs(fields["E"]).max(),
-                    1.0e-3 * np.abs(expected).max(),
-                    f"Laser field present before the pulse has arrived (iteration {it}).",
-                )
+            expected = self.expected_at(it)
+            mask = self._probe_mask(expected)
+            if not mask.any():
                 continue
+            scale = np.abs(expected[:, mask]).max()
+            candidate = (scale, it, expected, mask)
+            if best is None or candidate[0] > best[0]:
+                best = candidate
 
-            region = interior & _strong_field_mask(expected)
-            scale = np.abs(expected[:, region]).max()
-            # rtol + atol such that the (dominant) field inside the reached region
-            # agrees to within the numerical propagation error (~ a few % for the
-            # Yee solver over the covered distance).
+        self.assertIsNotNone(best, "No checkpoint had a strong injected field in the probe slab.")
+        scale, it, expected, mask = best
+        # A real assertion, not noise: the probe must carry a significant
+        # fraction of the analytic amplitude, and enough cells to be meaningful.
+        self.assertGreater(scale, 0.1 * E0, "The injected field in the probe slab is too weak to test.")
+        self.assertGreater(int(mask.sum()), 100, "The probe region is too small to be a meaningful test.")
+
+        fields = self.fields_at(it)
+        # E_x is dominated by the category-B plane wave, E_z by the category-A
+        # Gaussian; compare both (the vector sum is what the simulation injects).
+        np.testing.assert_allclose(
+            fields["E"][:, mask],
+            expected[:, mask],
+            rtol=_HUYGENS_RTOL,
+            atol=_HUYGENS_ATOL_FRACTION * scale,
+            err_msg=(
+                f"Simulated and analytic injected E field disagree at iteration {it} "
+                f"(|E| ~ {scale:.3e} V/m); the analytic formula does not reproduce "
+                "the incident field that is actually fed in through the Huygens surface."
+            ),
+        )
+
+
+class TestGaussianBulkEnvelope(_LaserTestBase):
+    """
+    Category-A bulk-property checks for the Gaussian laser (E_z component).
+
+    Only category-A lasers are checked in bulk (see the module docstring): their
+    ``E`` is "what the laser looks like in perfect vacuum", so the envelope
+    extracted from the written field should reproduce the analytic
+    amplitude/widths up to the documented tolerance floor.  The plane wave is
+    *not* checked here.
+    """
+
+    def _analytic_observables(self, time):
+        """Analytic envelope amplitude and widths on the beam axis / focus plane."""
+        x = self.coordinates[0][0, 0, :]
+        y = self.coordinates[1][:, 0, 0]
+        focus = np.asarray(GAUSSIAN_LASER.focal_position, dtype=float)
+        # beam axis along y
+        on_axis = GAUSSIAN_LASER.envelope(focus[0], y, focus[2], t=time)
+        # transverse line at the focus
+        transverse = GAUSSIAN_LASER.envelope(x, focus[1], focus[2], t=time)
+        return {
+            "amplitude": float(on_axis.max()),
+            "width_y": _one_over_e2_width(on_axis, CELL_SIZE[1]),
+            "width_x": _one_over_e2_width(transverse, CELL_SIZE[0]),
+        }
+
+    def test_gaussian_envelope_amplitude_and_widths(self):
+        """
+        The simulated Gaussian envelope reproduces the analytic amplitude and
+        longitudinal/transverse widths (category-A bulk properties).
+
+        Extract the envelope from the written E_z (FFT analytic signal along the
+        propagation direction) and compare to the analytic envelope of the
+        category-A Gaussian at the checkpoint where the analytic field is
+        strongest (i.e. closest to focus).  Tolerance per ``_BULK_RTOL``.
+        """
+        analytic = None
+        best_scale = -1.0
+        for it in self.checkpoint_steps:
+            field = self.expected_at(it)[_component_index(GAUSSIAN_LASER)]
+            scale = np.abs(field).max()
+            if scale > best_scale:
+                best_scale = scale
+                analytic = self._analytic_observables(it * self.sim.time_step_size)
+                best_it = it
+        self.assertGreater(best_scale, 0.1 * E0, "The Gaussian field never reached a meaningful amplitude.")
+
+        simulated = _observables(
+            self.fields_at(best_it)["E"][_component_index(GAUSSIAN_LASER)],
+            CELL_SIZE,
+            _BULK_WINDOW_CELLS,
+        )
+
+        for name in ("amplitude", "width_x", "width_y"):
+            measured, expected = simulated[name], analytic[name]
+            self.assertGreater(expected, 0.0)
             np.testing.assert_allclose(
-                fields["E"][:, region],
-                expected[:, region],
-                rtol=0.1,
-                atol=0.1 * scale,
-                err_msg=f"Simulated and analytic laser E field disagree at iteration {it}.",
+                measured,
+                expected,
+                rtol=_BULK_RTOL,
+                err_msg=(
+                    f"Gaussian bulk property {name!r} disagrees at iteration {best_it}: "
+                    f"measured {measured:.3e} vs analytic {expected:.3e}."
+                ),
             )
+
+
+class TestPlaneWaveFeedIn(_LaserTestBase):
+    """
+    Category-B checks for the plane wave: feed-in surface only.
+
+    ``PlaneWaveLaser`` is defined by its input shape, so its ``E`` is the
+    waveform that is fed in, not the diffracted field in vacuum.  We therefore
+    only verify that the injected field at the Huygens surface matches the
+    analytic waveform (covered for the E_x component by
+    ``TestInjectedFieldAtHuygensSurface``) and explicitly do *not* compare bulk
+    envelope properties, which its model does not describe.
+    """
+
+    def test_plane_wave_is_injected_at_the_huygens_surface(self):
+        """The E_x component of the freshly injected field matches the plane wave."""
+        component = _component_index(PLANE_WAVE_LASER)
+        origin = _huygens_origin(PLANE_WAVE_LASER, CELL_SIZE, NUMBER_OF_CELLS)
+        time_shift = np.dot(origin, PLANE_WAVE_LASER.propagation_direction) / constants.c
+        best = None
+        for it in self.checkpoint_steps:
+            expected = PLANE_WAVE_LASER.E(*self.coordinates, t=it * self.sim.time_step_size + time_shift)[component]
+            mask = np.zeros(expected.shape, dtype=bool)
+            surface_index = PLANE_WAVE_LASER.picongpu_huygens_surface_positions[1][0]
+            start = surface_index + _HUYGENS_PROBE_MARGIN_CELLS
+            mask[:, start : start + _HUYGENS_PROBE_WIDTH_CELLS, :] = True
+            mask &= _strong_field_mask(expected[np.newaxis], threshold=0.2)[0]
+            if not mask.any():
+                continue
+            scale = np.abs(expected[mask]).max()
+            if best is None or scale > best[0]:
+                best = (scale, it, expected, mask)
+
+        self.assertIsNotNone(best, "The plane wave never reached the probe slab.")
+        scale, it, expected, mask = best
+        self.assertGreater(scale, 0.1 * E0, "The injected plane wave is too weak to test.")
+        fields = self.fields_at(it)
+        # Only E_x is meaningful for the x-polarized plane wave; the other
+        # components are the Gaussian's (E_z) or the sub-permille residuals.
+        np.testing.assert_allclose(
+            fields["E"][component][mask],
+            expected[mask],
+            rtol=_HUYGENS_RTOL,
+            atol=_HUYGENS_ATOL_FRACTION * scale,
+            err_msg=f"Injected plane wave (E_x) disagrees with the analytic waveform at iteration {it}.",
+        )

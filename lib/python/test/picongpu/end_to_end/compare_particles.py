@@ -48,6 +48,14 @@ def apply_range(particles, range):
 
 
 def read_grids(series_name, names=("E", "B"), iteration=0):
+    """
+    Read the meshes' *cell coordinates* in SI units.
+
+    The openPMD meshes carry their positions in the file's unit system; the
+    returned coordinates are converted to SI with ``mesh.grid_unit_SI``.  This
+    is intentional: diagnostics are compared in SI, so callers can compare the
+    coordinates directly against SI positions (e.g. the test's ``CELL_SIZE``).
+    """
     series = opmd.Series(str(series_name), opmd.Access.read_only)
     tmp = {}
     for name in names:
@@ -64,6 +72,15 @@ def read_grids(series_name, names=("E", "B"), iteration=0):
 
 
 def read_fields(series_name, names=("E", "B"), iteration=0):
+    """
+    Read field components in SI units.
+
+    openPMD stores the fields in the dataset's unit system; the returned values
+    are converted to SI with ``mesh.unit_SI``.  This SI rescale is intentional:
+    the end-to-end tests compare diagnostics against the analytic laser fields,
+    which are SI, so everything is kept in SI.  The array layout is
+    ``(component, z, y, x)`` for 3D meshes.
+    """
     series = opmd.Series(str(series_name), opmd.Access.read_only)
     tmp = {}
     for name in names:

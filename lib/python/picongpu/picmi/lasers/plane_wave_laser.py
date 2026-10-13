@@ -50,6 +50,19 @@ class PlaneWaveLaser(PICMI_Laser, BaseLaser):
         Maximum amplitude of the laser field [V/m]. Specify either a0 or E0.
     phi0: float
         Carrier envelope phase (CEP) [rad]
+
+    Analytic field (category B)
+    ---------------------------
+    This is a **category-B** laser: it is defined by the *input waveform* that is
+    fed in, so its analytic ``E`` is *what the field would look like if we fed
+    this in* at ``(x, y, z, t)`` -- the incident waveform, not a self-consistent
+    vacuum field.  The plane-wave model deliberately ignores diffraction, so it
+    must **not** be held to bulk envelope-property assertions; it is only
+    checked at the feed-in (Huygens) surface.  See ``lasers.rst``.
+
+    The methods follow the shared analytic-field contract (see
+    :class:`~picongpu.picmi.lasers.base_laser.BaseLaser`): SI coordinates, SI
+    time, SI fields, component-first vector layout.
     """
 
     wavelength: PositiveFloat
@@ -112,6 +125,13 @@ class PlaneWaveLaser(PICMI_Laser, BaseLaser):
         return x, y, z, t
 
     def complex_amplitude(self, x, y, z, t=0.0):
+        """
+        Complex scalar field amplitude [V/m] at SI ``(x, y, z)`` and time ``t``.
+
+        Category-B semantics: this is the amplitude of the waveform that is
+        *fed in* (Gaussian ramp, plateau, Gaussian fall-off), not a vacuum
+        solution.  Shape ``x.shape``.
+        """
         from picongpu.picmi.constants import c
 
         # Mirror of the C++ PlaneWaveFunctorIncidentE (BaseSeparableFunctorE).
@@ -144,6 +164,12 @@ class PlaneWaveLaser(PICMI_Laser, BaseLaser):
         return value.astype(np.complex128)
 
     def E(self, x, y, z, t=0.0):
+        """
+        Real vector electric field [V/m] at SI ``(x, y, z)`` and time ``t``.
+
+        Component-first, shape ``(3,) + x.shape``; the (uncurved) polarization
+        vector times the real part of :meth:`complex_amplitude`.
+        """
         return self.polarization_vector_at(x, y, z, t) * np.real(self.complex_amplitude(x, y, z, t))[np.newaxis, ...]
 
     def Ex(self, x, y, z, t=0.0):

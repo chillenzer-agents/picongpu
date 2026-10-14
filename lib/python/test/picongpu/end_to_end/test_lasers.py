@@ -556,7 +556,7 @@ class TestInjectedFieldAtHuygensSurface(_LaserTestBase):
     a documented ~2-3 % tolerance floor.
     """
 
-    def _probe_mask(self, expected):
+    def _probe_mask(self, expected, component=None):
         """Thin slab 1 cell inside YMin, on the part the pulse has reached.
 
         The slab is deliberately *not* intersected with
@@ -565,13 +565,21 @@ class TestInjectedFieldAtHuygensSurface(_LaserTestBase):
         it can leave zero cells.  Instead the slab is confined transversally by
         ``_HUYGENS_PROBE_CONFINEMENT_CELLS`` so it stays clear of the finite
         Huygens-aperture edge where the injected wave diffracts.
+
+        With ``component=None`` the strong-field gate uses the combined field
+        magnitude (the scalar-neglected floor needs a combined reference); with
+        an explicit ``component`` it gates on *that* component alone, so a
+        per-polarization assertion only sees cells where the component under
+        test is significant.
         """
         mask = np.zeros(expected.shape[1:], dtype=bool)
         surface_index = GAUSSIAN_LASER.picongpu_huygens_surface_positions[1][0]
         start = surface_index + _HUYGENS_PROBE_MARGIN_CELLS
         mask[:, start : start + _HUYGENS_PROBE_WIDTH_CELLS, :] = True
         mask &= _transverse_confinement_mask(mask.shape, _HUYGENS_PROBE_CONFINEMENT_CELLS)
-        return mask & _strong_field_mask(expected, threshold=0.2)
+        if component is None:
+            return mask & _strong_field_mask(expected, threshold=0.2)
+        return mask & _strong_field_mask(expected[component][np.newaxis], threshold=0.2)
 
     def test_injected_field_equals_analytic_field(self):
         """
@@ -585,6 +593,23 @@ class TestInjectedFieldAtHuygensSurface(_LaserTestBase):
         are the real gate -- they test the analytic formula and C++ injection
         directly.
         """
+        # Identify dominant component for each laser:
+        #   GaussianLaser (z-pol) -> E_z (index 2)
+        #   PlaneWaveLaser (x-pol) -> E_x (index 0)
+        # The third component (E_y, index 1) is scalar-neglected for both.
+        dom_plane_wave = _component_index(PLANE_WAVE_LASER)  # 0
+        dom_gaussian = _component_index(GAUSSIAN_LASER)  # 2
+        dominant = (dom_plane_wave, dom_gaussian)
+        neglected = set(range(3)) - set(dominant)
+
+        # The combined probe field is E_z-dominated (the Gaussian is much
+        # stronger at the probe than the plane wave), so selecting the single
+        # checkpoint that maximises the combined field and then applying a
+        # per-component atol admits E_x-weak cells and can flag a ratio blow-up
+        # there.  That is a probe-selection artefact, not a formula error, so
+        # select the checkpoint and the strong-field mask *per component*: each
+        # dominant component is asserted where it is actually significant.
+        per_component = {}  # component -> (ref_scale, iteration, expected, mask)
         best = None
         for it in self.checkpoint_steps:
             expected = self.expected_at(it)
@@ -596,29 +621,35 @@ class TestInjectedFieldAtHuygensSurface(_LaserTestBase):
             if best is None or candidate[0] > best[0]:
                 best = candidate
 
+            for comp in dominant:
+                comp_mask = self._probe_mask(expected, component=comp)
+                if not comp_mask.any():
+                    continue
+                ref_scale = np.abs(expected[comp, comp_mask]).max()
+                entry = (ref_scale, it, expected, comp_mask)
+                if comp not in per_component or entry[0] > per_component[comp][0]:
+                    per_component[comp] = entry
+
         self.assertIsNotNone(best, "No checkpoint had a strong injected field in the probe slab.")
-        scale, it, expected, mask = best
+        combined_scale, combined_it, combined_expected, combined_mask = best
         # A real assertion, not noise: the probe must carry a significant
         # fraction of the analytic amplitude, and enough cells to be meaningful.
-        self.assertGreater(scale, 0.1 * E0, "The injected field in the probe slab is too weak to test.")
-        self.assertGreater(int(mask.sum()), 4, "The probe region is too small to be a meaningful test.")
+        self.assertGreater(combined_scale, 0.1 * E0, "The injected field in the probe slab is too weak to test.")
+        self.assertGreater(int(combined_mask.sum()), 4, "The probe region is too small to be a meaningful test.")
 
-        fields = self.fields_at(it)
-        # Identify dominant component for each laser:
-        #   GaussianLaser (z-pol) -> E_z (index 2)
-        #   PlaneWaveLaser (x-pol) -> E_x (index 0)
-        # The third component (E_y, index 1) is scalar-neglected for both.
-        dom_plane_wave = _component_index(PLANE_WAVE_LASER)  # 0
-        dom_gaussian = _component_index(GAUSSIAN_LASER)  # 2
-        neglected = set(range(3)) - {dom_plane_wave, dom_gaussian}
-
-        # Dominant components: tight assertion (real gate)
-        for comp in (dom_plane_wave, dom_gaussian):
-            ref_scale = np.abs(expected[comp, mask]).max()
-            self.assertGreater(ref_scale, 0.05 * E0,
-                f"Component {comp} has no meaningful amplitude at iteration {it}.")
+        # Dominant components: tight assertion (real gate), each at the
+        # checkpoint where that component is strongest and on its own
+        # strong-field mask.
+        for comp in dominant:
+            self.assertIn(comp, per_component, f"No checkpoint had a strong E[{comp}] field in the probe slab.")
+            ref_scale, it, expected, mask = per_component[comp]
+            self.assertGreater(
+                ref_scale,
+                0.05 * E0,
+                f"Component {comp} has no meaningful amplitude at iteration {it}.",
+            )
             np.testing.assert_allclose(
-                fields["E"][comp, mask],
+                self.fields_at(it)["E"][comp, mask],
                 expected[comp, mask],
                 rtol=_HUYGENS_RTOL,
                 atol=_HUYGENS_ATOL_FRACTION * ref_scale,
@@ -631,14 +662,14 @@ class TestInjectedFieldAtHuygensSurface(_LaserTestBase):
 
         # Scalar-neglected components: wider tolerance (floor, not a signal)
         for comp in neglected:
-            ref_scale = max(np.abs(expected[comp, mask]).max(), 1e-12)
+            ref_scale = max(np.abs(combined_expected[comp, combined_mask]).max(), 1e-12)
             np.testing.assert_allclose(
-                fields["E"][comp, mask],
-                expected[comp, mask],
+                self.fields_at(combined_it)["E"][comp, combined_mask],
+                combined_expected[comp, combined_mask],
                 rtol=_SCALAR_NEGLECTED_RTOL,
-                atol=_SCALAR_NEGLECTED_ATOL_FRACTION * scale,
+                atol=_SCALAR_NEGLECTED_ATOL_FRACTION * combined_scale,
                 err_msg=(
-                    f"Scalar-neglected E[{comp}] exceeds tolerance floor at iteration {it} "
+                    f"Scalar-neglected E[{comp}] exceeds tolerance floor at iteration {combined_it} "
                     f"(|E_{comp}| ~ {ref_scale:.3e} V/m)."
                 ),
             )

@@ -20,6 +20,91 @@ A simulation can carry several lasers at once;
 the :ref:`tutorial <python_package/tutorial:Tutorial: Setting up a simple LWFA>`
 adds a Gaussian pulse to a full setup.
 
+Analytic fields
+---------------
+
+Several lasers can evaluate the analytic electric field they describe, which is
+what PIConGPU injects for them.
+:meth:`~picongpu.picmi.lasers.GaussianLaser.complex_amplitude` returns the
+complex field amplitude, :meth:`~picongpu.picmi.lasers.GaussianLaser.envelope`
+its absolute value, and
+:meth:`~picongpu.picmi.lasers.GaussianLaser.E` the real vector field
+(also available per component as ``Ex``/``Ey``/``Ez``).
+
+Two categories of lasers
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The analytic methods do not mean the same thing for every laser:
+
+**Category A -- derived from the focus properties.**
+:class:`~picongpu.picmi.lasers.GaussianLaser`,
+:class:`~picongpu.picmi.lasers.DispersivePulseLaser` and
+:class:`~picongpu.picmi.lasers.TWTSLaser` describe the beam through its focus
+(``waist``, ``focal_position``, ...).
+For them ``E`` is *what the laser would look like in perfect vacuum* at
+``(x, y, z, t)``: a complete, diffraction-aware description.
+Only category-A lasers expose meaningful **bulk** properties (amplitude,
+transverse and longitudinal width away from the injection surface).
+
+**Category B -- defined by the input shape.**
+:class:`~picongpu.picmi.lasers.PlaneWaveLaser` and
+:class:`~picongpu.picmi.lasers.FromOpenPMDPulseLaser` are defined by the
+waveform that is fed in.
+For them ``E`` is *what it would look like if we fed this in* at
+``(x, y, z, t)`` -- the incident waveform, not a self-consistent vacuum field.
+Consequently category-B lasers must not be held to bulk-property assertions;
+they are only checked at the feed-in (Huygens) surface.
+
+Call-operator contract
+~~~~~~~~~~~~~~~~~~~~~~
+
+``E(x, y, z, t=0.0)``, ``complex_amplitude(x, y, z, t=0.0)``,
+``envelope(x, y, z, t=0.0)`` and the per-component ``Ex``/``Ey``/``Ez`` follow
+one contract:
+
+* **units.** Coordinates are metres (SI), time is seconds (SI), fields are V/m.
+  The methods return SI values; no unit system is involved.
+* **layout.** The vector field ``E`` (and ``Ex``/``Ey``/``Ez``) is returned
+  *component first*, i.e. with shape ``(3,) + x.shape``.
+  ``complex_amplitude`` and ``envelope`` are scalar and have shape
+  ``x.shape``.
+  The inputs ``x``, ``y`` and ``z`` may be numpy arrays of equal shape
+  (e.g. from ``numpy.meshgrid``) or scalars.
+* **domain.** The formulas are valid for the electromagnetic field *outside*
+  the laser focus on the upstream side, i.e. where the paraxial/focus-derived
+  description applies.  They are not a solution of the full Maxwell system:
+  the model is a scalar field times a polarization vector.
+
+The analytic interface currently exposes the electric field only: there is no
+``B`` method.  The C++ incident-field solver derives its magnetic counterpart
+from ``E`` through the slowly-varying-envelope approximation, so no separate
+Python formula exists.
+
+Documented limitations
+~~~~~~~~~~~~~~~~~~~~~~
+
+The analytic ``E`` is an idealised description.  The residual mismatch against
+a PIConGPU run has a **tolerance floor** from
+
+* physical approximations: the scalar-field model drops the sub-permille
+  transverse/longitudinal vector components (the polarization rotation across
+  the curved wavefront) and it does not back-propagate the field from the focus
+  to the Huygens surface;
+* numerical artifacts: the finite-order Yee solver (numerical dispersion /
+  phase-velocity error) and the sampling of the carrier and envelope.
+
+The tests are therefore designed with a clear scale separation
+``envelope >> wavelength >> cell size`` (e.g. 10 cells per wavelength and
+more than a hundred samples per envelope): a *Huygens-proximate* probe a few
+cells inside the injection surface can be asserted tightly (no propagation
+yet), whereas *bulk* envelope properties after propagation are only compared
+within a documented, looser tolerance.
+
+.. literalinclude:: ../snippets/selected_topics/laser_fields.py
+   :language: python
+   :start-after: # BEGIN-LASER-FIELDS
+   :end-before: # END-LASER-FIELDS
+
 Common properties and constraints
 ---------------------------------
 
@@ -73,7 +158,9 @@ Laser types
    the incidence relative to the ``y`` axis.
 
 :class:`~picongpu.picmi.lasers.PlaneWaveLaser`
-   A plane wave with a temporal shape.
+   A plane wave with a temporal shape:
+   a Gaussian ramp followed by a plateau of length
+   ``picongpu_plateau_duration`` and a Gaussian fall-off.
    The focus is fixed at the origin
    (``focal_position`` and ``laser_nofocus_constant_si``
    are supplied by the frontend).

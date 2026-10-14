@@ -34,6 +34,17 @@ all parameterized by the same :class:`~picongpu.picmi.diagnostics.OpenPMDConfig`
    :start-at: @ParticleFunctor(name="kineticEnergy")
    :end-before: for config in sorted
 
+Units
+-----
+
+openPMD data is self-describing: every dataset carries its unit in the file's
+unit system.  The test helpers that read field output
+(``read_fields`` and ``read_grids`` in ``compare_particles.py``) multiply by
+``mesh.unit_SI`` / ``mesh.grid_unit_SI`` and therefore return **SI** values and
+coordinates.  This is intentional: diagnostics are compared in SI, so the
+values can be compared directly against the SI analytic laser fields
+(see :ref:`lasers`) and the SI grid parameters without any further conversion.
+
 Output files
 ------------
 

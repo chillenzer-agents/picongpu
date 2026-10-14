@@ -83,7 +83,11 @@ def _make_wait_function_from(submission_information, submission_cmd="bash"):
             raise NotImplementedError("Only bash submission information can be parsed at this point.")
 
 
-def gather_results(result_path: Path):
+def gather_results(result_path: str | Path):
+    # `result_path` may arrive as a plain string: the runner stores `run_dir`
+    # verbatim when a caller assigns to it (e.g. the laser e2e test's
+    # PICONGPU_LASER_TEST_RUN_DIR reuse path), and `str / str` is a TypeError.
+    result_path = Path(result_path)
     # job has to finish
     _wait_until(
         _make_wait_function_from(result_path / "submission_information.txt", rc_params.get("tbg_submit", "bash"))

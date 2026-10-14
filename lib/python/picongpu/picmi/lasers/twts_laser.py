@@ -51,6 +51,12 @@ class TWTSLaser(PICMI_Laser, BaseLaser):
     windowStart: float, default 0.0
     windowEnd: float, default 0.0
     windowLength: float, default 0.0
+
+    Analytic field (category A)
+    ---------------------------
+    This is a **category-A** laser (derived from its focus properties); its
+    analytic ``E`` is the perfect-vacuum field, including the pulse-front tilt.
+    See ``lasers.rst`` for the taxonomy and the shared contract.
     """
 
     wavelength: PositiveFloat

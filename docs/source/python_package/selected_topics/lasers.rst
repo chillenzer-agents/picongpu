@@ -100,6 +100,14 @@ cells inside the injection surface can be asserted tightly (no propagation
 yet), whereas *bulk* envelope properties after propagation are only compared
 within a documented, looser tolerance.
 
+The pulse is defined in the single, user-visible reference frame of the PICMI
+input and the openPMD output: the pulse maximum (for a symmetric pulse, the
+centroid) is at ``centroid_position`` at ``t = 0``.  ``E(x, y, z, t)`` is
+evaluated in that frame, so it reproduces the field written to the result
+files directly.  The Huygens-surface timing used internally by the PIConGPU
+core is an implementation detail of the translation layer and never appears in
+a user-facing formula.
+
 .. literalinclude:: ../snippets/selected_topics/laser_fields.py
    :language: python
    :start-after: # BEGIN-LASER-FIELDS

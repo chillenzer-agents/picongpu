@@ -236,35 +236,6 @@ def setup_sim():
 SIM = None
 
 
-def _huygens_origin(laser, cell_size, domain_cells):
-    """
-    Position of the laser center on the (Huygens) generation surface, in SI.
-
-    Faithful port of ``incidentField::detail::BaseFunctorE::getOrigin()``:
-    the origin is the intersection of the line through the focus along the
-    (negative) propagation direction with the generation surface, choosing the
-    point a laser encounters first.  The generation surface is displaced by
-    0.75 cells inwards from the configured POSITION indices, matching the
-    placement of the incident-field sources in the simulation.
-    """
-    direction = np.asarray(laser.propagation_direction, dtype=float)
-    focus_attr = getattr(laser, "focal_position", None)
-    if focus_attr is None:
-        focus_attr = getattr(laser, "focus_pos", [0.0, 0.0, 0.0])
-    focus = np.asarray(focus_attr, dtype=float)
-    positions = np.asarray(laser.picongpu_huygens_surface_positions, dtype=int)
-    origin_p = -np.inf
-    for axis in range(3):
-        if np.abs(direction[axis]) < 1e-30:
-            continue
-        min_pos = (positions[axis][0] + 0.75) * cell_size[axis]
-        max_index = positions[axis][1] if positions[axis][1] > 0 else domain_cells[axis] + positions[axis][1]
-        max_pos = (max_index - 0.75) * cell_size[axis]
-        axis_p = min((min_pos - focus[axis]) / direction[axis], (max_pos - focus[axis]) / direction[axis])
-        origin_p = max(origin_p, axis_p)
-    return focus + origin_p * direction
-
-
 def _huygens_interior_mask(lasers, cell_size, domain_cells):
     """
     Cells that are strictly inside the Huygens box (i.e. not in the PML/absorber
@@ -325,25 +296,19 @@ def _transverse_confinement_mask(shape, confinement):
     return result
 
 
-def _expected_E_field(coordinates, lasers, time, cell_size, domain_cells):
+def _expected_E_field(coordinates, lasers, time):
     """
     Sum of the analytic laser fields, evaluated at ``time`` (SI).
 
-    Models the following layers on top of the bare analytic formulas:
-
-    * Huygens-surface timing: the frontend derives the laser's ``pulse_init``
-      from the centroid under the assumption that the generation surface sits at
-      the coordinate origin.  In reality the surface is displaced to the actual
-      ``origin`` (see ``_huygens_origin``), which delays/advances the pulse by
-      ``(origin . propagation_direction) / c``.  We add that shift so that the
-      analytic prediction uses the same time reference as the simulation.
-    * The field exists only inside the Huygens box (masked separately).
+    The laser's ``pulse_init`` is converted to the core's Huygens-surface
+    reference frame at translation time (see ``Simulation.get_as_pypicongpu``),
+    so the analytic ``laser.E(..., t)`` and the simulation share one uniquely
+    defined reference frame and no ad-hoc timing shift is needed.  The field
+    exists only inside the Huygens box (masked separately).
     """
     total = None
     for laser in lasers:
-        origin = _huygens_origin(laser, cell_size, domain_cells)
-        huygens_time_shift = np.dot(origin, laser.propagation_direction) / constants.c
-        contribution = laser.E(*coordinates, t=time + huygens_time_shift)
+        contribution = laser.E(*coordinates, t=time)
         total = contribution if total is None else total + contribution
     return total
 
@@ -519,9 +484,7 @@ class _LaserTestBase(TestCase):
         return read_fields(self.checkpoint_pattern, iteration=iteration)
 
     def expected_at(self, iteration):
-        return _expected_E_field(
-            self.coordinates, LASERS, iteration * self.sim.time_step_size, CELL_SIZE, NUMBER_OF_CELLS
-        )
+        return _expected_E_field(self.coordinates, LASERS, iteration * self.sim.time_step_size)
 
 
 class TestLaserInterface(_LaserTestBase):
@@ -592,6 +555,10 @@ class TestInjectedFieldAtHuygensSurface(_LaserTestBase):
         level.  The dominant components (E_z from Gaussian, E_x from PlaneWave)
         are the real gate -- they test the analytic formula and C++ injection
         directly.
+
+        No timing shift is applied: the reference-frame conversion lives in the
+        translation layer, so ``laser.E(..., t)`` is already in the simulation's
+        frame (see ``_expected_E_field``).
         """
         # Identify dominant component for each laser:
         #   GaussianLaser (z-pol) -> E_z (index 2)
@@ -697,7 +664,7 @@ class TestGaussianBulkEnvelope(_LaserTestBase):
 
     def _analytic_field(self, time):
         """Analytic category-A ``E_z`` on the checkpoint grid (SI)."""
-        return _expected_E_field(self.coordinates, [GAUSSIAN_LASER], time, CELL_SIZE, NUMBER_OF_CELLS)[self._component]
+        return _expected_E_field(self.coordinates, [GAUSSIAN_LASER], time)[self._component]
 
     def test_gaussian_envelope_amplitude_and_widths(self):
         """
@@ -770,11 +737,9 @@ class TestPlaneWaveFeedIn(_LaserTestBase):
     def test_plane_wave_is_injected_at_the_huygens_surface(self):
         """The E_x component of the freshly injected field matches the plane wave."""
         component = _component_index(PLANE_WAVE_LASER)
-        origin = _huygens_origin(PLANE_WAVE_LASER, CELL_SIZE, NUMBER_OF_CELLS)
-        time_shift = np.dot(origin, PLANE_WAVE_LASER.propagation_direction) / constants.c
         best = None
         for it in self.checkpoint_steps:
-            expected = PLANE_WAVE_LASER.E(*self.coordinates, t=it * self.sim.time_step_size + time_shift)[component]
+            expected = PLANE_WAVE_LASER.E(*self.coordinates, t=it * self.sim.time_step_size)[component]
             mask = np.zeros(expected.shape, dtype=bool)
             surface_index = PLANE_WAVE_LASER.picongpu_huygens_surface_positions[1][0]
             start = surface_index + _HUYGENS_PROBE_MARGIN_CELLS

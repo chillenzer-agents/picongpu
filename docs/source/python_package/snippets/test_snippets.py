@@ -384,6 +384,22 @@ EXPECTED_FILES = {
             "laser 0 enters through XMin",
             "laser 1 enters through YMax",
             "laser 2 enters through ZMin",
+            "laser 3 enters through XMax",
+            "It worked!",
+        ],
+        "file_contains": [
+            ("laser_entry_faces_setup/include/picongpu/param/incidentField.param", "PyPIConGPUFromOpenPMDPulseParam"),
+        ],
+    },
+    "selected_topics/laser_multi_face.py": {
+        "no_run": True,
+        "files": [
+            "laser_multi_face_setup/include/picongpu/param/incidentField.param",
+            "laser_multi_face_subset_setup/include/picongpu/param/incidentField.param",
+        ],
+        "stdout_contains": [
+            "default: one pulse injected through ['XMin', 'ZMin']",
+            "override: one pulse injected through ['XMin']",
             "It worked!",
         ],
     },

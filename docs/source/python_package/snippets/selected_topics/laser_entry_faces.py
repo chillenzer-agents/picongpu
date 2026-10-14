@@ -13,9 +13,11 @@ License: GPLv3+
 
 Places three Gaussian lasers on three different entry faces: one entering
 through the low-x face (propagation along +x), one through the high-y face
-(propagation along -y) and one through the low-z face (propagation along +z).
-The generated ``incidentField.param`` is then inspected to show that every
-laser was placed on the face matching its propagation direction.
+(propagation along -y) and one through the low-z face (propagation along +z), and a FromOpenPMD-pulse laser
+through the high-x face (propagation along -x). The generated
+``incidentField.param`` is then inspected to show that
+every laser, including the from-openPMD one, was placed on the face matching
+its propagation direction instead of the legacy hardcoded YMin.
 """
 
 # BEGIN-LASER-ENTRY-FACES
@@ -52,6 +54,21 @@ lasers = [
     laser([0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [CENTER[0], 1.5 * NUM_CELLS[1] * CELL_SIZE[1], CENTER[2]]),
     # enters through the low-z face, propagates along +z:
     laser([0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [CENTER[0], CENTER[1], -5.0e-6]),
+    # a from-openPMD pulse enters through the high-x face, propagating along -x:
+    # it is placed on the face its direction crosses like the standard lasers
+    # (the record is read from the openPMD file at simulation start, so the
+    # file path only needs to exist at run time, not at setup generation):
+    picmi.FromOpenPMDPulseLaser(
+        propagation_direction=[-1.0, 0.0, 0.0],
+        polarization_direction=[0.0, 1.0, 0.0],
+        time_offset_si=0.0,
+        file_path="pulse%T.bp5",
+        iteration=0,
+        dataset_name="E",
+        datatype="double",
+        polarisationAxisOpenPMD="y",
+        propagationAxisOpenPMD="x",
+    ),
 ]
 
 grid = picmi.Cartesian3DGrid(
@@ -76,7 +93,7 @@ def entry_face_of(incident_field, index):
 
 
 incident_field = Path("laser_entry_faces_setup/include/picongpu/param/incidentField.param").read_text()
-for index, expected in enumerate(["XMin", "YMax", "ZMin"]):
+for index, expected in enumerate(["XMin", "YMax", "ZMin", "XMax"]):
     face = entry_face_of(incident_field, index)
     assert face == expected, f"laser {index} was placed on {face}, expected {expected}"
     print(f"laser {index} enters through {face}")

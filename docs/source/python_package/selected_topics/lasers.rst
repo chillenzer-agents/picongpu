@@ -148,35 +148,58 @@ All lasers share a few properties:
 * ``propagation_direction`` and ``polarization_direction``:
   normalized 3D vectors.
   The propagation direction must point *into* the simulation box;
-  its dominant component determines the entry face
-  (see `Propagation direction and entry face`_ below).
+  its components determine the entry faces
+  (see `Propagation direction and entry faces`_ below).
 * ``centroid_position``: the position of the pulse at time zero.
-  It must be *outside* of the simulation box on the entry side
-  (see `Propagation direction and entry face`_ below),
+  It must be *outside* of the simulation box on every entry side
+  (see `Propagation direction and entry faces`_ below),
   so that the pulse enters the box during the simulation.
 * the field amplitude, given by exactly one of
   ``a0`` (the normalized vector potential) or
   ``E0`` (the peak electric field in V/m);
   the other is derived.
 
-Propagation direction and entry face
-------------------------------------
+Propagation direction and entry faces
+-------------------------------------
 
-A laser enters the simulation box through the coordinate face whose normal
-is the dominant component of its ``propagation_direction``: the component
-with the largest absolute value. A positive dominant component selects the
-``Min`` face of that axis (low side), a negative one the ``Max`` face
-(high side). For example ``[0, 1, 0]`` enters through ``YMin`` (the
-conventional head-on case), ``[1, 0, 0]`` through ``XMin`` and
-``[0, 0, -1]`` through ``ZMax``. Exactly the same rule validates
-``centroid_position``: it must lie outside the box on the entry side, i.e.
-the entry-axis component of the centroid must not point along the
-propagation direction (``centroid[axis] * propagation_direction[axis] <= 0``).
+A laser enters the simulation box through the coordinate faces its
+``propagation_direction`` *crosses*. A face is crossed iff the propagation
+direction has a non-zero component pointing inward through that boundary:
+for a positive ``d``-component this is the ``Min`` face of axis ``d`` (low
+side), for a negative one the ``Max`` face (high side). For example
+``[0, 1, 0]`` enters through ``YMin`` only (the conventional head-on case),
+``[1, 0, 0]`` through ``XMin``, and ``[0, 0, -1]`` through ``ZMax``. By
+default *all* crossed faces are used, so an obliquely incident pulse whose
+direction has several non-zero components is injected through every one of
+them: ``[0.5, 0, 0.866]`` crosses ``XMin`` **and** ``ZMin`` and is driven on
+both faces with the one shared pulse profile. This is the physically correct
+injection for an oblique wavefront, and it matches PIConGPU's ability to list
+the same profile type under several face aliases.
 
-For a genuinely diagonal direction with several equally large components
-(e.g. a 45-degree incidence), the tie is resolved to the first axis in
-``x``, ``y``, ``z`` order by convention, not by physics. Use a
-non-symmetric direction so the dominant component is unambiguous.
+Exactly the same rule validates ``centroid_position``: it must lie outside
+the box on *every* entry side, i.e. for each crossed axis
+``centroid[d] * propagation_direction[d] <= 0``.
+
+The full box of Huygens surfaces (``picongpu_huygens_surface_positions``)
+must be identical across all lasers, but each laser independently chooses
+which of those surfaces it uses; injecting on a strict subset is allowed.
+Use the PIConGPU extension keyword ``picongpu_entry_faces`` to give an
+explicit per-laser face list, which overrides the derived all-crossed
+default. It is available on the standard lasers
+(:class:`~picongpu.picmi.lasers.GaussianLaser`,
+:class:`~picongpu.picmi.lasers.DispersivePulseLaser`,
+:class:`~picongpu.picmi.lasers.PlaneWaveLaser` and
+:class:`~picongpu.picmi.lasers.FromOpenPMDPulseLaser`); ``TWTSLaser``
+keeps a dedicated two-plane placement and rejects it.
+
+.. literalinclude:: ../snippets/selected_topics/laser_multi_face.py
+   :language: python
+   :start-after: # BEGIN-LASER-MULTI-FACE
+   :end-before: # END-LASER-MULTI-FACE
+
+A 2D (2D3V) simulation has no ``z`` coordinate and therefore no Z face to
+inject through, so a direction with a ``z``-component (or an explicit
+selection containing ``ZMin``/``ZMax``) is rejected there.
 
 The example below places three lasers on three different faces — ``XMin``,
 ``YMax`` and ``ZMin`` — and checks the generated incident field:
@@ -237,6 +260,19 @@ Laser types
    A pulse imported from an `openPMD <https://www.openpmd.org/>`__ file
    (``file_path``, ``iteration``, ``dataset_name``, ...),
    for initial conditions that are too complex to describe analytically.
+   Like the standard lasers it is placed on the faces its
+   ``propagation_direction`` crosses, and ``picongpu_entry_faces`` may
+   override the derived list (it is not rejected for this laser type). The
+   profile requires an axis-parallel direction (core constraint, checked in
+   the frontend), so the derived list is exactly one face;
+   ``propagationAxisOpenPMD`` names the record axis the stored pulse runs
+   along and need not coincide with the direction's axis — the core rotates
+   the record into the simulation frame. Two caveats are the user's
+   responsibility: the stored dataset is loaded once per parameter type at
+   t=0 (``OpenPMDdata<T_Params>::get()``), so listing the same pulse under
+   several faces shares one on-device dataset (memory, not correctness), and
+   an explicit face list the direction does not head for is physically
+   meaningless even though the core accepts it.
 
 .. note::
 

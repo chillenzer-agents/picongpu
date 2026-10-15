@@ -6,6 +6,12 @@ Simulation-Wide Settings
 Some options are configured on the ``Simulation`` itself
 rather than on a grid, solver or species.
 
+``picongpu_auto_adjust_grid`` and ``picongpu_progress_percent`` expose two
+PIConGPU runtime options. Use ``False`` to emit ``--autoAdjustGrid false``;
+leaving it as ``None`` omits the option. Progress percentage accepts integers
+from 1 through 100; ``None`` keeps the PIConGPU default. These settings do not
+change the grid definition or the simulation's timestep count.
+
 .. literalinclude:: ../snippets/selected_topics/simulation_settings.py
    :language: python
    :start-at: simulation = picmi.Simulation

@@ -144,6 +144,14 @@ class Simulation(RenderedObject, BaseModel):
     memory_config: MemoryConfig = MemoryConfig()
     """memory / exchange-buffer knobs rendered into ``memory.param`` (see ``MemoryConfig``)."""
 
+    auto_adjust_grid: bool | None = Field(default=None, strict=True)
+    progress_percent: int | None = Field(default=None, strict=True, ge=1, le=100)
+
+    @field_serializer("auto_adjust_grid")
+    def _serialize_auto_adjust_grid(self, value) -> str | None:
+        # A string keeps explicit False distinct from omission in Mustache sections.
+        return None if value is None else str(value).lower()
+
     @computed_field
     def precisionSqrt(self) -> str:
         return (

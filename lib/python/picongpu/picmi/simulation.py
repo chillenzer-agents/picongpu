@@ -363,6 +363,12 @@ class Simulation(picmistandard.PICMI_Simulation):
     picongpu_walltime: datetime.timedelta | None = Field(default=None)
     """time after which the cluster scheduler will stop the simulation"""
 
+    picongpu_auto_adjust_grid: bool | None = Field(default=None, strict=True)
+    """Allow runtime grid adjustment; None leaves the C++ default in effect."""
+
+    picongpu_progress_percent: int | None = Field(default=None, strict=True, ge=1, le=100)
+    """Print progress after this percentage of steps; None retains the C++ default."""
+
     _runner: Runner | None = PrivateAttr(default=None)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -730,6 +736,8 @@ class Simulation(picmistandard.PICMI_Simulation):
             precision=self.picongpu_precision,
             precision_overrides=self.picongpu_precision_config.get_as_pypicongpu(),
             memory_config=self.picongpu_memory_config.get_as_pypicongpu(),
+            auto_adjust_grid=self.picongpu_auto_adjust_grid,
+            progress_percent=self.picongpu_progress_percent,
         )
 
     def _get_base_density(self) -> float:

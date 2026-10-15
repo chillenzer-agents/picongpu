@@ -85,6 +85,37 @@ inputs:
     doc: "Directory with the simulation setup to run"
 
 outputs:
+  # Per-stage outputs: stable, top-level aliases of the individual steps'
+  # outputs that each workflow stage produces. Partial (prefix) runs ask
+  # cwltool for exactly these (--target), which makes it execute only the
+  # steps upstream of them and prune the downstream stages. The default
+  # full run asks for the four collect outputs below, so it behaves exactly
+  # as before and never materializes these aliases in the run directory.
+  build_bin_directory:
+    type: Directory
+    outputSource: build_step/bin_directory
+    label: "Built executables (build stage)"
+    doc: "Direct output of the build step, exposed for partial (prefix) runs."
+  prepare_tbg_directory:
+    type: Directory
+    outputSource: prepare_submission_step/tbg_directory
+    label: "Prepared submission directory (prepare stage)"
+    doc: "Direct output of the prepare-submission step, exposed for partial (prefix) runs."
+  submit_submission_information:
+    type: File
+    outputSource: submit_step/submission_information
+    label: "Submission information (submit stage)"
+    doc: "Direct output of the submit step, exposed for partial (prefix) runs."
+  submit_link_results_script:
+    type: File
+    outputSource: submit_step/link_results_script
+    label: "Link-results script (submit stage)"
+    doc: "Direct output of the submit step, exposed for partial (prefix) runs."
+  submit_tbg_directory:
+    type: Directory
+    outputSource: submit_step/tbg_directory
+    label: "Submitted job directory (submit stage)"
+    doc: "Direct output of the submit step, exposed for partial (prefix) runs."
   input_directory:
     type: Directory
     outputSource: organize_output_step/input_directory

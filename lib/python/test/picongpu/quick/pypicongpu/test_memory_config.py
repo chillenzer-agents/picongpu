@@ -6,6 +6,7 @@ License: GPLv3+
 """
 
 from unittest import TestCase
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -15,6 +16,7 @@ from picongpu.picmi.constants import MiB, kB
 from picongpu.picmi.memory_config import MemoryConfig
 from picongpu.picmi.precision_config import PrecisionConfig
 from picongpu.pypicongpu import memory as pypicongpu_memory
+from picongpu.pypicongpu.precision_config import PrecisionConfig as BackendPrecisionConfig
 from picongpu.pypicongpu.rendering import Renderer
 
 
@@ -165,6 +167,60 @@ class TestPrecisionOverrides(TestCase):
                 _sim(picongpu_precision_config=PrecisionConfig(sqrt=value))
 
 
+@pytest.mark.parametrize("core", [32, 64])
+@pytest.mark.parametrize("twts,bits", [("core", 0), (32, 32), (64, 64)])
+def test_twts_precision_is_independent_of_core_and_cutoff(core, twts, bits):
+    config = PrecisionConfig(twts=twts)
+    sim = _sim(picongpu_precision=core, picongpu_precision_config=config)
+    backend = sim.get_as_pypicongpu().precision_overrides
+    assert backend.twts == twts
+    assert backend.twts_precision_bits == bits
+    assert backend.twts_num_sigmas == 6
+    rendered = _rendered("precision.param.mustache", sim)
+    assert f"namespace precisionPIConGPU = precision{core}Bit;" in rendered
+    assert f"#    define PICONGPU_TWTS_PRECISION {bits}\n" in rendered
+    assert "#    define PICONGPU_TWTS_NUM_SIGMAS 6\n" in rendered
+
+
+@pytest.mark.parametrize("cutoff", [1, 8, 2**32 - 1])
+def test_twts_cutoff_round_trip_and_rendering(cutoff):
+    config = PrecisionConfig(twts_num_sigmas=cutoff)
+    assert config.get_as_pypicongpu().twts_num_sigmas == cutoff
+    rendered = _rendered("precision.param.mustache", _sim(picongpu_precision_config=config))
+    assert f"#    define PICONGPU_TWTS_NUM_SIGMAS {cutoff}\n" in rendered
+    assert "#    define PICONGPU_TWTS_PRECISION 0\n" in rendered
+
+
+@pytest.mark.parametrize("model", [PrecisionConfig, BackendPrecisionConfig])
+@pytest.mark.parametrize("value", [0, 16, 128, "64", True, None])
+def test_twts_invalid_precision_rejected(model, value):
+    with pytest.raises(ValidationError):
+        model(twts=value)
+
+
+@pytest.mark.parametrize("model", [PrecisionConfig, BackendPrecisionConfig])
+@pytest.mark.parametrize("value", [0, -1, 2**32, 8.0, 8.5, "8", True, None])
+def test_twts_invalid_cutoff_rejected(model, value):
+    with pytest.raises(ValidationError):
+        model(twts_num_sigmas=value)
+
+
+def test_twts_header_consumes_rendered_precision_controls():
+    repo = Path(__file__).resolve().parents[6]
+    header = (repo / "include/picongpu/fields/background/templates/twtstight/TWTSTight.hpp").read_text()
+    precision = (repo / "include/picongpu/param/precision.param").read_text()
+    rendered = _rendered(
+        "precision.param.mustache",
+        _sim(picongpu_precision_config=PrecisionConfig(twts=64, twts_num_sigmas=8)),
+    )
+    for name, value in (("PICONGPU_TWTS_PRECISION", 64), ("PICONGPU_TWTS_NUM_SIGMAS", 8)):
+        assert f"#    define {name} {value}" in rendered
+        assert f"#ifndef {name}" in precision
+        assert f"#ifndef {name}" in header
+    assert "using float_T = float_64;" in header
+    assert "numSigmas = PICONGPU_TWTS_NUM_SIGMAS;" in header
+
+
 class TestMemoryTranslation(TestCase):
     def test_default_is_memory_config(self):
         assert isinstance(_sim().picongpu_memory_config, MemoryConfig)
@@ -228,6 +284,8 @@ class TestTemplateRendering(TestCase):
     def test_precision_param_defaults(self):
         rendered = _rendered("precision.param.mustache", _sim())
         assert "namespace precisionPIConGPU = precision32Bit;" in rendered
+        assert "#    define PICONGPU_TWTS_PRECISION 0\n" in rendered
+        assert "#    define PICONGPU_TWTS_NUM_SIGMAS 6\n" in rendered
         assert "namespace precisionSqrt = precisionPIConGPU;" in rendered
         assert "namespace precisionExp = precisionPIConGPU;" in rendered
         assert "namespace precisionTrigonometric = precisionPIConGPU;" in rendered

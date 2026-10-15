@@ -32,6 +32,15 @@
 
 #include <picongpu/simulation_types.hpp>
 
+// Shared TWTS numerics; 0 follows core precision, 32/64 select internal arithmetic.
+// Returned fields, amplitude scaling and switching-window arithmetic remain float_X.
+#ifndef PICONGPU_TWTS_PRECISION
+#    define PICONGPU_TWTS_PRECISION {{{precision_overrides.twts_precision_bits}}}
+#endif
+#ifndef PICONGPU_TWTS_NUM_SIGMAS
+#    define PICONGPU_TWTS_NUM_SIGMAS {{{precision_overrides.twts_num_sigmas}}}
+#endif
+
 namespace picongpu
 {
     /*! Select a precision for the simulation data

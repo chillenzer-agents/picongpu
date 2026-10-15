@@ -168,6 +168,17 @@ class Species(RenderedObject, BaseModel):
 
     shape: Shape = Shape("TSC")
 
+    @field_validator("shape")
+    @classmethod
+    def _validate_interpolation_shape(cls, shape):
+        # Counter is for diagnostics: support=0 and no cached shapeArray API.
+        # It cannot be used by FieldToParticleInterpolation as a species shape.
+        if shape == Shape.counter:
+            raise ValueError(
+                "Counter is a diagnostic counting shape and cannot be used for species field interpolation."
+            )
+        return shape
+
     @computed_field
     def species_name(self) -> str:
         return self.name

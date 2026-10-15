@@ -86,6 +86,34 @@ See
 :ref:`(De-)Serialization and Reproducibility <python_package/selected_topics/serialization:(De-)Serialization and Reproducibility>`
 for the API and the metadata that a generated setup carries.
 
+Translating a Simulation
+------------------------
+
+:func:`picongpu.picmi.translate.translate` performs the PICMI to PyPIConGPU
+translation as an explicit constraint resolution over the PIConGPU dialect:
+
+.. literalinclude:: ../snippets/foundations/translation.py
+   :language: python
+   :start-after: BEGIN-TRANSLATE-REACHABILITY
+   :end-before: END-TRANSLATE-REACHABILITY
+
+It collects the constraints that the objects **reachable** from the
+``Simulation`` impose on each other, orders them with ``graphlib``
+(a referenced object is resolved before its referrer; reference cycles are
+reported instead of silently mistranslated), and resolves them into a fresh
+copy. Two properties follow directly:
+
+* **Purity** -- the input ``Simulation`` and all its members are left
+  unmutated, so the same input can be translated (or reused) repeatedly.
+* **Reachability** -- only objects reachable from the ``Simulation``
+  contribute constraints. In the snippet above the ``ADK`` model is attached
+  to the ion species only through its constructor arguments; leaving it out of
+  ``picongpu_interaction`` therefore yields no ionization, while adding it
+  does -- regardless of whether the model was constructed.
+
+``sim.get_as_pypicongpu()`` remains the reference translation used by
+``run()`` and ``write_input_file()``, and the two agree under normalisation.
+
 Multiple simulations in a single script
 ---------------------------------------
 

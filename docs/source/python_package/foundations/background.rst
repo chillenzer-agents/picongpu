@@ -76,6 +76,24 @@ PyPIConGPU middle layer
   It is not considered public interface but should be relatively stable
   because it closely follows core PIConGPU's C++ interface which is mostly stable at this point.
 
+Constraint resolution
+  The translation from PICMI to PyPIConGPU is a
+  `pydantic <https://docs.pydantic.dev/>`__-based constraint resolution
+  (:func:`picongpu.picmi.translate.translate`
+  in the :mod:`picongpu.picmi.translate` module).
+  It collects the constraints that the objects **reachable** from a
+  ``Simulation`` impose on each other, orders them with the standard-library
+  ``graphlib`` topological sorter (so a referenced object is resolved before
+  its referrer, and reference cycles are reported rather than silently
+  mistranslated), and resolves them into a fresh copy --
+  the input ``Simulation`` and its members are never mutated.
+  This is what makes an object that is constructed but never added to the
+  simulation contribute nothing: only reachable objects
+  (interactions in ``picongpu_interaction``, diagnostics in ``diagnostics``,
+  species, grids, ...) take part.
+  The classical per-class ``get_as_pypicongpu`` methods remain the reference
+  renderer that the resolver drives.
+
 Template layer
   The source code and configuration files are rendered
   from the PyPIConGPU representation via mustache template files.

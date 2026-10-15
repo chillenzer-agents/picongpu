@@ -23,6 +23,7 @@ from pydantic import (
 
 from picongpu.pypicongpu.collisions import CollisionalPhysicsSetup
 from picongpu.pypicongpu.output.radiation import RadiationPlugin
+from picongpu.pypicongpu.output.phase_space import validate_extension_order
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
 from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFunctor
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
@@ -199,6 +200,7 @@ class Simulation(RenderedObject, BaseModel):
         ]
         if outputs is None:
             return default
+        validate_extension_order(outputs)
         if not any(isinstance(o, RadiationPlugin) for o in outputs):
             return outputs + default
         return outputs

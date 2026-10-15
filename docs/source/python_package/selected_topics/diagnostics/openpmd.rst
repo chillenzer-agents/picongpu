@@ -88,6 +88,8 @@ It lists, per time step, which fields and particles are written:
   each entry is ``None`` (full extent), a single cell index
   or a ``(start, stop)`` pair --
   e.g. ``RangeSpec((10, 20), None, None)`` dumps cells 10-20 in ``x`` only);
+  unrestricted axes serialize as ``:`` so a later restricted axis keeps its
+  intended position (for example, ``:,10:20,:`` restricts only ``y``);
   the default is the full grid.
 * ``data_preparation_strategy``:
   ``"mappedMemory"`` (default) or ``"doubleBuffer"``

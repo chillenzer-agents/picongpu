@@ -329,7 +329,9 @@ class Simulation(picmistandard.PICMI_Simulation):
             raise ValueError(f"Minimum weighting must be finite and > 0, not {value=}.")
         return value
 
-    picongpu_min_weighting: Annotated[float | None, AfterValidator(_validate_min_weighting)] = Field(default=None)
+    picongpu_min_weighting: Annotated[float | None, AfterValidator(_validate_min_weighting)] = Field(
+        default=None, strict=True
+    )
     """
     minimum macro-particle weighting below which particles are not created / are deleted
 

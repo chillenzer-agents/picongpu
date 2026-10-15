@@ -7,7 +7,11 @@ License: GPLv3+
 import re
 from unittest import TestCase
 
+import pytest
+
 from picongpu import templates
+from picongpu.picmi import diagnostics as diag
+from picongpu.picmi.diagnostics.backend_config import RangeSpec
 from picongpu.pypicongpu.output.openpmd_plugin import FieldDump
 from picongpu.pypicongpu.particle_functor import ParticleFunctor
 from picongpu.pypicongpu.rendering.renderer import Renderer
@@ -77,3 +81,19 @@ class TestFileOutputFieldDump(TestCase):
         self.assertNotIn("namespace particles::traits", rendered)
         self.assertNotIn("struct SpeciesEligibleForSolver", rendered)
         self.assertNotIn("CreateEligible_t", rendered)
+
+
+@pytest.mark.parametrize(
+    "bounds, expected",
+    [
+        ((None, None, None), ":,:,:"),
+        (((1780, 1804), None, None), "1780:1804,:,:"),
+        ((None, (1780, 1804), None), ":,1780:1804,:"),
+        ((None, None, (884, 908)), ":,:,884:908"),
+    ],
+)
+@pytest.mark.parametrize("as_object", [False, True])
+def test_range_preserves_axis_positions(bounds, expected, as_object):
+    # C++ toRangeSlice skips empty components, so commas alone are insufficient.
+    config = diag.OpenPMDConfig(file="fields", range=RangeSpec(*bounds) if as_object else bounds)
+    assert config.model_dump(mode="json")["range"] == expected

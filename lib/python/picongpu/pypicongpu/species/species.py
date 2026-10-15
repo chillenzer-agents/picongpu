@@ -6,7 +6,7 @@ License: GPLv3+
 """
 
 import re
-from pydantic import BaseModel, computed_field, field_validator
+from pydantic import BaseModel, computed_field, field_validator, model_validator
 from enum import Enum
 
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronConstant
@@ -30,6 +30,18 @@ class Shape(Enum):
     cubic = "PQS"
     quartic = "PCS"
     counter = "Counter"
+
+
+class CurrentDeposition(Enum):
+    Esirkepov = "Esirkepov"
+    EmZ = "EmZ"
+
+    @classmethod
+    def _missing_(cls, value):
+        # EZ is the paper's name and a C++ alias; serialize one canonical value.
+        if value == "EZ":
+            return cls.EmZ
+        return None
 
 
 class Pusher(Enum):
@@ -167,6 +179,17 @@ class Species(RenderedObject, BaseModel):
     """name of the species"""
 
     shape: Shape = Shape("TSC")
+    current_deposition: CurrentDeposition = CurrentDeposition.Esirkepov
+
+    @model_validator(mode="after")
+    def _validate_deposition_shape(self):
+        # EmZ deposits over support-1 points along the current component.
+        # NGP has support=1, so these loops are empty (also for Jx/Jy in 2D).
+        if self.current_deposition == CurrentDeposition.EmZ and self.shape == Shape.NGP:
+            raise ValueError(
+                "EmZ current deposition does not support NGP; use linear, quadratic, cubic or other:quartic."
+            )
+        return self
 
     @field_validator("shape")
     @classmethod

@@ -53,7 +53,8 @@ Its most important parameters are:
   override the (element-)derived mass and charge in SI units.
   This is how you define custom particles.
 * ``particle_shape``:
-  the particle shape used for current/charge deposition.
+  the species' shape flag, field-to-particle interpolation shape and
+  current-deposition shape.
   If left unset, it is inherited from
   :attr:`~picongpu.picmi.simulation.Simulation.particle_shape`
   and, if that too is unset, falls back to the PIConGPU default
@@ -122,6 +123,21 @@ The value at each position of ``proportions`` becomes the corresponding member's
    :class:`~picongpu.picmi.species.Species` entry becomes its own operation.
    There is therefore no implicit merging of look-alike species: to initialise
    species collectively, you must group them in a ``MultiSpecies``.
+
+Particle shape, interpolation and current deposition
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``Species.particle_shape`` determines the shape used to gather grid fields at
+particle positions and to deposit current. The generated definitions use a
+separate shape alias for each species. For example, ``particle_shape="cubic"``
+selects PQS for the species' shape flag, field interpolation and default
+Esirkepov current deposition, even when another species uses ``"linear"``
+(CIC). Omitting the species shape inherits the Simulation shape, falling back
+to TSC if that too is unset.
+
+The diagnostic-only ``"other:counter"`` shape is rejected during conversion:
+it cannot provide the cached assignment functions used by field interpolation.
+NGP remains valid with Esirkepov.
 
 .. _distributions:
 

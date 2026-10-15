@@ -33,6 +33,7 @@ but you can also import them directly:
    :hidden:
 
    simulation
+   simulation_group
    grid
    solver
    species

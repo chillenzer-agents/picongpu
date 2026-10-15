@@ -83,6 +83,18 @@ TOML_EXPECTED = {
     "configuring_environment/rc_params_shebang.toml": {
         "shebang": "#!/usr/bin/env zsh",
     },
+    "configuring_environment/rc_params_dependencies.toml": {
+        "dependencies": {
+            "enabled": True,
+            "provider": "source",
+            "jobs": 16,
+            "only": ["fftw3", "pngwriter"],
+            "prefix": "/scratch/$USER/picongpu-deps",
+            "cache": "/scratch/$USER/picongpu-deps-sources",
+            "offline": False,
+            "versions": {"hdf5": "1.14.6"},
+        },
+    },
     "configuring_environment/rc_params_profile_precedence.toml": {
         "my_rc_params_value": "Rendering template content directly",
         "profile_content": "echo 'Using profile_content directly'",
@@ -95,6 +107,14 @@ TOML_EXPECTED = {
 EXPECTED_FILES = {
     "configuring_environment/rc_params_basic.py": {
         "stdout_contains": ["It worked!"],
+    },
+    "configuring_environment/rc_params_dependencies.py": {
+        "stdout_contains": [
+            "active: True",
+            'export DEPS_PROVIDER="source"',
+            'export DEPS_ONLY="fftw3,pngwriter"',
+            "picongpu-deps.sh",
+        ],
     },
     "configuring_environment/rc_params_preset_guard.py": {
         "stderr_contains": ["triggered resetting rc_params"],

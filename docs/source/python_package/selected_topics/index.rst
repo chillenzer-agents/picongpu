@@ -35,3 +35,4 @@ The remaining pages are deep dives into cross-cutting features.
    serialization
    custom_input
    hpc_submission
+   troubleshooting

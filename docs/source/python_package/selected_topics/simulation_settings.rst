@@ -113,6 +113,9 @@ low-level memory and exchange-buffer knobs rendered into
 All sizes are raw byte counts; write them with the byte-size constants from
 ``picongpu.picmi.constants`` (``KiB``, ``MiB``, ``GiB``, ...) for
 readability, e.g. ``reserved_gpu_memory_size=350 * picmi.constants.MiB``.
+Large values are emitted with a wide integer literal before multiplication,
+so values such as ``4 * picmi.constants.GiB`` do not overflow a C++ ``int``
+intermediate.
 (The ``super_cell_size`` is part of the grid, not the memory configuration.)
 
 .. note::

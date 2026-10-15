@@ -59,6 +59,9 @@ Its most important parameters are:
   :attr:`~picongpu.picmi.simulation.Simulation.particle_shape`
   and, if that too is unset, falls back to the PIConGPU default
   ``"quadratic"`` (i.e. TSC).
+* ``picongpu_current_deposition``:
+  the current-deposition algorithm, ``"Esirkepov"`` (default), ``"EmZ"`` or
+  its alias ``"EZ"``, using the species' resolved ``particle_shape``.
 * ``method``:
   the particle pusher (default ``"Boris"``;
   ``"Vay"`` and ``"Higuera-Cary"`` are relativistic variants,
@@ -138,6 +141,19 @@ to TSC if that too is unset.
 The diagnostic-only ``"other:counter"`` shape is rejected during conversion:
 it cannot provide the cached assignment functions used by field interpolation.
 NGP remains valid with Esirkepov.
+
+``picongpu_current_deposition`` is a PIConGPU-specific extension. ``"EZ"``
+is an alias of ``"EmZ"``; both generate the canonical C++ name ``EmZ``.
+NGP is rejected with EmZ because its support is only one point, leaving the
+in-plane EmZ current-deposition loops empty. Current smoothing remains an
+independent solver choice. For example:
+
+.. code-block:: python
+
+   electrons = picmi.Species(
+       name="e", particle_type="electron", particle_shape="cubic",
+       picongpu_current_deposition="EZ",
+   )
 
 .. _distributions:
 

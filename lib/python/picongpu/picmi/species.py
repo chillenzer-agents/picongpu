@@ -8,7 +8,7 @@ License: GPLv3+
 import re
 from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from picmistandard import PICMI_Species
 from pydantic import (
@@ -29,7 +29,7 @@ from picongpu.pypicongpu.species.constant.constant import Constant
 from picongpu.pypicongpu.species.constant.densityratio import DensityRatio
 from picongpu.pypicongpu.species.constant.mass import Mass
 from picongpu.pypicongpu.species.operation import AnyOperation
-from picongpu.pypicongpu.species.species import Pusher, Shape
+from picongpu.pypicongpu.species.species import CurrentDeposition, Pusher, Shape
 from picongpu.pypicongpu.species.species import Species as PyPIConGPUSpecies
 
 from .. import pypicongpu
@@ -98,6 +98,10 @@ class Species(PICMI_Species):
     pushers prefixed with 'other:' (e.g. 'other:Acceleration',
     'other:Photon', 'other:Probe', 'other:Axel'). If left unset it falls back
     to the PIConGPU default 'Boris'.
+
+    `picongpu_current_deposition` selects 'Esirkepov' (default), 'EmZ' or
+    its alias 'EZ', using this species' resolved particle shape. EmZ/EZ do
+    not support NGP.
     """
 
     # PIConGPU's native default particle shape (TSC). This is the code-level
@@ -109,6 +113,8 @@ class Species(PICMI_Species):
     picongpu_fixed_charge: bool = False
     particle_shape: str | None = None
     method: str | None = None
+    picongpu_current_deposition: Literal["Esirkepov", "EmZ", "EZ"] = "Esirkepov"
+
 
     # Theoretically, Position(), Momentum() and Weighting() are also requirements imposed from the outside,
     # e.g., by the current deposition, pusher, ..., but these concepts are not separately modelled in PICMI
@@ -228,6 +234,7 @@ class Species(PICMI_Species):
             **self._evaluate_species_requirements(),
             shape=self._shape(default_particle_shape),
             pusher=self._pusher(),
+            current_deposition=CurrentDeposition(self.picongpu_current_deposition),
         )
 
     def picongpu_get_mass_si(self) -> float:

@@ -10,7 +10,8 @@ exactly the code that is executed in CI**.
 
 - Each snippet is a real, minimal, faithful script in one of the topic
   subdirectories (mirroring the documentation chapter it belongs to):
-   - `configuring_environment/`: `rc_params` usage
+   - `configuring_environment/`: `rc_params` usage and the `picongpu`
+     configuration commands (`rc`, `dependencies`)
    - `defining_simulation/`: PICMI input scripts
    - `running_simulation/`: bash commands and workflow invocations
    - `quickstart/`: the commands of the quick start guide

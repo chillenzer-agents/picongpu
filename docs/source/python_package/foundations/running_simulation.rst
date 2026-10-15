@@ -54,7 +54,7 @@ In this case, you can use one of the following:
 
         (``uv run`` executes a script or project in its own environment;
         ``uvx`` -- short for ``uv tool run`` -- is the equivalent for invoking
-        an *installed* console script such as ``pic-deps``.)
+        an *installed* console script such as ``picongpu``.)
 
     .. tab-item:: pip-run
 

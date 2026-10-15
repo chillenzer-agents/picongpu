@@ -66,6 +66,25 @@ Guard cells
 It must be a non-negative multiple of the super-cell size;
 if unset, PIConGPU's default is used.
 
+The vacuum field update reads neighbouring cells, so each axis must carry
+enough guard cells to hold the solver's stencil.
+The frontend validates this when the solver is constructed and raises a
+``ValueError`` for a too-shallow guard:
+
+* ``"Yee"``, ``"Lehe"`` and ``"CKC"`` advance the fields with a
+  one-cell-wide stencil and need **at least 1** guard cell per axis.
+* ``"other:ArbitraryOrderFDTD"`` reaches ``order // 2`` cells into the guard
+  region, so each axis needs **at least ``stencil_order[axis] // 2``** guard
+  cells (order 4 needs 2, order 8 needs 4).
+* ``"other:None"`` disables the vacuum update and is exempt.
+* An unset ``guard_cells`` (``None``, the default) leaves PIConGPU's
+  ``(1, 1, 1)`` super-cell guard in place and skips the check.
+
+.. literalinclude:: ../snippets/selected_topics/grids_guard_cells.py
+   :language: python
+   :start-after: from picongpu import picmi
+   :end-before: print("It worked!")
+
 Solvers
 -------
 

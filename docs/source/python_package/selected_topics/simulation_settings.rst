@@ -100,6 +100,26 @@ functions) can be overridden individually via
 each of ``sqrt``, ``exp`` and ``trig`` takes ``"core"`` (the default,
 which follows the core precision), ``32`` or ``64``.
 
+The same configuration exposes shared numerical controls for all TWTSTight
+laser pulses, including incident-field and background-field use:
+
+* ``twts``: internal arithmetic precision, either ``"core"`` (default), ``32`` or ``64``.
+* ``twts_num_sigmas``: positive integer envelope cutoff (default ``6``, maximum
+  ``2**32 - 1``).
+
+For example, keep a float32 simulation while using double precision and cutoff
+8 for both TWTS pulses::
+
+    picongpu_precision=32,
+    picongpu_precision_config=picmi.PrecisionConfig(twts=64, twts_num_sigmas=8),
+
+These are PIConGPU extensions. They render guarded definitions into the
+existing ``precision.param`` and apply to every TWTS pulse. Old custom
+precision files that omit the macros retain core arithmetic and cutoff 6.
+Returned fields, amplitude scaling and switching-window arithmetic still use
+``float_X``. Larger cutoffs evaluate more of the pulse tails; input validation
+does not establish their numerical accuracy or stability.
+
 Particle shape
 --------------
 

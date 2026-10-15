@@ -85,6 +85,21 @@ class TestMemoryConfigDefaults(TestCase):
         assert "super_cell_size" not in MemoryConfig.model_fields
 
 
+@pytest.mark.parametrize(
+    "size,expected",
+    [
+        (2**31 - 1, "2147483647"),
+        (2**31, "2048ULL * 1024 * 1024"),
+        (4 * 1024**3, "4096ULL * 1024 * 1024"),
+        (4 * 1024**3 + 1024, "4194305ULL * 1024"),
+        (4 * 1024**3 + 1, "4294967297ULL"),
+    ],
+)
+def test_large_memory_literals_promote_before_multiplication(size, expected):
+    sim = _sim(picongpu_memory_config=MemoryConfig(reserved_gpu_memory_size=size))
+    assert f"reservedGpuMemorySize = {expected};" in _rendered("memory.param.mustache", sim)
+
+
 class TestMemoryConfigValidation(TestCase):
     def test_bytes_must_be_positive(self):
         for field in ("bytes_exchange_x", "bytes_exchange_y", "bytes_exchange_z", "bytes_edges", "bytes_corner"):

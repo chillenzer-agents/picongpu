@@ -19,11 +19,14 @@ def _non_negative(values):
 
 
 def _human_bytes(value: int) -> str:
+    # Multiplications of unsuffixed literals otherwise use int, even when
+    # assigned to size_t (e.g. a 4 GiB reserve). Promote before multiplying.
+    suffix = "ULL" if value > 2**31 - 1 else ""
     if value % (1024 * 1024) == 0:
-        return f"{value // (1024 * 1024)} * 1024 * 1024"
+        return f"{value // (1024 * 1024)}{suffix} * 1024 * 1024"
     if value % 1024 == 0:
-        return f"{value // 1024} * 1024"
-    return str(value)
+        return f"{value // 1024}{suffix} * 1024"
+    return f"{value}{suffix}"
 
 
 class MemoryConfig(BaseModel):

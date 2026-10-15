@@ -1,0 +1,15 @@
+preset = "bash"
+
+# cwltool provenance is tracked by default and written to the run directory.
+# The optional [provenance] table controls it:
+[provenance]
+# set to false to opt out of provenance tracking entirely
+enabled = true
+# who to attribute the run to in the provenance record
+# (falls back to the CWL_FULL_NAME and ORCID environment variables)
+full_name = "Your Name"
+orcid = "0000-0002-1825-0097"
+# additionally capture host resp. user environment provenance
+# (host is on by default, user is off by default)
+host = true
+user = false

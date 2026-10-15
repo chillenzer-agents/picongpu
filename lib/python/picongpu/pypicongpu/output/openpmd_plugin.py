@@ -40,7 +40,8 @@ class RangeSpecEntry(BaseModel):
     @model_serializer(mode="plain")
     def _serialize(self) -> str:
         if self.data is None:
-            return ""
+            # PMacc skips empty comma-separated slices; ':' retains this axis.
+            return ":"
         if isinstance(self.data, int):
             return str(self.data)
         if isinstance(self.data, tuple):
@@ -67,6 +68,8 @@ class OpenPMDConfig(BaseModel):
     @field_validator("range", mode="before")
     @classmethod
     def _validate_range(cls, value):
+        if isinstance(value, RangeSpec):
+            return value
         try:
             return RangeSpec(data=value)
         except ValidationError as error1:

@@ -32,6 +32,22 @@
 
 #include <picongpu/simulation_types.hpp>
 
+/** TWTS internal arithmetic: 0 follows the simulation precision, or select 32/64.
+ * Applies to all TWTSTight pulses, for incident and background fields alike.
+ * Field storage, amplitude scaling and switching-window arithmetic remain float_X.
+ * Guarded definitions also allow an explicit build-time override.
+ */
+#ifndef PICONGPU_TWTS_PRECISION
+#    define PICONGPU_TWTS_PRECISION 0
+#endif
+
+/** TWTS envelope cutoff in multiples of tauG*c, independent of arithmetic precision.
+ * Larger values evaluate more of the pulse tails and require numerical care.
+ */
+#ifndef PICONGPU_TWTS_NUM_SIGMAS
+#    define PICONGPU_TWTS_NUM_SIGMAS 6
+#endif
+
 namespace picongpu
 {
     /*! Select a precision for the simulation data

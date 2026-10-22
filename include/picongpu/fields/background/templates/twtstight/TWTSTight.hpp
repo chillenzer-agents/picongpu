@@ -65,9 +65,31 @@
 #include <array>
 #include <tuple>
 
+// Defaults for existing setups whose precision.param predates these controls.
+// defines.hpp has already loaded precision.param; do not include field parameter
+// files here, as they themselves depend on this implementation.
+#ifndef PICONGPU_TWTS_PRECISION
+#    define PICONGPU_TWTS_PRECISION 0
+#endif
+#ifndef PICONGPU_TWTS_NUM_SIGMAS
+#    define PICONGPU_TWTS_NUM_SIGMAS 6
+#endif
+
+#if PICONGPU_TWTS_NUM_SIGMAS < 1 || PICONGPU_TWTS_NUM_SIGMAS > 4'294'967'295ULL
+#    error "PICONGPU_TWTS_NUM_SIGMAS must be a positive uint32_t value"
+#endif
+
 namespace picongpu::templates::twtstight
 {
+#if PICONGPU_TWTS_PRECISION == 0
     using float_T = float_X;
+#elif PICONGPU_TWTS_PRECISION == 32
+    using float_T = float_32;
+#elif PICONGPU_TWTS_PRECISION == 64
+    using float_T = float_64;
+#else
+#    error "PICONGPU_TWTS_PRECISION must be 0 (core), 32 or 64"
+#endif
     using float3_T = ::pmacc::math::Vector<float_T, 3u>;
     using complex_T = alpaka::Complex<float_T>;
     using complex_64 = alpaka::Complex<float_64>;
@@ -77,7 +99,7 @@ namespace picongpu::templates::twtstight
      *  Developer note: In case the float_T-type is set to float_64 instead of float_X,
      *  numSigma can be increased to numSigmas = 10 without running into numerical issues.
      */
-    constexpr uint32_t numSigmas = 6;
+    constexpr uint32_t numSigmas = PICONGPU_TWTS_NUM_SIGMAS;
 
     /** Provides the E- or B-field functors of the TWTSTight laser for the
      *  fieldBackground and incidentField approaches.

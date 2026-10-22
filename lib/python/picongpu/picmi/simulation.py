@@ -350,11 +350,14 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     picongpu_precision_config: PrecisionConfig = Field(default_factory=PrecisionConfig)
     """
-    per-namespace precision overrides (sqrt/exp/trig) rendered into ``precision.param``
+    special-operation precision (sqrt/exp/trig) and shared TWTS numerical controls
+    rendered into ``precision.param``
     (see ``PrecisionConfig``).
 
     ``"core"`` (default) aliases the core ``precisionPIConGPU`` precision; ``32``/``64``
     force ``precision32Bit``/``precision64Bit`` respectively.
+    ``twts`` uses the same precision choices; ``twts_num_sigmas`` independently
+    controls the envelope cutoff for all TWTS pulses (default 6).
     """
 
     picongpu_memory_config: MemoryConfig = Field(default_factory=MemoryConfig)

@@ -22,6 +22,9 @@
 
 
 
+#include "picongpu/algorithms/AssignedTrilinearInterpolation.hpp"
+#include "picongpu/algorithms/FieldToParticleInterpolation.hpp"
+#include "picongpu/fields/currentDeposition/Solver.def"
 #include "picongpu/particles/Particles.hpp"
 
 #include <pmacc/identifier/value_identifier.hpp>
@@ -48,6 +51,8 @@ namespace picongpu
                 value_identifier(float_X, DensityRatio_{{{typename}}}, {{{ratio}}});
             {{/density_ratio}}
         {{/constants}}
+
+        using ParticleShape_{{{typename}}} = {{#shape}}particles::shapes::{{{shape}}}{{/shape}}{{^shape}}UsedParticleShape{{/shape}};
 
         using ParticleFlags_{{{typename}}} = MakeSeq_t<
             {{! note: put defaults at end, s.t. that generated section may always safely end in comma }}
@@ -87,9 +92,9 @@ namespace picongpu
             {{/constants}}
 
             particlePusher<{{#pusher}}particles::pusher::{{{pusher}}}{{/pusher}}{{^pusher}}UsedParticlePusher{{/pusher}}>,
-            shape<{{#shape}}particles::shapes::{{{shape}}}{{/shape}}{{^shape}}UsedParticleShape{{/shape}}>,
-            interpolation<UsedField2Particle>,
-            current<UsedParticleCurrentSolver>>;
+            shape<ParticleShape_{{{typename}}}>,
+            interpolation<FieldToParticleInterpolation<ParticleShape_{{{typename}}}, AssignedTrilinearInterpolation>>,
+            current<currentSolver::Esirkepov<ParticleShape_{{{typename}}}>>>;
 
         using ParticleAttributes_{{{typename}}} = MakeSeq_t<
             {{#attributes}}

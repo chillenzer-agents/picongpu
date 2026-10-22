@@ -29,6 +29,42 @@ Parameters:
    ``min_momentum`` must be smaller than ``max_momentum``.
    For example, ``1.0 * m_e * c`` (≈ ``2.73e-22`` kg·m/s) is one electron
    rest-mass momentum.
+* ``picongpu_extension`` (optional):
+   the bare openPMD filename extension, for example ``"bp"``, ``"bp5"`` or
+   ``"h5"``, without a leading dot. This new option is a PIConGPU extension,
+   not a parameter adopted by the PICMI standard. Omission or ``None`` leaves
+   the C++ plugin default unchanged and emits no extension option.
+   The value must start with an ASCII letter or digit and otherwise contain
+   only ASCII letters, digits, underscores or hyphens. Python validates the
+   token, not backend availability in the eventual openPMD installation.
+
+For example, request the reference electron y/py diagnostic as:
+
+.. code-block:: python
+
+   from picongpu.picmi import constants
+   from picongpu.picmi.diagnostics import PhaseSpace, TS
+
+   phase_space = PhaseSpace(
+       species=electrons,
+       period=TS[::812],
+       spatial_coordinate="y",
+       momentum_coordinate="py",
+       min_momentum=-50 * constants.m_e * constants.c,
+       max_momentum=2000 * constants.m_e * constants.c,
+       picongpu_extension="bp",
+   )
+
+Extensions are selected per diagnostic. Different diagnostics of the same
+species may use different formats. The C++ CLI indexes extension values in
+diagnostic order, independently for each species; all filters of a species
+share that sequence. An explicit extension must therefore precede any omitted
+extensions for that species. For example, ``["bp", "h5", None]`` is supported,
+but ``[None, "bp"]`` is rejected during simulation conversion because omitting
+the first CLI entry would incorrectly apply ``"bp"`` to the first diagnostic.
+Set explicit values on the preceding diagnostics or add diagnostics with
+explicit extensions first. Entries for other species do not affect this rule.
+No diagnostics are automatically reordered or assigned an assumed default.
 
 The output is written as `openPMD <https://www.openpmd.org/>`__ files
 into the ``simOutput/phaseSpace/`` directory;

@@ -102,6 +102,9 @@ pypicongpu_output_with_newlines="
           --{{{species.species_name}}}_phaseSpace.momentum {{{momentum_coordinate}}}
           --{{{species.species_name}}}_phaseSpace.min {{{min_momentum}}}
           --{{{species.species_name}}}_phaseSpace.max {{{max_momentum}}}
+          {{#extension}}
+          --{{{species.species_name}}}_phaseSpace.ext {{{extension}}}
+          {{/extension}}
     {{/type_phasespace}}
 
     {{#type_energyhistogram}}

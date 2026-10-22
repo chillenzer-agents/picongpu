@@ -16,6 +16,7 @@ from picongpu.picmi.diagnostics.timestepspec import TimeStepSpec
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species
 from picongpu.pypicongpu.output.phase_space import PhaseSpace as PyPIConGPUPhaseSpace
+from picongpu.pypicongpu.output.phase_space import FileExtension
 
 
 def _unfiltered_species(species: Species | FilteredSpecies) -> Species:
@@ -66,8 +67,9 @@ class PhaseSpace(PICMI_Diagnostic):
         Maximum value for the phase-space coordinate range.
         Unit: SI momentum (kg*m/s) (see min_momentum).
 
-    name: string, optional
-        Optional name for the phase-space plugin.
+    picongpu_extension: string, optional
+        Bare openPMD filename extension, such as "bp" or "h5". None (default)
+        leaves the C++ plugin default in effect. This is a PIConGPU extension.
     """
 
     species: Species | FilteredSpecies
@@ -76,6 +78,7 @@ class PhaseSpace(PICMI_Diagnostic):
     momentum_coordinate: Literal["px", "py", "pz"]
     min_momentum: float
     max_momentum: float
+    picongpu_extension: FileExtension | None = None
 
     def check(self, *args, **kwargs):
         if self.min_momentum >= self.max_momentum:

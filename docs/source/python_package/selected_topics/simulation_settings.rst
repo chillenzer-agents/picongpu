@@ -50,18 +50,32 @@ particle count per cell:
 Both are mostly relevant as numerical knobs and can usually be left at
 their defaults.
 
-Macro-particle weighting
-------------------------
+Minimum macroparticle weighting
+-------------------------------
 
-PIConGPU's particle initialization never creates a macro-particle whose weighting is
-below a floor: such particles are skipped at initialization and removed
-during the run. This floor is exposed as
-:attr:`~picongpu.picmi.simulation.Simulation.picongpu_min_weighting`:
+``picongpu_min_weighting`` sets the global ``particles::MIN_WEIGHTING``
+constant in ``particle.param``. This is a PIConGPU extension, not a standard
+PICMI parameter. Omission or ``None`` selects the C++ default ``10.0``; for example:
 
-* ``picongpu_min_weighting``: the minimum macro-particle weighting, given as
-  a bare ``float`` in PIConGPU code units (``unit: none``, i.e. **not** SI).
-  It must be finite and strictly positive. If unset, PIConGPU's default of
-  ``10.0`` is used (this matches the C++ ``MIN_WEIGHTING`` default).
+.. code-block:: python
+
+   sim = picmi.Simulation(..., picongpu_min_weighting=0.1)
+
+The weighting is a dimensionless count of physical particles represented by
+a macroparticle. The value must be a finite, strictly positive number and remain
+positive and finite in the selected core precision. Zero is invalid: the C++
+``WeightMacroParticles`` algorithm asserts positivity and divides by this value.
+Booleans and numeric strings are rejected. The option applies globally
+to every species; it does not change the density profile, normalization or layout.
+
+For ``PseudoRandomLayout`` with a requested maximum of ``N`` particles per cell,
+let ``Nr`` be the physical-particle count in the cell. The C++ start-position
+algorithm chooses ``floor(min(N, Nr / MIN_WEIGHTING))`` macroparticles and,
+when this count is positive, assigns each the weight ``Nr / count``.
+Cells below the minimum contain no macroparticles. With one requested particle
+per cell, the cutoff density in 3D is ``MIN_WEIGHTING / cell_volume``;
+equality creates one particle, subject to floating-point rounding.
+For 2D, the physical cell volume includes ``picongpu_cell_depth_si``.
 
 Numerical precision
 -------------------

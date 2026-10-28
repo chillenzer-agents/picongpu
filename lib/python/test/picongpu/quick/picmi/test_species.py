@@ -51,7 +51,7 @@ class TestSpeciesShapeAndMethod(TestCase):
 
     def test_picongpu_extensions(self):
         self._assert_converts("other:quartic", "other:Acceleration", Shape.quartic, Pusher.Acceleration)
-        self._assert_converts("other:counter", "other:Photon", Shape.counter, Pusher.Photon)
+        self._assert_converts("quadratic", "other:Photon", Shape.quadratic, Pusher.Photon)
         self._assert_converts("other:quartic", "other:Probe", Shape.quartic, Pusher.Probe)
         self._assert_converts("other:quartic", "other:Axel", Shape.quartic, Pusher.Axel)
 
@@ -213,13 +213,18 @@ class TestSpeciesShapeInheritsFromSimulation(TestCase):
             "quadratic": Shape.quadratic,
             "cubic": Shape.cubic,
             "other:quartic": Shape.quartic,
-            "other:counter": Shape.counter,
         }.items():
             with self.subTest(sim_shape=sim_shape):
                 sim = _make_sim(particle_shape=sim_shape)
                 sp = picmi.Species(particle_type="electron")
                 sim.add_species(sp, None)
                 self.assertIs(self._converted(sim).shape, expected)
+
+    def test_inherited_counter_shape_rejected_for_interpolation(self):
+        sim = _make_sim(particle_shape="other:counter")
+        sim.add_species(picmi.Species(particle_type="electron"), None)
+        with self.assertRaisesRegex(ValueError, "diagnostic counting shape"):
+            self._converted(sim)
 
     def test_explicit_species_shape_overrides_simulation(self):
         sim = _make_sim(particle_shape="cubic")

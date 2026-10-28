@@ -87,9 +87,11 @@ class Species(PICMI_Species):
 
     `particle_shape` accepts the PICMI-standard shapes ('NGP', 'linear',
     'quadratic', 'cubic') and PIConGPU extensions prefixed with 'other:'
-    (e.g. 'other:quartic', 'other:counter'). If left unset it is inherited
-    from the owning Simulation (see ``Simulation.particle_shape``) and, if
-    that too is unset, falls back to the PIConGPU default 'quadratic' (TSC).
+    (e.g. 'other:quartic'). If left unset it is inherited from the owning
+    Simulation (see ``Simulation.particle_shape``) and, if that too is unset,
+    falls back to the PIConGPU default 'quadratic' (TSC). The diagnostic-only
+    'other:counter' shape is rejected during conversion because it cannot
+    provide field interpolation.
 
     `method` accepts the PICMI-standard pusher methods ('Boris', 'Vay',
     'Higuera-Cary', 'Li', 'free-streaming', 'LLRK4') and PIConGPU-specific

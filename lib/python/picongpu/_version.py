@@ -20,9 +20,15 @@ def _parse_version():
             filter(lambda s: s.startswith("PICONGPU_VERSION_"), header_code.split("\n#define ")),
         )
     }
-    return f"{version_dict['major']}.{version_dict['minor']}.{version_dict['patch']}" + (
-        f"-{version_dict['label']}" if "label" in version_dict else ""
-    )
+    return _compose_version(version_dict)
+
+
+def _compose_version(version_dict):
+    # PICONGPU_VERSION_LABEL is a C string literal (e.g. "dev"); strip the
+    # surrounding quotes before composing the human-readable Python version.
+    label = version_dict.get("label", "").strip('"')
+    version = f"{version_dict['major']}.{version_dict['minor']}.{version_dict['patch']}"
+    return version + (f"-{label}" if label else "")
 
 
 __version__ = _parse_version()

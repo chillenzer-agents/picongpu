@@ -44,7 +44,7 @@ from picongpu.picmi.interaction import (
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
 from picongpu.picmi.interaction.ionization.fieldionization import FieldIonization
 from picongpu.picmi.species import _STANDARD_SHAPES
-from picongpu.picmi.species_requirements import (
+from picongpu.picmi._species_requirements import (
     SimpleDensityOperation,
     SimpleMomentumOperation,
     get_as_pypicongpu,

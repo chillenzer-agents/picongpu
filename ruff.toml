@@ -1,0 +1,15 @@
+# Ruff configuration for PIConGPU.
+# Kept intentionally minimal: this file currently contains no options, so ruff
+# runs with its default rule set (E4, E7, E9, F); the pre-commit hook
+# additionally passes `--ignore E721` (see .pre-commit-config.yaml).
+#
+# lint.ignore-init-module-imports was removed: ruff 0.12.x (as pinned by
+# .pre-commit-config.yaml) deprecates the option and makes it inert (a plain
+# unused import in `__init__.py` is flagged F401 with or without the setting).
+# Keeping it would be dead config and would eventually become an unknown-field
+# hard error once the option is removed from ruff entirely.
+#
+# Instead, `__init__.py` files that serve as explicit re-export hubs
+# ("as X as X", no `__all__`) are kept F401-clean by the re-export idiom
+# itself: `from .foo import Bar as Bar` tells ruff the name is intentionally
+# re-exported. This is ruff's own suggested fix for the pattern.

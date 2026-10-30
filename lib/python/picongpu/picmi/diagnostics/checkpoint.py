@@ -10,7 +10,7 @@ from pathlib import Path
 from picmistandard import PICMI_Diagnostic
 from pydantic import Field, model_validator
 
-from picongpu.picmi.copy_attributes import default_converts_to
+from picongpu.picmi._copy_attributes import default_converts_to
 
 from ...pypicongpu.output.checkpoint import Checkpoint as PyPIConGPUCheckpoint
 from .timestepspec import TimeStepSpec

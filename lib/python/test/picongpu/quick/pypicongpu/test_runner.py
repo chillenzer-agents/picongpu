@@ -5,6 +5,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import json
 from functools import reduce
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
@@ -113,6 +114,47 @@ def test_picbuild_and_tbg_flags_are_disjoint_enough():
             for cls in (PicBuildFlags, TBGFlags)
         )
     ) == {"f", "force"}
+
+
+def test_flags_can_be_supplied_by_python_name():
+    assert PicBuildFlags(cmake_build_system="Ninja").cmake_build_system == "Ninja"
+    flags = TBGFlags(
+        project_path="setup",
+        cfg_file="my.cfg",
+        submit_system="sbatch",
+        template_file="my.tpl",
+        overwrite_vars=["A=1"],
+    )
+    assert flags.cfg_file == "my.cfg"
+    assert flags.submit_system == "sbatch"
+    assert flags.template_file == "my.tpl"
+    assert flags.overwrite_vars == ["A=1"]
+
+
+def test_flags_can_be_supplied_by_alias():
+    assert PicBuildFlags(G="Ninja").cmake_build_system == "Ninja"
+    flags = TBGFlags(project_path="setup", cfg="my.cfg", submit="sbatch", tpl="my.tpl", o=["A=1"])
+    assert flags.cfg_file == "my.cfg"
+    assert flags.submit_system == "sbatch"
+    assert flags.template_file == "my.tpl"
+    assert flags.overwrite_vars == ["A=1"]
+
+
+def test_supplying_name_and_alias_together_is_rejected():
+    with raises(ValidationError, match="ambiguous"):
+        PicBuildFlags(cmake_build_system="Ninja", G="Make")
+    with raises(ValidationError, match="ambiguous"):
+        PicBuildFlags(force=True, f=True)
+    with raises(ValidationError, match="ambiguous"):
+        TBGFlags(project_path="setup", cfg_file="a.cfg", cfg="b.cfg")
+
+
+def test_overwrite_vars_is_serialised_as_json_string():
+    flags = TBGFlags(project_path="setup", overwrite_vars=["A=1", "B=2"])
+    dumped = flags.model_dump(mode="json")
+    assert dumped["overwrite_vars"] == json.dumps(["A=1", "B=2"])
+    assert isinstance(dumped["overwrite_vars"], str)
+    assert TBGFlags(project_path="setup", overwrite_vars=None).model_dump(mode="json")["overwrite_vars"] is None
 
 
 def _rc_params_with_picongpurc(monkeypatch, content):

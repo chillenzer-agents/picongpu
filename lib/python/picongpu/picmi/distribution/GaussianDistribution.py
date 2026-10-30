@@ -72,7 +72,7 @@ class GaussianDistribution(Distribution):
         None,
     )
 
-    cell_size: tuple[float, ...] | None = None
+    cell_size: tuple[float, float] | tuple[float, float, float] | None = None
     """cell size per spatial dimension; a 2-tuple on 2D grids, a 3-tuple on 3D grids"""
 
     # @details pydantic provides an automatically generated __init__/constructor method which allows initialization off

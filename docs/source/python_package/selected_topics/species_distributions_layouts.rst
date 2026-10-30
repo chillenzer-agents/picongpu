@@ -210,7 +210,7 @@ It is given per species via the ``layouts`` list:
   This is the default choice for most simulations.
 
 :class:`~picongpu.picmi.layout.GriddedLayout`
-  A regular sub-grid of ``n_macroparticle_per_cell = [nx, ny, nz]``
+  A regular sub-grid of ``n_macroparticles_per_cell = [nx, ny, nz]``
   positions per cell (``nx * ny * nz`` particles per cell).
   Useful for well-resolved, low-noise configurations.
 

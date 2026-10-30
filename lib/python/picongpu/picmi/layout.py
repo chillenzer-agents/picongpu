@@ -29,7 +29,20 @@ class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
 
 
 class GriddedLayout(picmistandard.PICMI_GriddedLayout):
-    n_macroparticles_per_cell: list[int] = Field([0], init_var=False)
+    def __init__(self, *args, **kwargs):
+        if "n_macroparticle_per_cell" in kwargs:
+            raise TypeError(
+                "The deprecated spelling 'n_macroparticle_per_cell' is no longer supported. "
+                "Use 'n_macroparticles_per_cell' instead."
+            )
+        super().__init__(*args, **kwargs)
+
+    @field_validator("n_macroparticles_per_cell", mode="after")
+    @classmethod
+    def _require_positive(cls, value):
+        if not all(v >= 1 for v in value):
+            raise ValueError(f"All n_macroparticles_per_cell must be greater than or equal to 1. You gave: {value}.")
+        return value
 
     def get_as_pypicongpu(self):
         return Quiet(ppc=np.prod(self.n_macroparticles_per_cell), n_points=self.n_macroparticles_per_cell)

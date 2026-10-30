@@ -256,7 +256,7 @@ of itself, so that it stays self-contained and reusable:
 * ``metadata/rc_params.json``:
   the runtime configuration that was used.
 * ``ro-crate-metadata.json``:
-  an `RO-Crate <https://www.w3.org/TR/2021/REC-vc-r-crate-20211109/>`__ (version 1.2)
+  an `RO-Crate <https://www.researchobject.org/ro-crate/>`__ (version 1.3)
   describing the setup directory as a dataset:
   the ``workflow/workflow.cwl`` as its main entity,
   the PIConGPU version as the software used,

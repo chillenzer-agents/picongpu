@@ -784,6 +784,8 @@ def add_dataset_descriptions(crate):
 class _ROCrateInfo(BaseModel):
     name: str
     description: str
+    # RO-Crate specification version written into the generated metadata.
+    version: str = "1.3"
     datePublished: datetime | None = None
     license: str | None = None
     mainEntity: str | None

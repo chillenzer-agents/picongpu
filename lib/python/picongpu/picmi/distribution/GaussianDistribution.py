@@ -14,6 +14,10 @@ from .Distribution import Distribution
 import numpy as np
 
 
+# Sentinel to distinguish an omitted ``z`` from an explicit one.
+_MISSING_Z = object()
+
+
 @converts_to(
     Gaussian,
     conversions={"vacuum_cells_front": lambda self, _: int(self.vacuum_front / self.cell_size[1])},
@@ -31,6 +35,9 @@ class GaussianDistribution(Distribution):
     - for y > center_rear:                 density * exp(factor * abs(y - center_rear/sigma_rear)**power)
 
     with y being the position in the simulation box
+
+    The profile is one-dimensional along ``y``. It can be evaluated on both 3D
+    and 2D grids, with a dimension-dependent call contract (see :meth:`__call__`).
     """
 
     density: float
@@ -65,7 +72,8 @@ class GaussianDistribution(Distribution):
         None,
     )
 
-    cell_size: tuple[float, float, float] | None = None
+    cell_size: tuple[float, ...] | None = None
+    """cell size per spatial dimension; a 2-tuple on 2D grids, a 3-tuple on 3D grids"""
 
     # @details pydantic provides an automatically generated __init__/constructor method which allows initialization off
     #   all attributes as keyword arguments
@@ -79,7 +87,17 @@ class GaussianDistribution(Distribution):
         if self.density <= 0.0:
             raise ValueError("density must be > 0")
 
-    def __call__(self, x, y, z):
+    def __call__(self, x, y, z=_MISSING_Z):
+        """
+        Evaluate the density.
+
+        The call contract follows the grid dimensionality (stored in
+        ``cell_size``):
+
+        * 3D grid: ``__call__(x, y, z)`` -- the usual three spatial coordinates.
+        * 2D grid: ``__call__(x, y)`` -- ``z`` does not exist and passing it is an
+          error. The profile itself is still defined along ``y``.
+        """
         if self.cell_size is None:
             message = (
                 "Due to inconsistencies in the backend, evaluation of this function requires information about the cell_size."
@@ -89,20 +107,31 @@ class GaussianDistribution(Distribution):
             )
             raise NotImplementedError(message)
 
+        is_2d = len(self.cell_size) == 2
+        if is_2d:
+            if z is not _MISSING_Z:
+                raise TypeError(
+                    "GaussianDistribution on a 2D grid is evaluated as __call__(x, y); the z coordinate does not exist."
+                )
+            coordinates = (x, y)
+        else:
+            if z is _MISSING_Z:
+                raise TypeError("GaussianDistribution on a 3D grid is evaluated as __call__(x, y, z).")
+            coordinates = (x, y, z)
+
         # The definition of this density uses the origin of the cell
         # while the call operator uses the center.
-        x += -0.5 * self.cell_size[0]
-        y += -0.5 * self.cell_size[1]
-        z += -0.5 * self.cell_size[2]
+        shifted = [np.asarray(c) - 0.5 * cell_size for c, cell_size in zip(coordinates, self.cell_size)]
+        x, y = shifted[:2]
 
         # The last term undoes the shift to the cell origin.
         vacuum_y = int(self.vacuum_front / self.cell_size[1]) * self.cell_size[1] - 0.5 * self.cell_size[1]
 
         # We do this to get the correct shape after broadcasting:
-        exponent = 0 * (x + y + z)
+        exponent = np.zeros(np.broadcast_shapes(*[np.shape(coordinate) for coordinate in shifted]))
         exponent[y < self.center_front] = np.abs((y - self.center_front) / self.sigma_front)[y < self.center_front]
         exponent[y >= self.center_rear] = np.abs((y - self.center_rear) / self.sigma_rear)[y >= self.center_rear]
 
-        result = np.exp(self.factor * exponent**self.power)
+        result = np.asarray(np.exp(self.factor * exponent**self.power))
         result[y < vacuum_y] = 0.0
         return self.density * result

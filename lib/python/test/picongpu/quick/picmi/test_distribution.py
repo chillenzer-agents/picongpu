@@ -25,6 +25,14 @@ ARBITRARY_GRID = Cartesian3DGrid(
     upper_boundary_conditions=["periodic", "periodic", "periodic"],
 )
 
+ARBITRARY_GRID_2D = Cartesian2DGrid(
+    lower_bound=[0, 0],
+    upper_bound=[1, 1],
+    number_of_cells=[1, 1],
+    lower_boundary_conditions=["periodic", "periodic"],
+    upper_boundary_conditions=["periodic", "periodic"],
+)
+
 
 class HelperTestPicmiBoundaries:
     """
@@ -326,6 +334,32 @@ class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
         with pytest.raises(ValidationError):
             gaussian.get_as_pypicongpu(ARBITRARY_GRID).get_rendering_context()
 
+    def test_2d_grid(self):
+        """a 2D grid keeps the native 2-tuple cell_size and uses __call__(x, y)"""
+        gaussian_2d = self._get_distribution(vacuum_front=0.0)
+        gaussian_2d.get_as_pypicongpu(ARBITRARY_GRID_2D)
+        assert gaussian_2d.cell_size == ARBITRARY_GRID_2D.picongpu_cell_size
+        assert len(gaussian_2d.cell_size) == 2
+
+        x = np.array([0.5, 1.5, 2.5])
+        y = np.array([0.5, 1.5, 2.5])
+        result_2d = gaussian_2d(x, y)
+
+        # the profile only depends on y, so it must agree with the 3D wrapper
+        gaussian_3d = self._get_distribution(vacuum_front=0.0)
+        gaussian_3d.get_as_pypicongpu(ARBITRARY_GRID)
+        np.testing.assert_allclose(result_2d, gaussian_3d(x, y, np.zeros_like(x)))
+        # the 2D contract takes exactly the two spatial coordinates
+        with pytest.raises(TypeError, match="2D"):
+            gaussian_2d(x, y, np.zeros_like(x))
+
+    def test_3d_call_requires_z(self):
+        """a 3D grid still uses the explicit __call__(x, y, z) contract"""
+        gaussian = self._get_distribution()
+        gaussian.get_as_pypicongpu(ARBITRARY_GRID)
+        with pytest.raises(TypeError, match="3D"):
+            gaussian(0.0, 0.0)
+
     def test_drift(self):
         """drift is correctly translated"""
         # no drift
@@ -438,6 +472,29 @@ class TestPicmiCylindricalDistribution(TestCase, HelperTestPicmiBoundaries):
             exponential_pre_plasma_length=exponential_pre_plasma_length,
             exponential_pre_plasma_cutoff=exponential_pre_plasma_cutoff,
         )
+
+    def test_2d_grid(self):
+        """a 2D grid keeps the native 2-tuple cell_size and uses __call__(x, y)"""
+        parameters = {
+            "center_position": (0.5, 0.5, 0.0),
+            "radius": 2.0,
+            "cylinder_axis": (0.0, 0.0, 1.0),
+        }
+        dist_2d = self._get_distribution(**parameters)
+        dist_2d.get_as_pypicongpu(ARBITRARY_GRID_2D)
+        assert dist_2d.cell_size == ARBITRARY_GRID_2D.picongpu_cell_size
+        assert len(dist_2d.cell_size) == 2
+
+        x = np.array([0.0, 1.0, 3.0])
+        y = np.array([0.0, 1.0, 3.0])
+        result_2d = dist_2d(x, y)
+
+        # the z axis is degenerate on a 2D grid (z == 0), cf. the backend
+        dist_3d = self._get_distribution(**parameters)
+        dist_3d.get_as_pypicongpu(ARBITRARY_GRID)
+        np.testing.assert_allclose(result_2d, dist_3d(x, y, np.zeros_like(x)))
+        with pytest.raises(TypeError, match="2D"):
+            dist_2d(x, y, np.zeros_like(x))
 
     def test_full(self):
         """full paramset"""

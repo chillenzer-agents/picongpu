@@ -44,4 +44,10 @@ with TemporaryDirectory() as setup_dir:
 # select another supported version via the rc parameter before generating:
 rc_params["rocrate"] = {"info": {"version": "1.2"}}
 print("overridden RO-Crate version:", rc_params.rocrate_info.version)
+
+with TemporaryDirectory() as setup_dir:
+    sim.write_input_file(setup_dir, exist_ok=True)
+    metadata = json.loads((Path(setup_dir) / "ro-crate-metadata.json").read_text())
+    assert metadata["@context"] == "https://w3id.org/ro/crate/1.2/context"
+    print("overridden RO-Crate context:", metadata["@context"])
 # END-ROCRATE-VERSION

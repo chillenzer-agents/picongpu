@@ -177,6 +177,7 @@ EXPECTED_FILES = {
             "configured RO-Crate version: 1.3",
             "written RO-Crate context: https://w3id.org/ro/crate/1.3/context",
             "overridden RO-Crate version: 1.2",
+            "overridden RO-Crate context: https://w3id.org/ro/crate/1.2/context",
         ],
     },
     "defining_simulation/multiple_simulations.py": {

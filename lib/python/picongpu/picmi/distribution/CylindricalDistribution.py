@@ -50,7 +50,7 @@ class CylindricalDistribution(Distribution):
     exponential_pre_plasma_cutoff: float | None
     """cutoff of the exponential pre-plasma ramp, [m]"""
 
-    cell_size: tuple[float, ...] | None = None
+    cell_size: tuple[float, float] | tuple[float, float, float] | None = None
     """cell size per spatial dimension; a 2-tuple on 2D grids, a 3-tuple on 3D grids"""
 
     # @details pydantic provides an automatically generated __init__/constructor method which allows initialization off
@@ -162,12 +162,19 @@ class CylindricalDistribution(Distribution):
             ),
             axis=-1,
         )
-        radius = np.sqrt(self.radius**2 - pre_l**2) - pre_l
         result = np.zeros(np.broadcast_shapes(*map(np.shape, args)))
 
-        result[r < radius] = 1.0
         # As in the backend, a zero length or cutoff means that there is no ramp.
-        if pre_l > 0.0 and pre_c > 0.0:
+        # Without a ramp the plateau extends to the full radius; only inside the
+        # ramp is the reduced radius (which ensures mass conservation) used.
+        has_ramp = pre_l > 0.0 and pre_c > 0.0
+        if has_ramp:
+            radius = np.sqrt(self.radius**2 - pre_l**2) - pre_l
+        else:
+            radius = self.radius
+
+        result[r < radius] = 1.0
+        if has_ramp:
             mask = (r >= radius) * (r < radius + pre_c)
             result[mask] = np.exp((radius - r) / pre_l)[mask]
         return self.density * result

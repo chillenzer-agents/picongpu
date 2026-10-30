@@ -40,6 +40,12 @@ class CoreTreesBuildHook(BuildHookInterface):
         checkout_root = root / "../.."
         if not (checkout_root / "lib" / "python" / "pyproject.toml").exists():
             return
-        build_data["force_include"].update(
-            {source: destination for source, destination in CORE_TREES.items() if (root / source).exists()}
-        )
+        missing = sorted(source for source in CORE_TREES if not (root / source).exists())
+        if missing:
+            raise FileNotFoundError(
+                "PIConGPU core tree(s) missing from the source checkout: "
+                + ", ".join(missing)
+                + ". Build from a complete checkout, or from an extracted sdist "
+                "which already contains them in the package."
+            )
+        build_data["force_include"].update(CORE_TREES)

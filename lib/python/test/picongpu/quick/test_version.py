@@ -7,6 +7,7 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import importlib
 import importlib.metadata
 import tomllib
 from pathlib import Path
@@ -52,12 +53,50 @@ def test_version_matches_version_header():
 
 
 def test_version_header_matches_pyproject():
+    if not PYPROJECT.is_file():
+        pytest.skip(f"no source pyproject.toml at {PYPROJECT}")
     with PYPROJECT.open("rb") as pyproject_file:
         pyproject = tomllib.load(pyproject_file)
     assert Version(_version_header_composition()) == Version(pyproject["project"]["version"])
 
 
-def test_empty_label_has_no_trailing_dash():
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        ('"dev"', "1.2.3-dev"),
+        ("dev", "1.2.3-dev"),
+        ('""', "1.2.3"),
+        ('  ""  ', "1.2.3"),
+        (' "dev" ', "1.2.3-dev"),
+        ('" dev "', "1.2.3-dev"),
+    ],
+)
+def test_compose_version_parses_label(label, expected):
     from picongpu._version import _compose_version
 
-    assert _compose_version({"major": "1", "minor": "2", "patch": "3", "label": '""'}) == "1.2.3"
+    assert _compose_version({"major": "1", "minor": "2", "patch": "3", "label": label}) == expected
+
+
+def test_empty_label_in_header_has_no_trailing_dash(tmp_path, monkeypatch):
+    from picongpu import _version
+
+    header = tmp_path / "include" / "picongpu" / "version.hpp"
+    header.parent.mkdir(parents=True)
+    header.write_text(
+        "/* synthetic version header */\n"
+        "#define PICONGPU_VERSION_MAJOR 1\n"
+        "#define PICONGPU_VERSION_MINOR 2\n"
+        "#define PICONGPU_VERSION_PATCH 3\n"
+        '#define PICONGPU_VERSION_LABEL ""\n'
+    )
+    monkeypatch.setattr(_version.core, "path", lambda subdir: tmp_path / subdir)
+    _version._parse_version.cache_clear()
+    try:
+        # __version__ is computed at import time, so re-execute the module to
+        # exercise _parse_version through the full header path.
+        importlib.reload(_version)
+        assert _version.__version__ == "1.2.3"
+    finally:
+        monkeypatch.undo()
+        _version._parse_version.cache_clear()
+        importlib.reload(_version)

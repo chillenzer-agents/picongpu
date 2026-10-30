@@ -360,6 +360,13 @@ class TestPicmiGaussianDistribution(TestCase, HelperTestPicmiBoundaries):
         with pytest.raises(TypeError, match="3D"):
             gaussian(0.0, 0.0)
 
+    def test_cell_size_arity(self):
+        """only 2-tuples (2D) and 3-tuples (3D) are valid cell sizes"""
+        gaussian = self._get_distribution()
+        for cell_size in [(1.0,), (1.0, 1.0, 1.0, 1.0)]:
+            with pytest.raises(ValidationError):
+                gaussian.cell_size = cell_size
+
     def test_drift(self):
         """drift is correctly translated"""
         # no drift
@@ -476,25 +483,56 @@ class TestPicmiCylindricalDistribution(TestCase, HelperTestPicmiBoundaries):
     def test_2d_grid(self):
         """a 2D grid keeps the native 2-tuple cell_size and uses __call__(x, y)"""
         parameters = {
-            "center_position": (0.5, 0.5, 0.0),
-            "radius": 2.0,
-            "cylinder_axis": (0.0, 0.0, 1.0),
+            # non-zero z centre and a tilted axis make the evaluation plane
+            # observable: a wrong z would change which points lie in the cylinder
+            "center_position": (0.5, 0.5, 0.6),
+            "radius": 0.7,
+            "cylinder_axis": (0.3, 0.4, 0.6),
         }
         dist_2d = self._get_distribution(**parameters)
         dist_2d.get_as_pypicongpu(ARBITRARY_GRID_2D)
         assert dist_2d.cell_size == ARBITRARY_GRID_2D.picongpu_cell_size
         assert len(dist_2d.cell_size) == 2
 
-        x = np.array([0.0, 1.0, 3.0])
-        y = np.array([0.0, 1.0, 3.0])
+        x = np.array([0.0, 0.5, 1.0])
+        y = np.array([0.0, 0.5, 1.0])
         result_2d = dist_2d(x, y)
 
-        # the z axis is degenerate on a 2D grid (z == 0), cf. the backend
+        # Explicit expectation in the z == 0 plane, as the backend evaluates it.
+        axis = np.array(parameters["cylinder_axis"], dtype=float)
+        axis /= np.linalg.norm(axis)
+        positions = np.stack(
+            [
+                x - 0.5 * ARBITRARY_GRID_2D.picongpu_cell_size[0],
+                y - 0.5 * ARBITRARY_GRID_2D.picongpu_cell_size[1],
+                np.zeros_like(x),
+            ],
+            axis=-1,
+        )
+        rel = positions - np.array(parameters["center_position"])
+        r = np.linalg.norm(np.cross(rel, axis), axis=-1)
+        expected = np.where(r < parameters["radius"], 1.0, 0.0)
+        np.testing.assert_allclose(result_2d, expected)
+        # sanity: this expectation must depend on z, otherwise the check is blind
+        rel_wrong_z = positions - np.array([0.0, 0.0, 0.5]) - np.array(parameters["center_position"])
+        r_wrong_z = np.linalg.norm(np.cross(rel_wrong_z, axis), axis=-1)
+        assert not np.array_equal(np.where(r_wrong_z < parameters["radius"], 1.0, 0.0), expected)
+
+        # 3D evaluation at the correct plane (z = +cell_size/2 before the shift)
         dist_3d = self._get_distribution(**parameters)
         dist_3d.get_as_pypicongpu(ARBITRARY_GRID)
-        np.testing.assert_allclose(result_2d, dist_3d(x, y, np.zeros_like(x)))
+        np.testing.assert_allclose(
+            result_2d, dist_3d(x, y, np.full_like(x, 0.5 * ARBITRARY_GRID.picongpu_cell_size[2]))
+        )
         with pytest.raises(TypeError, match="2D"):
             dist_2d(x, y, np.zeros_like(x))
+
+    def test_cell_size_arity(self):
+        """only 2-tuples (2D) and 3-tuples (3D) are valid cell sizes"""
+        dist = self._get_distribution()
+        for cell_size in [(1.0,), (1.0, 1.0, 1.0, 1.0)]:
+            with pytest.raises(ValidationError):
+                dist.cell_size = cell_size
 
     def test_full(self):
         """full paramset"""
@@ -539,6 +577,22 @@ class TestPicmiCylindricalDistribution(TestCase, HelperTestPicmiBoundaries):
         # no error
         assert abs(pypic.density_si - 1.0) < 1e-10
         assert abs(pypic.radius_si - 2.0) < 1e-10
+
+    def test_zero_cutoff_uses_full_radius(self):
+        """a zero cutoff disables the ramp, so the plateau extends to the full radius"""
+        dist = self._get_distribution(
+            center_position=(0.0, 0.0, 0.0),
+            radius=2.0,
+            cylinder_axis=(0.0, 0.0, 1.0),
+            exponential_pre_plasma_length=1.0,
+            exponential_pre_plasma_cutoff=0.0,
+        )
+        dist.get_as_pypicongpu(ARBITRARY_GRID)
+        # shifted coordinates (1.0, 0.0, *) give r == 1.0: inside the full radius
+        # but outside the reduced radius sqrt(3) - 1 ~= 0.732
+        np.testing.assert_allclose(dist(1.5, 0.5, 0.0), 1.0)
+        # beyond the full radius the density is zero
+        np.testing.assert_allclose(dist(3.0, 0.5, 0.0), 0.0)
 
     def test_cutoff_below_zero(self):
         """cutoff below zero is not accepted (depends on ramp checks)"""

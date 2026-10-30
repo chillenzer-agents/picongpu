@@ -29,6 +29,10 @@ Step 2: Build Your Runtime Configuration
 ``picrc-builder`` guides you interactively through writing the
 ``.picongpurc.toml`` runtime configuration:
 it asks for the preset of your system and writes the file.
+Its default target is the canonical user-specific location
+``$XDG_CONFIG_HOME/picongpu/picongpurc.toml``
+(``~/.config/picongpu/picongpurc.toml`` if ``XDG_CONFIG_HOME`` is unset),
+and it creates missing parent directories.
 See :ref:`Configuring Your Environment <python_package/foundations/configuring_environment:Configuring Your Environment>`
 for the search order of that file, the available presets and all further knobs.
 

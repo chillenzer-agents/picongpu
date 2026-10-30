@@ -846,11 +846,19 @@ def search_in_environment_variables():
     return None
 
 
+def user_config_path():
+    """Return the canonical user-level runtime configuration path.
+
+    This is ``$XDG_CONFIG_HOME/picongpu/picongpurc.toml``, falling back to
+    ``~/.config/picongpu/picongpurc.toml`` when ``XDG_CONFIG_HOME`` is unset or
+    empty. An explicit ``~`` in ``XDG_CONFIG_HOME`` is expanded.
+    """
+    config_home = environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
+    return Path(config_home).expanduser() / "picongpu" / "picongpurc.toml"
+
+
 def search_in_user_config():
-    path = environ.get("XDG_CONFIG_HOME", Path.home() / ".config")
-    if path is None:
-        return None
-    path = Path(path) / "picongpu" / "picongpurc.toml"
+    path = user_config_path()
     if path.is_file():
         return path
     return None

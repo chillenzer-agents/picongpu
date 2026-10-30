@@ -9,7 +9,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import picongpu.picrc_builder as picrc_builder
-from picongpu.picrc_builder import _ask, _editable_keys, _require_selection, resolve_target_path, write_output
+from picongpu.picrc_builder import (
+    _ask,
+    _editable_keys,
+    _require_selection,
+    default_output_path,
+    resolve_target_path,
+    write_output,
+)
 
 
 def test_resolve_none_is_new_target():
@@ -36,6 +43,40 @@ def test_resolve_existing_file_is_loaded():
         target, is_new = resolve_target_path(existing)
         assert target == existing
         assert is_new is False
+
+
+def test_resolve_expands_a_leading_tilde(monkeypatch):
+    # A user-typed "~/..." path must land in the home directory, not in a
+    # literal directory named "~" below the current working directory
+    # (https://github.com/chillenzer-agents/picongpu/issues/206).
+    with TemporaryDirectory() as home:
+        monkeypatch.setenv("HOME", home)
+        target, is_new = resolve_target_path(Path("~/.config/picongpu/picongpurc.toml"))
+        assert target == Path(home) / ".config" / "picongpu" / "picongpurc.toml"
+        assert is_new is True
+
+
+def test_write_output_creates_expanded_parent_dirs(monkeypatch):
+    with TemporaryDirectory() as home:
+        monkeypatch.setenv("HOME", home)
+        target, _ = resolve_target_path(Path("~/.config/picongpu/picongpurc.toml"))
+        write_output({"preset": "bash"}, target)
+        assert target.is_file()
+        assert target.parent.is_dir()
+
+
+def test_default_output_path_is_the_xdg_user_config(monkeypatch):
+    with TemporaryDirectory() as xdg, TemporaryDirectory() as home:
+        monkeypatch.setenv("HOME", home)
+        monkeypatch.setenv("XDG_CONFIG_HOME", xdg)
+        assert default_output_path() == Path(xdg) / "picongpu" / "picongpurc.toml"
+
+
+def test_default_output_path_falls_back_to_home_config(monkeypatch):
+    with TemporaryDirectory() as home:
+        monkeypatch.setenv("HOME", home)
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        assert default_output_path() == Path(home) / ".config" / "picongpu" / "picongpurc.toml"
 
 
 def test_write_output_creates_missing_parent_dirs():

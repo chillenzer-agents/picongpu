@@ -340,6 +340,22 @@ def test_user_config_path_falls_back_to_home_config(monkeypatch, tmp_path):
     assert user_config_path() == tmp_path / "home" / ".config" / "picongpu" / "picongpurc.toml"
 
 
+def test_user_config_path_treats_empty_xdg_as_unset(monkeypatch, tmp_path):
+    # An empty XDG_CONFIG_HOME must behave like an unset one; reverting the
+    # `or` fallback to environ.get(..., default) would make this fail.
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", "")
+    assert user_config_path() == tmp_path / "home" / ".config" / "picongpu" / "picongpurc.toml"
+
+
+def test_user_config_path_ignores_relative_xdg_config_home(monkeypatch, tmp_path):
+    # The XDG spec requires absolute paths; a relative value is invalid and
+    # must be ignored in favour of ~/.config.
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", "relative/config")
+    assert user_config_path() == tmp_path / "home" / ".config" / "picongpu" / "picongpurc.toml"
+
+
 def test_user_config_path_expands_a_tilde_in_xdg_config_home(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("XDG_CONFIG_HOME", "~/.config")

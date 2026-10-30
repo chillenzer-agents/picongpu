@@ -47,7 +47,8 @@ using the `uv <https://docs.astral.sh/uv/>`__ tool::
 The canonical location for the generated file is
 ``$XDG_CONFIG_HOME/picongpu/picongpurc.toml``,
 which falls back to ``~/.config/picongpu/picongpurc.toml``
-when ``XDG_CONFIG_HOME`` is unset.
+when ``XDG_CONFIG_HOME`` is unset or empty
+(a relative ``XDG_CONFIG_HOME`` is ignored).
 The builder offers this path by default when it asks where to write,
 expands a leading ``~`` in a path you type,
 and creates missing parent directories,
@@ -104,7 +105,8 @@ The search is performed once, when the PIConGPU Python package is imported:
      Only the dot-prefixed name is found in this search.
   3. Otherwise, ``$XDG_CONFIG_HOME/picongpu/picongpurc.toml``
      is used, which is usually ``~/.config/picongpu/picongpurc.toml``
-     (``XDG_CONFIG_HOME`` falls back to ``~/.config`` when unset or empty).
+     (``XDG_CONFIG_HOME`` falls back to ``~/.config`` when unset or empty;
+     a relative value is ignored).
      This is the canonical user-specific location.
 
 If none of the above yields a file,

@@ -56,7 +56,7 @@ simulation = picmi.Simulation(
     particle_shape="linear",  # inherited by species that do not set their own
     species=[ions, electrons],
     layouts=[
-        picmi.GriddedLayout(n_macroparticle_per_cell=[2, 2, 2]),
+        picmi.GriddedLayout(n_macroparticles_per_cell=[2, 2, 2]),
         picmi.PseudoRandomLayout(n_macroparticles_per_cell=2),
     ],
 )

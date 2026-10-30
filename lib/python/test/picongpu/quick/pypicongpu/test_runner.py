@@ -6,7 +6,6 @@ License: GPLv3+
 """
 
 import json
-from functools import reduce
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
@@ -21,7 +20,6 @@ from picongpu.pypicongpu.runner import (
     generate_bare_profile,
     generate_bare_profile_as_in,
 )
-from picongpu.pypicongpu.util import UnpackChain
 from pydantic import ValidationError
 from pytest import fixture, raises
 
@@ -104,16 +102,19 @@ def test_picongpurc_content_takes_precedence_over_preset(arbitrary_string):
         assert RCParams(preset="bash", picongpurc_path=Path(file.name))["pic_backend"] == arbitrary_string
 
 
+def _accepted_flag_keys(cls):
+    """All keys a flag may be supplied under: Python name plus AliasChoices (populate_by_name=True)."""
+    keys = set()
+    for name, field in cls.model_fields.items():
+        keys.add(name)
+        if hasattr(field.validation_alias, "choices"):
+            keys |= {choice for choice in field.validation_alias.choices if isinstance(choice, str)}
+    return keys
+
+
 def test_picbuild_and_tbg_flags_are_disjoint_enough():
     # The overlapping flags mean roughly the same in both, so I consider this fine.
-    assert set.intersection(
-        *(
-            # This only covers the case that I use an AliasChoices object as validation_alias.
-            # But that's fine becuase I've done so.
-            reduce(set.union, UnpackChain(cls.model_fields).values().validation_alias.choices, set())
-            for cls in (PicBuildFlags, TBGFlags)
-        )
-    ) == {"f", "force"}
+    assert set.intersection(*(_accepted_flag_keys(cls) for cls in (PicBuildFlags, TBGFlags))) == {"f", "force"}
 
 
 def test_flags_can_be_supplied_by_python_name():
@@ -147,6 +148,15 @@ def test_supplying_name_and_alias_together_is_rejected():
         PicBuildFlags(force=True, f=True)
     with raises(ValidationError, match="ambiguous"):
         TBGFlags(project_path="setup", cfg_file="a.cfg", cfg="b.cfg")
+
+
+def test_supplying_two_aliases_together_is_rejected():
+    # Some fields have several aliases (e.g. submit_system: "submit" and "s");
+    # supplying two of them is just as ambiguous as name plus alias.
+    with raises(ValidationError, match="ambiguous"):
+        TBGFlags(project_path="setup", submit="sbatch", s="qsub")
+    with raises(ValidationError, match="ambiguous"):
+        PicBuildFlags(jobs=4, j=8)
 
 
 def test_overwrite_vars_is_serialised_as_json_string():
@@ -232,3 +242,19 @@ def test_generate_exist_ok_regenerates_existing_setup_dir(picmi_sim, tmp_path):
 
     assert param_file.read_text() == expected_param_content
     assert nested_file.read_text() == expected_nested_content
+
+
+def test_write_input_file_wires_public_flags_into_workflow_input(picmi_sim, tmp_path):
+    # Exercise the public path: Simulation.write_input_file(**flags) -> Runner.generate
+    # must route build and run flags supplied by Python name as well as by alias.
+    for index, flags in enumerate(
+        (
+            {"cmake_build_system": "Ninja", "cfg_file": "my.cfg"},
+            {"G": "Ninja", "cfg": "my.cfg"},
+        )
+    ):
+        setup_dir = tmp_path / f"setup-{index}"
+        picmi_sim.write_input_file(setup_dir, **flags)
+        workflow_input = json.loads(picmi_sim.picongpu_get_runner().workflow_input_path.read_text())
+        assert workflow_input["build_cmake_build_system"] == "Ninja"
+        assert workflow_input["run_cfg_file"] == "my.cfg"

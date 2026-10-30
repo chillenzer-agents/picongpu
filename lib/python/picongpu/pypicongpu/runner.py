@@ -39,7 +39,7 @@ from .util import alt
 
 
 def _reject_name_alias_ambiguity(cls, data):
-    """Reject flags supplied by both their Python name and one of their aliases."""
+    """Reject flags supplied under more than one of their accepted names/aliases."""
     if not isinstance(data, Mapping):
         return data
     conflicts = []
@@ -47,11 +47,15 @@ def _reject_name_alias_ambiguity(cls, data):
         if not isinstance(field.validation_alias, AliasChoices):
             continue
         aliases = [choice for choice in field.validation_alias.choices if isinstance(choice, str) and choice != name]
-        supplied_aliases = [alias for alias in aliases if alias in data]
-        if name in data and supplied_aliases:
-            conflicts.append(f"'{name}' (also given as {', '.join(map(repr, supplied_aliases))})")
+        supplied = [key for key in (name, *aliases) if key in data]
+        # More than one supplied key means the value is ambiguous: several
+        # aliases are just as problematic as an alias together with the name.
+        if len(supplied) > 1:
+            conflicts.append(f"'{name}' supplied as {', '.join(map(repr, supplied))}")
     if conflicts:
-        raise ValueError(f"ambiguous flag(s): {'; '.join(conflicts)} -- use either the name or its alias, not both")
+        raise ValueError(
+            f"ambiguous flag(s): {'; '.join(conflicts)} -- use only one name or alias per flag, not several"
+        )
     return data
 
 

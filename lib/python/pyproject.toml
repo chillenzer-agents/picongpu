@@ -28,7 +28,10 @@ dependencies = [
   "imageio",
   "jsonschema>=4.23",
   "matplotlib",
-  # interim: released engine, None handling neutralised in our rendering contexts:
+  # interim: released engine; our rendering contexts normalise a present None to
+  # "" (the upstream fix-none-handling build renders it as "None" and keeps
+  # partially-missing dotted names as None). Template use is section-only today,
+  # where None and "" are both falsy:
   "moosetash==1.0.1",
   "mpmath>=1.3",
   "numpy>=1.26.2",

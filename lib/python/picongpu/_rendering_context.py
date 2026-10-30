@@ -10,11 +10,16 @@ def normalize_none(value):
     """
     replace every ``None`` in a rendering context by an empty string
 
-    ``moosetash`` treats a present key whose value is ``None`` as a missing
-    variable. An empty string is falsy just like ``None``, so section and
-    inverted-section semantics are preserved while no spurious
-    ``MissingVariable`` is raised. All other values (including ``False``,
-    ``0`` and empty containers) are left untouched.
+    This is a local stand-in for the upstream ``fix-none-handling`` engine
+    build, not a byte-for-byte equivalent: that build renders an interpolated
+    present ``None`` as ``"None"`` and returns ``None`` for partially-missing
+    dotted names, whereas this shim yields ``""`` and a genuinely absent
+    variable still raises ``MissingVariable``. Current templates only use
+    these values in sections, where ``None`` and ``""`` are both falsy, so the
+    difference does not affect their output.
+
+    All other values (including ``False``, ``0`` and empty containers) are
+    left untouched.
 
     Recurses through dictionaries, lists and tuples.
 

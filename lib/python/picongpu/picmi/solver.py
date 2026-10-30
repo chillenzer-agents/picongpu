@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from typing import Annotated, Any, Literal, Self
 
 from picmistandard import PICMI_BinomialSmoother, PICMI_ElectromagneticSolver
-from pydantic import BeforeValidator, ConfigDict, PrivateAttr, model_validator
+from pydantic import BeforeValidator, ConfigDict, Field, PrivateAttr, model_validator
 
 from picongpu.pypicongpu import util
 from picongpu.pypicongpu.field_solver import (
@@ -153,10 +153,24 @@ class BinomialSmoother(PICMI_BinomialSmoother):
 
     model_config = ConfigDict(validate_default=True)
 
-    n_pass: Annotated[Sequence[int] | None, BeforeValidator(_single_pass_n_pass)] = None
-    compensation: Annotated[Sequence[bool] | None, util.rejects_unsupported("binomial smoother parameters")] = None
-    stride: Annotated[Sequence[int] | None, util.rejects_unsupported("binomial smoother parameters")] = None
-    alpha: Annotated[Sequence[float] | None, util.rejects_unsupported("binomial smoother parameters")] = None
+    n_pass: Annotated[Sequence[int] | None, BeforeValidator(_single_pass_n_pass)] = Field(
+        None, description="Vector of integers. Number of passes along each axis"
+    )
+    compensation: Annotated[Sequence[bool] | None, util.rejects_unsupported("binomial smoother parameters")] = Field(
+        None,
+        description="Not supported by PIConGPU: the binomial current interpolation is a fixed single-pass filter, "
+        "so compensation is rejected at construction.",
+    )
+    stride: Annotated[Sequence[int] | None, util.rejects_unsupported("binomial smoother parameters")] = Field(
+        None,
+        description="Not supported by PIConGPU: the binomial current interpolation has no stride, "
+        "so it is rejected at construction.",
+    )
+    alpha: Annotated[Sequence[float] | None, util.rejects_unsupported("binomial smoother parameters")] = Field(
+        None,
+        description="Not supported by PIConGPU: the binomial smoothing coefficients are fixed, "
+        "so alpha is rejected at construction.",
+    )
 
 
 class ElectromagneticSolver(PICMI_ElectromagneticSolver):
@@ -181,15 +195,40 @@ class ElectromagneticSolver(PICMI_ElectromagneticSolver):
     PIConGPU does not implement, are rejected at construction time.
     """
 
-    field_smoother: Annotated[PICMI_BinomialSmoother | None, util.rejects_unsupported("field smoothers")] = None
-    method: Literal["Yee", "Lehe", "CKC", "other:ArbitraryOrderFDTD", "other:None"]
-    stencil_order: Sequence[int] | None = None
-    subcycling: Annotated[int | None, util.rejects_unsupported("subcycling")] = None
-    galilean_velocity: Annotated[Sequence[float] | None, util.rejects_unsupported("galilean velocity")] = None
-    divE_cleaning: Annotated[bool | None, util.rejects_unsupported("divE cleaning")] = None
-    divB_cleaning: Annotated[bool | None, util.rejects_unsupported("divB cleaning")] = None
-    pml_divE_cleaning: Annotated[bool | None, util.rejects_unsupported("pml divE cleaning")] = None
-    pml_divB_cleaning: Annotated[bool | None, util.rejects_unsupported("pml divB cleaning")] = None
+    field_smoother: Annotated[PICMI_BinomialSmoother | None, util.rejects_unsupported("field smoothers")] = Field(
+        None,
+        description="Not supported by PIConGPU: field smoothing is rejected at construction.",
+    )
+    method: Literal["Yee", "Lehe", "CKC", "other:ArbitraryOrderFDTD", "other:None"] = Field(
+        ...,
+        description="The advance method used to solve Maxwell's equations. PIConGPU supports 'Yee', 'Lehe', "
+        "'CKC', 'other:ArbitraryOrderFDTD', and 'other:None' (no vacuum update of E and B).",
+    )
+    stencil_order: Sequence[int] | None = Field(None, description="Order of stencil for each axis (-1=infinite)")
+    subcycling: Annotated[int | None, util.rejects_unsupported("subcycling")] = Field(
+        None,
+        description="Not supported by PIConGPU: subcycling is rejected at construction.",
+    )
+    galilean_velocity: Annotated[Sequence[float] | None, util.rejects_unsupported("galilean velocity")] = Field(
+        None,
+        description="Not supported by PIConGPU: a Galilean reference frame is rejected at construction.",
+    )
+    divE_cleaning: Annotated[bool | None, util.rejects_unsupported("divE cleaning")] = Field(
+        None,
+        description="Not supported by PIConGPU: div(E) cleaning is rejected at construction.",
+    )
+    divB_cleaning: Annotated[bool | None, util.rejects_unsupported("divB cleaning")] = Field(
+        None,
+        description="Not supported by PIConGPU: div(B) cleaning is rejected at construction.",
+    )
+    pml_divE_cleaning: Annotated[bool | None, util.rejects_unsupported("pml divE cleaning")] = Field(
+        None,
+        description="Not supported by PIConGPU: div(E) cleaning in the PML is rejected at construction.",
+    )
+    pml_divB_cleaning: Annotated[bool | None, util.rejects_unsupported("pml divB cleaning")] = Field(
+        None,
+        description="Not supported by PIConGPU: div(B) cleaning in the PML is rejected at construction.",
+    )
 
     _stencil_neighbors: int | None = PrivateAttr(default=None)
 

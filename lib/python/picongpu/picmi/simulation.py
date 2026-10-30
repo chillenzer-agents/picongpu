@@ -276,7 +276,9 @@ class Simulation(picmistandard.PICMI_Simulation):
     """
 
     interactions: Annotated[list[Interaction | PICMI_Interaction], BeforeValidator(_prepare_interactions)] = Field(
-        default_factory=list
+        default_factory=list,
+        description="Interactions added with add_interaction. Accepts every interaction type PIConGPU supports: "
+        "field ionization, collisions, synchrotron radiation and the concrete ionization models.",
     )
     """
     All particle interactions of the simulation.

@@ -61,6 +61,10 @@ def test_write_output_creates_expanded_parent_dirs(monkeypatch):
         monkeypatch.setenv("HOME", home)
         target, _ = resolve_target_path(Path("~/.config/picongpu/picongpurc.toml"))
         write_output({"preset": "bash"}, target)
+        # The target must be the expanded path below HOME, not a literal "~"
+        # directory created relative to the current working directory. The
+        # latter would still make the two checks below pass on the pre-fix code.
+        assert target == Path(home) / ".config" / "picongpu" / "picongpurc.toml"
         assert target.is_file()
         assert target.parent.is_dir()
 

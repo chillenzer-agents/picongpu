@@ -846,10 +846,14 @@ def user_config_path():
 
     This is ``$XDG_CONFIG_HOME/picongpu/picongpurc.toml``, falling back to
     ``~/.config/picongpu/picongpurc.toml`` when ``XDG_CONFIG_HOME`` is unset or
-    empty. An explicit ``~`` in ``XDG_CONFIG_HOME`` is expanded.
+    empty. An explicit ``~`` in ``XDG_CONFIG_HOME`` is expanded. A relative
+    ``XDG_CONFIG_HOME`` is ignored (the XDG spec requires an absolute path) and
+    also falls back to ``~/.config``.
     """
-    config_home = environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
-    return Path(config_home).expanduser() / "picongpu" / "picongpurc.toml"
+    config_home = Path(environ.get("XDG_CONFIG_HOME") or Path.home() / ".config").expanduser()
+    if not config_home.is_absolute():
+        config_home = Path.home() / ".config"
+    return config_home / "picongpu" / "picongpurc.toml"
 
 
 def search_in_user_config():

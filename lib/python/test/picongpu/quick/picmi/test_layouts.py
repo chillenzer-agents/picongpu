@@ -48,11 +48,17 @@ def test_deprecated_singular_spelling_is_rejected():
         GriddedLayout(n_macroparticle_per_cell=[2, 2, 2])
 
 
-def test_instances_do_not_share_their_particle_counts():
-    first = GriddedLayout(n_macroparticles_per_cell=[1, 1, 1])
-    second = GriddedLayout(n_macroparticles_per_cell=[1, 1, 1])
+def test_deprecated_singular_spelling_get_is_rejected():
+    layout = GriddedLayout(n_macroparticles_per_cell=[2, 2, 2])
 
-    first.n_macroparticles_per_cell.append(2)
+    with pytest.raises(AttributeError):
+        layout.n_macroparticle_per_cell
 
-    assert second.n_macroparticles_per_cell == [1, 1, 1]
-    assert GriddedLayout(n_macroparticles_per_cell=[1, 1, 1]).n_macroparticles_per_cell == [1, 1, 1]
+
+def test_deprecated_singular_spelling_assignment_is_rejected():
+    layout = GriddedLayout(n_macroparticles_per_cell=[2, 2, 2])
+
+    with pytest.raises(AttributeError):
+        layout.n_macroparticle_per_cell = [1, 1, 1]
+
+    assert layout.n_macroparticles_per_cell == [2, 2, 2]

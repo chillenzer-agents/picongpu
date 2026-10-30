@@ -37,6 +37,23 @@ class GriddedLayout(picmistandard.PICMI_GriddedLayout):
             )
         super().__init__(*args, **kwargs)
 
+    # The pinned picmistandard still exposes the deprecated spelling as a
+    # property with a setter. Shadow it so that both attribute access and
+    # assignment raise, not only construction via ``__init__``.
+    @property
+    def n_macroparticle_per_cell(self):
+        raise AttributeError(
+            "The deprecated spelling 'n_macroparticle_per_cell' is no longer supported. "
+            "Use 'n_macroparticles_per_cell' instead."
+        )
+
+    @n_macroparticle_per_cell.setter
+    def n_macroparticle_per_cell(self, value):
+        raise AttributeError(
+            "The deprecated spelling 'n_macroparticle_per_cell' is no longer supported. "
+            "Use 'n_macroparticles_per_cell' instead."
+        )
+
     @field_validator("n_macroparticles_per_cell", mode="after")
     @classmethod
     def _require_positive(cls, value):

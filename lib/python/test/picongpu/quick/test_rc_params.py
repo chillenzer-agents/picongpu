@@ -13,10 +13,13 @@ from moosetash import MissingVariable
 from picongpu import DirtyResetError, core, rc_params
 from picongpu._rc_params import (
     PROFILE_PARAMETERS,
+    generate_default_rc_params,
     get_preset_declared_value,
     get_profile_parameter,
     preset_default_prefill,
     search_for_in_parents,
+    search_in_user_config,
+    user_config_path,
 )
 from pytest import fixture, raises, warns
 
@@ -324,3 +327,64 @@ def test_search_for_file_in_parent_directory(any_content, arbitrary_filename):
 def test_search_for_file_returns_none_if_not_found(arbitrary_filename):
     with TemporaryDirectory() as d1:
         assert search_for_in_parents(filename=arbitrary_filename, start_path=d1) is None
+
+
+def test_user_config_path_uses_xdg_config_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    assert user_config_path() == tmp_path / "xdg" / "picongpu" / "picongpurc.toml"
+
+
+def test_user_config_path_falls_back_to_home_config(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    assert user_config_path() == tmp_path / "home" / ".config" / "picongpu" / "picongpurc.toml"
+
+
+def test_user_config_path_expands_a_tilde_in_xdg_config_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", "~/.config")
+    assert user_config_path() == tmp_path / "home" / ".config" / "picongpu" / "picongpurc.toml"
+
+
+def test_search_in_user_config_finds_the_xdg_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    target = tmp_path / "xdg" / "picongpu" / "picongpurc.toml"
+    target.parent.mkdir(parents=True)
+    target.write_text('preset = "bash"\n')
+    assert search_in_user_config() == target
+
+
+def test_discovery_precedence_pic_rc_then_dot_name_then_xdg(monkeypatch, tmp_path):
+    # Keep the documented precedence: PIC_RC, then the nearest dot-prefixed
+    # file up the tree, then the XDG user configuration
+    # (https://github.com/chillenzer-agents/picongpu/issues/206).
+    home = tmp_path / "home"
+    xdg_file = home / ".config" / "picongpu" / "picongpurc.toml"
+    xdg_file.parent.mkdir(parents=True)
+    xdg_file.write_text('preset = "bash"\n')
+
+    project = tmp_path / "project"
+    run_dir = project / "run"
+    run_dir.mkdir(parents=True)
+    dot_file = project / ".picongpurc.toml"
+    dot_file.write_text('preset = "bash"\n')
+
+    override = tmp_path / "override.toml"
+    override.write_text('preset = "bash"\n')
+
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.delenv("PIC_RC", raising=False)
+    monkeypatch.chdir(run_dir)
+
+    # A dot-name closer to the input wins over the XDG location.
+    assert generate_default_rc_params()["picongpurc_path"] == dot_file
+
+    # PIC_RC wins over everything.
+    monkeypatch.setenv("PIC_RC", str(override))
+    assert generate_default_rc_params()["picongpurc_path"] == override
+
+    # Without a closer dot-name or PIC_RC, the XDG file is used.
+    monkeypatch.delenv("PIC_RC")
+    dot_file.unlink()
+    assert generate_default_rc_params()["picongpurc_path"] == xdg_file

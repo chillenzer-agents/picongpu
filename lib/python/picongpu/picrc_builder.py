@@ -30,6 +30,7 @@ from picongpu._rc_params import (
     get_available_presets,
     get_profile_parameter,
     preset_default_prefill,
+    user_config_path,
 )
 
 __all__ = ["main"]
@@ -244,9 +245,12 @@ def resolve_target_path(config: Path | None) -> tuple[Path | None, bool]:
     - ``config`` is a directory      -> ``(config / "picongpurc.toml", True)``.
     - ``config`` does not exist      -> ``(config, True)``.
     - ``config`` is ``None``         -> ``(None, True)`` (preset selection).
+
+    A leading ``~`` is expanded to the user's home directory before resolving.
     """
     if config is None:
         return None, True
+    config = Path(config).expanduser()
     if config.is_dir():
         return config / "picongpurc.toml", True
     if not config.is_file():
@@ -290,6 +294,17 @@ def _filter_user_keys(data, /, original_data):
         if key not in internal_keys or data.get(key) != original_data.get(key):
             output[key] = data[key]
     return output
+
+
+def default_output_path():
+    """Return the canonical path offered as the builder's default output location.
+
+    This is the XDG user configuration location,
+    ``$XDG_CONFIG_HOME/picongpu/picongpurc.toml`` (falling back to
+    ``~/.config/picongpu/picongpurc.toml``), so that a configuration written by
+    the builder is picked up by the runtime discovery.
+    """
+    return user_config_path()
 
 
 def write_output(output, path):
@@ -413,14 +428,14 @@ def _run(argv=None):
         questionary.print(f"Written to {target}.")
         questionary.print("You can start your simulation now.")
     elif choice in ("Yes, but ask for a path.", "Yes, but ask for a new path."):
-        default_path = Path("./.picongpurc.toml")
+        default_path = default_output_path()
         new_path_str = _ask(questionary.path("Path to write:", default=str(default_path)))
 
         if new_path_str is None:
             print("Aborted.")
             return
 
-        new_path = Path(new_path_str)
+        new_path = Path(new_path_str).expanduser()
 
         if new_path.exists():
             if not _ask(

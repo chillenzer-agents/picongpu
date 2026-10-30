@@ -16,6 +16,8 @@ import typing
 import sympy
 from moosetash import MissingVariable, render
 
+from picongpu._rendering_context import normalize_none
+
 
 class Renderer:
     """
@@ -147,6 +149,7 @@ class Renderer:
         preprocess a context object
 
         Applies the following preproccessing to an object:
+        - ``None`` values are replaced by empty strings (recursively)
         - list items have property "_first" and "_last" (boolean) added
         - numbers are translated to C++-compatible strings
 
@@ -155,6 +158,10 @@ class Renderer:
         :param context: context to be preprocessed
         :return: preprocessed copy of context dict
         """
+        # ``moosetash`` treats present keys with value ``None`` as missing;
+        # an empty string is falsy as well, but does not raise:
+        context = normalize_none(context)
+
         # delegate functionality to recursive function
         pp = Renderer.__get_context_preprocessed_recursive(context)
 

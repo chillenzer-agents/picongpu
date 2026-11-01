@@ -14,6 +14,10 @@ from .Distribution import Distribution
 import math
 
 
+# Sentinel to distinguish an omitted ``z`` from an explicit one.
+_MISSING_Z = object()
+
+
 class CylindricalDistribution(Distribution):
     """
     Describes a cylindrical density distribution of particles with gaussian up-ramp
@@ -46,7 +50,8 @@ class CylindricalDistribution(Distribution):
     exponential_pre_plasma_cutoff: float | None
     """cutoff of the exponential pre-plasma ramp, [m]"""
 
-    cell_size: tuple[float, float, float] | None = None
+    cell_size: tuple[float, float] | tuple[float, float, float] | None = None
+    """cell size per spatial dimension; a 2-tuple on 2D grids, a 3-tuple on 3D grids"""
 
     # @details pydantic provides an automatically generated __init__/constructor method which allows initialization off
     #   all attributes as keyword arguments
@@ -100,12 +105,17 @@ class CylindricalDistribution(Distribution):
             pre_plasma_ramp=pre_plasma_ramp,
         )
 
-    def __call__(
-        self,
-        x,
-        y,
-        z,
-    ):
+    def __call__(self, x, y, z=_MISSING_Z):
+        """
+        Evaluate the density.
+
+        The call contract follows the grid dimensionality (stored in
+        ``cell_size``):
+
+        * 3D grid: ``__call__(x, y, z)`` -- the usual three spatial coordinates.
+        * 2D grid: ``__call__(x, y)`` -- ``z`` does not exist and passing it is an
+          error. The evaluation plane is ``z == 0``, matching the backend.
+        """
         if self.cell_size is None:
             message = (
                 "Due to inconsistencies in the backend, evaluation of this function requires information about the cell_size."
@@ -115,11 +125,24 @@ class CylindricalDistribution(Distribution):
             )
             raise NotImplementedError(message)
 
+        is_2d = len(self.cell_size) == 2
+        if is_2d:
+            if z is not _MISSING_Z:
+                raise TypeError(
+                    "CylindricalDistribution on a 2D grid is evaluated as __call__(x, y); the z coordinate does not exist."
+                )
+        elif z is _MISSING_Z:
+            raise TypeError("CylindricalDistribution on a 3D grid is evaluated as __call__(x, y, z).")
+
         # The definition of this density uses the origin of the cell
         # while the call operator uses the center.
-        x += -0.5 * self.cell_size[0]
-        y += -0.5 * self.cell_size[1]
-        z += -0.5 * self.cell_size[2]
+        x = np.asarray(x) - 0.5 * self.cell_size[0]
+        y = np.asarray(y) - 0.5 * self.cell_size[1]
+        if is_2d:
+            # On a 2D grid there is no z dimension; the backend evaluates at z == 0.
+            z = np.asarray(0.0)
+        else:
+            z = np.asarray(z) - 0.5 * self.cell_size[2]
 
         # Just for convenience:
         pre_l = self.exponential_pre_plasma_length or 0.0
@@ -139,10 +162,19 @@ class CylindricalDistribution(Distribution):
             ),
             axis=-1,
         )
-        radius = np.sqrt(self.radius**2 - pre_l**2) - pre_l
         result = np.zeros(np.broadcast_shapes(*map(np.shape, args)))
 
+        # As in the backend, a zero length or cutoff means that there is no ramp.
+        # Without a ramp the plateau extends to the full radius; only inside the
+        # ramp is the reduced radius (which ensures mass conservation) used.
+        has_ramp = pre_l > 0.0 and pre_c > 0.0
+        if has_ramp:
+            radius = np.sqrt(self.radius**2 - pre_l**2) - pre_l
+        else:
+            radius = self.radius
+
         result[r < radius] = 1.0
-        mask = (r >= radius) * (r < radius + pre_c)
-        result[mask] = np.exp((radius - r) / pre_l)[mask]
+        if has_ramp:
+            mask = (r >= radius) * (r < radius + pre_c)
+            result[mask] = np.exp((radius - r) / pre_l)[mask]
         return self.density * result

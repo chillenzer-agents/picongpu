@@ -40,8 +40,8 @@ LAYOUTS = {
     "oneposition_1": OnePositionLayout(n_macroparticles_per_cell=1),
     "oneposition_2": OnePositionLayout(n_macroparticles_per_cell=2),
     "oneposition_2_offset": OnePositionLayout(n_macroparticles_per_cell=2, in_cell_offset=(0.1, 0.2, 0.3)),
-    "gridded_1": GriddedLayout(n_macroparticle_per_cell=(1, 1, 1)),
-    "gridded_1_2_3": GriddedLayout(n_macroparticle_per_cell=(1, 2, 3)),
+    "gridded_1": GriddedLayout(n_macroparticles_per_cell=(1, 1, 1)),
+    "gridded_1_2_3": GriddedLayout(n_macroparticles_per_cell=(1, 2, 3)),
     "pseudorandom_1": PseudoRandomLayout(n_macroparticles_per_cell=1),
     "pseudorandom_2": PseudoRandomLayout(n_macroparticles_per_cell=2),
 }

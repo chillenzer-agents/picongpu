@@ -85,6 +85,21 @@ class TestMemoryConfigDefaults(TestCase):
         assert "super_cell_size" not in MemoryConfig.model_fields
 
 
+@pytest.mark.parametrize(
+    "size,expected",
+    [
+        (2**31 - 1, "2147483647ULL"),
+        (2**31, "2048 * 1024 * 1024ULL"),
+        (4 * 1024**3, "4096 * 1024 * 1024ULL"),
+        (4 * 1024**3 + 1024, "4194305 * 1024ULL"),
+        (4 * 1024**3 + 1, "4294967297ULL"),
+    ],
+)
+def test_large_memory_literals_promote_before_multiplication(size, expected):
+    sim = _sim(picongpu_memory_config=MemoryConfig(reserved_gpu_memory_size=size))
+    assert f"reservedGpuMemorySize = {expected};" in _rendered("memory.param.mustache", sim)
+
+
 class TestMemoryConfigValidation(TestCase):
     def test_bytes_must_be_positive(self):
         for field in ("bytes_exchange_x", "bytes_exchange_y", "bytes_exchange_z", "bytes_edges", "bytes_corner"):
@@ -181,12 +196,12 @@ class TestMemoryTranslation(TestCase):
 class TestTemplateRendering(TestCase):
     def test_memory_param_defaults(self):
         rendered = _rendered("memory.param.mustache", _sim())
-        assert "constexpr size_t reservedGpuMemorySize = 350 * 1024 * 1024;" in rendered
-        assert "static constexpr uint32_t BYTES_EXCHANGE_X = 1 * 1024 * 1024;" in rendered
-        assert "static constexpr uint32_t BYTES_EXCHANGE_Y = 3 * 1024 * 1024;" in rendered
-        assert "static constexpr uint32_t BYTES_EXCHANGE_Z = 1 * 1024 * 1024;" in rendered
-        assert "static constexpr uint32_t BYTES_EDGES = 32 * 1024;" in rendered
-        assert "static constexpr uint32_t BYTES_CORNER = 8 * 1024;" in rendered
+        assert "constexpr size_t reservedGpuMemorySize = 350 * 1024 * 1024ULL;" in rendered
+        assert "static constexpr uint32_t BYTES_EXCHANGE_X = 1 * 1024 * 1024U;" in rendered
+        assert "static constexpr uint32_t BYTES_EXCHANGE_Y = 3 * 1024 * 1024U;" in rendered
+        assert "static constexpr uint32_t BYTES_EXCHANGE_Z = 1 * 1024 * 1024U;" in rendered
+        assert "static constexpr uint32_t BYTES_EDGES = 32 * 1024U;" in rendered
+        assert "static constexpr uint32_t BYTES_CORNER = 8 * 1024U;" in rendered
         assert "using REF_LOCAL_DOM_SIZE = mCT::Int<0, 0, 0>;" in rendered
         assert "const std::array<float_X, 3> DIR_SCALING_FACTOR = { 0.0, 0.0, 0.0 };" in rendered
         assert "constexpr bool fieldTmpSupportGatherCommunication = true;" in rendered
@@ -204,8 +219,8 @@ class TestTemplateRendering(TestCase):
             )
         )
         rendered = _rendered("memory.param.mustache", sim)
-        assert "constexpr size_t reservedGpuMemorySize = 100 * 1024 * 1024;" in rendered
-        assert "static constexpr uint32_t BYTES_EXCHANGE_X = 2 * 1024 * 1024;" in rendered
+        assert "constexpr size_t reservedGpuMemorySize = 100 * 1024 * 1024ULL;" in rendered
+        assert "static constexpr uint32_t BYTES_EXCHANGE_X = 2 * 1024 * 1024U;" in rendered
         assert "using REF_LOCAL_DOM_SIZE = mCT::Int<2, 3, 4>;" in rendered
         assert "const std::array<float_X, 3> DIR_SCALING_FACTOR = { 0.5, 0.25, 1.0 };" in rendered
         assert "constexpr bool fieldTmpSupportGatherCommunication = false;" in rendered

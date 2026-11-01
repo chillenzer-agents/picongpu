@@ -19,11 +19,13 @@ def _non_negative(values):
 
 
 def _human_bytes(value: int) -> str:
+    # Render readable products only; the C++ literal suffix is supplied by the
+    # mustache template, where the declared variable type is known.
     if value % (1024 * 1024) == 0:
         return f"{value // (1024 * 1024)} * 1024 * 1024"
     if value % 1024 == 0:
         return f"{value // 1024} * 1024"
-    return str(value)
+    return f"{value}"
 
 
 class MemoryConfig(BaseModel):

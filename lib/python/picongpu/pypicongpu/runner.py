@@ -9,6 +9,7 @@ import datetime
 import json
 import logging
 import tempfile
+from collections.abc import Mapping
 from importlib.util import module_from_spec, spec_from_file_location
 from os import chmod
 from pathlib import Path
@@ -22,8 +23,10 @@ from pydantic import (
     AliasChoices,
     BaseModel,
     BeforeValidator,
+    ConfigDict,
     Field,
     field_serializer,
+    model_validator,
 )
 from rocrate.rocrate import ROCrate
 
@@ -33,6 +36,27 @@ from picongpu.templates import path as tpath
 from .rendering import Renderer
 from .simulation import Simulation
 from .util import alt
+
+
+def _reject_name_alias_ambiguity(cls, data):
+    """Reject flags supplied under more than one of their accepted names/aliases."""
+    if not isinstance(data, Mapping):
+        return data
+    conflicts = []
+    for name, field in cls.model_fields.items():
+        if not isinstance(field.validation_alias, AliasChoices):
+            continue
+        aliases = [choice for choice in field.validation_alias.choices if isinstance(choice, str) and choice != name]
+        supplied = [key for key in (name, *aliases) if key in data]
+        # More than one supplied key means the value is ambiguous: several
+        # aliases are just as problematic as an alias together with the name.
+        if len(supplied) > 1:
+            conflicts.append(f"'{name}' supplied as {', '.join(map(repr, supplied))}")
+    if conflicts:
+        raise ValueError(
+            f"ambiguous flag(s): {'; '.join(conflicts)} -- use only one name or alias per flag, not several"
+        )
+    return data
 
 
 def script_content_with(commands, rc_params=rc_params):
@@ -93,6 +117,13 @@ def get_tmpdir_with_name(name, parent: Path | None = None):
 
 
 class PicBuildFlags(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_ambiguous_flags(cls, data):
+        return _reject_name_alias_ambiguity(cls, data)
+
     # We explicitly disallow the some shorthands like `-c`, `-t`, ...
     # because they overlap with tbg flags and could thus lead to confusion.
     jobs: int | None = Field(
@@ -137,6 +168,13 @@ class PicBuildFlags(BaseModel):
 
 
 class TBGFlags(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_ambiguous_flags(cls, data):
+        return _reject_name_alias_ambiguity(cls, data)
+
     # We explicitly disallow the some shorthands like `-c`, `-t`, ...
     # because they overlap with pic-build flags and could thus lead to confusion.
     cfg_file: str = Field(
@@ -172,6 +210,14 @@ class TBGFlags(BaseModel):
     @field_serializer("project_path")
     def _serialize_project_path(self, value) -> dict[str, str]:
         return {"class": "Directory", "location": str(value)}
+
+    @field_serializer("overwrite_vars")
+    def _serialize_overwrite_vars(self, value) -> str | None:
+        # The CWL input `run_overwrite_vars` is a string carrying JSON;
+        # `tbg -o` expects this value in JSON format.
+        if value is None:
+            return None
+        return json.dumps(value)
 
 
 class Runner(BaseModel):

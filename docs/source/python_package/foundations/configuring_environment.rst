@@ -44,8 +44,16 @@ using the `uv <https://docs.astral.sh/uv/>`__ tool::
 
   uv run --with="picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python" picrc-builder
 
-In either case, store the generated file in one of the locations
-described in `The .picongpurc.toml File`_ below.
+The canonical location for the generated file is
+``$XDG_CONFIG_HOME/picongpu/picongpurc.toml``,
+which falls back to ``~/.config/picongpu/picongpurc.toml``
+when ``XDG_CONFIG_HOME`` is unset or empty
+(a relative ``XDG_CONFIG_HOME`` is ignored).
+The builder offers this path by default when it asks where to write,
+expands a leading ``~`` in a path you type,
+and creates missing parent directories,
+so you can accept the default and start a simulation right away.
+Other valid locations are described in `The .picongpurc.toml File`_ below.
 
 .. _configuring_env_toml_file:
 
@@ -96,10 +104,16 @@ The search is performed once, when the PIConGPU Python package is imported:
      found in the current directory or any of its parent directories is used.
      Only the dot-prefixed name is found in this search.
   3. Otherwise, ``$XDG_CONFIG_HOME/picongpu/picongpurc.toml``
-     (typically ``~/.config/picongpu/picongpurc.toml``) is used.
+     is used, which is usually ``~/.config/picongpu/picongpurc.toml``
+     (``XDG_CONFIG_HOME`` falls back to ``~/.config`` when unset or empty;
+     a relative value is ignored).
+     This is the canonical user-specific location.
 
 If none of the above yields a file,
 the runtime configuration starts out with its built-in defaults.
+Because the search stops at the first match in this order,
+a ``.picongpurc.toml`` found closer to the current directory (step 2)
+takes precedence over the canonical file in the XDG location (step 3).
 
 .. _configuring_env_rc_params:
 

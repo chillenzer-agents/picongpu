@@ -201,10 +201,6 @@ are written into ``workflow/input.yaml``
 and can be customized by passing them as keyword arguments
 to ``simulation.run()`` / ``simulation.write_input_file()``
 (e.g. ``simulation.run(jobs=8, force=True)``).
-The runner accepts the step short names for the ones that have one:
-``cmake_build_system`` is also ``G``, ``cfg_file`` is ``cfg``,
-``submit_system`` is ``submit`` (or ``s``), ``template_file`` is ``tpl``
-and ``overwrite_vars`` is ``o``.
 The ``setup_dir`` / ``run_dir`` keyword arguments of
 ``simulation.run()`` are different:
 they only choose where the runner writes the setup directory

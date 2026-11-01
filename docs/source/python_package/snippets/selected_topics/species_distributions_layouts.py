@@ -47,7 +47,7 @@ electrons = picmi.Species(
     density_scale=1.0,
 )
 # layouts determine the particle positions within a cell
-ion_layout = picmi.GriddedLayout(n_macroparticle_per_cell=[2, 2, 2])
+ion_layout = picmi.GriddedLayout(n_macroparticles_per_cell=[2, 2, 2])
 electron_layout = picmi.PseudoRandomLayout(n_macroparticles_per_cell=2)
 
 simulation = picmi.Simulation(

@@ -10,6 +10,7 @@ import json
 from cwltool.context import RuntimeContext
 from cwltool.factory import Factory, WorkflowStatus
 from picongpu.picmi import Cartesian3DGrid, ElectromagneticSolver, Simulation
+from picongpu.pypicongpu.runner import PicBuildFlags, TBGFlags
 from pytest import fixture, raises
 
 
@@ -55,3 +56,27 @@ def test_validate_workflow(workflow_definition_path, workflow_input):
         Factory(runtime_context=RuntimeContext(kwargs={"validate_only": True})).make(str(workflow_definition_path))(
             **workflow_input
         )
+
+
+def test_workflow_input_accepts_flag_names_and_aliases(workflow_definition_path, sim):
+    runner = sim.picongpu_get_runner()
+    for build_flags, run_flags in [
+        (
+            PicBuildFlags(cmake_build_system="Ninja"),
+            TBGFlags(project_path=runner.setup_dir, cfg_file="my.cfg", overwrite_vars=["A=1", "B=2"]),
+        ),
+        (
+            PicBuildFlags(G="Ninja"),
+            TBGFlags(project_path=runner.setup_dir, cfg="my.cfg", o=["A=1", "B=2"]),
+        ),
+    ]:
+        runner.generate_workflow_input(build_flags=build_flags, run_flags=run_flags)
+        with runner.workflow_input_path.open("r") as file:
+            workflow_input = json.load(file)
+        assert workflow_input["build_cmake_build_system"] == "Ninja"
+        assert workflow_input["run_cfg_file"] == "my.cfg"
+        assert workflow_input["run_overwrite_vars"] == json.dumps(["A=1", "B=2"])
+        with raises(WorkflowStatus, match="Completed ValidationSuccess"):
+            Factory(runtime_context=RuntimeContext(kwargs={"validate_only": True})).make(str(workflow_definition_path))(
+                **workflow_input
+            )

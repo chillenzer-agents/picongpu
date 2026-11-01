@@ -92,8 +92,12 @@ def all_ge(iterable, m):
 def grid_dist_validate(grid_dist):
     if grid_dist is None:
         return None
-    if all_gt(sum(grid_dist, []), 0):
-        return grid_dist
+    if not grid_dist:
+        raise ValueError(f"{grid_dist=} must not be empty.")
+    if any(len(axis) == 0 for axis in grid_dist):
+        raise ValueError(f"{grid_dist=} must not contain empty axes.")
+    all_gt(sum(grid_dist, []), 0)
+    return grid_dist
 
 
 class Grid3D(BaseModel, RenderedObject):

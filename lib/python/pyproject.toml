@@ -28,35 +28,32 @@ dependencies = [
   "imageio",
   "jsonschema>=4.23",
   "matplotlib",
-  # temporary bug-fix branch, should point to an upcoming release including this in the future:
-  "moosetash @ git+https://github.com/chillenzer/moosetash.git@fix-none-handling",
+  # interim: released engine; our rendering contexts normalise a present None to
+  # "" (the upstream fix-none-handling build renders it as "None" and keeps
+  # partially-missing dotted names as None). Template use is section-only today,
+  # where None and "" are both falsy:
+  "moosetash==1.0.1",
   "mpmath>=1.3",
   "numpy>=1.26.2",
   "openpmd-api>=0.16.1",
   "pandas>=2.2.3",
   "particle>=0.25.1",
   "periodictable>=1.7.1",
-  # This commit hash points to the head of branch: pydantic-refactoring
-  # (https://github.com/picmi-standard/picmi/pull/133), so we don't loose it
-  # if someone force-pushes to the main feature branch.
-  "picmistandard @ git+https://github.com/chillenzer/picmi.git@952708894e31b35075fd876a970827c45e96747f",
-  "pillow",
+  "picmistandard>=0.35.0",
   "pint",
   "pydantic>=2.13",
   "pyyaml",
   "questionary>=2",
   "referencing>=0.35.1",
-  "roc-validator",
-  # Temporarily choosing the master here
-  # because the latest release doesn't yet support RO-Crate v1.2
-  # and it doesn't seem reasonable to build a new feature on top of an outdated standard.
-  "rocrate @ git+https://github.com/ResearchObject/ro-crate-py@master",
+  # RO-Crate 1.2 support is in published releases since 0.15.0 (0.16.0 also adds RO-Crate 1.3),
+  # so the former floating "@master" pin is no longer needed.
+  "rocrate>=0.16.0",
   "scipy>=1.12",
   "sympy>=1.14",
   "tomli-w>=1.2",
 ]
 
-optional-dependencies.test = [ "pytest>=9" ]
+optional-dependencies.test = [ "pytest>=9", "roc-validator" ]
 
 scripts.pic-deps = "picongpu.pic_deps:main"
 
@@ -68,23 +65,18 @@ allow-direct-references = true
 [tool.hatch.build.targets.wheel]
 packages = [ "picongpu" ]
 
-[tool.hatch.build.targets.wheel.force-include]
-"../../include" = "picongpu/core/include"
-"../../etc" = "picongpu/core/etc"
-"../../bin" = "picongpu/core/bin"
-"../../src/tools/bin" = "picongpu/core/bin"
-"../../share/picongpu/examples" = "picongpu/core/share/picongpu/examples"
-"../../thirdParty" = "picongpu/core/thirdParty"
-
 [tool.hatch.build.targets.sdist]
 packages = [ "picongpu" ]
-[tool.hatch.build.targets.sdist.force-include]
-"../../include" = "picongpu/core/include"
-"../../etc" = "picongpu/core/etc"
-"../../bin" = "picongpu/core/bin"
-"../../src/tools/bin" = "picongpu/core/bin"
-"../../share/picongpu/examples" = "picongpu/core/share/picongpu/examples"
-"../../thirdParty" = "picongpu/core/thirdParty"
+
+# The PIConGPU core trees (include/, etc/, bin/, ...) live outside lib/python in
+# a source checkout but must end up inside the package (picongpu/core/...) in
+# both the sdist and the wheel. A checkout-relative force-include path
+# (../../include, ...) fails when building from an extracted sdist, because
+# those paths do not exist there. hatch_build.py therefore adds the mappings
+# only when the source trees are present; when building from an sdist the trees
+# are already under picongpu/core/ and are picked up by `packages`.
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
 
 [tool.pytest.ini_options]
 markers = [

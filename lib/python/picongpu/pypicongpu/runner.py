@@ -460,9 +460,9 @@ class Runner(BaseModel):
         self._write_rocrate()
 
     def _write_rocrate(self):
-        rc_params.rocrate_info.add_metadata_to(ROCrate(self.setup_dir, version="1.2", init=True)).metadata.write(
-            self.setup_dir
-        )
+        rc_params.rocrate_info.add_metadata_to(
+            ROCrate(self.setup_dir, version=rc_params.rocrate_info.version, init=True)
+        ).metadata.write(self.setup_dir)
 
     def run(self):
         """

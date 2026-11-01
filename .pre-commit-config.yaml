@@ -91,7 +91,8 @@ repos:
     hooks:
       - id: pyproject-fmt
         # The default is 3.13, which would strip the 3.14 classifier.
-        args: ["--max-supported-python", "3.14"]
+        # Keep full versions so explicit floors such as >=0.35.0 are preserved.
+        args: ["--max-supported-python", "3.14", "--keep-full-version"]
   - repo: https://github.com/kynan/nbstripout
     rev: 0.9.1
     hooks:

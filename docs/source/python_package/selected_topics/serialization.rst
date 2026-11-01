@@ -47,8 +47,8 @@ into the ``metadata/`` directory of the setup:
   the runtime configuration that was used.
 
 In addition, the setup directory carries an
-`RO-Crate <https://www.w3.org/TR/2021/REC-vc-r-crate-20211109/>`__
-(version 1.2) as ``ro-crate-metadata.json``:
+`RO-Crate <https://www.researchobject.org/ro-crate/>`__
+(version 1.3) as ``ro-crate-metadata.json``:
 it describes the setup as a dataset,
 with the ``workflow/workflow.cwl`` as its main entity,
 the PIConGPU version as the software used,
@@ -56,6 +56,17 @@ and descriptions of the ``etc/``, ``include/``, ``metadata/`` and
 ``workflow/`` sub-datasets.
 This makes the setup understandable to (and processable by) tools that
 speak RO-Crate, independently of the PIConGPU Python package.
+
+The written RO-Crate specification version is controlled by the
+``rocrate.info.version`` runtime-configuration parameter,
+exposed as ``rc_params.rocrate_info.version`` and defaulting to ``1.3``;
+you can select another version supported by the ``rocrate`` library
+before generating the input files:
+
+.. literalinclude:: ../snippets/selected_topics/rocrate_version.py
+   :language: python
+   :start-after: BEGIN-ROCRATE-VERSION
+   :end-before: END-ROCRATE-VERSION
 
 Reproducibility
 ---------------

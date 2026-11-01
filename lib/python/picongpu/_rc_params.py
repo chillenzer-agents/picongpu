@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from rocrate.model import ComputationalWorkflow, ComputerLanguage, ContextEntity, SoftwareApplication
 
 from picongpu import core
+from picongpu._rendering_context import normalize_none
 
 from ._version import __version__
 
@@ -614,7 +615,9 @@ class RCParams:
 
     @property
     def rendering_context(self):
-        return _path_to_str(self._data)
+        # ``moosetash`` treats present keys with value ``None`` as missing;
+        # an empty string is falsy as well, but does not raise:
+        return normalize_none(_path_to_str(self._data))
 
     @property
     def profile_template_content(self):
@@ -784,6 +787,8 @@ def add_dataset_descriptions(crate):
 class _ROCrateInfo(BaseModel):
     name: str
     description: str
+    # RO-Crate specification version written into the generated metadata.
+    version: str = "1.3"
     datePublished: datetime | None = None
     license: str | None = None
     mainEntity: str | None

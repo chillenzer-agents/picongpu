@@ -172,6 +172,14 @@ EXPECTED_FILES = {
         "files": ["electrons.json"],
         "stdout_contains": ["serialized simulation into", "It worked!"],
     },
+    "selected_topics/rocrate_version.py": {
+        "stdout_contains": [
+            "configured RO-Crate version: 1.3",
+            "written RO-Crate context: https://w3id.org/ro/crate/1.3/context",
+            "overridden RO-Crate version: 1.2",
+            "overridden RO-Crate context: https://w3id.org/ro/crate/1.2/context",
+        ],
+    },
     "defining_simulation/multiple_simulations.py": {
         "no_run": True,
         "files": [f"scan/focal_{focal:.1e}/setup/include/picongpu/param/simulation.param" for focal in SCAN_FOCALS]

@@ -16,6 +16,8 @@ import typing
 import sympy
 from moosetash import MissingVariable, render
 
+from picongpu._rendering_context import normalize_none
+
 
 class Renderer:
     """
@@ -147,6 +149,7 @@ class Renderer:
         preprocess a context object
 
         Applies the following preproccessing to an object:
+        - ``None`` values are replaced by empty strings (recursively)
         - list items have property "_first" and "_last" (boolean) added
         - numbers are translated to C++-compatible strings
 
@@ -155,6 +158,10 @@ class Renderer:
         :param context: context to be preprocessed
         :return: preprocessed copy of context dict
         """
+        # ``moosetash`` treats present keys with value ``None`` as missing;
+        # an empty string is falsy as well, but does not raise:
+        context = normalize_none(context)
+
         # delegate functionality to recursive function
         pp = Renderer.__get_context_preprocessed_recursive(context)
 
@@ -243,6 +250,11 @@ class Renderer:
 
 
 def _allow_only_missing_type_variables(name, _):
-    if name.startswith("type_"):
+    # type discriminators are rendered as type_<kind> placeholders, e.g.
+    # "{{ type_random }}". They may also appear as the leaf of a partially
+    # missing dotted lookup (e.g. "{{ layout.type_random }}", where "layout"
+    # exists but has no "type_random" member): released moosetash >= 1.0.1
+    # reports the full dotted name to the handler, so check the leaf too.
+    if name.startswith("type_") or name.rsplit(".", 1)[-1].startswith("type_"):
         return ""
     raise MissingVariable(name)

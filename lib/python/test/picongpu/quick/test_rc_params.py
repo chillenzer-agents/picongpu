@@ -5,6 +5,8 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import re
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -12,8 +14,11 @@ from tempfile import TemporaryDirectory
 from moosetash import MissingVariable
 from picongpu import DirtyResetError, core, rc_params
 from picongpu._rc_params import (
+    PRESET_STORAGE_PATH,
     PROFILE_PARAMETERS,
     get_preset_declared_value,
+    get_preset_name,
+    get_preset_path,
     get_profile_parameter,
     preset_default_prefill,
     search_for_in_parents,
@@ -88,6 +93,7 @@ def test_dirty_resets_can_trigger_custom_handler(dirty_rc_params):
 
 def test_preset_points_profile_to_correct_pic_src_path(my_rc_params):
     my_rc_params["preset"] = "bash/bash_picongpu"
+    my_rc_params["pic_libs"] = "$HOME/pic-libs"
     assert f'export PICSRC="{str(my_rc_params["pic_src_path"])}"' in my_rc_params.profile_content
 
 
@@ -230,8 +236,68 @@ def test_rendering_profile_with_incomplete_info_can_trigger_custom_handler(my_rc
     assert "author" in call_args
 
 
+_PROFILE_ENV_VARS = (
+    "PIC_LIBS",
+    "CMAKE_ROOT",
+    "BOOST_ROOT",
+    "BLOSC_ROOT",
+    "LIBPNG_ROOT",
+    "PNGwriter_ROOT",
+    "HDF5_ROOT",
+    "ADIOS2_ROOT",
+    "OPENPMD_ROOT",
+    "FFTW_ROOT",
+    "CMAKE_PREFIX_PATH",
+    "CPATH",
+    "LD_LIBRARY_PATH",
+)
+
+
+def _source_bash_profile(home, **env):
+    profile = core.path("etc") / "picongpu" / "bash" / "bash_picongpu.profile.example"
+    body = "\n".join(f'printf "%s=%s\\n" {v} "${{{v}-<UNSET>}}"' for v in _PROFILE_ENV_VARS)
+    proc = subprocess.run(
+        ["bash", "--noprofile", "--norc", "-c", f'source "$1" >/dev/null 2>&1\n{body}', "_", profile],
+        env={"HOME": str(home), "PATH": "/usr/local/bin:/usr/bin:/bin", **env},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return dict(line.split("=", 1) for line in proc.stdout.splitlines())
+
+
+def test_bash_profile_leaves_a_clean_environment_untouched(tmp_path):
+    # Backwards compatibility: a user relying on system/distro packages neither
+    # gets PIC_LIBS forced nor any *_ROOT / search-path entries injected.
+    values = _source_bash_profile(tmp_path)
+    assert values == {v: "<UNSET>" for v in _PROFILE_ENV_VARS}
+
+
+def test_bash_profile_preserves_pre_set_roots_and_search_paths(tmp_path):
+    # A user who already configured a self-build (or any prefix) keeps their
+    # values; the profile only fills in what is unset.
+    values = _source_bash_profile(
+        tmp_path,
+        PIC_LIBS="/opt/custom-piclibs",
+        CMAKE_ROOT="/opt/cmake",
+        BOOST_ROOT="/opt/boost",
+        CMAKE_PREFIX_PATH="/opt/pfx",
+        CPATH="/opt/inc",
+        LD_LIBRARY_PATH="/opt/lib",
+    )
+    assert values["PIC_LIBS"] == "/opt/custom-piclibs"
+    assert values["CMAKE_ROOT"] == "/opt/cmake"
+    assert values["BOOST_ROOT"] == "/opt/boost"
+    assert values["CMAKE_PREFIX_PATH"] == "/opt/pfx"
+    assert values["CPATH"] == "/opt/inc"
+    assert values["LD_LIBRARY_PATH"] == "/opt/lib"
+
+
 def test_bash_profile_is_reproduced(my_rc_params):
     my_rc_params["preset"] = "bash/bash_picongpu"
+    # The shipped example keeps PIC_LIBS unset unless a prefix is provided;
+    # rendering the same expression must reproduce it byte-for-byte.
+    my_rc_params["pic_libs"] = "${PIC_LIBS:-}"
     my_rc_params["pic_src_path"] = "$HOME/src/picongpu"
     with (core.path("etc") / "picongpu" / "bash" / "bash_picongpu.profile.example").open("r") as file:
         assert my_rc_params.profile_content == file.read()
@@ -268,6 +334,49 @@ def test_raises_on_ambiguous_preset(my_rc_params):
 def test_allows_short_name_for_unambiguous_presets(my_rc_params):
     # passes:
     my_rc_params["preset"] = "bash"
+
+
+def test_bare_bash_resolves_canonically_with_variants_present():
+    # Adding bash/spack and bash/conda must not make preset="bash" ambiguous.
+    assert get_preset_path("bash") == PRESET_STORAGE_PATH / "bash" / "bash_picongpu.profile.example"
+    assert get_preset_path("bash/bash_picongpu.profile.example") == get_preset_path("bash")
+
+
+def test_bash_variant_presets_resolve_their_own_profiles():
+    assert get_preset_path("bash/spack") == PRESET_STORAGE_PATH / "bash" / "spack_picongpu.profile.example"
+    assert get_preset_path("bash/conda") == PRESET_STORAGE_PATH / "bash" / "conda_picongpu.profile.example"
+    assert get_preset_path("bash/spack_picongpu.profile.example") == get_preset_path("bash/spack")
+
+
+def test_preset_names_are_canonical():
+    assert get_preset_name("bash/bash_picongpu.profile.example") == "bash"
+    assert get_preset_name("bash/spack_picongpu.profile.example") == "bash/spack"
+    assert get_preset_name("bash/conda_picongpu.profile.example") == "bash/conda"
+    assert get_preset_name("hemera-hzdr/gpu_picongpu.profile.example") == "hemera-hzdr/gpu"
+    assert get_preset_name("perlmutter-nersc/gpu.profile.example") == "perlmutter-nersc/gpu"
+
+
+def _exported_version_pins(profile_name):
+    text = (PRESET_STORAGE_PATH / "bash" / profile_name).read_text()
+    return dict(re.findall(r'export ([A-Z][A-Z0-9_]*_VERSION)="\$\{[A-Z0-9_]+:-([^}]*)\}"', text))
+
+
+def test_bash_profiles_share_version_pins_and_environment():
+    profiles = [
+        "bash_picongpu.profile.example",
+        "spack_picongpu.profile.example",
+        "conda_picongpu.profile.example",
+    ]
+    pins = [_exported_version_pins(name) for name in profiles]
+    assert pins[0], "failed to parse the version pins from the base profile"
+    assert pins[0] == pins[1] == pins[2]
+
+    texts = [(PRESET_STORAGE_PATH / "bash" / name).read_text() for name in profiles]
+    for line in (
+        'export PIC_SYSTEM_TEMPLATE_PATH=${PIC_SYSTEM_TEMPLATE_PATH:-"etc/picongpu/bash"}',
+        'export PIC_BACKEND="omp2b:native"',
+    ):
+        assert all(line in text for text in texts), line
 
 
 def test_allows_file_extension_for_presets(my_rc_params):

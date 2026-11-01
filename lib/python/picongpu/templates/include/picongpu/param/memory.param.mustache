@@ -39,7 +39,7 @@ namespace picongpu
      *   - reduces
      *   - ...
      */
-    constexpr size_t reservedGpuMemorySize = {{{memory_config.reserved_gpu_memory_size}}};
+    constexpr size_t reservedGpuMemorySize = {{{memory_config.reserved_gpu_memory_size}}}ULL;
 
     /* short namespace*/
     namespace mCT = pmacc::math::CT;
@@ -81,11 +81,11 @@ namespace picongpu
     struct DefaultExchangeMemCfg
     {
         // memory used for a direction
-        static constexpr uint32_t BYTES_EXCHANGE_X = {{{memory_config.bytes_exchange_x}}};
-        static constexpr uint32_t BYTES_EXCHANGE_Y = {{{memory_config.bytes_exchange_y}}};
-        static constexpr uint32_t BYTES_EXCHANGE_Z = {{{memory_config.bytes_exchange_z}}};
-        static constexpr uint32_t BYTES_EDGES = {{{memory_config.bytes_edges}}};
-        static constexpr uint32_t BYTES_CORNER = {{{memory_config.bytes_corner}}};
+        static constexpr uint32_t BYTES_EXCHANGE_X = {{{memory_config.bytes_exchange_x}}}U;
+        static constexpr uint32_t BYTES_EXCHANGE_Y = {{{memory_config.bytes_exchange_y}}}U;
+        static constexpr uint32_t BYTES_EXCHANGE_Z = {{{memory_config.bytes_exchange_z}}}U;
+        static constexpr uint32_t BYTES_EDGES = {{{memory_config.bytes_edges}}}U;
+        static constexpr uint32_t BYTES_CORNER = {{{memory_config.bytes_corner}}}U;
 
         /** Reference local domain size
          *

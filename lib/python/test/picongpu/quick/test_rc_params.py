@@ -10,7 +10,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from moosetash import MissingVariable
-from picongpu import DirtyResetError, core, rc_params
+from picongpu import DirtyResetError, _rc_params, core, rc_params
 from picongpu._rc_params import (
     PROFILE_PARAMETERS,
     generate_default_rc_params,
@@ -401,6 +401,11 @@ def test_discovery_precedence_pic_rc_then_dot_name_then_xdg(monkeypatch, tmp_pat
     assert generate_default_rc_params()["picongpurc_path"] == override
 
     # Without a closer dot-name or PIC_RC, the XDG file is used.
+    # Stub the upward search here: it reaches the filesystem root, so a
+    # machine-level /.picongpurc.toml (e.g. written by the CI setup) would
+    # otherwise shadow the XDG file. The search itself is covered by the
+    # dedicated search_for_in_parents tests above.
     monkeypatch.delenv("PIC_RC")
     dot_file.unlink()
+    monkeypatch.setattr(_rc_params, "search_for_in_parents", lambda *args, **kwargs: None)
     assert generate_default_rc_params()["picongpurc_path"] == xdg_file

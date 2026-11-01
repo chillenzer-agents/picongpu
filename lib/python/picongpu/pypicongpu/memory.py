@@ -19,14 +19,13 @@ def _non_negative(values):
 
 
 def _human_bytes(value: int) -> str:
-    # Multiplications of unsuffixed literals otherwise use int, even when
-    # assigned to size_t (e.g. a 4 GiB reserve). Promote before multiplying.
-    suffix = "ULL" if value > 2**31 - 1 else ""
+    # Render readable products only; the C++ literal suffix is supplied by the
+    # mustache template, where the declared variable type is known.
     if value % (1024 * 1024) == 0:
-        return f"{value // (1024 * 1024)}{suffix} * 1024 * 1024"
+        return f"{value // (1024 * 1024)} * 1024 * 1024"
     if value % 1024 == 0:
-        return f"{value // 1024}{suffix} * 1024"
-    return f"{value}{suffix}"
+        return f"{value // 1024} * 1024"
+    return f"{value}"
 
 
 class MemoryConfig(BaseModel):

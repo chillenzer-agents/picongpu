@@ -59,7 +59,7 @@ speak RO-Crate, independently of the PIConGPU Python package.
 
 The written RO-Crate specification version is controlled by the
 ``rocrate.info.version`` runtime-configuration parameter,
-which defaults to ``1.3``;
+exposed as ``rc_params.rocrate_info.version`` and defaulting to ``1.3``;
 you can select another version supported by the ``rocrate`` library
 before generating the input files:
 

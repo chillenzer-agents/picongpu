@@ -14,3 +14,7 @@ class Position(Attribute):
     """
 
     picongpu_name: str = "position<position_pic>"
+    cpp_type: str = "floatD_X"
+    n_components: int = 3
+    unit_dimension: tuple = (1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    unit: str = "sim.pic.getCellSize() * sim.unit.length()"

@@ -9,7 +9,7 @@ from collections.abc import Callable, Iterable
 from inspect import signature
 from typing import Any, get_type_hints
 
-from pydantic import BaseModel, computed_field, field_validator, model_validator
+from pydantic import BaseModel, PrivateAttr, computed_field, field_validator, model_validator
 from sympy import Expr, Symbol, symbols, sympify
 
 from picongpu.picmi.particle_functor.rng_arg import RNGArg
@@ -21,26 +21,65 @@ from picongpu.pypicongpu.particle_functor import (
 )
 from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.species.attribute.attribute import Attribute
-from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
-from picongpu.pypicongpu.species.attribute.momentum import Momentum
-from picongpu.pypicongpu.species.attribute.momentum_prev_1 import MomentumPrev1
+from picongpu.pypicongpu.species.attribute.registry import ATTRIBUTE_REGISTRY, DERIVED_ACCESSORS
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.util import alt, decorating_class, is_iterable
 
-# Maps each particle attribute a functor may access to the pypicongpu species
-# attribute (if any) that must be present on the owning species for the accessor
-# to be usable. Registering these on the species via
-# ``Species.register_requirements`` makes the generated
-# ``SpeciesEligibleForSolver`` trait include the species instead of excluding it.
-# ``position`` and ``random_number`` need no attribute (the cell offset and the
-# RNG are always available); attributes absent from this map are not
-# registerable as an ``Attribute`` and would have to be requested explicitly.
-_ATTRIBUTE_BY_NAME = {
-    "weighting": Weighting,
-    "momentum": Momentum,
-    "momentumPrev1": MomentumPrev1,
-    "charge_state": BoundElectrons,
+# Derived accessors that still require a stored attribute on the owning species
+# (the others come from species constants or are always available).
+_ATTRIBUTE_BY_DERIVED_NAME = {
+    "damped_weighting": Weighting,
 }
+
+# Registered attributes whose stored value is already a per-real-particle
+# quantity.  Their C++ ``WeightingPower`` trait describes the macro-particle
+# bookkeeping, not the ``PhysicalParticle`` rescaling, so they must not be
+# divided by the weighting again.
+_PER_PARTICLE_ATTRIBUTES = frozenset({"position", "momentum", "momentumPrev1", "weighting", "particleId"})
+
+
+def _attribute_name(attribute):
+    """Extract the functor-facing name from an attribute-map value."""
+    return attribute[0] if isinstance(attribute, tuple) else attribute
+
+
+def _attribute_spec(attribute):
+    """Return the registry/derived descriptor for an attribute-map value."""
+    name = _attribute_name(attribute)
+    if name in ATTRIBUTE_REGISTRY:
+        return ATTRIBUTE_REGISTRY[name]()
+    derived = DERIVED_ACCESSORS.get(name)
+    return None if derived is None else _DerivedSpec(name, **derived)
+
+
+class _DerivedSpec:
+    """Lightweight descriptor for a derived accessor (not an ``Attribute``)."""
+
+    def __init__(self, name, cpp_type="float_X", n_components=1):
+        self.name = name
+        self.cpp_type = cpp_type
+        self.n_components = n_components
+        self.unit = "1."
+        self.unit_dimension = (0.0,) * 7
+        self.weighting_power = 0
+
+    @property
+    def component_cpp_type(self):
+        if self.n_components == 1:
+            return self.cpp_type
+        return "float_X"
+
+
+def _weighting_power(attribute):
+    """Physical-particle rescaling power for an accessed attribute."""
+    name = _attribute_name(attribute)
+    if name in _PER_PARTICLE_ATTRIBUTES:
+        return 0
+    if name in ("mass", "charge", "kinetic energy"):
+        return 1
+    spec = _attribute_spec(attribute)
+    return 0 if spec is None else getattr(spec, "weighting_power", 0)
+
 
 _COORDINATE_SYSTEM = {
     (
@@ -88,9 +127,18 @@ class AbstractParticle(Particle):
 
     def __init__(self):
         self.used_attributes = {}
+        self._symbol_weighting_power = {}
 
     def get_attribute_map(self):
         return self.used_attributes
+
+    def _record(self, symbols, attribute, weighting_power=None):
+        """Record an access and the scaling of every produced symbol."""
+        self.used_attributes |= {symbols: attribute}
+        if weighting_power is None:
+            weighting_power = _weighting_power(attribute)
+        for symbol in symbols if isinstance(symbols, tuple) else (symbols,):
+            self._symbol_weighting_power[symbol] = weighting_power
 
     def get(self, attribute, **kwargs) -> Expr | Iterable[Expr]:
         if attribute == "position":
@@ -99,15 +147,15 @@ class AbstractParticle(Particle):
             unit = kwargs.get("unit", "cell")
             self.needs_total_position = self.needs_total_position or (origin.lower() not in ["cell", "local"])
             my_symbols = _COORDINATE_SYSTEM[(origin, precision, unit)]
-            self.used_attributes |= {my_symbols: ("position", origin, precision, unit)}
+            self._record(my_symbols, ("position", origin, precision, unit), weighting_power=0)
 
         elif attribute == "momentum":
             my_symbols = symbols("px,py,pz")
-            self.used_attributes |= {my_symbols: "momentum"}
+            self._record(my_symbols, "momentum", weighting_power=0)
 
         elif attribute == "momentumPrev1":
             my_symbols = symbols("p1x,p1y,p1z")
-            self.used_attributes |= {my_symbols: "momentumPrev1"}
+            self._record(my_symbols, "momentumPrev1", weighting_power=0)
 
         elif attribute in ["gamma", "kinetic energy", "velocity"]:
             # This relies on python dictionaries having a stable ordering.
@@ -123,11 +171,15 @@ class AbstractParticle(Particle):
                 my_symbols = symbols("vx,vy,vz")
             else:
                 raise ValueError("Reached impossible path.")
-            self.used_attributes |= {my_symbols: attribute}
+            self._record(my_symbols, attribute, weighting_power=1 if attribute == "kinetic energy" else 0)
 
         else:
-            my_symbols = Symbol(attribute)
-            self.used_attributes |= {my_symbols: attribute}
+            spec = _attribute_spec(attribute)
+            if spec is not None and spec.n_components > 1:
+                my_symbols = tuple(Symbol(f"{attribute}_{i}") for i in range(spec.n_components))
+            else:
+                my_symbols = Symbol(attribute)
+            self._record(my_symbols, attribute)
 
         return my_symbols
 
@@ -138,13 +190,6 @@ class MacroParticle(AbstractParticle):
     The returned quantity is a macro-particle (weighting-scaled) property,
     which is what the accessors produce as-is.
     """
-
-
-# Symbols whose value scales linearly with the macroparticle weighting, and thus
-# must be rescaled by ``weighting ** -1`` to obtain the single-particle value.
-# Any symbol not listed here is already a per-particle quantity (e.g. momentum,
-# velocity, position, damped_weighting), so it is left untouched (identity, 0).
-_SCALING = {Symbol("mass"): 1, Symbol("Ekin"): 1, Symbol("charge"): 1}
 
 
 class PhysicalParticle(AbstractParticle):
@@ -165,7 +210,10 @@ class PhysicalParticle(AbstractParticle):
         my_symbols = super().get(*args, **kwargs)
         if self.scales_with_weighting is None:
             w = super().get("weighting")
-            rescaled = tuple(s * (w ** (-_SCALING.get(s, 0))) for s in alt(lambda: iter(my_symbols), [my_symbols]))
+            rescaled = tuple(
+                s * (w ** (-self._symbol_weighting_power.get(s, 0)))
+                for s in alt(lambda: iter(my_symbols), [my_symbols])
+            )
             my_symbols = rescaled if is_iterable(my_symbols) else rescaled[0]
         return my_symbols
 
@@ -196,6 +244,13 @@ class ParticleFunctor(BaseModel):
     """
 
     model_config = {"arbitrary_types_allowed": True}
+
+    _custom_templates: bool = PrivateAttr(False)
+    """whether the simulation supplies a custom template directory
+
+    Custom templates may extend ``speciesAttributes.param`` with attributes the
+    registry does not know about; such unknown names are allowed in that case.
+    """
 
     functor: Callable[[Any], Any]
     name: str | None = None
@@ -270,10 +325,8 @@ class ParticleFunctor(BaseModel):
             )
         if self.name is None:
             self.name = self.functor.__name__
-        if self.return_type is None:
-            self.return_type = float if sig.return_annotation == sig.empty else sig.return_annotation
-        if self.unit_dimension is None:
-            self.unit_dimension = UnitDimension()
+        if self.return_type is None and sig.return_annotation is not sig.empty:
+            self.return_type = sig.return_annotation
         if self.scales_with_weighting is not None and self._particle_class() is not PhysicalParticle:
             raise TypeError(
                 f"Can't apply scaling to a non-PhysicalParticle functor. You gave: {self.scales_with_weighting=}."
@@ -284,6 +337,61 @@ class ParticleFunctor(BaseModel):
             )
         return self
 
+    def _evaluate(self):
+        particle = (
+            self._particle_class()(self.scales_with_weighting)
+            if self._particle_class() is PhysicalParticle
+            else self._particle_class()()
+        )
+        rng = self.rng_class()
+        expression = self(particle) if rng is None else self(particle, rng)
+        attribute_map = particle.get_attribute_map() | alt(lambda: rng.get_attribute_map(), {})
+        return particle, rng, expression, attribute_map
+
+    @staticmethod
+    def _infer_return_type(expression, attribute_map):
+        """Infer the C++ value type from a bare registry attribute access.
+
+        Only expressions that are exactly an accessed attribute (a scalar or a
+        whole vector) get a registry-driven type; arbitrary expressions fall
+        back to ``float_X`` as before.
+        """
+        if isinstance(expression, tuple):
+            for key, attribute in attribute_map.items():
+                if isinstance(key, tuple) and tuple(key) == tuple(expression):
+                    spec = _attribute_spec(attribute)
+                    if spec is not None and spec.n_components == len(expression) and spec.n_components > 1:
+                        return spec.cpp_type
+            return None
+        if isinstance(expression, Symbol):
+            for key, attribute in attribute_map.items():
+                spec = _attribute_spec(attribute)
+                if spec is None:
+                    continue
+                if isinstance(key, tuple):
+                    if expression in key:
+                        return spec.component_cpp_type
+                elif key == expression:
+                    return spec.cpp_type
+        return None
+
+    @staticmethod
+    def _matching_spec(expression, attribute_map):
+        """The descriptor of the attribute an expression is exactly taken from."""
+        if isinstance(expression, tuple):
+            for key, attribute in attribute_map.items():
+                if isinstance(key, tuple) and tuple(key) == tuple(expression):
+                    return _attribute_spec(attribute)
+            return None
+        if isinstance(expression, Symbol):
+            for key, attribute in attribute_map.items():
+                if isinstance(key, tuple):
+                    if expression in key:
+                        return _attribute_spec(attribute)
+                elif key == expression:
+                    return _attribute_spec(attribute)
+        return None
+
     def get_required_attributes(self) -> list[Attribute]:
         """The pypicongpu species attributes this functor accesses.
 
@@ -291,42 +399,44 @@ class ParticleFunctor(BaseModel):
         functor actually carries the attributes it reads (e.g. ``momentumPrev1``)
         rather than being excluded as ineligible. Attributes that are not a
         concrete ``Attribute`` (e.g. ``mass``/``charge``, which come from species
-        constants, or positions, which are always available) are omitted.
+        constants) are omitted.
         """
-        particle = (
-            self._particle_class()(self.scales_with_weighting)
-            if self._particle_class() is PhysicalParticle
-            else self._particle_class()()
-        )
-        rng = self.rng_class()
-        if rng is not None:
-            self(particle, rng)
-        else:
-            self(particle)
-        attribute_map = particle.get_attribute_map() | alt(lambda: rng.get_attribute_map(), {})
-        requirements = {
-            _ATTRIBUTE_BY_NAME[name]
-            for value in attribute_map.values()
-            if (name := value[0] if isinstance(value, tuple) else value) in _ATTRIBUTE_BY_NAME
-        }
+        _, _, _, attribute_map = self._evaluate()
+        requirements = set()
+        for value in attribute_map.values():
+            name = _attribute_name(value)
+            cls = ATTRIBUTE_REGISTRY.get(name) or _ATTRIBUTE_BY_DERIVED_NAME.get(name)
+            if cls is not None:
+                requirements.add(cls)
         return [attribute_type() for attribute_type in sorted(requirements, key=lambda cls: cls.__name__)]
 
-    def get_as_pypicongpu(self, mode) -> PyPIConGPUParticleFunctor:
-        particle = (
-            self._particle_class()(self.scales_with_weighting)
-            if self._particle_class() is PhysicalParticle
-            else self._particle_class()()
-        )
-        rng = self.rng_class()
-        functor_expression = self(particle) if rng is None else self(particle, rng)
-        attribute_map = particle.get_attribute_map() | alt(lambda: rng.get_attribute_map(), {})
+    def get_as_pypicongpu(self, mode, custom_templates=None) -> PyPIConGPUParticleFunctor:
+        allow_unknown = self._custom_templates if custom_templates is None else custom_templates
+        particle, rng, functor_expression, attribute_map = self._evaluate()
+        spec = self._matching_spec(functor_expression, attribute_map)
+        if self.return_type is None:
+            self.return_type = self._infer_return_type(functor_expression, attribute_map) or float
+        if spec is not None and spec.n_components > 1 and isinstance(functor_expression, tuple):
+            if mode != "DerivedField":
+                raise ValueError(
+                    f"Returning the whole vector attribute {_attribute_name(attribute_map[functor_expression])!r} "
+                    f"is not supported in {mode} functors; index it to a single component or use a "
+                    "DerivedField functor."
+                )
+        unit_dimension = self.unit_dimension
+        unit_factor = self.unit_factor
+        if unit_dimension is None:
+            unit_dimension = UnitDimension() if spec is None else UnitDimension(list(spec.unit_dimension))
+            self.unit_dimension = unit_dimension
+            if unit_factor is None and spec is not None:
+                unit_factor = spec.unit
         return PyPIConGPUParticleFunctor(
             name=self.name,
             functor_expression=functor_expression,
-            functor_preamble=generate_preamble(attribute_map, mode=mode),
+            functor_preamble=generate_preamble(attribute_map, mode=mode, allow_unknown=allow_unknown),
             return_type=self.return_type,
-            unit_dimension=PyPIConGPUUnitDimension(unit_dimension=self.unit_dimension.unit_vector.tolist()),
-            unit_factor=self.unit_factor,
+            unit_dimension=PyPIConGPUUnitDimension(unit_dimension=unit_dimension.unit_vector.tolist()),
+            unit_factor=unit_factor,
             needs_total_position=particle.needs_total_position,
             rng_info=alt(lambda: rng.model_dump(mode="python"), None),
         )

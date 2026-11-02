@@ -16,6 +16,10 @@ construction).
 The registry maps historical functor names where they differ from the stored
 identifier: ``position`` -> ``position_pic`` and
 ``charge_state`` -> ``boundElectrons``.
+
+Registering a plugin- or atomic-physics-internal attribute only allocates its
+storage on the species; it does not enable the consuming plugin and costs memory
+per particle, so request only what a functor actually reads.
 """
 
 from .accepted import Accepted
@@ -64,7 +68,7 @@ DERIVED_ACCESSORS: dict[str, dict] = {
     "charge": {"cpp_type": "float_X"},
     "gamma": {"cpp_type": "float_X"},
     "kinetic energy": {"cpp_type": "float_X"},
-    "velocity": {"cpp_type": "float_X", "n_components": 3},
+    "velocity": {"cpp_type": "float3_X", "n_components": 3},
     "damped_weighting": {"cpp_type": "float_X"},
     "timestep": {"cpp_type": "uint32_t"},
     "timestep_size": {"cpp_type": "float_X"},

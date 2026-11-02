@@ -102,6 +102,6 @@ def test_extended_attributes_compile_and_run():
     run_dir = Path(simulation.picongpu_get_runner().run_dir)
     assert run_dir.exists()
     # The species must carry all three accessed attributes.
-    species_definition = (run_dir / "include" / "picongpu" / "param" / "speciesDefinition.param").read_text()
+    species_definition = (run_dir / "input" / "include" / "picongpu" / "param" / "speciesDefinition.param").read_text()
     for attribute in ("particleId", "radiationMask", "probeE"):
         assert attribute in species_definition

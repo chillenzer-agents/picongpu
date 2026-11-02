@@ -46,20 +46,32 @@ The most frequently used classes -- ``Simulation``, the grids, solvers,
 lasers, species, distributions, layouts, interactions and the constants --
 are re-exported directly at the :mod:`picongpu.picmi` top level,
 so ``picmi.<Name>`` works for all of them.
+The rule for the top level is: it holds what you pass to ``Simulation`` or
+``Species`` (or a picmistandard name).
 A few more specialised, but still user-facing, names are grouped one level
 deeper and are not repeated at the top level.
 The most important to know:
 
 * the functor-authoring helpers live in :mod:`picongpu.picmi.particle_functor`
-  -- :class:`~picongpu.picmi.particle_functor.RNGArg` for parameterising a
+  -- :class:`~picongpu.picmi.particle_functor.ParticleFunctor`,
+  :class:`~picongpu.picmi.particle_functor.ParticleFilter`,
+  :class:`~picongpu.picmi.particle_functor.FilteredSpecies` and
+  :class:`~picongpu.picmi.particle_functor.RNGArg` for parameterising a
   functor by a random number;
 * the predefined unit dimensions ``I``, ``L``, ``M`` and ``T``
   (of type :class:`~picongpu.picmi.unit_dimension.UnitDimension`)
   for annotating a functor's result live in
   :mod:`picongpu.picmi.unit_dimension`;
-* the diagnostics helpers and the ``TS`` shorthand for ``TimeStepSpec`` live in
-  :mod:`picongpu.picmi.diagnostics`
-  (see :ref:`TimeStepSpec <time-steps>`).
+* the diagnostics helpers -- including ``TS`` for ``TimeStepSpec``
+  (see :ref:`TimeStepSpec <time-steps>`) and ``RangeSpec`` for restricted
+  dumps -- live in :mod:`picongpu.picmi.diagnostics`;
+* interaction inputs that are not direct ``Simulation`` inputs, such as
+  ``CollisionNumericsConfig``, ``IonizationCurrent`` and
+  ``EnergyConservation``, live in :mod:`picongpu.picmi.interaction`.
+
+``Any*`` unions (for example ``AnyInteraction`` in
+:mod:`picongpu.picmi.interaction`) are typing aids and are never promoted to
+the top level either.
 
 The following snippet exercises the surface;
 it is executed as part of the test suite, so every name it touches is

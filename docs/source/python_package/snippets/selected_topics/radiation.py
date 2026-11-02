@@ -22,8 +22,7 @@ from pathlib import Path
 from sympy import cos, pi, sin
 
 from picongpu import picmi
-from picongpu.picmi.diagnostics import Radiation, TS
-from picongpu.pypicongpu.output.radiation import RadiationObserverConfiguration
+from picongpu.picmi.diagnostics import Radiation, RadiationObserverConfiguration, TS
 
 N_OBSERVER = 32
 

@@ -186,7 +186,6 @@ EXPECTED_FILES = {
             "rng argument type: RNGArg",
             "energy unit dimension: L^2.0 M^1.0 T^-2.0",
             "TS is TimeStepSpec: True",
-            "BinningFunctor is ParticleFunctor: True",
             "It worked!",
         ],
     },

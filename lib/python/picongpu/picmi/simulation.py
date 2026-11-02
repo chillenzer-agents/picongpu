@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import picmistandard
+from picmistandard import PICMI_Interaction
 from pydantic import (
     AfterValidator,
     BeforeValidator,
@@ -38,7 +39,6 @@ from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid
 from picongpu.picmi.interaction import (
     SUPPORTED_INTERACTION_TYPES,
     Interaction,
-    PICMI_Interaction,
     Synchrotron,
 )
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup

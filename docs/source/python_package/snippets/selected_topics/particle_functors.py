@@ -27,7 +27,7 @@ from picongpu.picmi.particle_functor import (
     ParticleFunctor,
     PhysicalParticle,
 )
-from picongpu.picmi.particle_functor.unit_dimension import M, UnitDimension
+from picongpu.picmi.unit_dimension import M, UnitDimension
 
 grid = picmi.Cartesian3DGrid(
     number_of_cells=[32, 32, 32],

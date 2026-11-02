@@ -10,7 +10,6 @@ from .backend_config import OpenPMDConfig as OpenPMDConfig
 from .backend_config import OpenPMDBackendConfig as OpenPMDBackendConfig
 from .binning import Binning as Binning
 from .binning import BinningAxis as BinningAxis
-from .binning import BinningFunctor as BinningFunctor
 from .binning import BinSpec as BinSpec
 from .checkpoint import Checkpoint as Checkpoint
 from .energy_histogram import EnergyHistogram as EnergyHistogram

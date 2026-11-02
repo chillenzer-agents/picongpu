@@ -54,6 +54,27 @@ class Attribute(BaseModel):
     weighting_power: int = Field(default=0, exclude=True)
     """power of the weighting the stored value scales with (``WeightingPower``)"""
 
+    physical_weighting_power: int | None = Field(default=None, exclude=True)
+    """rescale exponent for ``PhysicalParticle`` access, if it differs from ``weighting_power``
+
+    ``weighting_power`` mirrors the C++ ``WeightingPower`` trait.  For a few
+    attributes that trait describes the macro-particle bookkeeping rather than
+    the single-particle meaning used by ``PhysicalParticle`` functors (for
+    example ``weighting`` must not be divided by itself).  Those entries set
+    this override explicitly; ``None`` means "use ``weighting_power``".
+    """
+
+    access_strategy: str = Field(default="structured_binding", exclude=True)
+    """how the preamble binds the stored value
+
+    ``"structured_binding"`` (default) emits ``auto const [a, b, ...] = value;``
+    and therefore requires the C++ type to support the tuple protocol (e.g.
+    ``pmacc::math::Vector``).  ``"whole"`` emits a single
+    ``auto const name = value;`` and indexes it in the functor expression
+    (``name[0]``, ...), which also works for types without a tuple protocol
+    such as ``DataSpace<simDim>``.
+    """
+
     internal: bool = Field(default=False, exclude=True)
     """implementation detail rather than a first-class user-facing quantity"""
 

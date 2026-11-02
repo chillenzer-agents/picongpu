@@ -12,7 +12,7 @@ and accumulated into spectra that are written to openPMD files.
 
 .. literalinclude:: ../../snippets/selected_topics/radiation.py
    :language: python
-   :start-at: radiation = Radiation
+   :start-at: radiation = picmi.diagnostics.Radiation
    :end-before: sim = picmi.Simulation(
 
 The plugin requires a bit more setup than the other diagnostics,

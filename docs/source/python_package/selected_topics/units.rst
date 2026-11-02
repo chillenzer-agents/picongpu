@@ -63,10 +63,10 @@ single-letter keywords or from explicit exponents:
 
 .. code-block:: python
 
-   from picongpu.picmi.unit_dimension import UnitDimension
+   from picongpu import picmi
 
-   velocity = UnitDimension(L=1, M=0, T=-1)
-   energy = UnitDimension(L=2, M=1, T=-2)
+   velocity = picmi.unit_dimension.UnitDimension(L=1, M=0, T=-1)
+   energy = picmi.unit_dimension.UnitDimension(L=2, M=1, T=-2)
 
 The predefined singletons ``L``, ``M``, ``T`` and ``I``
 (from ``picongpu.picmi.unit_dimension``)
@@ -75,7 +75,7 @@ readable:
 
 .. code-block:: python
 
-   from picongpu.picmi.unit_dimension import L, M, T
+   from picongpu import picmi
 
-   momentum = M * L / T
-   energy = M * L**2 / T**2
+   momentum = picmi.unit_dimension.M * picmi.unit_dimension.L / picmi.unit_dimension.T
+   energy = picmi.unit_dimension.M * picmi.unit_dimension.L**2 / picmi.unit_dimension.T**2

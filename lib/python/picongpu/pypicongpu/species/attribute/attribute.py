@@ -46,7 +46,11 @@ class Attribute(BaseModel):
     """powers of the seven SI base units (L, M, T, I, theta, N, J)"""
 
     unit: str = Field(default="1.", exclude=True)
-    """C++ expression for the SI value of one internal unit (``getUnit()``)"""
+    """SI value of one internal unit, mirroring the C++ ``Unit<T>`` trait
+
+    May be per-component (e.g. ``Position``'s anisotropic cell size) and is
+    therefore not necessarily a valid scalar ``getUnit()`` expression.
+    """
 
     macro_weighted: bool = Field(default=False, exclude=True)
     """whether the stored value is macro-particle weighted (``MacroWeighted``)"""

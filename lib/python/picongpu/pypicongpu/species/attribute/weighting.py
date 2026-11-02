@@ -14,3 +14,5 @@ class Weighting(Attribute):
     """
 
     picongpu_name: str = "weighting"
+    macro_weighted: bool = True
+    weighting_power: int = 1

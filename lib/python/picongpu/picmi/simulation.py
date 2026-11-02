@@ -644,6 +644,11 @@ class Simulation(picmistandard.PICMI_Simulation):
             ] + [axis.functor for axis in getattr(diagnostic, "axes", None) or []]
             if not functors:
                 continue
+            # Custom templates may extend speciesAttributes.param, so unknown
+            # attribute names must only be rejected when the packaged templates
+            # (and hence the Python registry) are authoritative.
+            for functor in functors:
+                functor._custom_templates = bool(self.picongpu_template_dir)
             species = getattr(diagnostic, "species", None)
             for one_species in species if isinstance(species, list) else [species]:
                 if one_species is None:
@@ -655,6 +660,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                     # needed for diagnostics (e.g. DerivedFieldDump) that only
                     # read the species by name and never convert the wrapper.
                     if (filter_functor := getattr(one_species, "functor", None)) is not None:
+                        filter_functor._custom_templates = bool(self.picongpu_template_dir)
                         one_species.species.register_requirements(filter_functor.get_required_attributes())
                     one_species = one_species.species
                 for functor in functors:

@@ -5,6 +5,8 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
+import os
+import tempfile
 from unittest import TestCase
 
 from sympy import Symbol, sqrt
@@ -16,7 +18,11 @@ from picongpu.picmi.particle_functor.unit_dimension import UnitDimension
 from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
 from picongpu.pypicongpu.species.attribute.momentum import Momentum
 from picongpu.pypicongpu.species.attribute.momentum_prev_1 import MomentumPrev1
+from picongpu.pypicongpu.species.attribute.particle_id import ParticleId
+from picongpu.pypicongpu.species.attribute.probe_e import ProbeE
+from picongpu.pypicongpu.species.attribute.radiation_mask import RadiationMask
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
+from picongpu.pypicongpu.species.attribute.weighting_damping_factor import WeightingDampingFactor
 
 
 def render(functor, mode="DerivedField"):
@@ -295,6 +301,313 @@ class TestParticleClassResolution(TestCase):
             @ParticleFunctor(scales_with_weighting=1)
             def f(particle: MacroParticle):
                 return particle.get("mass")
+
+
+class TestRegisteredAttributeRendering(TestCase):
+    """Rendering and registry-driven defaults for extended attributes."""
+
+    def test_scalar_particle_id(self):
+        @ParticleFunctor
+        def pid(particle: MacroParticle):
+            return particle.get("particleId")
+
+        rendered = render(pid)
+        self.assertEqual(rendered.return_type, "uint64_t")
+        self.assertIn("particle[particleId_]", rendered.functor_preamble[0].statement)
+        self.assertEqual(rendered.functor_expression, "particleId")
+        self.assertEqual(rendered.get_unit_cpp, "1.")
+
+    def test_bool_radiation_mask(self):
+        @ParticleFunctor
+        def mask(particle: MacroParticle) -> bool:
+            return particle.get("radiationMask")
+
+        rendered = render(mask)
+        self.assertEqual(rendered.return_type, "bool")
+        self.assertIn("particle[radiationMask_]", rendered.functor_preamble[0].statement)
+
+    def test_vector_probe_e_indexing_uses_structured_binding(self):
+        @ParticleFunctor
+        def e_x(particle: MacroParticle):
+            return particle.get("probeE")[1]
+
+        rendered = render(e_x)
+        self.assertEqual(rendered.return_type, "float_X")
+        self.assertEqual(
+            rendered.functor_preamble[0].statement,
+            "auto const [probeE_0,probeE_1,probeE_2] = particle[probeE_];",
+        )
+        self.assertEqual(rendered.functor_expression, "probeE_1")
+        self.assertEqual(rendered.unit_dimension_cpp, "{1.0, 1.0, -3.0, -1.0, 0.0, 0.0, 0.0}")
+        self.assertEqual(rendered.get_unit_cpp, "sim.unit.eField()")
+
+    def test_vector_probe_b_structured_binding(self):
+        @ParticleFunctor
+        def b_y(particle: MacroParticle):
+            return particle.get("probeB")[1]
+
+        rendered = render(b_y)
+        self.assertEqual(rendered.functor_expression, "probeB_1")
+        self.assertEqual(rendered.unit_dimension_cpp, "{0.0, 1.0, -2.0, -1.0, 0.0, 0.0, 0.0}")
+        self.assertEqual(rendered.get_unit_cpp, "sim.unit.bField()")
+
+    def test_whole_vector_return_uses_registry_type(self):
+        @ParticleFunctor
+        def e_vec(particle: MacroParticle):
+            return particle.get("probeE")
+
+        rendered = render(e_vec)
+        self.assertEqual(rendered.return_type, "float3_X")
+        self.assertEqual(rendered.functor_expression, "{probeE_0, probeE_1, probeE_2}")
+
+    def test_raw_weighting_damping_factor(self):
+        @ParticleFunctor
+        def damping(particle: MacroParticle):
+            return particle.get("weightingDampingFactor")
+
+        rendered = render(damping)
+        self.assertEqual(rendered.return_type, "float_X")
+        self.assertEqual(rendered.functor_expression, "weightingDampingFactor")
+        self.assertIn("particle[weightingDampingFactor_]", rendered.functor_preamble[0].statement)
+
+    def test_derived_damped_weighting_still_available(self):
+        @ParticleFunctor
+        def damped(particle: MacroParticle):
+            return particle.get("damped_weighting")
+
+        rendered = render(damped)
+        self.assertIn("getDampedWeighting(particle)", rendered.functor_preamble[0].statement)
+        self.assertEqual(rendered.functor_expression, "damped_weighting")
+
+    def test_arbitrary_expression_falls_back_to_float(self):
+        @ParticleFunctor
+        def doubled(particle: MacroParticle):
+            return 2.0 * particle.get("probeE")[0]
+
+        self.assertEqual(render(doubled).return_type, "float_X")
+
+
+class TestRegisteredAttributeRequirements(TestCase):
+    """The registry drives Species.register_requirements."""
+
+    def test_scalar_bool_vector_requirements(self):
+        def requirements_for(name):
+            @ParticleFunctor
+            def f(particle: MacroParticle, n=name):
+                value = particle.get(n)
+                return value[0] if hasattr(value, "__getitem__") else value
+
+            return f.get_required_attributes()
+
+        self.assertEqual(requirements_for("particleId"), [ParticleId()])
+        self.assertEqual(requirements_for("radiationMask"), [RadiationMask()])
+        self.assertEqual(requirements_for("probeE"), [ProbeE()])
+        self.assertEqual(requirements_for("weightingDampingFactor"), [WeightingDampingFactor()])
+
+    def _render_species_definition(self, diagnostics):
+        grid = picmi.Cartesian3DGrid(
+            number_of_cells=[8, 8, 8],
+            lower_bound=[0, 0, 0],
+            upper_bound=[8, 8, 8],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+        )
+        sim = picmi.Simulation(
+            time_step_size=1.0,
+            max_steps=4,
+            solver=picmi.ElectromagneticSolver(method="Yee", grid=grid),
+        )
+        species = picmi.Species(particle_type="electron")
+        sim.add_species(species, None)
+        for diagnostic in diagnostics(species):
+            sim.add_diagnostic(diagnostic)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sim.write_input_file(os.path.join(tmpdir, "input"))
+            with open(os.path.join(tmpdir, "input", "include", "picongpu", "param", "speciesDefinition.param")) as f:
+                return f.read()
+
+    def test_binning_axis_registers_attribute(self):
+        from picongpu.picmi.diagnostics import BinSpec, Binning, BinningAxis
+
+        @ParticleFunctor
+        def pid(particle: MacroParticle) -> int:
+            return particle.get("particleId")
+
+        @ParticleFunctor
+        def count(particle: MacroParticle) -> float:
+            return 1.0
+
+        rendered = self._render_species_definition(
+            lambda species: [
+                Binning(
+                    name="pid",
+                    deposition_functor=count,
+                    axes=[BinningAxis(functor=pid, bin_spec=BinSpec(kind="linear", start=0, stop=100, nsteps=10))],
+                    species=species,
+                )
+            ]
+        )
+        self.assertIn("particleId", rendered)
+
+    def test_derived_field_registers_vector_attribute(self):
+        from picongpu.picmi.diagnostics import DerivedFieldDump
+
+        @ParticleFunctor
+        def e_x(particle: MacroParticle) -> float:
+            return particle.get("probeE")[0]
+
+        rendered = self._render_species_definition(lambda species: [DerivedFieldDump(species=species, functor=e_x)])
+        self.assertIn("probeE", rendered)
+
+    def test_filter_registers_bool_attribute(self):
+        from picongpu.picmi.diagnostics import DerivedFieldDump
+        from picongpu.picmi.particle_functor import FilteredSpecies
+
+        @ParticleFilter
+        def selected(particle: MacroParticle) -> bool:
+            return particle.get("radiationMask")
+
+        @ParticleFunctor
+        def count(particle: MacroParticle) -> float:
+            return 1.0
+
+        rendered = self._render_species_definition(
+            lambda species: [
+                DerivedFieldDump(species=FilteredSpecies(species=species, functor=selected), functor=count)
+            ]
+        )
+        self.assertIn("radiationMask", rendered)
+
+
+class TestRegisteredAttributeModeValidation(TestCase):
+    """Mode-invalid access raises clearly (including the former broken renders)."""
+
+    def _render(self, attribute, mode="DerivedField", **kwargs):
+        @ParticleFunctor
+        def f(particle: MacroParticle):
+            return particle.get(attribute, **kwargs)
+
+        return render(f, mode)
+
+    def test_position_global_in_derived_field_raises(self):
+        with self.assertRaisesRegex(ValueError, "origin='global'.*DerivedField"):
+            self._render("position", origin="global")
+
+    def test_position_total_in_derived_field_raises(self):
+        with self.assertRaisesRegex(ValueError, "origin='total'.*DerivedField"):
+            self._render("position", origin="total")
+
+    def test_position_local_in_derived_field_is_balanced(self):
+        @ParticleFunctor
+        def f(particle: MacroParticle):
+            return particle.get("position", origin="local")[0]
+
+        rendered = render(f)
+        self.assertEqual(
+            rendered.functor_preamble[0].statement,
+            "auto const [xl_cell_cell,yl_cell_cell,zl_cell_cell] = (static_cast<float3_X>(particle[localCellIdx_]));",
+        )
+
+    def test_position_cell_in_derived_field_is_balanced(self):
+        @ParticleFunctor
+        def f(particle: MacroParticle):
+            return particle.get("position", origin="cell")[0]
+
+        rendered = render(f)
+        self.assertEqual(
+            rendered.functor_preamble[0].statement,
+            "auto const [xc_cell_cell,yc_cell_cell,zc_cell_cell] = (static_cast<float3_X>(particle[position_]));",
+        )
+
+    def test_position_local_in_filter_is_balanced(self):
+        @ParticleFunctor
+        def f(particle: MacroParticle) -> bool:
+            return particle.get("position", origin="local")[0] > 0
+
+        rendered = render(f, "Filter")
+        self.assertIn("(static_cast<float3_X>(particle[localCellIdx_]))", rendered.functor_preamble[0].statement)
+
+    def test_position_cell_in_binning_raises(self):
+        @ParticleFunctor
+        def f(particle: MacroParticle):
+            return particle.get("position", origin="cell")[0]
+
+        with self.assertRaisesRegex(ValueError, "origin='cell'.*Binning"):
+            render(f, "Binning")
+
+    def test_timestep_unavailable_outside_binning(self):
+        for mode in ("DerivedField", "Filter"):
+            with self.subTest(mode=mode):
+                with self.assertRaisesRegex(ValueError, "only available in Binning"):
+                    self._render("timestep", mode)
+                with self.assertRaisesRegex(ValueError, "only available in Binning"):
+                    self._render("timestep_size", mode)
+
+    def test_timestep_available_in_binning(self):
+        rendered = self._render("timestep", "Binning")
+        self.assertEqual(rendered.functor_preamble[0].statement, "auto const timestep = domainInfo.currentStep;")
+
+    def test_unknown_attribute_raises_without_custom_templates(self):
+        @ParticleFunctor
+        def f(particle: MacroParticle):
+            return particle.get("nonexistentThing")
+
+        with self.assertRaisesRegex(ValueError, "Unknown particle attribute 'nonexistentThing'"):
+            render(f)
+
+    def test_unknown_attribute_allowed_with_custom_templates(self):
+        @ParticleFunctor
+        def f(particle: MacroParticle):
+            return particle.get("myCustomAttribute")
+
+        rendered = f.get_as_pypicongpu("DerivedField", custom_templates=True)
+        self.assertIn("particle[myCustomAttribute_]", rendered.functor_preamble[0].statement)
+
+    def test_whole_vector_outside_derived_field_raises(self):
+        for mode in ("Binning", "Filter"):
+            with self.subTest(mode=mode):
+
+                @ParticleFunctor
+                def f(particle: MacroParticle):
+                    return particle.get("probeE")
+
+                with self.assertRaisesRegex(ValueError, "whole vector attribute 'probeE'"):
+                    render(f, mode)
+
+
+class TestRegisteredAttributeScaling(TestCase):
+    """Registry ``WeightingPower`` drives PhysicalParticle rescaling."""
+
+    def _expression(self, functor):
+        return render(functor).functor_expression
+
+    def test_charge_state_is_now_rescaled(self):
+        @ParticleFunctor
+        def state(particle: PhysicalParticle):
+            return particle.get("charge_state")
+
+        self.assertEqual(self._expression(state), "charge_state/weighting")
+
+    def test_probe_e_is_not_rescaled(self):
+        @ParticleFunctor
+        def e_x(particle: PhysicalParticle):
+            return particle.get("probeE")[0]
+
+        self.assertEqual(self._expression(e_x), "probeE_0")
+
+    def test_particle_id_is_not_rescaled(self):
+        @ParticleFunctor
+        def pid(particle: PhysicalParticle):
+            return particle.get("particleId")
+
+        self.assertEqual(self._expression(pid), "particleId")
+
+    def test_momentum_remains_per_particle(self):
+        @ParticleFunctor
+        def momentum(particle: PhysicalParticle):
+            return particle.get("momentum")[0]
+
+        self.assertEqual(self._expression(momentum), "px")
 
 
 if __name__ == "__main__":

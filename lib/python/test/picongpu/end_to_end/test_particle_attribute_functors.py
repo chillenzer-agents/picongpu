@@ -48,6 +48,16 @@ def probe_e_x(particle: MacroParticle):
 
 
 @ParticleFunctor
+def position_x(particle: MacroParticle):
+    return particle.get("position", origin="cell")[0]
+
+
+@ParticleFunctor
+def total_cell_idx_x(particle: MacroParticle):
+    return particle.get("totalCellIdx")[0]
+
+
+@ParticleFunctor
 def deposition(particle: MacroParticle):
     return 1.0
 
@@ -87,6 +97,9 @@ def build_simulation():
             species=filtered,
         ),
         DerivedFieldDump(species=filtered, functor=probe_e_x),
+        DerivedFieldDump(species=SPECIES, functor=position_x),
+        DerivedFieldDump(species=SPECIES, functor=total_cell_idx_x),
+        DerivedFieldDump(species=SPECIES, functor=particle_id),
     ]
     return simulation
 
@@ -97,11 +110,14 @@ def test_extended_attributes_compile_and_run():
     rendered = particle_id.get_as_pypicongpu(mode="Binning")
     assert rendered.return_type == "uint64_t"
     assert probe_e_x.get_as_pypicongpu(mode="DerivedField").get_unit_cpp == "sim.unit.eField()"
+    assert position_x.get_as_pypicongpu(mode="DerivedField").get_unit_cpp == "1."
+    total_cell_idx = total_cell_idx_x.get_as_pypicongpu(mode="DerivedField")
+    assert total_cell_idx.functor_preamble[0].statement == "auto const totalCellIdx_value = particle[totalCellIdx_];"
 
     simulation.step(0)
     run_dir = Path(simulation.picongpu_get_runner().run_dir)
     assert run_dir.exists()
     # The species must carry all three accessed attributes.
     species_definition = (run_dir / "input" / "include" / "picongpu" / "param" / "speciesDefinition.param").read_text()
-    for attribute in ("particleId", "radiationMask", "probeE"):
+    for attribute in ("particleId", "radiationMask", "probeE", "totalCellIdx"):
         assert attribute in species_definition

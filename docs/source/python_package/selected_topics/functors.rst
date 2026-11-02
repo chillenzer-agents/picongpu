@@ -121,6 +121,11 @@ through ``particle.get("...")``:
   select the reference frame, the resolution and the units.
   (``"cell"`` is only available as an ``origin`` for derived-field and
   filter functors, not for binning functors.)
+  With ``unit="cell"`` the value is a dimensionless cell coordinate,
+  ``unit="si"`` is already converted to metres, and ``unit="pic"`` is in
+  internal PIConGPU length units.  The generated ``getUnit()`` is a single
+  scalar, so for ``"pic"`` it assumes an isotropic cell size; anisotropic
+  cells are not represented per axis.
 * ``"momentum"`` / ``"momentumPrev1"``:
   the 3D momentum (index it as
   ``px, py, pz = particle.get("momentum")``).
@@ -152,13 +157,17 @@ Python registry that mirrors
      - unique macroparticle identifier
    * - ``"charge_state"``
      - ``float_X``
-     - stored as ``boundElectrons``; the historical functor name is kept
+     - stored as ``boundElectrons``; requires an ion species with element
+       atomic numbers (``atomicNumbers``, e.g. an element ``particle_type``
+       plus an ionization model)
    * - ``"weightingDampingFactor"``
      - ``float_X``
      - optional raw damping factor (see ``"damped_weighting"`` above)
    * - ``"totalCellIdx"``
      - ``DataSpace<simDim>``
-     - total cell index (a vector)
+     - total cell index; index it per spatial axis
+       (``particle.get("totalCellIdx")[0]`` in x), so only the first
+       ``simDim`` components exist (three in 3D, two in 2D)
    * - ``"radiationMask"``, ``"transitionRadiationMask"``
      - ``bool``
      - **internal**: masks owned by the radiation plugins
@@ -219,10 +228,17 @@ its first argument declares what the returned quantity *means*:
   interprets the result as a single-particle property.
   The generated code symbolically divides the weighting out of the
   scaling-sensitive symbols (``"mass"``, ``"charge"``,
-  ``"kinetic energy"``), so e.g. a mass functor returns the physical
-  particle mass rather than the macroparticle mass, while per-particle
-  quantities such as momentum, velocity, position and
-  ``"damped_weighting"`` are already unaffected.
+  ``"kinetic energy"``, and ``"charge_state"`` / ``boundElectrons``), so
+  e.g. a mass functor returns the physical particle mass rather than the
+  macroparticle mass.  Per-particle quantities such as momentum, velocity,
+  position and ``"damped_weighting"`` are already unaffected.
+  The C++ ``WeightingPower`` trait of ``momentum``, ``momentumPrev1`` and
+  ``weighting`` is ``1`` (their macro-particle bookkeeping), but they are
+  deliberately *not* divided by the weighting here: momentum is taken as an
+  already per-particle quantity, and dividing the weighting by itself would
+  be meaningless.  These exceptions live in the registry
+  (``physical_weighting_power``), which is the single source of truth for
+  the rescaling.
 
 .. literalinclude:: ../snippets/selected_topics/particle_functors.py
    :language: python

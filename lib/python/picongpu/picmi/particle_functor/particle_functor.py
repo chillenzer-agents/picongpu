@@ -31,12 +31,6 @@ _ATTRIBUTE_BY_DERIVED_NAME = {
     "damped_weighting": Weighting,
 }
 
-# Registered attributes whose stored value is already a per-real-particle
-# quantity.  Their C++ ``WeightingPower`` trait describes the macro-particle
-# bookkeeping, not the ``PhysicalParticle`` rescaling, so they must not be
-# divided by the weighting again.
-_PER_PARTICLE_ATTRIBUTES = frozenset({"position", "momentum", "momentumPrev1", "weighting", "particleId"})
-
 
 def _attribute_name(attribute):
     """Extract the functor-facing name from an attribute-map value."""
@@ -55,13 +49,15 @@ def _attribute_spec(attribute):
 class _DerivedSpec:
     """Lightweight descriptor for a derived accessor (not an ``Attribute``)."""
 
-    def __init__(self, name, cpp_type="float_X", n_components=1):
+    def __init__(self, name, cpp_type="float_X", n_components=1, weighting_power=0, physical_weighting_power=None):
         self.name = name
         self.cpp_type = cpp_type
         self.n_components = n_components
         self.unit = "1."
         self.unit_dimension = (0.0,) * 7
-        self.weighting_power = 0
+        self.weighting_power = weighting_power
+        self.physical_weighting_power = physical_weighting_power
+        self.access_strategy = "structured_binding"
 
     @property
     def component_cpp_type(self):
@@ -71,14 +67,50 @@ class _DerivedSpec:
 
 
 def _weighting_power(attribute):
-    """Physical-particle rescaling power for an accessed attribute."""
-    name = _attribute_name(attribute)
-    if name in _PER_PARTICLE_ATTRIBUTES:
-        return 0
-    if name in ("mass", "charge", "kinetic energy"):
-        return 1
+    """Physical-particle rescaling power for an accessed attribute.
+
+    The registry is the single source of truth: ``weighting_power`` mirrors the
+    C++ trait, and ``physical_weighting_power`` encodes the few explicit
+    exceptions where the single-particle meaning differs (momentum and the
+    weighting itself).  ``None`` falls back to ``weighting_power``.
+    """
     spec = _attribute_spec(attribute)
-    return 0 if spec is None else getattr(spec, "weighting_power", 0)
+    if spec is None:
+        return 0
+    override = getattr(spec, "physical_weighting_power", None)
+    return spec.weighting_power if override is None else override
+
+
+# ``position`` is special: the same stored value is exposed in one of three
+# units, each with a different dimension and scalar ``getUnit()`` factor.
+# ``getUnit()`` returns a single float, so the (anisotropic) cell size cannot
+# be represented per axis; the factor assumes an isotropic cell.
+_POSITION_UNIT_METADATA = {
+    # in-cell/world cell indices: dimensionless
+    "cell": ((0.0,) * 7, "1."),
+    # already multiplied by the SI cell size: metres
+    "si": ((1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), "1."),
+    # multiplied by the PIC cell size: internal length units
+    "pic": ((1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), "sim.unit.length()"),
+}
+
+
+def _position_unit(expression, attribute_map):
+    """Unit keyword of an exact ``position`` access, or ``None``.
+
+    Only a bare aligned access (one component symbol, or the whole vector)
+    carries an unambiguous unit; arbitrary expressions keep the explicit
+    ``unit_dimension``/``unit_factor`` interface.
+    """
+    for key, attribute in attribute_map.items():
+        if _attribute_name(attribute) != "position":
+            continue
+        matches = (isinstance(expression, Symbol) and isinstance(key, tuple) and expression in key) or (
+            isinstance(expression, tuple) and isinstance(key, tuple) and tuple(key) == tuple(expression)
+        )
+        if matches:
+            return attribute[-1]
+    return None
 
 
 _COORDINATE_SYSTEM = {
@@ -147,15 +179,15 @@ class AbstractParticle(Particle):
             unit = kwargs.get("unit", "cell")
             self.needs_total_position = self.needs_total_position or (origin.lower() not in ["cell", "local"])
             my_symbols = _COORDINATE_SYSTEM[(origin, precision, unit)]
-            self._record(my_symbols, ("position", origin, precision, unit), weighting_power=0)
+            self._record(my_symbols, ("position", origin, precision, unit))
 
         elif attribute == "momentum":
             my_symbols = symbols("px,py,pz")
-            self._record(my_symbols, "momentum", weighting_power=0)
+            self._record(my_symbols, "momentum")
 
         elif attribute == "momentumPrev1":
             my_symbols = symbols("p1x,p1y,p1z")
-            self._record(my_symbols, "momentumPrev1", weighting_power=0)
+            self._record(my_symbols, "momentumPrev1")
 
         elif attribute in ["gamma", "kinetic energy", "velocity"]:
             # This relies on python dictionaries having a stable ordering.
@@ -171,12 +203,17 @@ class AbstractParticle(Particle):
                 my_symbols = symbols("vx,vy,vz")
             else:
                 raise ValueError("Reached impossible path.")
-            self._record(my_symbols, attribute, weighting_power=1 if attribute == "kinetic energy" else 0)
+            self._record(my_symbols, attribute)
 
         else:
             spec = _attribute_spec(attribute)
             if spec is not None and spec.n_components > 1:
-                my_symbols = tuple(Symbol(f"{attribute}_{i}") for i in range(spec.n_components))
+                if getattr(spec, "access_strategy", "structured_binding") == "whole":
+                    # The C++ value is bound as a whole (e.g. DataSpace<simDim>,
+                    # which has no tuple protocol); index it in the expression.
+                    my_symbols = tuple(Symbol(f"{attribute}_value[{i}]") for i in range(spec.n_components))
+                else:
+                    my_symbols = tuple(Symbol(f"{attribute}_{i}") for i in range(spec.n_components))
             else:
                 my_symbols = Symbol(attribute)
             self._record(my_symbols, attribute)
@@ -425,11 +462,18 @@ class ParticleFunctor(BaseModel):
                 )
         unit_dimension = self.unit_dimension
         unit_factor = self.unit_factor
+        position_unit = _position_unit(functor_expression, attribute_map)
         if unit_dimension is None:
-            unit_dimension = UnitDimension() if spec is None else UnitDimension(list(spec.unit_dimension))
-            self.unit_dimension = unit_dimension
-            if unit_factor is None and spec is not None:
-                unit_factor = spec.unit
+            if position_unit is not None:
+                unit_dimension = UnitDimension(list(_POSITION_UNIT_METADATA[position_unit][0]))
+                self.unit_dimension = unit_dimension
+                if unit_factor is None:
+                    unit_factor = _POSITION_UNIT_METADATA[position_unit][1]
+            else:
+                unit_dimension = UnitDimension() if spec is None else UnitDimension(list(spec.unit_dimension))
+                self.unit_dimension = unit_dimension
+                if unit_factor is None and spec is not None:
+                    unit_factor = spec.unit
         return PyPIConGPUParticleFunctor(
             name=self.name,
             functor_expression=functor_expression,

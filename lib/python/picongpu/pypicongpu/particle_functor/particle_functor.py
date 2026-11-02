@@ -213,21 +213,38 @@ def _fallback_accessor(name, mode, allow_unknown):
     )
 
 
+def _preamble_spec(attribute):
+    """Registry descriptor of a preamble attribute value, if available."""
+    name = attribute[0] if isinstance(attribute, tuple) else attribute
+    cls = ATTRIBUTE_REGISTRY.get(name)
+    return None if cls is None else cls()
+
+
 def generate_preamble(
     attribute_mapping, mode: Literal["Binning", "Filter", "DerivedField"], allow_unknown: bool = False
 ):
-    statements = {}
+    lines = []
+    unsupported = []
     for symbol, attribute in attribute_mapping.items():
         statement = _accessor(attribute, mode)
         if statement is _MISSING_ACCESSOR:
             statement = _fallback_accessor(attribute, mode, allow_unknown)
-        statements[symbol] = statement
-    if unsupported_synbols := [symbol for symbol, statement in statements.items() if statement is NotImplemented]:
-        raise ValueError(f"Found {unsupported_synbols=} trying to generate C++ code for one of your functors.")
-    return [
-        {"statement": f"auto const {symbol_to_string(symbol)} = {statement};"}
-        for symbol, statement in statements.items()
-    ]
+        if statement is NotImplemented:
+            unsupported.append(symbol)
+            continue
+        spec = _preamble_spec(attribute)
+        if spec is not None and getattr(spec, "access_strategy", "structured_binding") == "whole":
+            # Types such as DataSpace<simDim> have no std::tuple_size
+            # specialisation, so bind the whole value and index it in the
+            # functor expression (the symbols are named ``<name>_value[i]``).
+            name = attribute[0] if isinstance(attribute, tuple) else attribute
+            statement = f"auto const {name}_value = {statement};"
+        else:
+            statement = f"auto const {symbol_to_string(symbol)} = {statement};"
+        lines.append({"statement": statement})
+    if unsupported:
+        raise ValueError(f"Found {unsupported=} trying to generate C++ code for one of your functors.")
+    return lines
 
 
 class _PreambleStatement(BaseModel):

@@ -31,8 +31,8 @@ because you must tell it *where* to look.
    so the period must not contain step 0.
 
 ``observer``
-   A ``RadiationObserverConfiguration`` (from
-   ``picongpu.pypicongpu.output.radiation``) with
+   A :class:`~picongpu.picmi.diagnostics.RadiationObserverConfiguration`
+   (from ``picongpu.picmi.diagnostics``) with
 
    * ``N_observer``:
      the number of observation directions, and

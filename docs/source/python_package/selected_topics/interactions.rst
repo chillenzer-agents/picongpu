@@ -136,8 +136,8 @@ Coulomb logarithm) are represented by
 :class:`~picongpu.picmi.interaction.collision.CollisionalPhysicsSetup`
    An optional container that holds several collisions
    together with the ``screening_species`` and a ``numerics_config``
-   (a ``CollisionNumericsConfig`` with ``precision``,
-   ``cell_list_chunk_size`` and ``debug_screening_length``).
+   (a :class:`~picongpu.picmi.interaction.CollisionNumericsConfig` with
+   ``precision``, ``cell_list_chunk_size`` and ``debug_screening_length``).
    If you pass bare ``Collision`` objects,
    they are combined into such a setup automatically;
    if you pass a setup, *all* collisions must be subsumed under it.

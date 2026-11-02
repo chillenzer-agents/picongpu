@@ -140,7 +140,7 @@ The functor's ``name`` defaults to the function name;
 use ``@ParticleFunctor(name="...")`` to override it.
 Use ``return_type`` (e.g. ``int``) when the annotation of your function
 is not enough, and ``unit_dimension``
-(a :class:`~picongpu.picmi.particle_functor.UnitDimension`)
+(a :class:`~picongpu.picmi.unit_dimension.UnitDimension`)
 to declare the physical unit of the result.
 
 Single-particle semantics

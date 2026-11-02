@@ -23,7 +23,7 @@ import numpy as np
 import sympy
 from picongpu import picmi
 from picongpu.picmi.diagnostics import RadiationObserverConfiguration
-from picongpu.picmi.particle_functor import I, L, M, T
+from picongpu.picmi.unit_dimension import I, L, M, T
 from scipy.constants import c, elementary_charge
 
 """
@@ -164,10 +164,10 @@ def computeCharge(particle):
     return particle.get("charge")
 
 
-energyFunctor = picmi.diagnostics.BinningFunctor(
+energyFunctor = picmi.ParticleFunctor(
     name="energy", functor=computeEnergy, return_type=float, unit_dimension=L**2 * M * T**-2
 )
-thetaFunctor = picmi.diagnostics.BinningFunctor(
+thetaFunctor = picmi.ParticleFunctor(
     name="theta",
     functor=computeAngle,
     return_type=float,
@@ -182,7 +182,7 @@ thetaRange = picmi.diagnostics.BinSpec(kind="linear", start=-0.250, stop=+0.250,
 energyAxis = picmi.diagnostics.BinningAxis(functor=energyFunctor, bin_spec=energyRange, name="energy")
 thetaAxis = picmi.diagnostics.BinningAxis(functor=thetaFunctor, bin_spec=thetaRange, name="theta")
 
-eSpec_deposition_functor = picmi.diagnostics.BinningFunctor(
+eSpec_deposition_functor = picmi.ParticleFunctor(
     name="eSpec", functor=computeCharge, return_type=float, unit_dimension=I * T
 )
 

@@ -5,8 +5,6 @@ Authors: Julian Lenz
 License: GPLv3+
 """
 
-from picmistandard import PICMI_Interaction as PICMI_Interaction
-
 from . import ionization as ionization
 from .collision import Collision as Collision
 from .collision import CollisionalPhysicsSetup as CollisionalPhysicsSetup

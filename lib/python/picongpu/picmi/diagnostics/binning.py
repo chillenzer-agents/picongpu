@@ -12,7 +12,7 @@ from picmistandard import PICMI_Diagnostic, resolve_once
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from picongpu.picmi.diagnostics.backend_config import OpenPMDBackendConfig, OpenPMDConfig
-from picongpu.picmi.particle_functor import ParticleFunctor as BinningFunctor
+from picongpu.picmi.particle_functor import ParticleFunctor
 from picongpu.picmi.particle_functor.particle_filter import FilteredSpecies
 from picongpu.picmi.species import Species
 from picongpu.pypicongpu.output.binning import Binning as PyPIConGPUBinning
@@ -40,7 +40,7 @@ class BinSpec(BaseModel):
 
 
 class BinningAxis(BaseModel):
-    functor: BinningFunctor
+    functor: ParticleFunctor
     bin_spec: BinSpec
     name: str | None = None
     use_overflow_bins: bool = True
@@ -63,7 +63,7 @@ class Binning(PICMI_Diagnostic):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str
-    deposition_functor: BinningFunctor
+    deposition_functor: ParticleFunctor
     axes: list[BinningAxis]
     species: Species | FilteredSpecies | list[Species | FilteredSpecies]
     period: TimeStepSpec | None = None

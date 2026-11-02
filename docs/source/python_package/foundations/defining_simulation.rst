@@ -52,10 +52,11 @@ The most important to know:
 
 * the functor-authoring helpers live in :mod:`picongpu.picmi.particle_functor`
   -- :class:`~picongpu.picmi.particle_functor.RNGArg` for parameterising a
-  functor by a random number, and the predefined unit dimensions
-  ``I``, ``L``, ``M`` and ``T``
-  (of type :class:`~picongpu.picmi.particle_functor.UnitDimension`)
-  for annotating a functor's result;
+  functor by a random number;
+* the predefined unit dimensions ``I``, ``L``, ``M`` and ``T``
+  (of type :class:`~picongpu.picmi.unit_dimension.UnitDimension`)
+  for annotating a functor's result live in
+  :mod:`picongpu.picmi.unit_dimension`;
 * the diagnostics helpers and the ``TS`` shorthand for ``TimeStepSpec`` live in
   :mod:`picongpu.picmi.diagnostics`
   (see :ref:`TimeStepSpec <time-steps>`).
@@ -69,12 +70,6 @@ guaranteed to resolve:
    :start-after: BEGIN-IMPORT-SURFACE
    :end-before: END-IMPORT-SURFACE
 
-There is no ``__all__`` list: the public surface is defined by the explicit
-re-exports in the package ``__init__`` files.
-Consequently, ``from picongpu.picmi import *`` imports exactly those names that
-are bound in the top-level namespace
-(plus the submodules ``constants`` and ``diagnostics``),
-rather than an explicitly curated list.
 Prefer the explicit ``picmi.<Name>`` form in your input files.
 
 Input files can carry `PEP 723 inline script metadata <https://peps.python.org/pep-0723/>`__ at the top

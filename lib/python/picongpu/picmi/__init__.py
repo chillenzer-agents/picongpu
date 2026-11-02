@@ -8,15 +8,9 @@ import picmistandard as _picmistandard
 
 from . import constants
 from . import diagnostics as diagnostics
+from . import unit_dimension as unit_dimension
 from .applied_field import AnalyticAppliedField as AnalyticAppliedField
 from .applied_field import ConstantAppliedField as ConstantAppliedField
-from .constants import B as B
-from .constants import GB as GB
-from .constants import GiB as GiB
-from .constants import KiB as KiB
-from .constants import MB as MB
-from .constants import MiB as MiB
-from .constants import kB as kB
 from .distribution import AnalyticDistribution as AnalyticDistribution
 from .distribution import CylindricalDistribution as CylindricalDistribution
 from .distribution import FoilDistribution as FoilDistribution

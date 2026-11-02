@@ -22,7 +22,7 @@ from picongpu.picmi import (
 )
 from picongpu.picmi.diagnostics import DerivedFieldDump
 from picongpu.picmi.particle_functor.particle_functor import MacroParticle, PhysicalParticle
-from picongpu.picmi.particle_functor.unit_dimension import M
+from picongpu.picmi.unit_dimension import M
 
 from .arbitrary_parameters import NUMBER_OF_CELLS, UPPER_BOUNDARY, gather_results
 from .distributions import Gaussian

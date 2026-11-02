@@ -202,6 +202,166 @@ class TestPhysicalParticleScaling(TestCase):
         self.assertEqual(self._expression(charge), "charge/weighting")
 
 
+class TestParticleDumpFilterRequirementRegistration(TestCase):
+    """A filter used only by a ``ParticleDump`` still registers its attributes.
+
+    ``ParticleDump`` has no diagnostic functor, so the old requirement
+    walker skipped it entirely and a filtered dump could render a species
+    without the attribute the filter reads.
+    """
+
+    def test_filter_in_particle_dump_registers_attribute(self):
+        from picongpu.picmi.diagnostics import ParticleDump
+        from picongpu.picmi.particle_functor import FilteredSpecies
+
+        @ParticleFilter
+        def has_prev_momentum(particle: MacroParticle) -> bool:
+            return particle.get("momentumPrev1")[0] > 0
+
+        grid = picmi.Cartesian3DGrid(
+            number_of_cells=[8, 8, 8],
+            lower_bound=[0, 0, 0],
+            upper_bound=[8, 8, 8],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+        )
+        sim = picmi.Simulation(
+            time_step_size=1.0,
+            max_steps=4,
+            solver=picmi.ElectromagneticSolver(method="Yee", grid=grid),
+        )
+        species = picmi.Species(particle_type="electron")
+        sim.add_species(species, None)
+        sim.add_diagnostic(ParticleDump(species=FilteredSpecies(species=species, functor=has_prev_momentum)))
+        converted = sim.get_as_pypicongpu().species[0]
+        self.assertIn(MomentumPrev1(), converted.attributes)
+
+
+class TestCustomTemplatePropagation(TestCase):
+    """``Simulation(picongpu_template_dir=...)`` relaxes unknown-name checks."""
+
+    def test_simulation_propagates_custom_templates_to_functors(self):
+        import tempfile
+
+        from picongpu.picmi.diagnostics import DerivedFieldDump
+
+        @ParticleFunctor
+        def custom(particle: MacroParticle):
+            return particle.get("myCustomAttribute")
+
+        grid = picmi.Cartesian3DGrid(
+            number_of_cells=[8, 8, 8],
+            lower_bound=[0, 0, 0],
+            upper_bound=[8, 8, 8],
+            lower_boundary_conditions=["open", "open", "periodic"],
+            upper_boundary_conditions=["open", "open", "periodic"],
+        )
+        with tempfile.TemporaryDirectory() as template_dir:
+            sim = picmi.Simulation(
+                time_step_size=1.0,
+                max_steps=4,
+                solver=picmi.ElectromagneticSolver(method="Yee", grid=grid),
+                picongpu_template_dir=template_dir,
+            )
+            species = picmi.Species(particle_type="electron")
+            sim.add_species(species, None)
+            sim.add_diagnostic(DerivedFieldDump(species=species, functor=custom))
+            sim._register_functor_requirements()
+            self.assertTrue(custom._custom_templates)
+
+        rendered = custom.get_as_pypicongpu("DerivedField")
+        self.assertIn("particle[myCustomAttribute_]", rendered.functor_preamble[0].statement)
+
+
+class TestPositionUnitMetadata(TestCase):
+    """``position`` units are scalar for ``getUnit()`` and unit-dependent."""
+
+    def _render(self, unit):
+        @ParticleFunctor
+        def f(particle: MacroParticle):
+            return particle.get("position", origin="cell", unit=unit)[0]
+
+        return render(f)
+
+    def test_cell_unit_is_dimensionless(self):
+        rendered = self._render("cell")
+        self.assertEqual(rendered.get_unit_cpp, "1.")
+        self.assertEqual(rendered.unit_dimension_cpp, "{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}")
+
+    def test_si_unit_is_length_with_scalar_factor(self):
+        rendered = self._render("si")
+        # already converted to metres in the preamble, so getUnit() is 1.
+        self.assertEqual(rendered.get_unit_cpp, "1.")
+        self.assertEqual(rendered.unit_dimension_cpp, "{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}")
+
+    def test_pic_unit_is_internal_length(self):
+        rendered = self._render("pic")
+        self.assertEqual(rendered.get_unit_cpp, "sim.unit.length()")
+        self.assertEqual(rendered.unit_dimension_cpp, "{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}")
+
+    def test_get_unit_is_never_a_vector_expression(self):
+        for unit in ("cell", "si", "pic"):
+            with self.subTest(unit=unit):
+                self.assertNotIn("getCellSize", self._render(unit).get_unit_cpp)
+
+
+class TestTotalCellIdxRendering(TestCase):
+    """``DataSpace<simDim>`` has no tuple protocol; bind it as a whole."""
+
+    def test_preamble_does_not_use_structured_binding(self):
+        @ParticleFunctor
+        def f(particle: MacroParticle):
+            return particle.get("totalCellIdx")[0]
+
+        rendered = render(f)
+        statements = [s.statement for s in rendered.functor_preamble]
+        self.assertEqual(statements, ["auto const totalCellIdx_value = particle[totalCellIdx_];"])
+        self.assertNotIn("[", statements[0].split("=")[0])
+        self.assertEqual(rendered.functor_expression, "totalCellIdx_value[0]")
+
+    def test_whole_vector_return_type_is_dataspace(self):
+        @ParticleFunctor
+        def f(particle: MacroParticle):
+            return particle.get("totalCellIdx")
+
+        rendered = render(f)
+        self.assertEqual(rendered.return_type, "DataSpace<simDim>")
+        self.assertIn("totalCellIdx_value[0]", rendered.functor_expression)
+
+
+class TestWeightingPowerSingleSource(TestCase):
+    """The registry encodes the PhysicalParticle rescaling exception explicitly."""
+
+    def test_vs_cpp_trait_and_physical_override(self):
+        from picongpu.pypicongpu.species.attribute.registry import ATTRIBUTE_REGISTRY
+
+        self.assertEqual(ATTRIBUTE_REGISTRY["momentum"]().weighting_power, 1)
+        self.assertEqual(ATTRIBUTE_REGISTRY["momentum"]().physical_weighting_power, 0)
+        self.assertEqual(ATTRIBUTE_REGISTRY["momentumPrev1"]().physical_weighting_power, 0)
+        self.assertEqual(ATTRIBUTE_REGISTRY["weighting"]().weighting_power, 1)
+        self.assertEqual(ATTRIBUTE_REGISTRY["weighting"]().physical_weighting_power, 0)
+        # bound electrons follow the C++ WeightingPower with no override
+        self.assertEqual(ATTRIBUTE_REGISTRY["charge_state"]().weighting_power, 1)
+        self.assertIsNone(ATTRIBUTE_REGISTRY["charge_state"]().physical_weighting_power)
+
+    def test_physical_scaling_uses_registry(self):
+        @ParticleFunctor
+        def momentum(particle: PhysicalParticle):
+            return particle.get("momentum")[0]
+
+        @ParticleFunctor
+        def weight(particle: PhysicalParticle):
+            return particle.get("weighting")
+
+        @ParticleFunctor
+        def state(particle: PhysicalParticle):
+            return particle.get("charge_state")
+
+        self.assertEqual(render(momentum).functor_expression, "px")
+        self.assertEqual(render(weight).functor_expression, "weighting")
+        self.assertEqual(render(state).functor_expression, "charge_state/weighting")
+
+
 class TestFilteredDerivedFieldRequirementRegistration(TestCase):
     """A filter inside a ``DerivedFieldDump`` must register its attributes.
 

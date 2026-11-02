@@ -64,10 +64,10 @@ ATTRIBUTE_REGISTRY: dict[str, type] = {
 # well-defined value type/weighting behaviour.  They are intentionally not part
 # of the species registry (they need no extra attribute storage).
 DERIVED_ACCESSORS: dict[str, dict] = {
-    "mass": {"cpp_type": "float_X"},
-    "charge": {"cpp_type": "float_X"},
+    "mass": {"cpp_type": "float_X", "weighting_power": 1},
+    "charge": {"cpp_type": "float_X", "weighting_power": 1},
     "gamma": {"cpp_type": "float_X"},
-    "kinetic energy": {"cpp_type": "float_X"},
+    "kinetic energy": {"cpp_type": "float_X", "weighting_power": 1},
     "velocity": {"cpp_type": "float3_X", "n_components": 3},
     "damped_weighting": {"cpp_type": "float_X"},
     "timestep": {"cpp_type": "uint32_t"},

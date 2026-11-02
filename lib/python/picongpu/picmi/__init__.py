@@ -1,13 +1,44 @@
 """
 PICMI for PIConGPU
+
+The top level exposes exactly the objects a user passes to
+:class:`~picongpu.picmi.simulation.Simulation` or
+:class:`~picongpu.picmi.species.Species` (or picmistandard names), plus the
+deliberately bound concern submodules. Everything else lives at its concern
+level:
+
+* diagnostics and their inputs (``RangeSpec``, ``TimeStepSpec``, ...) live in
+  :mod:`picongpu.picmi.diagnostics`,
+* functor-authoring helpers (``ParticleFunctor``, ``ParticleFilter``,
+  ``FilteredSpecies``, ...) live in :mod:`picongpu.picmi.particle_functor`,
+* unions (``AnyInteraction``, ``AnyAppliedField``, ...) live with their concern
+  submodule and are never promoted to the top level,
+* physical constants live only in :mod:`picongpu.picmi.constants`.
+
+Backend (``pypicongpu``) objects are not re-exported here.
 """
 
 import sys as _sys
 
 import picmistandard as _picmistandard
 
-from . import constants
+# Deliberately bound concern submodules. Their contents are not flattened into
+# the top level beyond the user-input classes imported below.
+from . import applied_field as applied_field
+from . import constants as constants
 from . import diagnostics as diagnostics
+from . import distribution as distribution
+from . import grid as grid
+from . import interaction as interaction
+from . import lasers as lasers
+from . import layout as layout
+from . import memory_config as memory_config
+from . import multi_species as multi_species
+from . import particle_functor as particle_functor
+from . import precision_config as precision_config
+from . import simulation as simulation
+from . import solver as solver
+from . import species as species
 from . import unit_dimension as unit_dimension
 from .applied_field import AnalyticAppliedField as AnalyticAppliedField
 from .applied_field import ConstantAppliedField as ConstantAppliedField
@@ -23,7 +54,6 @@ from .interaction import Collision as Collision
 from .interaction import CollisionalPhysicsSetup as CollisionalPhysicsSetup
 from .interaction import ConstLogCollision as ConstLogCollision
 from .interaction import DynamicLogCollision as DynamicLogCollision
-from .interaction import Interaction as Interaction
 from .interaction import Synchrotron as Synchrotron
 from .interaction.ionization.electroniccollisionalequilibrium import (
     ThomasFermi as ThomasFermi,
@@ -45,9 +75,6 @@ from .layout import OnePositionLayout as OnePositionLayout
 from .layout import PseudoRandomLayout as PseudoRandomLayout
 from .memory_config import MemoryConfig as MemoryConfig
 from .multi_species import MultiSpecies as MultiSpecies
-from .particle_functor import FilteredSpecies as FilteredSpecies
-from .particle_functor import ParticleFilter as ParticleFilter
-from .particle_functor import ParticleFunctor as ParticleFunctor
 from .precision_config import PrecisionConfig as PrecisionConfig
 from .simulation import Simulation as Simulation
 from .solver import BinomialSmoother as BinomialSmoother

@@ -16,11 +16,11 @@ from picongpu.picmi import (
     Cartesian3DGrid,
     ElectromagneticSolver,
     GriddedLayout,
-    ParticleFunctor,
     Simulation,
     Species,
 )
 from picongpu.picmi.diagnostics import DerivedFieldDump
+from picongpu.picmi.particle_functor import ParticleFunctor
 from picongpu.picmi.particle_functor.particle_functor import MacroParticle, PhysicalParticle
 from picongpu.picmi.unit_dimension import M
 

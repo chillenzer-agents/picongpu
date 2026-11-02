@@ -13,14 +13,14 @@ from pydantic import Field, computed_field, model_validator
 
 from ...pypicongpu import laser
 from .._copy_attributes import default_converts_to
-from .base_laser import BaseLaser, PositiveFloat
+from .base_laser import _BaseLaser, PositiveFloat
 from .polarization_type import PolarizationType
 
 from .. import constants
 
 
 @default_converts_to(laser.TWTSLaser)
-class TWTSLaser(PICMI_Laser, BaseLaser):
+class TWTSLaser(PICMI_Laser, _BaseLaser):
     """
     Specifies a Traveling-Wave Thomson Scattering (TWTS) laser
 

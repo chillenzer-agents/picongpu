@@ -15,12 +15,45 @@ from picongpu.pypicongpu.collision import Collision as PyPIConGPUCollision
 from picongpu.pypicongpu.collision import (
     CollisionalPhysicsSetup as PyPIConGPUCollisionalPhysicsSetup,
 )
-from picongpu.pypicongpu.collision import CollisionFunctor
 from picongpu.pypicongpu.collision import (
-    CollisionNumericsConfig as CollisionNumericsConfig,
+    CollisionNumericsConfig as PyPIConGPUCollisionNumericsConfig,
 )
-from picongpu.pypicongpu.collision import ConstLogCollision as ConstLogCollision
-from picongpu.pypicongpu.collision import DynamicLogCollision as DynamicLogCollision
+from picongpu.pypicongpu.collision import ConstLogCollision as PyPIConGPUConstLogCollision
+from picongpu.pypicongpu.collision import DynamicLogCollision as PyPIConGPUDynamicLogCollision
+
+
+class ConstLogCollision(PyPIConGPUConstLogCollision):
+    """
+    PIConGPU's constant-Coulomb-log collision model (frontend home).
+
+    The physics and validation live in the backend model; this frontend class
+    only gives the input a stable home at :mod:`picongpu.picmi.interaction`, so
+    that no backend object is re-exported on the PICMI surface.
+    """
+
+
+class DynamicLogCollision(PyPIConGPUDynamicLogCollision):
+    """
+    PIConGPU's dynamically computed Coulomb-log collision model (frontend home).
+
+    Requires *screening species* in the surrounding ``CollisionalPhysicsSetup``
+    to compute the Coulomb logarithm from. The physics and validation live in
+    the backend model; this frontend class only gives the input a stable home at
+    :mod:`picongpu.picmi.interaction`.
+    """
+
+
+CollisionFunctor = ConstLogCollision | DynamicLogCollision
+
+
+class CollisionNumericsConfig(PyPIConGPUCollisionNumericsConfig):
+    """
+    Numerical knobs of the binary-collision pipeline (frontend home).
+
+    ``precision`` (32, 64 or ``"X"``), ``cell_list_chunk_size`` and
+    ``debug_screening_length`` are the PIConGPU collision-numerics inputs; the
+    fields and validation live in the backend model.
+    """
 
 
 class Collision(BaseModel):

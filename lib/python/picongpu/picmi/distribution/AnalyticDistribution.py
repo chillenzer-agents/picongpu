@@ -15,7 +15,7 @@ from picmistandard.base import Expression
 from pydantic import ConfigDict, Field, PrivateAttr, computed_field, model_validator
 from sympy import Expr, Symbol, lambdify, symbols, sympify
 
-from picongpu.picmi._FieldFunctor import (
+from picongpu.picmi._field_functor import (
     _FieldFunctor,
     callable_extra_parameters,
     expression_from_callable,
@@ -61,7 +61,7 @@ class AnalyticDistribution(PICMI_AnalyticDistribution):
     A plasma whose density, momentum and momentum spread are analytic expressions.
 
     The class is a thin PICMI-standard wrapper around the shared
-    :class:`~picongpu.picmi._FieldFunctor._FieldFunctor`: each of the three
+    :class:`~picongpu.picmi._field_functor._FieldFunctor`: each of the three
     field families (the density, the per-axis momentum and the per-axis momentum
     spread) is delegated to one or more ``_FieldFunctor`` instances, which carry
     the whole expression/function resolution, parameter collection, validation

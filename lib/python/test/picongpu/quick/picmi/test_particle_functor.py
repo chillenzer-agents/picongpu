@@ -10,7 +10,7 @@ from unittest import TestCase
 from sympy import Symbol, sqrt
 
 from picongpu import picmi
-from picongpu.picmi import ParticleFilter, ParticleFunctor
+from picongpu.picmi.particle_functor import ParticleFilter, ParticleFunctor
 from picongpu.picmi.particle_functor.particle_functor import MacroParticle, PhysicalParticle
 from picongpu.picmi.unit_dimension import UnitDimension
 from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons

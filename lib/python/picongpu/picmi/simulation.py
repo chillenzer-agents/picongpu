@@ -38,7 +38,7 @@ from picongpu.picmi.distribution.AnalyticDistribution import AnalyticDistributio
 from picongpu.picmi.grid import Cartesian2DGrid, Cartesian3DGrid
 from picongpu.picmi.interaction import (
     SUPPORTED_INTERACTION_TYPES,
-    Interaction,
+    AnyInteraction,
     Synchrotron,
 )
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
@@ -275,7 +275,7 @@ class Simulation(picmistandard.PICMI_Simulation):
     update using picongpu_add_custom_user_input() or by direct setting
     """
 
-    interactions: Annotated[list[Interaction | PICMI_Interaction], BeforeValidator(_prepare_interactions)] = Field(
+    interactions: Annotated[list[AnyInteraction | PICMI_Interaction], BeforeValidator(_prepare_interactions)] = Field(
         default_factory=list
     )
     """

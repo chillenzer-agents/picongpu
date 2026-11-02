@@ -13,7 +13,7 @@ from pydantic import Field, computed_field, model_validator
 
 from ...pypicongpu import laser, util
 from .._copy_attributes import default_converts_to
-from .base_laser import BaseLaser
+from .base_laser import _BaseLaser
 from .polarization_type import PolarizationType
 
 
@@ -24,7 +24,7 @@ from .polarization_type import PolarizationType
     # i.e. PULSE_DURATION = duration / 2 (#5739)
     conversions={"duration": lambda self, *args, **kwargs: self._pulse_duration_sigma_si()},
 )
-class GaussianLaser(PICMI_GaussianLaser, BaseLaser):
+class GaussianLaser(PICMI_GaussianLaser, _BaseLaser):
     """
     PICMI object for Gaussian Laser.
 

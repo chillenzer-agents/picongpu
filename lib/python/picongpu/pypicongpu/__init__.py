@@ -1,5 +1,12 @@
 """
 internal representation of params to generate PIConGPU input files
+
+The package root is intentionally thin: it exposes the two entry points
+:class:`~picongpu.pypicongpu.runner.Runner` and
+:class:`~picongpu.pypicongpu.simulation.Simulation` together with the
+explicitly imported submodules. Classes otherwise stay in their submodule
+(``pypicongpu.field_solver.YeeSolver``, ``pypicongpu.output.Checkpoint``,
+...).
 """
 
 import sys as _sys
@@ -16,19 +23,11 @@ from . import output as output
 from . import particle_functor as particle_functor
 from . import precision_config as precision_config
 from . import rendering as rendering
+from . import runner as runner
+from . import simulation as simulation
 from . import species as species
 from . import util as util
 from . import walltime as walltime
-from .field_solver.ArbitraryOrderFDTD import ArbitraryOrderFDTDSolver as ArbitraryOrderFDTDSolver
-from .field_solver.CKC import CKCSolver as CKCSolver
-from .field_solver.Lehe import LeheSolver as LeheSolver
-from .field_solver.NoneSolver import NoneSolver as NoneSolver
-from .field_solver.Yee import YeeSolver as YeeSolver
-from .output.checkpoint import Checkpoint as Checkpoint
-from .output.energy_histogram import EnergyHistogram as EnergyHistogram
-from .output.field_energy_monitor import FieldEnergyMonitor as FieldEnergyMonitor
-from .output.macro_particle_count import MacroParticleCount as MacroParticleCount
-from .output.phase_space import PhaseSpace as PhaseSpace
 from .runner import Runner as Runner
 from .simulation import Simulation as Simulation
 

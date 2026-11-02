@@ -34,7 +34,7 @@ from picongpu.pypicongpu.species.species import Species as PyPIConGPUSpecies
 
 from .. import pypicongpu
 from ..pypicongpu.species.util.element import Element
-from ._predefinedparticletypeproperties import PredefinedParticleTypeProperties
+from ._predefined_particle_type_properties import PredefinedParticleTypeProperties
 
 
 # Accepted particle-shape terms: the PICMI-standard names plus PIConGPU-only
@@ -257,7 +257,7 @@ class Species(PICMI_Species):
         # This is necessary to determine the definition order inside of the C++ header.
         if not isinstance(other, Species):
             raise ValueError(f"Unknown comparison between {self=} and {other=}.")
-        return any(isinstance(req, DependsOn) and req.species == other for req in self._requirements)
+        return any(isinstance(req, _DependsOn) and req.species == other for req in self._requirements)
 
     def register_requirements(self, requirements):
         for requirement in requirements:
@@ -280,5 +280,5 @@ def particle_type_requirements(particle_type):
     return [Mass(mass_si=mass or 0.0), Charge(charge_si=charge or 0.0)]
 
 
-class DependsOn(BaseModel):
+class _DependsOn(BaseModel):
     species: Species

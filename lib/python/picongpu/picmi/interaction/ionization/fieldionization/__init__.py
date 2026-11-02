@@ -5,4 +5,6 @@ from .BSI import BSI as BSI
 from .BSI import BSIExtension as BSIExtension
 from .fieldionization import _FieldIonizationModel as _FieldIonizationModel
 from .fieldionization_adapter import FieldIonization as FieldIonization
+from .ionizationcurrent import EnergyConservation as EnergyConservation
+from .ionizationcurrent import IonizationCurrent as IonizationCurrent
 from .keldysh import Keldysh as Keldysh

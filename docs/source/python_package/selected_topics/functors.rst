@@ -102,7 +102,14 @@ It is used as a decorator, and its first argument must be annotated with the
 particle flavour it operates on --
 :class:`~picongpu.picmi.particle_functor.MacroParticle` (the default) or
 :class:`~picongpu.picmi.particle_functor.PhysicalParticle`.
-A minimal (tested) example is shown at the end of this section:
+A minimal (tested) example is shown at the end of this section.
+The imports used in this part of the page are:
+
+.. code-block:: python
+
+   from picongpu import picmi
+   from picongpu.picmi import particle_functor
+   from picongpu.picmi import unit_dimension
 
 .. literalinclude:: ../snippets/selected_topics/particle_functors.py
    :language: python

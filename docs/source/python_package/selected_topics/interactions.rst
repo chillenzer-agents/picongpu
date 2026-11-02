@@ -15,6 +15,8 @@ and synchrotron radiation).
 
 .. code-block:: python
 
+   from picongpu import picmi
+
    sim = picmi.Simulation(max_steps=100, solver=solver, interactions=[...])
 
 Each interaction is attached to the species it acts on

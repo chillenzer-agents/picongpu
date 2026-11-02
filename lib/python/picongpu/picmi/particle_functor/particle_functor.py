@@ -84,7 +84,9 @@ def _weighting_power(attribute):
 # ``position`` is special: the same stored value is exposed in one of three
 # units, each with a different dimension and scalar ``getUnit()`` factor.
 # ``getUnit()`` returns a single float, so the (anisotropic) cell size cannot
-# be represented per axis; the factor assumes an isotropic cell.
+# be represented per axis; the factor assumes an isotropic cell.  This is the
+# scalar functor view of the per-axis stored-value traits in
+# ``pypicongpu.species.attribute.position.Position``.
 _POSITION_UNIT_METADATA = {
     # in-cell/world cell indices: dimensionless
     "cell": ((0.0,) * 7, "1."),

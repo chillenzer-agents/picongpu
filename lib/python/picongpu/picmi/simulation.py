@@ -636,29 +636,46 @@ class Simulation(picmistandard.PICMI_Simulation):
         ``momentumPrev1``) into the corresponding ``Attribute`` requirements.
         Particle filters are registered from ``FilteredSpecies`` instead.
         """
+        custom_templates = bool(self.picongpu_template_dir)
+
+        def register_species_walk(one_species, functors):
+            while hasattr(one_species, "species"):
+                # A FilteredSpecies wraps the owner species; its filter
+                # accesses attributes just like any diagnostic functor, so
+                # register them on the (eventual) owner as well. This is
+                # needed for diagnostics (e.g. ParticleDump) that only read the
+                # species by name and never convert the wrapper.
+                if (filter_functor := getattr(one_species, "functor", None)) is not None:
+                    filter_functor._custom_templates = custom_templates
+                    one_species.species.register_requirements(filter_functor.get_required_attributes())
+                one_species = one_species.species
+            for functor in functors:
+                one_species.register_requirements(functor.get_required_attributes())
+
         for diagnostic in self.diagnostics:
             functors = [
                 functor
                 for name in ("functor", "deposition_functor")
                 if (functor := getattr(diagnostic, name, None)) is not None
             ] + [axis.functor for axis in getattr(diagnostic, "axes", None) or []]
-            if not functors:
-                continue
+            # Custom templates may extend speciesAttributes.param, so unknown
+            # attribute names must only be rejected when the packaged templates
+            # (and hence the Python registry) are authoritative.
+            for functor in functors:
+                functor._custom_templates = custom_templates
             species = getattr(diagnostic, "species", None)
             for one_species in species if isinstance(species, list) else [species]:
-                if one_species is None:
-                    continue
-                while hasattr(one_species, "species"):
-                    # A FilteredSpecies wraps the owner species; its filter
-                    # accesses attributes just like the diagnostic functor, so
-                    # register them on the (eventual) owner as well. This is
-                    # needed for diagnostics (e.g. DerivedFieldDump) that only
-                    # read the species by name and never convert the wrapper.
-                    if (filter_functor := getattr(one_species, "functor", None)) is not None:
-                        one_species.species.register_requirements(filter_functor.get_required_attributes())
-                    one_species = one_species.species
-                for functor in functors:
-                    one_species.register_requirements(functor.get_required_attributes())
+                if one_species is not None:
+                    register_species_walk(one_species, functors)
+
+        # Species wrapped in filters in interactions (collision pairs, screening
+        # species) access attributes exactly like diagnostic species, but are
+        # not reachable through ``self.diagnostics``.
+        for interaction in self.interactions or []:
+            members = [member for pair in getattr(interaction, "species_pairs", None) or [] for member in pair]
+            members += list(getattr(interaction, "screening_species", None) or [])
+            for one_species in members:
+                register_species_walk(one_species, [])
 
     def get_as_pypicongpu(self) -> pypicongpu.simulation.Simulation:
         """translate to PyPIConGPU object"""

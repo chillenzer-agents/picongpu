@@ -286,3 +286,25 @@ class TestSpeciesShapeInheritsFromSimulation(TestCase):
         )
         converted = binner.get_as_pypicongpu(time_step_size=1.0, num_steps=4, default_particle_shape=sim.particle_shape)
         self.assertIs(converted.species[0].shape, Shape.linear)
+
+
+class TestChargeStateAtomicNumbers(TestCase):
+    """``charge_state`` needs the C++ ``atomicNumbers`` flag; detect it early."""
+
+    def test_bound_electrons_without_element_properties_raises(self):
+        from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
+
+        electron = Species(name="electron", particle_type="electron")
+        electron.register_requirements([BoundElectrons()])
+        with self.assertRaisesRegex(ValueError, "atomic numbers"):
+            electron.get_as_pypicongpu()
+
+    def test_bound_electrons_with_element_properties_is_accepted(self):
+        from picongpu.pypicongpu.species.attribute.boundelectrons import BoundElectrons
+        from picongpu.pypicongpu.species.constant.elementproperties import ElementProperties
+        from picongpu.pypicongpu.species.util import Element
+
+        hydrogen = Species(name="hydrogen", particle_type="H")
+        hydrogen.register_requirements([BoundElectrons(), ElementProperties(element=Element("H"))])
+        # no ValueError
+        self.assertIsNotNone(hydrogen.get_as_pypicongpu())

@@ -88,6 +88,30 @@ def explicit_scale(particle: MacroParticle) -> float:
 # END-UNIT-FACTOR
 
 
+# BEGIN-EXTENDED-ATTRIBUTES
+# All predefined stored attributes are available by name. Scalar attributes
+# derive their return type from the registry, so no annotation is needed:
+@ParticleFunctor
+def particle_id(particle: MacroParticle):
+    return particle.get("particleId")
+
+
+# A boolean attribute can be used directly as a filter:
+@ParticleFilter
+def radiation_marked(particle: MacroParticle) -> bool:
+    return particle.get("radiationMask")
+
+
+# Vector attributes work like momentum: index the component you need
+# (or return the whole vector from a derived field).
+@ParticleFunctor
+def probe_e_x(particle: MacroParticle):
+    return particle.get("probeE")[0]
+
+
+# END-EXTENDED-ATTRIBUTES
+
+
 @ParticleFunctor
 def count(particle: MacroParticle):
     return 1.0
@@ -97,7 +121,10 @@ def count(particle: MacroParticle):
 gamma_distribution = Binning(
     name="gammaDistribution",
     deposition_functor=count,
-    axes=[BinningAxis(functor=gamma, bin_spec=BinSpec(kind="linear", start=1.0, stop=100.0, nsteps=100))],
+    axes=[
+        BinningAxis(functor=gamma, bin_spec=BinSpec(kind="linear", start=1.0, stop=100.0, nsteps=100)),
+        BinningAxis(functor=particle_id, bin_spec=BinSpec(kind="linear", start=0, stop=1000, nsteps=100)),
+    ],
     species=electrons,
     period=picmi.diagnostics.TS[::10],
 )
@@ -113,6 +140,8 @@ def fast(particle: MacroParticle) -> bool:
 # its name in the output is "electrons_fast":
 fast_electrons = FilteredSpecies(species=electrons, functor=fast)
 # END-PARTICLE-FILTER
+
+radiating_electrons = FilteredSpecies(species=electrons, functor=radiation_marked)
 
 histogram = EnergyHistogram(
     species=fast_electrons,
@@ -132,13 +161,22 @@ macroparticle_mass_dump = DerivedFieldDump(
 # unit_factor pins the numeric getUnit() scale (here 1e6) instead of the
 # auto-derived sim.unit.* monomial.
 explicit_scale_dump = DerivedFieldDump(species=electrons, functor=explicit_scale, period=picmi.diagnostics.TS[::10])
+# probeE is a vector attribute; index one component for the scalar derived field.
+probe_e_dump = DerivedFieldDump(species=radiating_electrons, functor=probe_e_x, period=picmi.diagnostics.TS[::10])
 
 simulation = picmi.Simulation(
     max_steps=100,
     solver=solver,
     species=[electrons],
     layouts=[picmi.PseudoRandomLayout(n_macroparticles_per_cell=2)],
-    diagnostics=[gamma_distribution, histogram, physical_mass_dump, macroparticle_mass_dump, explicit_scale_dump],
+    diagnostics=[
+        gamma_distribution,
+        histogram,
+        physical_mass_dump,
+        macroparticle_mass_dump,
+        explicit_scale_dump,
+        probe_e_dump,
+    ],
 )
 
 simulation.write_input_file(Path("particle_functors_setup"))

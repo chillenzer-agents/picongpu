@@ -13,6 +13,7 @@ from pydantic import BaseModel, BeforeValidator, computed_field, model_validator
 from picongpu.pypicongpu.particle_functor.translate_to_cpp_type import translate_to_cpp_type
 from picongpu.pypicongpu.particle_functor.rng_info import RNGInfo
 from picongpu.pypicongpu.particle_functor.unit_dimension import UnitDimension
+from picongpu.pypicongpu.species.attribute.registry import ATTRIBUTE_REGISTRY, DERIVED_ACCESSORS
 from picongpu.pypicongpu.rendering.pmaccprinter import PMAccPrinter
 from picongpu.pypicongpu.rendering.renderedobject import RenderedObject
 from picongpu.pypicongpu.util import alt
@@ -32,12 +33,14 @@ COMMON_ACCESSORS = {
     "charge": "picongpu::traits::attribute::getCharge(particle[weighting_], particle)",
     "charge_state": "picongpu::traits::attribute::getChargeState(particle)",
     "damped_weighting": "picongpu::traits::attribute::getDampedWeighting(particle)",
-    "timestep": "domainInfo.currentStep",
-    "timestep_size": "sim.pic.getDt()",
 }
 
 BINNING_ACCESSORS = (
     COMMON_ACCESSORS
+    | {
+        "timestep": "domainInfo.currentStep",
+        "timestep_size": "sim.pic.getDt()",
+    }
     | {
         (
             "position",
@@ -53,8 +56,8 @@ BINNING_ACCESSORS = (
 )
 
 _ORIGINS = [
-    ("local", f"static_cast<float3_X>({by_bracket('localCellIdx')}"),
-    ("cell", f"static_cast<float3_X>({by_bracket('position')}"),
+    ("local", f"static_cast<float3_X>({by_bracket('localCellIdx')})"),
+    ("cell", f"static_cast<float3_X>({by_bracket('position')})"),
     ("total", "static_cast<float3_X>(particleOffsetToTotalOrigin)"),
 ]
 _PRECISIONS = [("cell", ""), ("sub_cell", " + " + by_bracket("position"))]
@@ -160,16 +163,88 @@ def symbol_to_string(symbol):
     return str(symbol) if not isinstance(symbol, tuple) else "[" + ",".join(map(str, symbol)) + "]"
 
 
-def generate_preamble(attribute_mapping, mode: Literal["Binning", "Filter", "DerivedField"]):
-    statements = {
-        symbol: ACCESSORS[mode](attribute, by_bracket(attribute)) for symbol, attribute in attribute_mapping.items()
-    }
-    if unsupported_synbols := [symbol for symbol, statement in statements.items() if statement is NotImplemented]:
-        raise ValueError(f"Found {unsupported_synbols=} trying to generate C++ code for one of your functors.")
-    return [
-        {"statement": f"auto const {symbol_to_string(symbol)} = {statement};"}
-        for symbol, statement in statements.items()
-    ]
+_MISSING_ACCESSOR = object()
+
+
+def _mode_table(mode):
+    return {
+        "Binning": BINNING_ACCESSORS,
+        "DerivedField": DERIVED_FIELD_ACCESSORS,
+        "Filter": FILTER_ACCESSORS,
+    }[mode]
+
+
+def _accessor(name, mode):
+    table = _mode_table(mode)
+    if name in table:
+        return table[name]
+    if mode == "Filter" and alt(lambda: name[0] == "random_number", False):
+        return random_number_command(**dict(name[1]))
+    return _MISSING_ACCESSOR
+
+
+def _fallback_accessor(name, mode, allow_unknown):
+    """Resolve a plain stored attribute or raise a clear mode/name error."""
+    table = _mode_table(mode)
+    if isinstance(name, tuple):
+        kind = name[0]
+        if kind == "position":
+            available = sorted({key[1] for key in table if isinstance(key, tuple) and key[0] == "position"})
+            raise ValueError(
+                f"Particle position with origin={name[1]!r} is not available in {mode} functors. "
+                f"Available origins here: {', '.join(available) or 'none'}."
+            )
+        raise ValueError(f"Particle attribute access {name!r} is not available in {mode} functors.")
+    if name in ("timestep", "timestep_size"):
+        raise ValueError(
+            f"{name!r} is only available in Binning functors because only they receive domainInfo; "
+            f"it is not available in {mode} functors."
+        )
+    if name in ATTRIBUTE_REGISTRY or name in DERIVED_ACCESSORS:
+        return by_bracket(name)
+    if allow_unknown:
+        # Custom templates may extend speciesAttributes.param with attributes the
+        # Python registry does not know about.
+        return by_bracket(name)
+    supported = ", ".join(sorted(ATTRIBUTE_REGISTRY))
+    raise ValueError(
+        f"Unknown particle attribute {name!r} in {mode} functor. Supported stored attributes: {supported}. "
+        "Unknown names are only allowed when a custom template directory is configured."
+    )
+
+
+def _preamble_spec(attribute):
+    """Registry descriptor of a preamble attribute value, if available."""
+    name = attribute[0] if isinstance(attribute, tuple) else attribute
+    cls = ATTRIBUTE_REGISTRY.get(name)
+    return None if cls is None else cls()
+
+
+def generate_preamble(
+    attribute_mapping, mode: Literal["Binning", "Filter", "DerivedField"], allow_unknown: bool = False
+):
+    lines = []
+    unsupported = []
+    for symbol, attribute in attribute_mapping.items():
+        statement = _accessor(attribute, mode)
+        if statement is _MISSING_ACCESSOR:
+            statement = _fallback_accessor(attribute, mode, allow_unknown)
+        if statement is NotImplemented:
+            unsupported.append(symbol)
+            continue
+        spec = _preamble_spec(attribute)
+        if spec is not None and getattr(spec, "access_strategy", "structured_binding") == "whole":
+            # Types such as DataSpace<simDim> have no std::tuple_size
+            # specialisation, so bind the whole value and index it in the
+            # functor expression (the symbols are named ``<name>_value[i]``).
+            name = attribute[0] if isinstance(attribute, tuple) else attribute
+            statement = f"auto const {name}_value = {statement};"
+        else:
+            statement = f"auto const {symbol_to_string(symbol)} = {statement};"
+        lines.append({"statement": statement})
+    if unsupported:
+        raise ValueError(f"Found {unsupported=} trying to generate C++ code for one of your functors.")
+    return lines
 
 
 class _PreambleStatement(BaseModel):

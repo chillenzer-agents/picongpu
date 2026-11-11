@@ -13,8 +13,8 @@ from picmistandard import PICMI_Laser, resolve_once
 from pydantic import Field, computed_field, model_validator
 
 from ...pypicongpu import laser
-from ..copy_attributes import default_converts_to
-from .base_laser import BaseLaser, PositiveFloat
+from .._copy_attributes import default_converts_to
+from .base_laser import _BaseLaser, PositiveFloat
 from .polarization_type import PolarizationType
 
 
@@ -25,7 +25,7 @@ from .polarization_type import PolarizationType
         "laser_nofocus_constant_si": lambda self: 0.0,
     },
 )
-class PlaneWaveLaser(PICMI_Laser, BaseLaser):
+class PlaneWaveLaser(PICMI_Laser, _BaseLaser):
     """
     Specifies a plane wave with a temporal shape
 

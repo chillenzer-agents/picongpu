@@ -13,14 +13,11 @@ from picmistandard import PICMI_BinomialSmoother, PICMI_ElectromagneticSolver
 from pydantic import BeforeValidator, ConfigDict, PrivateAttr, model_validator
 
 from picongpu.pypicongpu import util
-from picongpu.pypicongpu.field_solver import (
-    AnySolver,
-    ArbitraryOrderFDTDSolver,
-    CKCSolver,
-    LeheSolver,
-    NoneSolver,
-    YeeSolver,
-)
+from picongpu.pypicongpu.field_solver import ArbitraryOrderFDTDSolver as _ArbitraryOrderFDTDSolver
+from picongpu.pypicongpu.field_solver import CKCSolver as _CKCSolver
+from picongpu.pypicongpu.field_solver import LeheSolver as _LeheSolver
+from picongpu.pypicongpu.field_solver import NoneSolver as _NoneSolver
+from picongpu.pypicongpu.field_solver import YeeSolver as _YeeSolver
 
 _other_than_one_pass = (
     "a number of binomial smoothing passes other than one (PIConGPU's C++ current "
@@ -240,15 +237,15 @@ class ElectromagneticSolver(PICMI_ElectromagneticSolver):
         # other:ArbitraryOrderFDTD
         return 1 / (_ao_fDTD_weight_sum(self._stencil_neighbors) * math.sqrt(inv_cell_sum))
 
-    def get_as_pypicongpu(self) -> AnySolver:
+    def get_as_pypicongpu(self) -> Any:
         match self.method:
             case "Yee":
-                return YeeSolver()
+                return _YeeSolver()
             case "Lehe":
-                return LeheSolver()
+                return _LeheSolver()
             case "CKC":
-                return CKCSolver()
+                return _CKCSolver()
             case "other:ArbitraryOrderFDTD":
-                return ArbitraryOrderFDTDSolver(neighbors=self._stencil_neighbors)
+                return _ArbitraryOrderFDTDSolver(neighbors=self._stencil_neighbors)
             case "other:None":
-                return NoneSolver()
+                return _NoneSolver()

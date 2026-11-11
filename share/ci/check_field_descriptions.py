@@ -19,8 +19,12 @@ It reports three classes of regression:
       standard base class or of a local base class) without its own
       ``description=`` (the (a1) regression of issue #194).
 (iii) a class docstring that re-lists the class' own fields in numpydoc
-      ``name : type`` or ``- name : type`` bullet form (the (c) duplication
-      regression).
+      ``name : type``, Google-style ``name (type):`` / ``name:`` or bullet
+      ``- name : type`` form (the (c) duplication regression).
+(iv)  a parameter-list-looking string constant in a class body that is *not*
+      the docstring (for example a list placed after a ``model_config``
+      assignment). ``ast.get_docstring`` and autodoc ignore such a string, so
+      its parameter list silently escapes the docstring check.
 
 Exit status is non-zero if any finding is reported.
 """
@@ -330,13 +334,6 @@ STANDARD_FIELDS: dict[str, frozenset[str]] = {
 # ``Field(...)`` that is not listed below. Remove entries as they are documented.
 BARE_FIELD_BASELINE: frozenset[tuple[str, str, str]] = frozenset(
     {
-        ("diagnostics/checkpoint.py", "Checkpoint", "timePeriod"),
-        ("diagnostics/checkpoint.py", "Checkpoint", "restartStep"),
-        ("diagnostics/checkpoint.py", "Checkpoint", "restartChunkSize"),
-        ("diagnostics/checkpoint.py", "Checkpoint", "restartLoop"),
-        ("distribution/AnalyticDistribution.py", "AnalyticDistribution", "directed_velocity"),
-        ("distribution/AnalyticDistribution.py", "AnalyticDistribution", "momentum_functions"),
-        ("distribution/AnalyticDistribution.py", "AnalyticDistribution", "momentum_spread_functions"),
         ("distribution/GaussianBunchDistribution.py", "GaussianBunchDistribution", "velocity_divergence"),
         ("simulation.py", "Simulation", "picongpu_min_weighting"),
         ("grid.py", "Cartesian3DGrid", "picongpu_n_gpus"),
@@ -358,7 +355,6 @@ BARE_FIELD_BASELINE: frozenset[tuple[str, str, str]] = frozenset(
         ("memory_config.py", "MemoryConfig", "bytes_edges"),
         ("memory_config.py", "MemoryConfig", "bytes_corner"),
         ("simulation.py", "Simulation", "picongpu_custom_user_input"),
-        ("simulation.py", "Simulation", "picongpu_interaction"),
         ("simulation.py", "Simulation", "picongpu_typical_ppc"),
         ("simulation.py", "Simulation", "picongpu_template_dir"),
         ("simulation.py", "Simulation", "picongpu_moving_window_move_point"),
@@ -368,15 +364,19 @@ BARE_FIELD_BASELINE: frozenset[tuple[str, str, str]] = frozenset(
         ("simulation.py", "Simulation", "picongpu_precision_config"),
         ("simulation.py", "Simulation", "picongpu_memory_config"),
         ("simulation.py", "Simulation", "picongpu_walltime"),
-        ("simulation.py", "Simulation", "picongpu_distributions"),
     }
 )
 
 # The (a1) redeclaration set and the (c) docstring duplication set are fixed in
 # this change, so their baselines are intentionally empty: a new occurrence is
 # always a failure.
-NUMDOC_PARAM_HEADER = re.compile(r"^[ \t]*(Parameters|Other Parameters|Attributes)[ \t]*$", re.MULTILINE)
+# Parameter-list sections come in two styles: numpydoc uses a bare (or dashed)
+# header with ``name : type`` entries, Google style a header with an optional
+# trailing colon and ``name (type):`` / ``name:`` entries. ``Args`` is the
+# Google spelling used by free functions.
+NUMDOC_PARAM_HEADER = re.compile(r"^[ \t]*(?:Parameters|Other Parameters|Attributes|Args)[ \t]*:?[ \t]*$", re.MULTILINE)
 NUMDOC_ENTRY = re.compile(r"^\s*(\w+)\s*:\s*\S", re.MULTILINE)
+GOOGLE_ENTRY = re.compile(r"^\s*([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*:(?:\s.*)?$", re.MULTILINE)
 BULLET_ENTRY = re.compile(r"^\s*[-*]\s*(\w+)\s*:\s*\S", re.MULTILINE)
 
 
@@ -469,31 +469,58 @@ def _local_ancestor_fields(
     return inherited
 
 
-def _docstring_listed_names(node: ast.ClassDef) -> set[str]:
-    doc = ast.get_docstring(node)
-    if not doc:
-        return set()
+def _section_listed_names(text: str) -> set[str]:
+    """Names listed as entries of a numpydoc or Google-style parameter section."""
     names: set[str] = set()
-    header = NUMDOC_PARAM_HEADER.search(doc)
+    header = NUMDOC_PARAM_HEADER.search(text)
     if header:
-        lines = doc[header.end() :].splitlines()
+        lines = text[header.end() :].splitlines()
         start = 0
         while start < len(lines) and not lines[start].strip():
             start += 1
         if start < len(lines) and set(lines[start].strip()) == {"-"}:
             start += 1
-        # A numpydoc section lists "name : type" entries (entries may be
-        # indented or not), each followed by indented prose. It ends at the
-        # first unindented, non-blank line that is not itself an entry.
+        # A numpydoc section lists "name : type" entries, a Google-style section
+        # "name (type):" / "name:" entries; entries may be indented or not and are
+        # followed by (possibly indented) prose. The section ends at the first
+        # unindented, non-blank line that is not itself an entry.
         for line in lines[start:]:
-            entry = NUMDOC_ENTRY.match(line)
+            entry = NUMDOC_ENTRY.match(line) or GOOGLE_ENTRY.match(line)
             if entry:
                 names.add(entry.group(1))
                 continue
             if line.strip() and line[0] not in " \t":
                 break
-    names.update(BULLET_ENTRY.findall(doc))
+    names.update(BULLET_ENTRY.findall(text))
     return names
+
+
+def _docstring_listed_names(node: ast.ClassDef) -> set[str]:
+    doc = ast.get_docstring(node)
+    return _section_listed_names(doc) if doc else set()
+
+
+def _has_parameter_list(text: str) -> bool:
+    """True if ``text`` looks like a parameter-list section (header plus entries)."""
+    return NUMDOC_PARAM_HEADER.search(text) is not None and bool(_section_listed_names(text))
+
+
+def _class_body_parameter_lists(node: ast.ClassDef) -> list[int]:
+    """Line numbers of class-body strings that look like parameter lists.
+
+    Only the first statement can be the class docstring; any other standalone
+    string is inert (``ast.get_docstring`` ignores it and autodoc renders
+    nothing), so a parameter list hidden there silently escapes the docstring
+    check -- the ``checkpoint.py`` bug this guard exists to catch.
+    """
+    lines: list[int] = []
+    for index, stmt in enumerate(node.body):
+        if index == 0:
+            continue
+        if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            if _has_parameter_list(stmt.value.value):
+                lines.append(stmt.value.lineno)
+    return lines
 
 
 def check(directory: Path) -> list[str]:
@@ -533,7 +560,49 @@ def check(directory: Path) -> list[str]:
                     f"{rel}:{cls.node.lineno}: {cls.name}: class docstring re-lists its own "
                     f"fields {sorted(listed)}; move the prose to Field(description=...)"
                 )
+            # (iv) parameter list in a class-body string that is not the docstring
+            for lineno in _class_body_parameter_lists(cls.node):
+                findings.append(
+                    f"{rel}:{lineno}: {cls.name}: parameter list in a class-body string that is not "
+                    f"the docstring; make it the docstring or move the prose to Field(description=...)"
+                )
     return findings
+
+
+def _validate_baseline(directory: Path) -> list[str]:
+    """Check that every baseline entry names a real, still-bare own ``Field``.
+
+    A baseline tuple is only meaningful while its field genuinely lacks a
+    ``description=``. This self-check makes stale tuples (a field that was
+    documented, removed, renamed or never declared locally) impossible to keep:
+    they fail the guard at startup instead of silently widening the baseline.
+    """
+    problems: list[str] = []
+    registries: dict[str, dict[str, _ClassInfo]] = {}
+    for rel, cls_name, field_name in sorted(BARE_FIELD_BASELINE):
+        if rel not in registries:
+            path = directory / rel
+            registries[rel] = (
+                {cls.name: cls for cls in _collect_file(path, path.read_text(encoding="utf-8"))}
+                if path.is_file()
+                else {}
+            )
+        cls = registries[rel].get(cls_name)
+        if cls is None:
+            problems.append(f"{rel}: baseline entry {cls_name}.{field_name}: file or class not found")
+            continue
+        stmt = cls.fields.get(field_name)
+        if stmt is None:
+            problems.append(f"{rel}: baseline entry {cls_name}.{field_name}: no such own field")
+            continue
+        calls = _field_calls(stmt)
+        if not calls:
+            problems.append(f"{rel}: baseline entry {cls_name}.{field_name}: field has no Field(...) call")
+        elif any(_has_description(call) for call in calls):
+            problems.append(
+                f"{rel}: baseline entry {cls_name}.{field_name}: field now has description=; drop the entry"
+            )
+    return problems
 
 
 def main(argv: list[str]) -> int:
@@ -541,6 +610,15 @@ def main(argv: list[str]) -> int:
     if not directory.is_dir():
         print(f"check_field_descriptions: not a directory: {directory}", file=sys.stderr)
         return 2
+    problems = _validate_baseline(directory)
+    if problems:
+        print(
+            "check_field_descriptions: baseline self-check failed (stale BARE_FIELD_BASELINE entries):",
+            file=sys.stderr,
+        )
+        for problem in problems:
+            print(f"  {problem}", file=sys.stderr)
+        return 1
     findings = check(directory)
     if findings:
         print("check_field_descriptions: field-description guard failed:", file=sys.stderr)

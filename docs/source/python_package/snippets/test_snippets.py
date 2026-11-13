@@ -462,8 +462,10 @@ EXPECTED_FILES = {
         "no_run": True,
         "files": [
             "particle_functors_setup/etc/picongpu/N.cfg",
+            "particle_functors_setup/include/picongpu/param/binningSetup.param",
             "particle_functors_setup/include/picongpu/param/particleFilters.param",
             "particle_functors_setup/include/picongpu/param/fileOutput.param",
+            "particle_functors_setup/include/picongpu/param/speciesDefinition.param",
         ],
         "file_contains": [
             ("particle_functors_setup/etc/picongpu/N.cfg", "--electrons_energyHistogram.filter fast"),
@@ -472,6 +474,16 @@ EXPECTED_FILES = {
             ("particle_functors_setup/include/picongpu/param/fileOutput.param", "sim.unit.mass()"),
             # unit_factor pins the numeric getUnit() scale (no C++ code string)
             ("particle_functors_setup/include/picongpu/param/fileOutput.param", "return 1000000.0;"),
+            # extended attributes: scalar registry default, bool filter, vector probe
+            ("particle_functors_setup/include/picongpu/param/speciesDefinition.param", "particleId"),
+            ("particle_functors_setup/include/picongpu/param/speciesDefinition.param", "radiationMask"),
+            ("particle_functors_setup/include/picongpu/param/speciesDefinition.param", "probeE"),
+            ("particle_functors_setup/include/picongpu/param/binningSetup.param", "particle[particleId_]"),
+            ("particle_functors_setup/include/picongpu/param/particleFilters.param", "particle[radiationMask_]"),
+            (
+                "particle_functors_setup/include/picongpu/param/fileOutput.param",
+                "auto const [probeE_0,probeE_1,probeE_2] = particle[probeE_];",
+            ),
         ],
     },
     "selected_topics/units_and_constants.py": {

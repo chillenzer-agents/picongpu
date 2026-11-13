@@ -21,12 +21,13 @@ from pydantic import (
 )
 
 from picongpu.picmi.species_requirements import evaluate_requirements, resolving_add, run_construction
-from picongpu.pypicongpu.species.attribute import Momentum, Position
+from picongpu.pypicongpu.species.attribute import BoundElectrons, Momentum, Position
 from picongpu.pypicongpu.species.attribute.attribute import Attribute
 from picongpu.pypicongpu.species.attribute.weighting import Weighting
 from picongpu.pypicongpu.species.constant.charge import Charge
 from picongpu.pypicongpu.species.constant.constant import Constant
 from picongpu.pypicongpu.species.constant.densityratio import DensityRatio
+from picongpu.pypicongpu.species.constant.elementproperties import ElementProperties
 from picongpu.pypicongpu.species.constant.mass import Mass
 from picongpu.pypicongpu.species.operation import AnyOperation
 from picongpu.pypicongpu.species.species import Pusher, Shape
@@ -221,9 +222,22 @@ class Species(PICMI_Species):
         return self.DEFAULT_PARTICLE_SHAPE
 
     def get_as_pypicongpu(self, *args, default_particle_shape: str | None = None, **kwargs):
+        requirements = self._evaluate_species_requirements()
+        # ``charge_state`` (boundElectrons) is only valid for species whose
+        # C++ ``GetChargeState`` can resolve the atomic number; that requires
+        # the ``atomicNumbers`` flag, emitted from the element-properties
+        # constant. Detect it here instead of letting PMACC_CASSERT fire.
+        if any(isinstance(attribute, BoundElectrons) for attribute in requirements["attributes"]) and not any(
+            isinstance(constant, ElementProperties) for constant in requirements["constants"]
+        ):
+            raise ValueError(
+                f"Species {self.name!r} uses particle attribute 'charge_state' (boundElectrons), which "
+                "requires the element's atomic numbers (C++ flag 'atomicNumbers'). Define the species "
+                "with an element particle_type and an ionization model, or use a different attribute."
+            )
         return PyPIConGPUSpecies(
             name=self.name,
-            **self._evaluate_species_requirements(),
+            **requirements,
             shape=self._shape(default_particle_shape),
             pusher=self._pusher(),
         )

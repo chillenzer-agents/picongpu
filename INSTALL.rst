@@ -263,7 +263,7 @@ ISAAC
 """""
 - 1.6.0+
 - requires *boost* (header only), *IceT*, *Jansson*, *libjpeg* (preferably *libjpeg-turbo*), *libwebsockets* (only for the ISAAC server, but not the plugin itself)
-- enables live in situ visualization, see more here `Plugin description <https://github.com/ComputationalRadiationPhysics/picongpu/wiki/Plugin%3A-ISAAC>`_
+- enables live in situ visualization, see more here `plugin description <https://picongpu.readthedocs.io/en/latest/usage/plugins/isaac.html>`_
 - *Spack:* ``spack install isaac``
 - *from source:* build the *in situ library* and its dependencies as described in `ISAAC's INSTALL.md <https://github.com/ComputationalRadiationPhysics/isaac/blob/master/INSTALL.md>`_
 - *environment:* set environment variable ``CMAKE_PREFIX_PATH`` for each dependency and the ISAAC in situ library

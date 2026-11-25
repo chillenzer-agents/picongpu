@@ -77,6 +77,7 @@ the section that answers your question.
    python_package/index
    usage/reference
    install/changelog.md
+   usage/troubleshooting
 
 .. toctree::
    :caption: Using PIConGPU (PICMI)
@@ -92,6 +93,7 @@ the section that answers your question.
    :maxdepth: 1
    :hidden:
 
+   usage/domainDefinitions
    models/pic
    models/AOFDTD
    models/lasers

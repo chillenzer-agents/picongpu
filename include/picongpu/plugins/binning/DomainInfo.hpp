@@ -45,7 +45,7 @@ namespace picongpu
          * @brief Provides knowledge of the simulation domain to the user
          *
          * Names and concept are described at
-         * https://github.com/ComputationalRadiationPhysics/picongpu/wiki/PIConGPU-domain-definitions
+         * https://picongpu.readthedocs.io/en/latest/usage/domainDefinitions.html
          */
         class DomainInfoBase
         {

@@ -68,7 +68,7 @@ The output writes a number of non-standard custom openPMD attributes:
 * ``p_unit``: The SI scaling for the momentum axis. Use this instead of ``gridUnitSI``.
 * ``globalDomainOffset``, ``globalDomainSize`` and ``globalDomainAxisLabels``: Information on the global domain.
 * ``totalDomainOffset``, ``totalDomainSize`` and ``totalDomainAxisLabels``: Information on the total domain.
-  Please consult the `PIConGPU wiki <https://github.com/ComputationalRadiationPhysics/picongpu/wiki/PIConGPU-domain-definitions>`_ for explanations on the meaning of global and total domain.
+  Please consult the :ref:`domain definitions <usage-domain-definitions>` for explanations on the meaning of global and total domain.
 * ``sim_unit``: SI scaling for the charge density values. Alias for ``unitSI``.
 
 Analysis Tools

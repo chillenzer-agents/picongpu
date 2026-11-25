@@ -47,7 +47,6 @@ Directory Structure
 
     * ``tbg`` templates (as long as PIConGPU specific, later on to ``share/tbg/``)
     * network configurations (e.g. infiniband)
-    * score-p and vampir-trace filters
 
 * ``share/``
 
@@ -74,3 +73,33 @@ Directory Structure
 
   * currently for the documentation files
   * might move, e.g. to ``lib/picongpu/docs/`` and its build artifacts to ``share/{doc,man}/``, 
+
+File Endings
+------------
+
+PIConGPU and pmacc use the following file types.
+Endings marked as *special* are not standard C++ or configuration file types and are interpreted by our
+build and tooling.
+
+======================== ================== ===============================================================
+ending                   usage              description
+======================== ================== ===============================================================
+``.cpp``                 source code        C++ source
+``.hpp``                 source code        C++ header
+``.def``                 source code        C++ header with definitions only (special)
+``.tpp``                 source code        C++ template implementation
+``.kernel``              source code        kernel implementation (special)
+``.param``               configuration      user compile-time configuration (special)
+``.unitless``            configuration      unit and trait definitions for attributes (special)
+``.cfg``                 configuration      TBG run-time configuration
+``.tpl``                 configuration      TBG batch-system template
+``.toml``                configuration      runtime configuration, e.g. for the openPMD plugin
+``.py``                  source code        Python
+``.sh``                  source code        shell script
+``.cwl``                 workflow           Common Workflow Language description
+``.mustache``            template           code-generation template for pypicongpu (special)
+``.md``                  documentation      Markdown
+``.rst``                 documentation      reStructuredText
+``.txt``                 build system       CMake build configuration
+``.json``                configuration      schema or input for code generation
+======================== ================== ===============================================================

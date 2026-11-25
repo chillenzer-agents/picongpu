@@ -31,8 +31,8 @@ namespace pmacc
     /**
      * Groups local, global and total domain information.
      *
-     * For a detailed description of domains, see the PIConGPU wiki page:
-     * https://github.com/ComputationalRadiationPhysics/picongpu/wiki/PIConGPU-domain-definitions
+     * For a detailed description of domains, see the PIConGPU manual:
+     * https://picongpu.readthedocs.io/en/latest/usage/domainDefinitions.html
      */
     template<unsigned DIM>
     class SubGrid

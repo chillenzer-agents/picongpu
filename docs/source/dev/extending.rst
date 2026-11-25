@@ -80,6 +80,54 @@ As mentioned above, a simulation stage should merely be calling an actual implem
 When possible, it is recommended to use existing generic algorithms like ``particles::Manipulate<>`` or ``FieldTmp::computeValue()``.
 Otherwise, one often has to implement an own kernel.
 
+Adding a Particle Attribute
+---------------------------
+
+Particle attributes are lvalues stored with each particle of a species.
+To add a new attribute that is also written by the openPMD plugin:
+
+1. Declare the attribute in ``include/picongpu/param/speciesAttributes.param``.
+   Use ``alias(...)`` when the type is supplied later in a ``MakeSeq_t``, or
+   ``value_identifier(...)`` to define a concrete type and initial value:
+
+   .. code:: c++
+
+      // name only; the type is set where the attribute is used
+      alias(myAttribute);
+
+      // concrete type and default value
+      value_identifier(float_X, myAttribute, 0._X);
+
+2. Add the attribute to the particle description.
+   By default this is the ``DefaultParticleAttributes`` sequence in
+   ``include/picongpu/param/speciesDefinition.param``:
+
+   .. code:: c++
+
+      using DefaultParticleAttributes = MakeSeq_t<
+          position<position_pic>,
+          momentum,
+          weighting,
+          myAttribute>;
+
+   A species can also use its own attribute sequence instead of
+   ``DefaultParticleAttributes``.
+
+3. Implement the traits ``Unit``, ``UnitDimension``, ``MacroWeighted`` and
+   ``WeightingPower`` for the new attribute in
+   ``include/picongpu/unitless/speciesAttributes.unitless``.
+   These traits define the conversion to SI units and the scaling with the
+   macro-particle weighting.
+
+4. Access the attribute inside kernels and functors as
+   ``particle[myAttribute_]``.
+   Note the trailing underscore used by the identifier accessor.
+
+.. seealso::
+
+   The default attributes and the always-present pmacc attributes are listed in
+   :ref:`usage-params-core`.
+
 Writing a Kernel
 ----------------
 

@@ -183,20 +183,22 @@ The generated C++ input is **not compiled in this environment** (no toolchain) -
 strictly "shape-verified statically", not "compiles". The following checklist is the
 compile-verification gate the integrator/CI must satisfy:
 
-- [ ] A setup with `NativeDerivedFieldDump` scalar (`Density`), directional
+- [x] A setup with `NativeDerivedFieldDump` scalar (`Density`), directional
       (`WeightedVelocity<x>`) and combined (`RelativisticDensity`) fields compiles, including
       per-species `FieldTmpSolverConfig` / `ValidateFieldTmpSolver_t` instantiation
       (`SpeciesEligibleForSolver<..., FilteredDerivedAttribute<..., Filter>>::type::value`).
-- [ ] `AverageDerivedFieldDump` of `WeightedVelocity`/`Momentum` compiles
+- [x] `AverageDerivedFieldDump` of `WeightedVelocity` compiles
       (`combinedAttributes::AverageAttribute<T>` + `IsWeighted<T>` static_assert path).
-- [ ] A setup **without** any derived fields compiles (empty `FieldTmpSolverConfigs` ->
+- [x] A setup **without** any derived fields compiles (empty `FieldTmpSolverConfigs` ->
       `MakeSeq_t<>` -> empty `FieldTmpSolvers`; shape unchanged vs. pre-change template).
-- [ ] The custom-functor path (`DerivedFieldDump`) still compiles (regression: generated
+- [x] The custom-functor path (`DerivedFieldDump`) still compiles (regression: generated
       `IsWeighted<custom>` specialisation + `CreateFieldTmpOperation_t`).
-- [ ] A filtered derived field (`filtername`) instantiates correctly (filter-level
+- [x] A filtered derived field (`filtername`) instantiates correctly (filter-level
       `SpeciesEligibleForSolver` in `particleFilters.param` is compatible).
 - [ ] An incompatible species/field/filter request fails at compile time with the intended
       `static_assert` message instead of an empty-solver-list/missing-source runtime error.
+      (The assertion is in the instantiated `ValidateFieldTmpSolver`; the negative case was
+      not separately compiled.)
 
 ## Clean-up applied (deliberate deviations from the WIP)
 
@@ -260,3 +262,61 @@ functor struct name.
 Chosen base remains **fork `dev`**; this port deliberately does not re-base onto #69's branch
 (uncoupling the two otherwise-independent features). The integrator merges #69 first, then #75
 (or vice versa) and applies the two-hunk resolution above.
+
+## Rebase onto fork `dev` (`37a9c60ea`) - conflict resolutions
+
+All conflicts were content conflicts; everything else auto-merged.
+
+- `docs/source/python_package/snippets/test_snippets.py`: kept dev's new
+  `openpmd_backend_config.py` snippet entry **and** this port's `derived_fields.py`
+  entry.
+- `picmi/diagnostics/__init__.py`: followed dev's explicit `X as X` re-export style
+  (dev removed the `__all__` list); added `NativeDerivedFieldDump` /
+  `AverageDerivedFieldDump` to the imports and to `AnyDiagnostic`.
+- `picmi/diagnostics/field_dump.py`: kept dev's `PICMI_Diagnostic` base class and its
+  imports, added the port's `model_validator` / `ClassVar`. The narrowed subclass
+  fields now carry `Field(description=...)` because dev added the
+  `check_field_descriptions` pre-commit guard.
+- `picmi/simulation.py`: kept dev's applied-field import and added
+  `_BuiltinDerivedFieldDump` + `BuiltinFieldSolver`. `Species` was re-added to the
+  `picmi.species` import: dev had replaced it with `_STANDARD_SHAPES`, but the port's
+  `_to_field_dump` still needs `isinstance(..., Species)`.
+- modify/delete `test_field_dump.py`: dev had meanwhile added
+  `test_range_preserves_axis_positions` (openPMD `range` serialisation), which is
+  independent of the derived-field mechanism. The file is kept with only that test;
+  the three template tests of the removed `derived_fields` species-eligibility
+  narrowing are dropped (the `field_tmp_solvers` tests replace them).
+- `fileOutput.param.mustache`: kept dev's newer functor unit rendering
+  (`get_unit_cpp`, `unit_dimension_cpp`) and includes; replaced only the old
+  `derived_fields` / `CreateEligible_t` block with the port's
+  `FieldTmpSolverConfig` / `ValidateFieldTmpSolver_t` / `mp_transform` block.
+
+## Re-sync with upstream #5761
+
+Upstream head remains `80d08aa94fb24963d0eab960934525d296b7fecc` ("use meta loops to
+make fileOutput more readable", committed 2026-08-20). The PR's `updatedAt`
+(2026-11-25T09:24Z) is a **comment-only** update - the timeline shows discussion
+comments, no push after 2026-08-20. The port was based on this head (the template
+structure and test assertions match it), so the code delta since the port's base is
+**zero**.
+
+## Compile verification on `hal` (CUDA)
+
+Ran on `hal` (NVIDIA A30, CUDA 13.0, `-DCMAKE_CUDA_ARCHITECTURES=80`, openPMD and
+PNGwriter enabled), setups generated from this branch:
+
+- full setup: 2 species; scalar `Density`, directional `WeightedVelocity<x>`, combined
+  `RelativisticDensity`, `AverageDerivedFieldDump(WeightedVelocity<x>)`, filtered
+  `Density` (`FilteredSpecies`), custom-functor `DerivedFieldDump`, plus native `E`.
+  `cmake --build --target install --parallel 10` succeeds (full `picongpu` binary).
+- empty setup (only native `E`): succeeds; renders `FieldTmpSolverConfigs =
+  MakeSeq_t<>` and `fieldTmpNumSlots = 1`.
+- Found and fixed a real gap while compiling: C++ static_asserts
+  `fieldTmpNumSlots >= 1 + RequiredExtraSlots<Solver>`, and a combined attribute
+  (`CombinedDeriveSolver`) needs one extra slot. The port left `fieldTmpNumSlots` at
+  the collision default (1), so every setup with `AverageAttribute` /
+  `RelativisticDensity` / `ScreeningInvSquared` failed. `Simulation.field_tmp_num_slots`
+  now raises the value to 2 when a combined solver is present, and `memory.param`
+  renders it.
+- Note: an initial `--parallel 48` build was OOM-killed; the successful runs used
+  `--parallel 10`.

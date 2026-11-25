@@ -305,28 +305,27 @@ class TestPositionUnitMetadata(TestCase):
                 self.assertNotIn("getCellSize", self._render(unit).get_unit_cpp)
 
 
-class TestTotalCellIdxRendering(TestCase):
-    """``DataSpace<simDim>`` has no tuple protocol; bind it as a whole."""
+class TestTotalCellIdxNotFunctorFacing(TestCase):
+    """``totalCellIdx`` is owned by the openPMD plugin, not by species functors."""
 
-    def test_preamble_does_not_use_structured_binding(self):
-        @ParticleFunctor
-        def f(particle: MacroParticle):
-            return particle.get("totalCellIdx")[0]
-
-        rendered = render(f)
-        statements = [s.statement for s in rendered.functor_preamble]
-        self.assertEqual(statements, ["auto const totalCellIdx_value = particle[totalCellIdx_];"])
-        self.assertNotIn("[", statements[0].split("=")[0])
-        self.assertEqual(rendered.functor_expression, "totalCellIdx_value[0]")
-
-    def test_whole_vector_return_type_is_dataspace(self):
+    def test_request_raises_unknown_attribute_without_custom_templates(self):
         @ParticleFunctor
         def f(particle: MacroParticle):
             return particle.get("totalCellIdx")
 
-        rendered = render(f)
-        self.assertEqual(rendered.return_type, "DataSpace<simDim>")
-        self.assertIn("totalCellIdx_value[0]", rendered.functor_expression)
+        with self.assertRaisesRegex(ValueError, "Unknown particle attribute 'totalCellIdx'"):
+            render(f)
+
+    def test_request_allowed_only_with_custom_templates(self):
+        @ParticleFunctor
+        def f(particle: MacroParticle):
+            return particle.get("totalCellIdx")
+
+        rendered = f.get_as_pypicongpu("DerivedField", custom_templates=True)
+        self.assertEqual(
+            rendered.functor_preamble[0].statement,
+            "auto const totalCellIdx = particle[totalCellIdx_];",
+        )
 
 
 class TestWeightingPowerSingleSource(TestCase):

@@ -11,7 +11,6 @@ from .probe_b import ProbeB as ProbeB
 from .probe_e import ProbeE as ProbeE
 from .process_class import ProcessClass as ProcessClass
 from .radiation_mask import RadiationMask as RadiationMask
-from .total_cell_idx import TotalCellIdx as TotalCellIdx
 from .transition_index import TransitionIndex as TransitionIndex
 from .transition_radiation_mask import TransitionRadiationMask as TransitionRadiationMask
 from .weighting import Weighting as Weighting
@@ -31,7 +30,6 @@ __all__ = [
     "ProbeE",
     "ProcessClass",
     "RadiationMask",
-    "TotalCellIdx",
     "TransitionIndex",
     "TransitionRadiationMask",
     "Weighting",

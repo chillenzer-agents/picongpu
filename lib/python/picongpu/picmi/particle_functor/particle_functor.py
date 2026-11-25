@@ -57,7 +57,6 @@ class _DerivedSpec:
         self.unit_dimension = (0.0,) * 7
         self.weighting_power = weighting_power
         self.physical_weighting_power = physical_weighting_power
-        self.access_strategy = "structured_binding"
 
     @property
     def component_cpp_type(self):
@@ -210,12 +209,7 @@ class AbstractParticle(Particle):
         else:
             spec = _attribute_spec(attribute)
             if spec is not None and spec.n_components > 1:
-                if getattr(spec, "access_strategy", "structured_binding") == "whole":
-                    # The C++ value is bound as a whole (e.g. DataSpace<simDim>,
-                    # which has no tuple protocol); index it in the expression.
-                    my_symbols = tuple(Symbol(f"{attribute}_value[{i}]") for i in range(spec.n_components))
-                else:
-                    my_symbols = tuple(Symbol(f"{attribute}_{i}") for i in range(spec.n_components))
+                my_symbols = tuple(Symbol(f"{attribute}_{i}") for i in range(spec.n_components))
             else:
                 my_symbols = Symbol(attribute)
             self._record(my_symbols, attribute)

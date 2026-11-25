@@ -149,9 +149,9 @@ through ``particle.get("...")``:
   the current iteration and the timestep size.  These are only available to
   binning functors, because only they receive the required ``domainInfo``.
 
-All remaining predefined stored attributes are available by name.  Their value
-type, component count, unit and weighting scaling come from a hand-maintained
-Python registry that mirrors
+All remaining functor-facing predefined stored attributes are available by
+name.  Their value type, component count, unit and weighting scaling come from a
+hand-maintained Python registry that mirrors
 ``include/picongpu/param/speciesAttributes.param`` and
 ``include/picongpu/unitless/speciesAttributes.unitless``:
 
@@ -172,11 +172,6 @@ Python registry that mirrors
    * - ``"weightingDampingFactor"``
      - ``float_X``
      - optional raw damping factor (see ``"damped_weighting"`` above)
-   * - ``"totalCellIdx"``
-     - ``DataSpace<simDim>``
-     - total cell index; index it per spatial axis
-       (``particle.get("totalCellIdx")[0]`` in x), so only the first
-       ``simDim`` components exist (three in 3D, two in 2D)
    * - ``"radiationMask"``, ``"transitionRadiationMask"``
      - ``bool``
      - **internal**: masks owned by the radiation plugins
@@ -188,8 +183,16 @@ Python registry that mirrors
      - ``uint32_t`` / ``uint8_t`` / ``bool``
      - **internal**: atomic-physics bookkeeping
 
+.. note::
+
+   ``totalCellIdx`` is deliberately **not** exposed through ``particle.get``.
+   The openPMD plugin adds it to its particle list internally (for the
+   ``positionOffset`` conversion and restarts), so exposing it as a species
+   attribute would duplicate that entry and fail PIConGPU's
+   one-entry-per-attribute check.
+
 The vector attributes (``position``, ``momentum``, ``momentumPrev1``,
-``probeE``, ``probeB``, ``totalCellIdx``) return a plain tuple, so they can be
+``probeE``, ``probeB``) return a plain tuple, so they can be
 indexed or unpacked just like ``momentum`` (``x, y, z =
 particle.get("probeE")`` or ``ex = particle.get("probeE")[0]``); the tested
 example below uses the indexed form.

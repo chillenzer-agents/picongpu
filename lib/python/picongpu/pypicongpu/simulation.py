@@ -189,6 +189,21 @@ class Simulation(RenderedObject, BaseModel):
     def field_tmp_solvers(self) -> list[DerivedFieldSolver]:
         return unique(source.get_solver() for source in self._derived_field_dumps())
 
+    @computed_field
+    @property
+    def field_tmp_num_slots(self) -> int:
+        """Number of ``FieldTmp`` slots to allocate in ``memory.param``.
+
+        Combined derived attributes (``AverageAttribute``, ``RelativisticDensity``,
+        ``ScreeningInvSquared``) compute their result through an intermediate
+        ``FieldTmp``, so PIConGPU requires at least one slot beyond the plain
+        particle-to-grid operations. The collision pipeline can require more.
+        """
+        slots = self.collisional_physics.num_tmp_field_slots
+        if any("combinedAttributes::" in solver.attribute_type for solver in self.field_tmp_solvers):
+            slots = max(slots, 2)
+        return slots
+
     @field_validator("output", mode="after")
     @classmethod
     def _output_validation(cls, outputs):

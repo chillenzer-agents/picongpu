@@ -1,6 +1,8 @@
 """Tests for rendering built-in openPMD derived fields."""
 
 from picongpu import templates
+from picongpu.picmi.grid import Cartesian3DGrid
+from picongpu.pypicongpu.memory import MemoryConfig
 from picongpu.pypicongpu.output.openpmd_plugin import (
     BuiltinFieldSolver,
     FieldDump,
@@ -134,3 +136,55 @@ def test_custom_functor_definition_is_reused_by_species_specific_solvers():
     assert len(simulation.derived_field_functors) == 1
     assert len(simulation.field_tmp_solvers) == 2
     assert simulation.field_tmp_solvers[0].attribute_type == simulation.field_tmp_solvers[1].attribute_type
+
+
+def _simulation_with_builtin_solver(solver):
+    period = TimeStepSpec(specs=[{"start": 0, "stop": 10, "step": 1}])
+    plugin = OpenPMDPlugin(
+        sources=[
+            (
+                period,
+                FieldDump(
+                    name="field",
+                    species="species_electrons",
+                    filtername=None,
+                    builtin_solver=solver,
+                ),
+            )
+        ]
+    )
+    return Simulation.model_construct(output=[plugin])
+
+
+def test_plain_derived_field_keeps_one_field_tmp_slot():
+    solver = BuiltinFieldSolver(type="deriveField::derivedAttributes::Density", typename="Native_Density")
+    assert _simulation_with_builtin_solver(solver).field_tmp_num_slots == 1
+
+
+def test_combined_attribute_requests_an_extra_field_tmp_slot():
+    # CombinedDeriveSolver computes through one intermediate FieldTmp; PIConGPU
+    # static_asserts fieldTmpNumSlots >= 1 + RequiredExtraSlots.
+    solver = BuiltinFieldSolver(
+        type=("deriveField::combinedAttributes::AverageAttribute<deriveField::derivedAttributes::WeightedVelocity<0>>"),
+        typename="Average_WeightedVelocity_0",
+    )
+    assert _simulation_with_builtin_solver(solver).field_tmp_num_slots == 2
+
+
+def test_memory_param_renders_the_computed_field_tmp_slots():
+    grid = Cartesian3DGrid(
+        number_of_cells=[8, 8, 8],
+        lower_bound=[0, 0, 0],
+        upper_bound=[1e-6, 1e-6, 1e-6],
+        lower_boundary_conditions=["periodic", "periodic", "periodic"],
+        upper_boundary_conditions=["periodic", "periodic", "periodic"],
+    )
+    context = {
+        "field_tmp_num_slots": 2,
+        "grid": grid.get_as_pypicongpu().model_dump(mode="json"),
+        "memory_config": MemoryConfig().model_dump(mode="json"),
+    }
+    template = (templates.path() / "include/picongpu/param/memory.param.mustache").read_text()
+    rendered = Renderer.get_rendered_template(Renderer.get_context_preprocessed(context), template)
+
+    assert "constexpr uint32_t fieldTmpNumSlots = 2;" in rendered

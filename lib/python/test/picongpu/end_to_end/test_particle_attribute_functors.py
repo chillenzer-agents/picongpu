@@ -10,6 +10,10 @@ The test exercises a representative scalar (``particleId``), bool
 (``radiationMask``) and vector (``probeE``) attribute through a Binning
 diagnostic and a derived field.  It needs a full PIConGPU build and is
 therefore only run with the ``end_to_end``/``slow`` test selection.
+
+``totalCellIdx`` is intentionally not covered: the openPMD plugin appends it to
+its particle list unconditionally, so exposing it as a species attribute would
+trigger a duplicate-attribute static assert.
 """
 
 from pathlib import Path
@@ -57,11 +61,6 @@ def position_x(particle: MacroParticle):
 
 
 @ParticleFunctor
-def total_cell_idx_x(particle: MacroParticle):
-    return particle.get("totalCellIdx")[0]
-
-
-@ParticleFunctor
 def deposition(particle: MacroParticle):
     return 1.0
 
@@ -102,7 +101,6 @@ def build_simulation():
         ),
         DerivedFieldDump(species=filtered, functor=probe_e_x),
         DerivedFieldDump(species=SPECIES, functor=position_x),
-        DerivedFieldDump(species=SPECIES, functor=total_cell_idx_x),
         DerivedFieldDump(species=SPECIES, functor=particle_id),
     ]
     return simulation
@@ -115,13 +113,13 @@ def test_extended_attributes_compile_and_run():
     assert rendered.return_type == "uint64_t"
     assert probe_e_x.get_as_pypicongpu(mode="DerivedField").get_unit_cpp == "sim.unit.eField()"
     assert position_x.get_as_pypicongpu(mode="DerivedField").get_unit_cpp == "1."
-    total_cell_idx = total_cell_idx_x.get_as_pypicongpu(mode="DerivedField")
-    assert total_cell_idx.functor_preamble[0].statement == "auto const totalCellIdx_value = particle[totalCellIdx_];"
 
     simulation.step(0)
     run_dir = Path(simulation.picongpu_get_runner().run_dir)
     assert run_dir.exists()
-    # The species must carry all three accessed attributes.
+    # The species must carry all three accessed attributes.  ``totalCellIdx`` is
+    # deliberately absent: the openPMD plugin adds it to its own particle list,
+    # so declaring it on the species would duplicate the attribute.
     species_definition = (run_dir / "input" / "include" / "picongpu" / "param" / "speciesDefinition.param").read_text()
-    for attribute in ("particleId", "radiationMask", "probeE", "totalCellIdx"):
+    for attribute in ("particleId", "radiationMask", "probeE"):
         assert attribute in species_definition

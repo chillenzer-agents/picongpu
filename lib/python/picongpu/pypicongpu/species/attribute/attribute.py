@@ -68,17 +68,6 @@ class Attribute(BaseModel):
     this override explicitly; ``None`` means "use ``weighting_power``".
     """
 
-    access_strategy: str = Field(default="structured_binding", exclude=True)
-    """how the preamble binds the stored value
-
-    ``"structured_binding"`` (default) emits ``auto const [a, b, ...] = value;``
-    and therefore requires the C++ type to support the tuple protocol (e.g.
-    ``pmacc::math::Vector``).  ``"whole"`` emits a single
-    ``auto const name = value;`` and indexes it in the functor expression
-    (``name[0]``, ...), which also works for types without a tuple protocol
-    such as ``DataSpace<simDim>``.
-    """
-
     internal: bool = Field(default=False, exclude=True)
     """implementation detail rather than a first-class user-facing quantity"""
 

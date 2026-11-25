@@ -55,8 +55,17 @@ EXPECTED_METADATA = {
     "transitionIndex": ("uint32_t", 1, "1.", (0.0,) * 7, False, 0, True),
     "binIndex": ("uint32_t", 1, "1.", (0.0,) * 7, False, 0, True),
     "accepted": ("bool", 1, "1.", (0.0,) * 7, False, 0, True),
-    "totalCellIdx": ("DataSpace<simDim>", 3, "1.", (0.0,) * 7, False, 0, False),
 }
+
+# ``totalCellIdx`` is a real stored identifier but deliberately not functor-
+# facing: the openPMD plugin appends it to its particle list unconditionally
+# (``WriteSpecies.hpp`` and the restart ``LoadSpecies.hpp`` build
+# ``MakeSeq_t<..., totalCellIdx>`` without deduplication), so a species that
+# declared it through the registry would trigger a duplicate-attribute static
+# assert.  The exclusion is pinned explicitly rather than comparing only against
+# "whatever is registered", so a *different* unregistered identifier still
+# fails the completeness check.
+OPENPMD_PLUGIN_MANAGED_IDENTIFIERS = frozenset({"totalCellIdx"})
 
 
 def _repository_root() -> Path:
@@ -95,12 +104,17 @@ def test_every_stored_identifier_is_registered_exactly_once():
     found = _stored_identifiers()
     stored = set(found)
     registered = _stored_registry_identifiers()
-    assert stored == registered
+    excluded = OPENPMD_PLUGIN_MANAGED_IDENTIFIERS
+    # The exclusion must name identifiers that really exist in C++ and must not
+    # hide anything the registry is expected to expose.
+    assert excluded <= stored
+    assert excluded.isdisjoint(registered)
+    assert stored == registered | excluded
     # one entry per stored identifier (two functor names may map to distinct
     # stored identifiers, but no identifier may be registered twice)
     assert len(registered) == len(ATTRIBUTE_REGISTRY)
     # no identifier is silently skipped or counted twice
-    assert len(found) == len(stored) == len(ATTRIBUTE_REGISTRY) == 17
+    assert len(found) == len(stored) == len(ATTRIBUTE_REGISTRY) + len(excluded) == 17
 
 
 def test_aliases_and_flags_are_excluded():

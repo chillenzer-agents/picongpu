@@ -20,6 +20,13 @@ identifier: ``position`` -> ``position_pic`` and
 Registering a plugin- or atomic-physics-internal attribute only allocates its
 storage on the species; it does not enable the consuming plugin and costs memory
 per particle, so request only what a functor actually reads.
+
+``totalCellIdx`` is deliberately **not** registered.  The openPMD plugin
+appends it to its particle list unconditionally (``WriteSpecies.hpp`` and the
+restart ``LoadSpecies.hpp`` build ``MakeSeq_t<..., totalCellIdx>`` without
+deduplication), so a species that also declared it would trigger a
+duplicate-attribute static assert.  The attribute remains an internal detail of
+that plugin and is not functor-facing.
 """
 
 from .accepted import Accepted
@@ -34,7 +41,6 @@ from .probe_b import ProbeB
 from .probe_e import ProbeE
 from .process_class import ProcessClass
 from .radiation_mask import RadiationMask
-from .total_cell_idx import TotalCellIdx
 from .transition_index import TransitionIndex
 from .transition_radiation_mask import TransitionRadiationMask
 from .weighting import Weighting
@@ -57,8 +63,11 @@ ATTRIBUTE_REGISTRY: dict[str, type] = {
     "transitionIndex": TransitionIndex,
     "binIndex": BinIndex,
     "accepted": Accepted,
-    "totalCellIdx": TotalCellIdx,
 }
+# ``totalCellIdx`` is intentionally absent: the openPMD plugin already adds it
+# to its particle list (see the module docstring).  The registry coverage test
+# carries the explicit exclusion so it cannot silently drift.
+
 
 # Derived accessors that are not stored attributes but still have a
 # well-defined value type/weighting behaviour.  They are intentionally not part

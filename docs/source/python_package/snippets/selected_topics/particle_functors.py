@@ -83,8 +83,9 @@ def explicit_scale(particle: particle_functor.MacroParticle) -> float:
 
 
 # BEGIN-EXTENDED-ATTRIBUTES
-# All predefined stored attributes are available by name. Scalar attributes
-# derive their return type from the registry, so no annotation is needed:
+# All functor-facing predefined stored attributes are available by name. Scalar
+# attributes derive their return type from the registry, so no annotation is
+# needed:
 @particle_functor.ParticleFunctor
 def particle_id(particle: particle_functor.MacroParticle):
     return particle.get("particleId")

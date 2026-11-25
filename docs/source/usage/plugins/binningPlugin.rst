@@ -126,7 +126,7 @@ The ``DomainInfo`` class contains:
 .. doxygenclass:: picongpu::plugins::binning::DomainInfoBase
   :members:
 
-The global and local offsets can be understood by looking at the `PIConGPU domain definitions <https://github.com/ComputationalRadiationPhysics/picongpu/wiki/PIConGPU-domain-definitions>`_.
+The global and local offsets can be understood by looking at the :ref:`PIConGPU domain definitions <usage-domain-definitions>`.
 
 Particle binning
 ^^^^^^^^^^^^^^^^

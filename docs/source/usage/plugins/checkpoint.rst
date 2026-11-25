@@ -72,4 +72,4 @@ Interacting Manually with Checkpoint Data
    Interacting with the *raw data of checkpoints* for manual manipulation is considered an advanced feature for experienced users.
 
 Contrary to regular output, checkpoints contain additional data which might be confusing on the first glance.
-For example, some comments might be missing, all data from our concept of `slides for moving window simulations <https://github.com/ComputationalRadiationPhysics/picongpu/wiki/PIConGPU-domain-definitions>`_ will be visible, additional data for internal states of helper classes is stored as well and index tables such as openPMD particle patches are essential for parallel restarts.
+For example, some comments might be missing, all data from our concept of :ref:`slides for moving window simulations <usage-domain-definitions-moving-window>` will be visible, additional data for internal states of helper classes is stored as well and index tables such as openPMD particle patches are essential for parallel restarts.

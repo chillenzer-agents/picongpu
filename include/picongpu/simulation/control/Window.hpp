@@ -31,8 +31,8 @@ namespace picongpu
     /**
      * Window describes sizes and offsets.
      *
-     * For a detailed description of windows, see the PIConGPU wiki page:
-     * https://github.com/ComputationalRadiationPhysics/picongpu/wiki/PIConGPU-domain-definitions
+     * For a detailed description of windows, see the PIConGPU manual:
+     * https://picongpu.readthedocs.io/en/latest/usage/domainDefinitions.html
      */
     struct Window
     {

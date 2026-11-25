@@ -266,7 +266,7 @@ class TestCartesian3DGrid(TestCase):
 
             context = {
                 "grid": grid.get_as_pypicongpu().model_dump(mode="json"),
-                "collisional_physics": {"num_tmp_field_slots": 4},
+                "field_tmp_num_slots": 4,
                 "memory_config": MemoryConfig().model_dump(mode="json"),
             }
             rendered = Renderer.get_rendered_template(Renderer.get_context_preprocessed(context), template)

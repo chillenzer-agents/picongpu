@@ -302,6 +302,20 @@ EXPECTED_FILES = {
             'chunks = "auto"',
         ],
     },
+    "selected_topics/derived_fields.py": {
+        "no_run": True,
+        "files": [
+            "derived_fields_setup/include/picongpu/param/fileOutput.param",
+        ],
+        "file_contains": [
+            ("derived_fields_setup/include/picongpu/param/fileOutput.param", "deriveField::derivedAttributes::Density"),
+            (
+                "derived_fields_setup/include/picongpu/param/fileOutput.param",
+                "deriveField::derivedAttributes::WeightedVelocity<0>",
+            ),
+            ("derived_fields_setup/include/picongpu/param/fileOutput.param", "AverageAttribute"),
+        ],
+    },
     "selected_topics/binning.py": {
         "no_run": True,
         "files": [

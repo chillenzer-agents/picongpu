@@ -22,6 +22,7 @@ from pydantic import (
 from picongpu.pypicongpu.collision import CollisionalPhysicsSetup
 from picongpu.pypicongpu.output.radiation import RadiationPlugin
 from picongpu.pypicongpu.output.timestepspec import TimeStepSpec
+from picongpu.pypicongpu.output.openpmd_plugin import DerivedFieldSolver, FieldDump
 from picongpu.pypicongpu.particle_functor.particle_functor import ParticleFunctor
 from picongpu.pypicongpu.species.constant.synchrotron import SynchrotronParams
 from picongpu.pypicongpu.species.operation import AnyOperation
@@ -37,6 +38,7 @@ from .movingwindow import MovingWindow
 from .output import AnyPlugin, OpenPMDPlugin
 from .precision_config import PrecisionConfig
 from .rendering import RenderedObject
+from .util import unique
 from .walltime import Walltime
 
 
@@ -167,6 +169,40 @@ class Simulation(RenderedObject, BaseModel):
             if self.precision_overrides.trig == "core"
             else f"precision{self.precision_overrides.trig}Bit"
         )
+
+    def _derived_field_dumps(self):
+        return (
+            source
+            for plugin in self.output or []
+            if isinstance(plugin, OpenPMDPlugin)
+            for _, source in plugin.sources
+            if isinstance(source, FieldDump) and source.get_solver() is not None
+        )
+
+    @computed_field
+    @property
+    def derived_field_functors(self) -> list[ParticleFunctor]:
+        return unique(source.functor for source in self._derived_field_dumps() if source.functor is not None)
+
+    @computed_field
+    @property
+    def field_tmp_solvers(self) -> list[DerivedFieldSolver]:
+        return unique(source.get_solver() for source in self._derived_field_dumps())
+
+    @computed_field
+    @property
+    def field_tmp_num_slots(self) -> int:
+        """Number of ``FieldTmp`` slots to allocate in ``memory.param``.
+
+        Combined derived attributes (``AverageAttribute``, ``RelativisticDensity``,
+        ``ScreeningInvSquared``) compute their result through an intermediate
+        ``FieldTmp``, so PIConGPU requires at least one slot beyond the plain
+        particle-to-grid operations. The collision pipeline can require more.
+        """
+        slots = self.collisional_physics.num_tmp_field_slots
+        if any("combinedAttributes::" in solver.attribute_type for solver in self.field_tmp_solvers):
+            slots = max(slots, 2)
+        return slots
 
     @field_validator("output", mode="after")
     @classmethod

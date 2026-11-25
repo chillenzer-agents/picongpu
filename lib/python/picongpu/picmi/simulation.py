@@ -31,7 +31,7 @@ from pydantic import (
 from picongpu import pypicongpu, templates
 from picongpu.picmi import constants
 from picongpu.picmi.applied_field import AnyAppliedField, combine_applied_fields
-from picongpu.picmi.diagnostics.field_dump import NativeFieldDump, _FieldDump
+from picongpu.picmi.diagnostics.field_dump import NativeFieldDump, _BuiltinDerivedFieldDump, _FieldDump
 from picongpu.picmi.diagnostics.particle_dump import ParticleDump
 from picongpu.picmi.diagnostics.phase_space import PhaseSpace
 from picongpu.picmi.distribution.AnalyticDistribution import AnalyticDistribution
@@ -43,7 +43,7 @@ from picongpu.picmi.interaction import (
 )
 from picongpu.picmi.interaction.collision import Collision, CollisionalPhysicsSetup
 from picongpu.picmi.interaction.ionization.fieldionization import FieldIonization
-from picongpu.picmi.species import _STANDARD_SHAPES
+from picongpu.picmi.species import Species, _STANDARD_SHAPES
 from picongpu.picmi._species_requirements import (
     SimpleDensityOperation,
     SimpleMomentumOperation,
@@ -54,6 +54,7 @@ from picongpu.picmi._species_requirements import (
 from picongpu.picmi.memory_config import MemoryConfig
 from picongpu.picmi.precision_config import PrecisionConfig
 from picongpu.pypicongpu.backgroundfield import BackgroundField as PyPIConGPUBackgroundField
+from picongpu.pypicongpu.output.openpmd_plugin import BuiltinFieldSolver
 from picongpu.pypicongpu.output.openpmd_plugin import FieldDump as PyPIConGPUFieldDump
 from picongpu.pypicongpu.output.openpmd_plugin import OpenPMDPlugin
 from picongpu.pypicongpu.runner import Runner
@@ -535,6 +536,35 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     def _generate_openpmd_plugins(self, diagnostics, num_steps, default_particle_shape=None):
         diagnostics = list(diagnostics)
+
+        def _to_field_dump(diagnostic):
+            is_native = isinstance(diagnostic, NativeFieldDump)
+            is_builtin_derived = isinstance(diagnostic, _BuiltinDerivedFieldDump)
+            if is_native:
+                species = None
+                solver = None
+            else:
+                species = "species_" + (
+                    diagnostic.species.name
+                    if isinstance(diagnostic.species, Species)
+                    else diagnostic.species.species.name
+                )
+                if is_builtin_derived:
+                    solver_type, typename = diagnostic.get_builtin_solver()
+                    solver = BuiltinFieldSolver(type=solver_type, typename=typename)
+                else:
+                    solver = None
+            functor = (
+                None if is_native or is_builtin_derived else diagnostic.functor.get_as_pypicongpu(mode="DerivedField")
+            )
+            return PyPIConGPUFieldDump(
+                name=diagnostic.fieldname,
+                species=species,
+                filtername=diagnostic.filtername,
+                builtin_solver=solver,
+                functor=functor,
+            )
+
         return [
             OpenPMDPlugin(
                 sources=[
@@ -542,14 +572,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                         diagnostic.period.get_as_pypicongpu(time_step_size=self.time_step_size, num_steps=num_steps),
                         diagnostic.species.get_as_pypicongpu(default_particle_shape=default_particle_shape)
                         if isinstance(diagnostic, ParticleDump)
-                        else PyPIConGPUFieldDump(
-                            name=diagnostic.fieldname,
-                            filtername=diagnostic.filtername,
-                            species_name=None if isinstance(diagnostic, NativeFieldDump) else diagnostic.species_name,
-                            functor=None
-                            if isinstance(diagnostic, NativeFieldDump)
-                            else diagnostic.functor.get_as_pypicongpu(mode="DerivedField"),
-                        ),
+                        else _to_field_dump(diagnostic),
                     )
                     for diagnostic in filter(lambda x: x.options == options, diagnostics)
                 ],

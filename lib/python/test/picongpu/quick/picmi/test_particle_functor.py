@@ -267,7 +267,7 @@ class TestCustomTemplatePropagation(TestCase):
             sim.add_species(species, None)
             sim.add_diagnostic(DerivedFieldDump(species=species, functor=custom))
             sim._register_functor_requirements()
-            self.assertTrue(custom._custom_templates)
+            self.assertTrue(custom._has_custom_templates)
 
         rendered = custom.get_as_pypicongpu("DerivedField")
         self.assertIn("particle[myCustomAttribute_]", rendered.functor_preamble[0].statement)

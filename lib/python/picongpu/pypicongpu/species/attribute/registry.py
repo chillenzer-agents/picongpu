@@ -6,16 +6,17 @@ License: GPLv3+
 
 Hand-maintained registry of the predefined particle attributes.
 
-The keys are the names accepted by ``particle.get(...)``; the classes carry
-the C++ identifier plus the metadata from
-``include/picongpu/unitless/speciesAttributes.unitless``.  A quick test parses
-``speciesAttributes.param`` and this registry to guarantee that every stored
-``value_identifier`` has exactly one entry (aliases and flags are excluded by
-construction).
+The keys are the natural-language names accepted by ``particle.get(...)``
+(spaces, no snake/camel/pascal case); the classes carry the C++ identifier plus
+the metadata from ``include/picongpu/unitless/speciesAttributes.unitless``.  A
+quick test parses ``speciesAttributes.param`` and this registry to guarantee
+that every stored ``value_identifier`` has exactly one entry (aliases and flags
+are excluded by construction).
 
-The registry maps historical functor names where they differ from the stored
-identifier: ``position`` -> ``position_pic`` and
-``charge_state`` -> ``boundElectrons``.
+The generated C++ keeps the stored identifier, e.g. ``"id"`` -> ``particleId``,
+``"previous momentum"`` -> ``momentumPrev1``, ``"probe E"`` -> ``probeE`` and
+``"charge state"`` -> ``boundElectrons``.  ``position`` maps to
+``position<position_pic>``.
 
 Registering a plugin- or atomic-physics-internal attribute only allocates its
 storage on the species; it does not enable the consuming plugin and costs memory
@@ -48,21 +49,21 @@ from .weighting_damping_factor import WeightingDampingFactor
 
 ATTRIBUTE_REGISTRY: dict[str, type] = {
     "position": Position,
-    "particleId": ParticleId,
+    "id": ParticleId,
     "momentum": Momentum,
-    "momentumPrev1": MomentumPrev1,
+    "previous momentum": MomentumPrev1,
     "weighting": Weighting,
-    "weightingDampingFactor": WeightingDampingFactor,
-    "probeE": ProbeE,
-    "probeB": ProbeB,
-    "radiationMask": RadiationMask,
-    "transitionRadiationMask": TransitionRadiationMask,
-    "charge_state": BoundElectrons,
-    "atomicStateCollectionIndex": AtomicStateCollectionIndex,
-    "processClass": ProcessClass,
-    "transitionIndex": TransitionIndex,
-    "binIndex": BinIndex,
-    "accepted": Accepted,
+    "weighting damping factor": WeightingDampingFactor,
+    "probe E": ProbeE,
+    "probe B": ProbeB,
+    "radiation mask": RadiationMask,
+    "transition radiation mask": TransitionRadiationMask,
+    "charge state": BoundElectrons,
+    "atomic state collection index": AtomicStateCollectionIndex,
+    "atomic state process class": ProcessClass,
+    "atomic state transition index": TransitionIndex,
+    "atomic state bin index": BinIndex,
+    "atomic state transition accepted": Accepted,
 }
 # ``totalCellIdx`` is intentionally absent: the openPMD plugin already adds it
 # to its particle list (see the module docstring).  The registry coverage test
@@ -78,9 +79,9 @@ DERIVED_ACCESSORS: dict[str, dict] = {
     "gamma": {"cpp_type": "float_X"},
     "kinetic energy": {"cpp_type": "float_X", "weighting_power": 1},
     "velocity": {"cpp_type": "float3_X", "n_components": 3},
-    "damped_weighting": {"cpp_type": "float_X"},
+    "damped weighting": {"cpp_type": "float_X"},
     "timestep": {"cpp_type": "uint32_t"},
-    "timestep_size": {"cpp_type": "float_X"},
+    "timestep size": {"cpp_type": "float_X"},
 }
 
 

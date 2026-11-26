@@ -6,8 +6,9 @@ License: GPLv3+
 
 Compile/end-to-end coverage for the extended particle-attribute registry.
 
-The test exercises a representative scalar (``particleId``), bool
-(``radiationMask``) and vector (``probeE``) attribute through a Binning
+The test exercises a representative scalar (``"id"`` / ``particleId``), bool
+(``"radiation mask"`` / ``radiationMask``) and vector (``"probe E"`` / ``probeE``)
+attribute through a Binning
 diagnostic and a derived field.  It needs a full PIConGPU build and is
 therefore only run with the ``end_to_end``/``slow`` test selection.
 
@@ -47,12 +48,12 @@ SPECIES = Species(
 
 @ParticleFunctor
 def particle_id(particle: MacroParticle):
-    return particle.get("particleId")
+    return particle.get("id")
 
 
 @ParticleFunctor
 def probe_e_x(particle: MacroParticle):
-    return particle.get("probeE")[0]
+    return particle.get("probe E")[0]
 
 
 @ParticleFunctor
@@ -67,7 +68,7 @@ def deposition(particle: MacroParticle):
 
 @ParticleFilter
 def radiation_marked(particle: MacroParticle) -> bool:
-    return particle.get("radiationMask")
+    return particle.get("radiation mask")
 
 
 def build_simulation():

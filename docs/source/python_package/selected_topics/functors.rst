@@ -133,25 +133,26 @@ through ``particle.get("...")``:
   internal PIConGPU length units.  The generated ``getUnit()`` is a single
   scalar, so for ``"pic"`` it assumes an isotropic cell size; anisotropic
   cells are not represented per axis.
-* ``"momentum"`` / ``"momentumPrev1"``:
+* ``"momentum"`` / ``"previous momentum"``:
   the 3D momentum (index it as
   ``px, py, pz = particle.get("momentum")``).
 * ``"mass"``, ``"charge"``, ``"weighting"``:
   the particle's mass, charge and statistical weight.
 * ``"gamma"``, ``"kinetic energy"``, ``"velocity"``:
   derived quantities, computed from mass and momentum.
-* ``"damped_weighting"``:
+* ``"damped weighting"``:
   the weighting after applying the optional damping factor; the raw stored
-  factor is available separately as ``"weightingDampingFactor"``.
-* ``"timestep"`` / ``"timestep_size"``:
+  factor is available separately as ``"weighting damping factor"``.
+* ``"timestep"`` / ``"timestep size"``:
   the current iteration and the timestep size.  These are only available to
   binning functors, because only they receive the required ``domainInfo``.
 
 All remaining functor-facing predefined stored attributes are available by
-name.  Their value type, component count, unit and weighting scaling come from a
-hand-maintained Python registry that mirrors
+their natural-language name.  Their value type, component count, unit and
+weighting scaling come from a hand-maintained Python registry that mirrors
 ``include/picongpu/param/speciesAttributes.param`` and
-``include/picongpu/unitless/speciesAttributes.unitless``:
+``include/picongpu/unitless/speciesAttributes.unitless``.  The generated C++
+keeps the stored identifier (given in the notes):
 
 .. list-table::
    :header-rows: 1
@@ -159,25 +160,26 @@ hand-maintained Python registry that mirrors
    * - name
      - value type
      - notes
-   * - ``"particleId"``
+   * - ``"id"``
      - ``uint64_t``
-     - unique macroparticle identifier
-   * - ``"charge_state"``
+     - stored as ``particleId``; unique macroparticle identifier
+   * - ``"charge state"``
      - ``float_X``
      - stored as ``boundElectrons``; requires an ion species with element
        atomic numbers (``atomicNumbers``, e.g. an element ``particle_type``
        plus an ionization model)
-   * - ``"weightingDampingFactor"``
+   * - ``"weighting damping factor"``
      - ``float_X``
-     - optional raw damping factor (see ``"damped_weighting"`` above)
-   * - ``"radiationMask"``, ``"transitionRadiationMask"``
+     - optional raw damping factor (see ``"damped weighting"`` above)
+   * - ``"radiation mask"``, ``"transition radiation mask"``
      - ``bool``
      - **internal**: masks owned by the radiation plugins
-   * - ``"probeE"``, ``"probeB"``
+   * - ``"probe E"``, ``"probe B"``
      - ``float3_X``
      - **internal**: interpolated fields owned by the probe plugin
-   * - ``"atomicStateCollectionIndex"``, ``"processClass"``,
-       ``"transitionIndex"``, ``"binIndex"``, ``"accepted"``
+   * - ``"atomic state collection index"``,
+       ``"atomic state process class"``, ``"atomic state transition index"``,
+       ``"atomic state bin index"``, ``"atomic state transition accepted"``
      - ``uint32_t`` / ``uint8_t`` / ``bool``
      - **internal**: atomic-physics bookkeeping
 
@@ -189,14 +191,14 @@ hand-maintained Python registry that mirrors
    attribute would duplicate that entry and fail PIConGPU's
    one-entry-per-attribute check.
 
-The vector attributes (``position``, ``momentum``, ``momentumPrev1``,
-``probeE``, ``probeB``) return a plain tuple, so they can be
+The vector attributes (``position``, ``momentum``, ``"previous momentum"``,
+``"probe E"``, ``"probe B"``) return a plain tuple, so they can be
 indexed or unpacked just like ``momentum`` (``x, y, z =
-particle.get("probeE")`` or ``ex = particle.get("probeE")[0]``); the tested
+particle.get("probe E")`` or ``ex = particle.get("probe E")[0]``); the tested
 example below uses the indexed form.
 
 A derived-field functor may also return the whole vector
-(``return particle.get("probeE")``); its return type is then the registry's
+(``return particle.get("probe E")``); its return type is then the registry's
 C++ vector type.  Binning and filter functors must reduce it to a scalar
 component.
 
@@ -238,10 +240,10 @@ its first argument declares what the returned quantity *means*:
   interprets the result as a single-particle property.
   The generated code symbolically divides the weighting out of the
   scaling-sensitive symbols (``"mass"``, ``"charge"``,
-  ``"kinetic energy"``, and ``"charge_state"`` / ``boundElectrons``), so
+  ``"kinetic energy"``, and ``"charge state"`` / ``boundElectrons``), so
   e.g. a mass functor returns the physical particle mass rather than the
   macroparticle mass.  Per-particle quantities such as momentum, velocity,
-  position and ``"damped_weighting"`` are already unaffected.
+  position and ``"damped weighting"`` are already unaffected.
   The C++ ``WeightingPower`` trait of ``momentum``, ``momentumPrev1`` and
   ``weighting`` is ``1`` (their macro-particle bookkeeping), but they are
   deliberately *not* divided by the weighting here: momentum is taken as an
@@ -302,8 +304,8 @@ sympy expression built from ``sympy.Symbol("sim.unit.mass()")`` and friends
 
 Because a functor or filter accesses concrete particle attributes, using one
 with a species registers those attributes on that species (via
-``Species.register_requirements``): a functor reading ``"momentumPrev1"``, for
-instance, adds the ``momentumPrev1`` attribute to the species it is used with,
+``Species.register_requirements``): a functor reading ``"previous momentum"``,
+for instance, adds the ``momentumPrev1`` attribute to the species it is used with,
 so the attribute need not be declared by hand.  The registry drives this
 registration, so every attribute listed above (including the internal ones) is
 registered automatically.  Registering a plugin-internal attribute only
@@ -347,7 +349,7 @@ which is also what you will find in the output files.
    ``"moving_window"`` and ``"local_with_guards"`` (but not ``"cell"``);
    derived-field functors support ``"local"`` and ``"cell"`` (they have no
    total-origin offset); filter functors additionally support ``"total"``.
-   ``timestep`` and ``timestep_size`` are binning-only.  A functor that returns
+   ``"timestep"`` and ``"timestep size"`` are binning-only.  A functor that returns
    a whole vector from a binning axis or a filter, or uses a mode-invalid
    access, raises a Python error naming the offending attribute and mode.
 

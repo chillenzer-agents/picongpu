@@ -24,7 +24,7 @@ EXPECTED_METADATA = {
         0,
         False,
     ),
-    "particleId": ("uint64_t", 1, "1.", (0.0,) * 7, False, 0, False),
+    "id": ("uint64_t", 1, "1.", (0.0,) * 7, False, 0, False),
     "momentum": (
         "float3_X",
         3,
@@ -34,7 +34,7 @@ EXPECTED_METADATA = {
         1,
         False,
     ),
-    "momentumPrev1": (
+    "previous momentum": (
         "float3_X",
         3,
         "sim.unit.mass() * sim.unit.speed()",
@@ -44,17 +44,17 @@ EXPECTED_METADATA = {
         False,
     ),
     "weighting": ("float_X", 1, "1.", (0.0,) * 7, True, 1, False),
-    "weightingDampingFactor": ("float_X", 1, "1.", (0.0,) * 7, False, 0, False),
-    "probeE": ("float3_X", 3, "sim.unit.eField()", (1.0, 1.0, -3.0, -1.0, 0.0, 0.0, 0.0), False, 0, True),
-    "probeB": ("float3_X", 3, "sim.unit.bField()", (0.0, 1.0, -2.0, -1.0, 0.0, 0.0, 0.0), False, 0, True),
-    "radiationMask": ("bool", 1, "1.", (0.0,) * 7, False, 0, True),
-    "transitionRadiationMask": ("bool", 1, "1.", (0.0,) * 7, False, 0, True),
-    "charge_state": ("float_X", 1, "1.", (0.0,) * 7, False, 1, False),
-    "atomicStateCollectionIndex": ("uint32_t", 1, "1.", (0.0,) * 7, False, 0, True),
-    "processClass": ("uint8_t", 1, "1.", (0.0,) * 7, False, 0, True),
-    "transitionIndex": ("uint32_t", 1, "1.", (0.0,) * 7, False, 0, True),
-    "binIndex": ("uint32_t", 1, "1.", (0.0,) * 7, False, 0, True),
-    "accepted": ("bool", 1, "1.", (0.0,) * 7, False, 0, True),
+    "weighting damping factor": ("float_X", 1, "1.", (0.0,) * 7, False, 0, False),
+    "probe E": ("float3_X", 3, "sim.unit.eField()", (1.0, 1.0, -3.0, -1.0, 0.0, 0.0, 0.0), False, 0, True),
+    "probe B": ("float3_X", 3, "sim.unit.bField()", (0.0, 1.0, -2.0, -1.0, 0.0, 0.0, 0.0), False, 0, True),
+    "radiation mask": ("bool", 1, "1.", (0.0,) * 7, False, 0, True),
+    "transition radiation mask": ("bool", 1, "1.", (0.0,) * 7, False, 0, True),
+    "charge state": ("float_X", 1, "1.", (0.0,) * 7, False, 1, False),
+    "atomic state collection index": ("uint32_t", 1, "1.", (0.0,) * 7, False, 0, True),
+    "atomic state process class": ("uint8_t", 1, "1.", (0.0,) * 7, False, 0, True),
+    "atomic state transition index": ("uint32_t", 1, "1.", (0.0,) * 7, False, 0, True),
+    "atomic state bin index": ("uint32_t", 1, "1.", (0.0,) * 7, False, 0, True),
+    "atomic state transition accepted": ("bool", 1, "1.", (0.0,) * 7, False, 0, True),
 }
 
 # ``totalCellIdx`` is a real stored identifier but deliberately not functor-

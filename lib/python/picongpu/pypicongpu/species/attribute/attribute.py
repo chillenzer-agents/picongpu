@@ -84,6 +84,17 @@ class Attribute(BaseModel):
         return self.picongpu_name
 
     @property
+    def cpp_identifier(self) -> str:
+        """valid C++ identifier for the generated functor-local variable
+
+        The functor-facing registry key is natural language and may contain
+        spaces, so the preamble names its variable after the stored attribute
+        instead (``"id"`` -> ``particleId``, ``"charge state"`` ->
+        ``boundElectrons``).
+        """
+        return self.stored_identifier
+
+    @property
     def component_cpp_type(self) -> str:
         """C++ type of one component when the whole attribute is a vector"""
         if self.n_components == 1:

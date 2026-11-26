@@ -28,7 +28,7 @@ from picongpu.pypicongpu.util import alt, decorating_class, is_iterable
 # Derived accessors that still require a stored attribute on the owning species
 # (the others come from species constants or are always available).
 _ATTRIBUTE_BY_DERIVED_NAME = {
-    "damped_weighting": Weighting,
+    "damped weighting": Weighting,
 }
 
 
@@ -57,6 +57,11 @@ class _DerivedSpec:
         self.unit_dimension = (0.0,) * 7
         self.weighting_power = weighting_power
         self.physical_weighting_power = physical_weighting_power
+
+    @property
+    def cpp_identifier(self):
+        """valid C++ identifier for the generated functor-local variable"""
+        return self.name.replace(" ", "_")
 
     @property
     def component_cpp_type(self):
@@ -186,9 +191,9 @@ class AbstractParticle(Particle):
             my_symbols = symbols("px,py,pz")
             self._record(my_symbols, "momentum")
 
-        elif attribute == "momentumPrev1":
+        elif attribute == "previous momentum":
             my_symbols = symbols("p1x,p1y,p1z")
-            self._record(my_symbols, "momentumPrev1")
+            self._record(my_symbols, "previous momentum")
 
         elif attribute in ["gamma", "kinetic energy", "velocity"]:
             # This relies on python dictionaries having a stable ordering.
@@ -208,10 +213,13 @@ class AbstractParticle(Particle):
 
         else:
             spec = _attribute_spec(attribute)
+            # Natural-language keys may contain spaces, so the generated C++
+            # variable is named after the stored identifier instead.
+            symbol_base = attribute if spec is None else spec.cpp_identifier
             if spec is not None and spec.n_components > 1:
-                my_symbols = tuple(Symbol(f"{attribute}_{i}") for i in range(spec.n_components))
+                my_symbols = tuple(Symbol(f"{symbol_base}_{i}") for i in range(spec.n_components))
             else:
-                my_symbols = Symbol(attribute)
+                my_symbols = Symbol(symbol_base)
             self._record(my_symbols, attribute)
 
         return my_symbols

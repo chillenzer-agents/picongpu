@@ -88,20 +88,20 @@ def explicit_scale(particle: particle_functor.MacroParticle) -> float:
 # needed:
 @particle_functor.ParticleFunctor
 def particle_id(particle: particle_functor.MacroParticle):
-    return particle.get("particleId")
+    return particle.get("id")
 
 
 # A boolean attribute can be used directly as a filter:
 @particle_functor.ParticleFilter
 def radiation_marked(particle: particle_functor.MacroParticle) -> bool:
-    return particle.get("radiationMask")
+    return particle.get("radiation mask")
 
 
 # Vector attributes work like momentum: index the component you need
 # (or return the whole vector from a derived field).
 @particle_functor.ParticleFunctor
 def probe_e_x(particle: particle_functor.MacroParticle):
-    return particle.get("probeE")[0]
+    return particle.get("probe E")[0]
 
 
 # END-EXTENDED-ATTRIBUTES
@@ -162,7 +162,7 @@ macroparticle_mass_dump = diagnostics.DerivedFieldDump(
 explicit_scale_dump = diagnostics.DerivedFieldDump(
     species=electrons, functor=explicit_scale, period=diagnostics.TS[::10]
 )
-# probeE is a vector attribute; index one component for the scalar derived field.
+# "probe E" is a vector attribute; index one component for the scalar derived field.
 probe_e_dump = diagnostics.DerivedFieldDump(species=radiating_electrons, functor=probe_e_x, period=diagnostics.TS[::10])
 
 simulation = picmi.Simulation(

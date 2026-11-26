@@ -42,7 +42,7 @@ class TestRequiredAttributes(TestCase):
     def test_momentum_prev_1_requires_its_attribute(self):
         @ParticleFunctor
         def damped(particle: MacroParticle):
-            return particle.get("momentumPrev1")
+            return particle.get("previous momentum")
 
         self.assertEqual(damped.get_required_attributes(), [MomentumPrev1()])
 
@@ -56,7 +56,7 @@ class TestRequiredAttributes(TestCase):
     def test_charge_state_requires_bound_electrons(self):
         @ParticleFunctor
         def state(particle: MacroParticle):
-            return particle.get("charge_state")
+            return particle.get("charge state")
 
         self.assertEqual(state.get_required_attributes(), [BoundElectrons()])
 
@@ -183,7 +183,7 @@ class TestPhysicalParticleScaling(TestCase):
     def test_physical_damped_weighting_is_identity(self):
         @ParticleFunctor
         def damped(particle: PhysicalParticle):
-            return particle.get("damped_weighting")
+            return particle.get("damped weighting")
 
         self.assertEqual(self._expression(damped), "damped_weighting")
 
@@ -216,7 +216,7 @@ class TestParticleDumpFilterRequirementRegistration(TestCase):
 
         @ParticleFilter
         def has_prev_momentum(particle: MacroParticle) -> bool:
-            return particle.get("momentumPrev1")[0] > 0
+            return particle.get("previous momentum")[0] > 0
 
         grid = picmi.Cartesian3DGrid(
             number_of_cells=[8, 8, 8],
@@ -336,12 +336,12 @@ class TestWeightingPowerSingleSource(TestCase):
 
         self.assertEqual(ATTRIBUTE_REGISTRY["momentum"]().weighting_power, 1)
         self.assertEqual(ATTRIBUTE_REGISTRY["momentum"]().physical_weighting_power, 0)
-        self.assertEqual(ATTRIBUTE_REGISTRY["momentumPrev1"]().physical_weighting_power, 0)
+        self.assertEqual(ATTRIBUTE_REGISTRY["previous momentum"]().physical_weighting_power, 0)
         self.assertEqual(ATTRIBUTE_REGISTRY["weighting"]().weighting_power, 1)
         self.assertEqual(ATTRIBUTE_REGISTRY["weighting"]().physical_weighting_power, 0)
         # bound electrons follow the C++ WeightingPower with no override
-        self.assertEqual(ATTRIBUTE_REGISTRY["charge_state"]().weighting_power, 1)
-        self.assertIsNone(ATTRIBUTE_REGISTRY["charge_state"]().physical_weighting_power)
+        self.assertEqual(ATTRIBUTE_REGISTRY["charge state"]().weighting_power, 1)
+        self.assertIsNone(ATTRIBUTE_REGISTRY["charge state"]().physical_weighting_power)
 
     def test_physical_scaling_uses_registry(self):
         @ParticleFunctor
@@ -354,11 +354,11 @@ class TestWeightingPowerSingleSource(TestCase):
 
         @ParticleFunctor
         def state(particle: PhysicalParticle):
-            return particle.get("charge_state")
+            return particle.get("charge state")
 
         self.assertEqual(render(momentum).functor_expression, "px")
         self.assertEqual(render(weight).functor_expression, "weighting")
-        self.assertEqual(render(state).functor_expression, "charge_state/weighting")
+        self.assertEqual(render(state).functor_expression, "boundElectrons/weighting")
 
 
 class TestFilteredDerivedFieldRequirementRegistration(TestCase):
@@ -394,7 +394,7 @@ class TestFilteredDerivedFieldRequirementRegistration(TestCase):
 
         @ParticleFilter
         def fprev(particle: MacroParticle) -> bool:
-            return particle.get("momentumPrev1")[0] > 0
+            return particle.get("previous momentum")[0] > 0
 
         @ParticleFunctor
         def plain(particle: MacroParticle):
@@ -468,7 +468,7 @@ class TestRegisteredAttributeRendering(TestCase):
     def test_scalar_particle_id(self):
         @ParticleFunctor
         def pid(particle: MacroParticle):
-            return particle.get("particleId")
+            return particle.get("id")
 
         rendered = render(pid)
         self.assertEqual(rendered.return_type, "uint64_t")
@@ -479,7 +479,7 @@ class TestRegisteredAttributeRendering(TestCase):
     def test_bool_radiation_mask(self):
         @ParticleFunctor
         def mask(particle: MacroParticle) -> bool:
-            return particle.get("radiationMask")
+            return particle.get("radiation mask")
 
         rendered = render(mask)
         self.assertEqual(rendered.return_type, "bool")
@@ -488,7 +488,7 @@ class TestRegisteredAttributeRendering(TestCase):
     def test_vector_probe_e_indexing_uses_structured_binding(self):
         @ParticleFunctor
         def e_x(particle: MacroParticle):
-            return particle.get("probeE")[1]
+            return particle.get("probe E")[1]
 
         rendered = render(e_x)
         self.assertEqual(rendered.return_type, "float_X")
@@ -503,7 +503,7 @@ class TestRegisteredAttributeRendering(TestCase):
     def test_vector_probe_b_structured_binding(self):
         @ParticleFunctor
         def b_y(particle: MacroParticle):
-            return particle.get("probeB")[1]
+            return particle.get("probe B")[1]
 
         rendered = render(b_y)
         self.assertEqual(rendered.functor_expression, "probeB_1")
@@ -513,7 +513,7 @@ class TestRegisteredAttributeRendering(TestCase):
     def test_whole_vector_return_uses_registry_type(self):
         @ParticleFunctor
         def e_vec(particle: MacroParticle):
-            return particle.get("probeE")
+            return particle.get("probe E")
 
         rendered = render(e_vec)
         self.assertEqual(rendered.return_type, "float3_X")
@@ -522,7 +522,7 @@ class TestRegisteredAttributeRendering(TestCase):
     def test_raw_weighting_damping_factor(self):
         @ParticleFunctor
         def damping(particle: MacroParticle):
-            return particle.get("weightingDampingFactor")
+            return particle.get("weighting damping factor")
 
         rendered = render(damping)
         self.assertEqual(rendered.return_type, "float_X")
@@ -532,7 +532,7 @@ class TestRegisteredAttributeRendering(TestCase):
     def test_derived_damped_weighting_still_available(self):
         @ParticleFunctor
         def damped(particle: MacroParticle):
-            return particle.get("damped_weighting")
+            return particle.get("damped weighting")
 
         rendered = render(damped)
         self.assertIn("getDampedWeighting(particle)", rendered.functor_preamble[0].statement)
@@ -541,7 +541,7 @@ class TestRegisteredAttributeRendering(TestCase):
     def test_arbitrary_expression_falls_back_to_float(self):
         @ParticleFunctor
         def doubled(particle: MacroParticle):
-            return 2.0 * particle.get("probeE")[0]
+            return 2.0 * particle.get("probe E")[0]
 
         self.assertEqual(render(doubled).return_type, "float_X")
 
@@ -558,10 +558,10 @@ class TestRegisteredAttributeRequirements(TestCase):
 
             return f.get_required_attributes()
 
-        self.assertEqual(requirements_for("particleId"), [ParticleId()])
-        self.assertEqual(requirements_for("radiationMask"), [RadiationMask()])
-        self.assertEqual(requirements_for("probeE"), [ProbeE()])
-        self.assertEqual(requirements_for("weightingDampingFactor"), [WeightingDampingFactor()])
+        self.assertEqual(requirements_for("id"), [ParticleId()])
+        self.assertEqual(requirements_for("radiation mask"), [RadiationMask()])
+        self.assertEqual(requirements_for("probe E"), [ProbeE()])
+        self.assertEqual(requirements_for("weighting damping factor"), [WeightingDampingFactor()])
 
     def _render_species_definition(self, diagnostics):
         grid = picmi.Cartesian3DGrid(
@@ -590,7 +590,7 @@ class TestRegisteredAttributeRequirements(TestCase):
 
         @ParticleFunctor
         def pid(particle: MacroParticle) -> int:
-            return particle.get("particleId")
+            return particle.get("id")
 
         @ParticleFunctor
         def count(particle: MacroParticle) -> float:
@@ -613,7 +613,7 @@ class TestRegisteredAttributeRequirements(TestCase):
 
         @ParticleFunctor
         def e_x(particle: MacroParticle) -> float:
-            return particle.get("probeE")[0]
+            return particle.get("probe E")[0]
 
         rendered = self._render_species_definition(lambda species: [DerivedFieldDump(species=species, functor=e_x)])
         self.assertIn("probeE", rendered)
@@ -624,7 +624,7 @@ class TestRegisteredAttributeRequirements(TestCase):
 
         @ParticleFilter
         def selected(particle: MacroParticle) -> bool:
-            return particle.get("radiationMask")
+            return particle.get("radiation mask")
 
         @ParticleFunctor
         def count(particle: MacroParticle) -> float:
@@ -700,7 +700,7 @@ class TestRegisteredAttributeModeValidation(TestCase):
                 with self.assertRaisesRegex(ValueError, "only available in Binning"):
                     self._render("timestep", mode)
                 with self.assertRaisesRegex(ValueError, "only available in Binning"):
-                    self._render("timestep_size", mode)
+                    self._render("timestep size", mode)
 
     def test_timestep_available_in_binning(self):
         rendered = self._render("timestep", "Binning")
@@ -728,9 +728,9 @@ class TestRegisteredAttributeModeValidation(TestCase):
 
                 @ParticleFunctor
                 def f(particle: MacroParticle):
-                    return particle.get("probeE")
+                    return particle.get("probe E")
 
-                with self.assertRaisesRegex(ValueError, "whole vector attribute 'probeE'"):
+                with self.assertRaisesRegex(ValueError, "whole vector attribute 'probe E'"):
                     render(f, mode)
 
 
@@ -743,21 +743,21 @@ class TestRegisteredAttributeScaling(TestCase):
     def test_charge_state_is_now_rescaled(self):
         @ParticleFunctor
         def state(particle: PhysicalParticle):
-            return particle.get("charge_state")
+            return particle.get("charge state")
 
-        self.assertEqual(self._expression(state), "charge_state/weighting")
+        self.assertEqual(self._expression(state), "boundElectrons/weighting")
 
     def test_probe_e_is_not_rescaled(self):
         @ParticleFunctor
         def e_x(particle: PhysicalParticle):
-            return particle.get("probeE")[0]
+            return particle.get("probe E")[0]
 
         self.assertEqual(self._expression(e_x), "probeE_0")
 
     def test_particle_id_is_not_rescaled(self):
         @ParticleFunctor
         def pid(particle: PhysicalParticle):
-            return particle.get("particleId")
+            return particle.get("id")
 
         self.assertEqual(self._expression(pid), "particleId")
 

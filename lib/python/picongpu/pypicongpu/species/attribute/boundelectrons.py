@@ -11,6 +11,10 @@ from .attribute import Attribute
 class BoundElectrons(Attribute):
     """
     Number of bound electrons per nucleus of a macroparticle
+
+    Exposed to particle functors as ``"charge state"``; the stored C++
+    identifier is ``boundElectrons``.
     """
 
     picongpu_name: str = "boundElectrons"
+    weighting_power: int = 1

@@ -286,7 +286,7 @@ class ParticleFunctor(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    _custom_templates: bool = PrivateAttr(False)
+    _has_custom_templates: bool = PrivateAttr(False)
     """whether the simulation supplies a custom template directory
 
     Custom templates may extend ``speciesAttributes.param`` with attributes the
@@ -452,7 +452,7 @@ class ParticleFunctor(BaseModel):
         return [attribute_type() for attribute_type in sorted(requirements, key=lambda cls: cls.__name__)]
 
     def get_as_pypicongpu(self, mode, custom_templates=None) -> PyPIConGPUParticleFunctor:
-        allow_unknown = self._custom_templates if custom_templates is None else custom_templates
+        allow_unknown = self._has_custom_templates if custom_templates is None else custom_templates
         particle, rng, functor_expression, attribute_map = self._evaluate()
         spec = self._matching_spec(functor_expression, attribute_map)
         if self.return_type is None:

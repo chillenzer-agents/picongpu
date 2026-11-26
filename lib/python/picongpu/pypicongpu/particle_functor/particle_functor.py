@@ -31,15 +31,15 @@ COMMON_ACCESSORS = {
     "kinetic energy": "picongpu::KinEnergy()(momentum::type{px, py, pz}, mass)",
     "velocity": "picongpu::Velocity()(momentum::type{px, py, pz}, mass)",
     "charge": "picongpu::traits::attribute::getCharge(particle[weighting_], particle)",
-    "charge_state": "picongpu::traits::attribute::getChargeState(particle)",
-    "damped_weighting": "picongpu::traits::attribute::getDampedWeighting(particle)",
+    "charge state": "picongpu::traits::attribute::getChargeState(particle)",
+    "damped weighting": "picongpu::traits::attribute::getDampedWeighting(particle)",
 }
 
 BINNING_ACCESSORS = (
     COMMON_ACCESSORS
     | {
         "timestep": "domainInfo.currentStep",
-        "timestep_size": "sim.pic.getDt()",
+        "timestep size": "sim.pic.getDt()",
     }
     | {
         (
@@ -195,13 +195,16 @@ def _fallback_accessor(name, mode, allow_unknown):
                 f"Available origins here: {', '.join(available) or 'none'}."
             )
         raise ValueError(f"Particle attribute access {name!r} is not available in {mode} functors.")
-    if name in ("timestep", "timestep_size"):
+    if name in ("timestep", "timestep size"):
         raise ValueError(
             f"{name!r} is only available in Binning functors because only they receive domainInfo; "
             f"it is not available in {mode} functors."
         )
-    if name in ATTRIBUTE_REGISTRY or name in DERIVED_ACCESSORS:
-        return by_bracket(name)
+    if name in ATTRIBUTE_REGISTRY:
+        # The natural-language key differs from the stored C++ identifier.
+        return by_bracket(ATTRIBUTE_REGISTRY[name]().cpp_identifier)
+    if name in DERIVED_ACCESSORS:
+        return by_bracket(name.replace(" ", "_"))
     if allow_unknown:
         # Custom templates may extend speciesAttributes.param with attributes the
         # Python registry does not know about.

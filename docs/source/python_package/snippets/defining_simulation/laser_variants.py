@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # /// script
-# requires-python = ">=3.11,<3.14"
 # dependencies = [
 #   "picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python"
 # ]
@@ -46,7 +45,7 @@ gaussian = picmi.GaussianLaser(
 dispersive = picmi.DispersivePulseLaser(
     wavelength=1.0e-6,
     waist=10.0e-6,
-    duration=10.0e-15,
+    duration=20.0e-15,
     propagation_direction=[0.0, 1.0, 0.0],
     polarization_direction=[1.0, 0.0, 0.0],
     focal_position=[1e-6, 1.5e-6, 1e-6],

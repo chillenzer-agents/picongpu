@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # /// script
-# requires-python = ">=3.11,<3.14"
 # dependencies = [
 #   "picongpu @ git+https://github.com/ComputationalRadiationPhysics/picongpu@dev#subdirectory=lib/python"
 # ]
@@ -22,7 +21,7 @@ from scipy.constants import c
 
 NUM_CELLS = [192, 2048, 192]
 CELL_SIZE = [0.1772e-6, 0.4430e-7, 0.1772e-6]
-LASER_DURATION = 5.0e-15
+LASER_DURATION = 2 * 5.0e-15
 
 laser = picmi.GaussianLaser(
     wavelength=0.8e-6,
@@ -37,7 +36,7 @@ laser = picmi.GaussianLaser(
     # the pulse centroid at time zero must be outside of the box:
     centroid_position=[
         NUM_CELLS[0] * CELL_SIZE[0] / 2.0,
-        -10.0 * LASER_DURATION * c,
+        -5.0 * LASER_DURATION * c,
         NUM_CELLS[2] * CELL_SIZE[2] / 2.0,
     ],
     # give exactly one of a0 (normalized vector potential) or E0 (peak field):

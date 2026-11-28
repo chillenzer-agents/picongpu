@@ -8,9 +8,10 @@ the fully relativistic particle-in-cell code.
 pip install picongpu
 ```
 
-This package generates and submits PIConGPU input. It does **not** contain the
-simulation engine: running a simulation still requires a PIConGPU build with a
-CUDA, HIP or CPU backend.
+This package generates and submits PIConGPU input and ships the PIConGPU C++
+sources, example setups and build scripts (`pic-create`, `pic-build`). It
+contains **no pre-built simulation binary**: running a simulation still requires
+compiling PIConGPU for your backend (CUDA, HIP or CPU).
 
 ## Documentation
 
